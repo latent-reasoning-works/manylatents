@@ -1,0 +1,26 @@
+PLINK v1.90b6.21 64-bit (19 Oct 2020)
+Options in effect:
+  --bfile /lustre06/project/6065672/shared/DietNet/1KGB_POP24/1KGP/WGS30X_raw/1000G.2504_WGS30x.GSA17k_MHI.intersectGSA.miss10perc.maf0.05.pruned.autosomes.noHLA.phased_imputed
+  --keep /lustre06/project/6065672/sciclun4/ActiveProjects/phate_genetics/notebooks/MyAdmix/output_info.txt
+  --make-bed
+  --out AMR_ACB_ASW
+  --real-ref-alleles
+
+Hostname: nc10236.narval.calcul.quebec
+Working directory: /lustre06/project/6065672/sciclun4/ActiveProjects/phate_genetics/notebooks/MyAdmix
+Start time: Wed May  1 11:20:26 2024
+
+Random number seed: 1714576826
+257372 MB RAM detected; reserving 128686 MB for main workspace.
+229986 variants loaded from .bim file.
+2504 people (0 males, 0 females, 2504 ambiguous) loaded from .fam.
+Ambiguous sex IDs written to AMR_ACB_ASW.nosex .
+--keep: 504 people remaining.
+Using 1 thread (no multithreaded calculations invoked).
+Before main variant filters, 504 founders and 0 nonfounders present.
+Calculating allele frequencies... done.
+229986 variants and 504 people pass filters and QC.
+Note: No phenotypes present.
+--make-bed to AMR_ACB_ASW.bed + AMR_ACB_ASW.bim + AMR_ACB_ASW.fam ... done.
+
+End time: Wed May  1 11:20:27 2024
