@@ -56,16 +56,23 @@ def plot_embeddings(data: np.ndarray,
         for label in unique_labels:
             indices = np.where(np.array(labels) == label)
             mean_position = np.mean(data[indices], axis=0)
-            ax.text(mean_position[0], mean_position[1], label, fontsize=5, weight='bold', ha='center')
-    
+            ax.text(mean_position[0], 
+                    mean_position[1], 
+                    label, 
+                    fontsize=5, 
+                    weight='bold', 
+                    ha='center')
+
     if create_new_plot:
         fig.tight_layout()
 
         # Dont plot title if none (empty string) supplied
         if title:
-            plt.savefig(f"{title.replace(' ', '_').lower()}.jpg", format='jpg', dpi=300)
+            plt.savefig(f"{title.replace(' ', '_').lower()}.jpg", 
+                        format='jpg', 
+                        dpi=300)
 
-        plt.close()
+            plt.close()
 
 def generate_filenames(**kwargs):
     """

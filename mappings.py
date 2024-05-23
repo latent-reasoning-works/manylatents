@@ -126,3 +126,24 @@ pop_pallette_covid_fine.update(zip(additional_labels, additional_colors))
 
 label_order_covid_fine = np.sort(WHO_labels)
 label_order_covid_coarse = ['Alpha', 'Beta', 'Delta', 'Gamma', 'Omicron', 'Other', 'Unassigned']
+
+
+# Raph request I use this color palette
+pop_pallette_1000G_coarse = {'EAS': 'blue',
+                            'EUR': 'purple',
+                            'AMR': 'red',
+                            'AFR': 'green',
+                            'SAS': 'orange'
+                           }
+
+label_order_1000G_fine = ['YRI', 'ESN', 'GWD', 'LWK', 'MSL', 'ACB', 'ASW',
+                           'IBS',  'CEUGBR', 'TSI', 'FIN',
+                           'PJL', 'BEB', 'GIH', 'STUITU',
+                           'CHB', 'CHS', 'CDX', 'KHV', 'JPT',
+                           'MXL', 'CLM', 'PEL', 'PUR']
+pop_colors=["#C7E9C0","#A1D99B","#74C476","#41AB5D","#238B45","#006D2C","#00441B",
+            "#EFBBFF","#D896FF","#BE29EC","#800080",
+            "#FEEDDE","#FDBE85","#FD8D3C","#E6550D",
+            "#DEEBF7","#9ECAE1","#008080","#0ABAB5","#08519C",
+           "#BC544B","#E3242B","#E0115F","#900D09","#7E2811"]
+pop_pallette_1000G_fine = {label:color for label,color in zip(label_order_1000G_fine, pop_colors)}
