@@ -8,17 +8,17 @@ from typing import List, Dict
 sns.set_context("notebook", font_scale=0.5)  # Adjust font_scale to make text smaller as needed
 
 def plot_embeddings(data: np.ndarray, 
-                    labels: List[str], 
+                    labels: List[str] | List[float], 
                     title: str, 
-                    color_dict: Dict[str, str], 
-                    label_order: List[str], 
+                    color_dict: Dict[str, str] | None, 
+                    label_order: List[str] | None, 
                     label_positions: bool = True, 
                     ax: Axes | None = None, **kwargs):
     """Plot 2D embeddings with annotations and specific color mapping.
 
     Args:
         data (np.ndarray): 2D coordinates of the embeddings.
-        labels (List[str]): List of labels for each data point.
+        labels (List[str]): List of labels for each data point (or continuous variable).
         title (str): Title of the plot.
         color_dict (Dict[str, str]): Dictionary mapping labels to colors.
         label_positions (bool): Whether to annotate average positions for each label.
@@ -26,9 +26,12 @@ def plot_embeddings(data: np.ndarray,
     Kwargs:
         Additional keyword arguments for sns.scatterplot (e.g., legend positioning).
     """
-    unique_labels = np.unique(labels)
-    palette = {label: color_dict[label] for label in unique_labels if label in color_dict}
-    
+    if isinstance(labels[0], str):
+        unique_labels = np.unique(labels)
+        palette = {label: color_dict[label] for label in unique_labels if label in color_dict}
+    else:
+        palette = sns.color_palette('Reds', as_cmap=True)
+
     if not ax:
         create_new_plot = True
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -52,7 +55,7 @@ def plot_embeddings(data: np.ndarray,
         ax.xaxis.set_major_locator(ticker.NullLocator())
         ax.yaxis.set_major_locator(ticker.NullLocator())
 
-    if label_positions:
+    if label_positions and isinstance(labels[0], str):
         for label in unique_labels:
             indices = np.where(np.array(labels) == label)
             mean_position = np.mean(data[indices], axis=0)
