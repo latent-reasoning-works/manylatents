@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 from typing import List, Dict
 
-sns.set_context("notebook", font_scale=0.5)  # Adjust font_scale to make text smaller as needed
+sns.set_context("notebook", font_scale=1.5)  # Adjust font_scale to make text smaller as needed
 
 def plot_embeddings(data: np.ndarray, 
                     labels: List[str] | List[float], 
@@ -26,11 +26,24 @@ def plot_embeddings(data: np.ndarray,
     Kwargs:
         Additional keyword arguments for sns.scatterplot (e.g., legend positioning).
     """
-    if isinstance(labels[0], str):
+    if label_order is None:
+        if isinstance(labels[0], str) |  isinstance(labels[0], int):
+            label_order = np.unique(np.array(labels))
+    if color_dict is None:
+        if isinstance(labels[0], str) |  isinstance(labels[0], int):
+            # Make color dict if None and categorical variables
+            colors = sns.color_palette("tab10", len(label_order))
+            color_dict = {label : colors[i] for i,label in enumerate(label_order)}
+    else:
+        pass
+    
+    if isinstance(labels[0], str) |  isinstance(labels[0], int):
         unique_labels = np.unique(labels)
         palette = {label: color_dict[label] for label in unique_labels if label in color_dict}
-    else:
+    elif isinstance(labels[0], float):
         palette = sns.color_palette('Reds', as_cmap=True)
+    else:
+        raise Exception('labels must have dtype float, int or str. Got {}'.format(type(labels[0])))
 
     if not ax:
         create_new_plot = True
@@ -55,7 +68,7 @@ def plot_embeddings(data: np.ndarray,
         ax.xaxis.set_major_locator(ticker.NullLocator())
         ax.yaxis.set_major_locator(ticker.NullLocator())
 
-    if label_positions and isinstance(labels[0], str):
+    if label_positions and (isinstance(labels[0], str) | isinstance(labels[0], int)):
         for label in unique_labels:
             indices = np.where(np.array(labels) == label)
             mean_position = np.mean(data[indices], axis=0)
