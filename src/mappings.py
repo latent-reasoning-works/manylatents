@@ -146,3 +146,44 @@ pop_colors=["#C7E9C0","#A1D99B","#74C476","#41AB5D","#238B45","#006D2C","#00441B
             "#DEEBF7","#9ECAE1","#008080","#0ABAB5","#08519C",
            "#BC544B","#E3242B","#E0115F","#900D09","#7E2811"]
 pop_pallette_1000G_fine = {label:color for label,color in zip(label_order_1000G_fine, pop_colors)}
+
+
+import copy
+
+def make_palette_label_order_HGDP(metadata_labels):
+    # SAS -> CSA + add MID, OCE
+    pop_palette_hgdp_coarse = copy.deepcopy(pop_pallette_1000G_coarse)
+    pop_palette_hgdp_coarse['CSA'] = pop_pallette_1000G_coarse['SAS']
+    pop_palette_hgdp_coarse.pop('SAS')
+
+    pop_palette_hgdp_coarse['MID'] = 'grey'
+    pop_palette_hgdp_coarse['OCE'] = 'yellow'
+
+    label_order_hgdp_coarse = copy.deepcopy(label_order_1000G_coarse)
+    label_order_hgdp_coarse.remove('SAS')
+    label_order_hgdp_coarse += ['CSA', 'MID', 'OCE']
+
+    # Keep original 24/26 populations (with colors), and add new ones. New pops colored using superpop
+    label_order_hgdp_fine = []
+    for super_pop in np.unique(metadata_labels['superpopulation']):
+        for pop in np.unique(metadata_labels['population'][metadata_labels['superpopulation']==super_pop]):
+            label_order_hgdp_fine.append(pop)
+
+    # create tmp object to hold the original 26 populations
+    mapping_26 = copy.deepcopy(pop_pallette_1000G_fine)
+    mapping_26['GBR'] = mapping_26['CEUGBR']
+    mapping_26['CEU'] = mapping_26['CEUGBR']
+    mapping_26['STU'] = mapping_26['STUITU']
+    mapping_26['ITU'] = mapping_26['STUITU']
+
+    pop_palette_hgdp_fine = {}
+
+    for super_pop in np.unique(metadata_labels['superpopulation']):
+        for pop in np.unique(metadata_labels['population'][metadata_labels['superpopulation']==super_pop]):
+            if pop not in mapping_26.keys():
+                # just use superpop color for now
+                pop_palette_hgdp_fine[pop] = pop_palette_hgdp_coarse[super_pop]
+            else:
+                pop_palette_hgdp_fine[pop] = mapping_26[pop]
+
+    return pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine

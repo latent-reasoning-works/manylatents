@@ -53,3 +53,8 @@ typing_extensions==4.11.0
 tzdata==2024.1+computecanada
 wcwidth==0.2.13+computecanada
 wrapt==1.16.0+computecanada
+requests
+rootutils
+heatgeo
+torch==2.3.1
+
