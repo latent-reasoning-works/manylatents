@@ -6,7 +6,7 @@ from typing import Tuple, List
 import mappings
 
 
-def load_data_HDGP(data_path: str, 
+def load_data_HGDP(data_path: str, 
                    metadata_path: str,
                    unrelated_sampleid_1000G_path: str) -> Tuple[np.ndarray, 
                                                          np.ndarray, 
