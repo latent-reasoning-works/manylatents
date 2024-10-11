@@ -165,8 +165,8 @@ def make_palette_label_order_HGDP(metadata_labels):
 
     # Keep original 24/26 populations (with colors), and add new ones. New pops colored using superpop
     label_order_hgdp_fine = []
-    for super_pop in np.unique(metadata_labels['superpopulation']):
-        for pop in np.unique(metadata_labels['population'][metadata_labels['superpopulation']==super_pop]):
+    for super_pop in np.unique(metadata_labels['Superpopulation']):
+        for pop in np.unique(metadata_labels['Population'][metadata_labels['Superpopulation']==super_pop]):
             label_order_hgdp_fine.append(pop)
 
     # create tmp object to hold the original 26 populations
@@ -178,8 +178,8 @@ def make_palette_label_order_HGDP(metadata_labels):
 
     pop_palette_hgdp_fine = {}
 
-    for super_pop in np.unique(metadata_labels['superpopulation']):
-        for pop in np.unique(metadata_labels['population'][metadata_labels['superpopulation']==super_pop]):
+    for super_pop in np.unique(metadata_labels['Superpopulation']):
+        for pop in np.unique(metadata_labels['Population'][metadata_labels['Superpopulation']==super_pop]):
             if pop not in mapping_26.keys():
                 # just use superpop color for now
                 pop_palette_hgdp_fine[pop] = pop_palette_hgdp_coarse[super_pop]
