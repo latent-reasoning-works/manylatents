@@ -1,13 +1,13 @@
 import sys
-from .numpy_dataset import FromNumpyDataset
+from grae.numpy_dataset import FromNumpyDataset
 
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset
 
 from phate import PHATE
-from .base_model import BaseModel
-from .torch_models import AETorchModule
+from grae.base_model import BaseModel
+from grae.torch_models import AETorchModule
 
 import numpy as np
 
@@ -17,7 +17,7 @@ batch_size = 128
 lr = 0.001
 weight_decay = 0
 epochs = 100
-hidden_dims = [80, 40, 10]
+hidden_dims = [800, 400, 100]
 device = 'cpu'
 lam = 1
 
@@ -186,3 +186,19 @@ class GRAE(BaseModel):
                  for batch in loader]
 
         return np.concatenate(x_hat)
+    
+
+if __name__ == "__main__":
+    x = np.random.rand(100, 100)
+    random_state = 42
+    n_components = 2
+    embedder_params = {'n_pca': None, 'decay': 60, 'knn': 6, 't': 6}
+    model = GRAE(random_state = random_state, 
+                 n_components = n_components, 
+                 embedder_params = embedder_params)
+    model.fit(x)
+    z = model.transform(x)
+    x_hat = model.inverse_transform(z)
+    print("x shape: ", x.shape)
+    print("x_recon shape: ", x_hat.shape)
+    print("z shape: ", z.shape)  # should be the same as x_hat
