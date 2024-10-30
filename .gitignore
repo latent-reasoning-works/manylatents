@@ -9,10 +9,7 @@ shuang/
 
 data/1000G/
 data/HGDP/
-<<<<<<< Updated upstream
 data/1KGP_VCF/
 data/HGDP_VCF/
-=======
 
 .env
->>>>>>> Stashed changes

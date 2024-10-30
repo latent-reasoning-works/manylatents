@@ -126,5 +126,5 @@ if __name__ == "__main__":
 
     input_dim = data.shape[1]  # Get the number of features from your data
     model_save_path = SAVE_PATH + 'AE/ae_trained_model_2D_' + data_name + '.pth'
-    trained_model = main(data_tensor, input_dim=input_dim, latent_dim=100, num_epochs=200, batch_size=128, learning_rate=5e-4, add_noise_flag=False, noise_factor=0.01, model_save_path=model_save_path)
+    trained_model = main(data_tensor, input_dim=input_dim, latent_dim=2, num_epochs=200, batch_size=128, learning_rate=5e-4, add_noise_flag=False, noise_factor=0.01, model_save_path=model_save_path)
 
