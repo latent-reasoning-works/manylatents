@@ -109,8 +109,8 @@ if __name__ == "__main__":
     # import data
     # load data from original
     if data_name == '1KGP':    
-        DATA_PATH = SCRATCH_PATH + '1KGP/'
-        fname = '1000G.2504_WGS30x.GSA17k_MHI.intersectGSA.miss10perc.maf0.05.pruned.autosomes.noHLA.phased_imputed_V1.hdf5'
+        DATA_PATH = SCRATCH_PATH + '1KGP/V3/'
+        fname = '1000G.2504_WGS30x.GSA17k_MHI.intersectGSA.miss10perc.maf0.05.pruned.autosomes.noHLA.phased_imputed.hdf5'
         data, class_labels, samples, snp_names, class_label_names = load_data_1000G(os.path.join(DATA_PATH, fname))
     elif data_name == 'HGDP':
         DATA_PATH = SCRATCH_PATH + 'HGDP+1KGP/'
@@ -125,6 +125,6 @@ if __name__ == "__main__":
     data_tensor = torch.from_numpy(maf_scaled_data).float()
 
     input_dim = data.shape[1]  # Get the number of features from your data
-    model_save_path = SAVE_PATH + 'AE/ae_trained_model_' + data_name + '.pth'
+    model_save_path = SAVE_PATH + 'AE/ae_trained_model_2D_' + data_name + '.pth'
     trained_model = main(data_tensor, input_dim=input_dim, latent_dim=100, num_epochs=200, batch_size=128, learning_rate=5e-4, add_noise_flag=False, noise_factor=0.01, model_save_path=model_save_path)
 
