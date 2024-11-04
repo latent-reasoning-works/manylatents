@@ -21,8 +21,8 @@ out_root="${dir_root}/Data/1KGPHGDPAOU_V7_RFMIX"
 genotypes="extractedChrAllPruned"
 RFMIX_GENETIC_MAPPING_FILE="for_rfmix_gmaps"
 SHAPEIT_GENETIC_MAPPING_FILE="for_shapeit_gmaps"
-SHAPEIT_EXEC="$PATH_TO_SOFTWARE/shapeit5/static_bins/phase_common_static"
-$RFMIX_EXEC="{PATH_TO_SOFTWARE}/rfmix"
+SHAPEIT_EXEC="${PATH_TO_SOFTWARE}/shapeit5/static_bins/phase_common_static"
+RFMIX_EXEC="{$PATH_TO_SOFTWARE}/rfmix"
 
 # Reference and query samples for RFMIX
 ref_samples_file="${out_root}/reference_samples.txt"
@@ -36,19 +36,20 @@ CHR=22   # Chromosomes 1 through 22
 
 # Download genetic mapping files
 if [ ! -f ${out_root}/${RFMIX_GENETIC_MAPPING_FILE} ]; then
-    gsutil cp "$WORKSPACE_BUCKET/${RFMIX_GENETIC_MAPPING_FILE}.tar.gz" ${out_root}
-    tar -xzvf "${out_root}/${RFMIX_GENETIC_MAPPING_FILE}.tar.gz"
+    mkdir ${out_root}/${RFMIX_GENETIC_MAPPING_FILE}
+    gsutil cp "$WORKSPACE_BUCKET/data/V2/${RFMIX_GENETIC_MAPPING_FILE}.tar.gz" ${out_root}
+    tar  --strip-components=7 -xzvf "${out_root}/${RFMIX_GENETIC_MAPPING_FILE}.tar.gz" -C ${out_root}/${RFMIX_GENETIC_MAPPING_FILE}
 else
     echo "$RFMIX_GENETIC_MAPPING_FILE already exists, skipping download."
 fi
 
 if [ ! -f ${out_root}/${SHAPEIT_GENETIC_MAPPING_FILE} ]; then
-    gsutil cp "$WORKSPACE_BUCKET/${SHAPEIT_GENETIC_MAPPING_FILE}.tar.gz" ${out_root}
-    tar -xzvf "${out_root}/${SHAPEIT_GENETIC_MAPPING_FILE}.tar.gz"
+    mkdir ${out_root}/${SHAPEIT_GENETIC_MAPPING_FILE}
+    gsutil cp "$WORKSPACE_BUCKET/data/V2/${SHAPEIT_GENETIC_MAPPING_FILE}.tar.gz" ${out_root}
+    tar --strip-components=9 -xzvf "${out_root}/${SHAPEIT_GENETIC_MAPPING_FILE}.tar.gz" -C ${out_root}/${SHAPEIT_GENETIC_MAPPING_FILE}
 else
     echo "$SHAPEIT_GENETIC_MAPPING_FILE already exists, skipping download."
 fi
-
 
 # Define filenames for chromosome-specific VCF and phasing output
 basename=$data_root/${genotypes}  # Base PLINK file without extension
