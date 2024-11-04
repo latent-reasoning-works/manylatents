@@ -2,7 +2,6 @@ __pycache__/
 slurm_files/
 .ipynb_checkpoints/
 figures/
-models/
 depricated/
 results/
 shuang/
@@ -11,3 +10,5 @@ data/1000G/
 data/HGDP/
 data/1KGP_VCF/
 data/HGDP_VCF/
+
+.env
