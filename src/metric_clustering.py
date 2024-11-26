@@ -127,3 +127,4 @@ def make_confusion_heatmap(true_labels, clusterer_labels, ax=None, colorbar=True
         cbar = heatmap.collections[0].colorbar
         cbar.ax.tick_params(labelsize=12)
     return heatmap
+
