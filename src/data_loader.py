@@ -4,104 +4,9 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, List
 import mappings
-
-
-def load_data_HGDP(data_path: str, 
-                   metadata_path: str,
-                   unrelated_sampleid_1000G_path: str) -> Tuple[np.ndarray, 
-                                                         np.ndarray, 
-                                                         np.ndarray,
-                                                         np.ndarray, 
-                                                         np.ndarray, 
-                                                         pd.DataFrame]:
-
-    with h5py.File(data_path, 'r') as hf:
-        #model_attrs = hf['gradients'][:]
-        #print('loaded gradient of fc1 w.r.t. input from {}'.format(attr_fc1_saliency_name))
-        inputs = hf['inputs'][:]
-        class_label_names = np.char.decode(hf['class_label_names'][:])
-        class_labels = hf['class_labels'][:]
-        samples = hf['samples'][:]
-        snp_names = np.char.decode(hf['snp_names'][:])
-
-    # Remove first sample because it is some kind of dummy values
-    sample = np.char.decode(samples)[1:]
-    inputs = inputs[1:]
-
-    # Load metadata from file
-    metadata_labels = pd.read_csv(metadata_path, sep='\t')
-
-    # Create Superpop/pop labels
-    population_info = metadata_labels.apply(lambda row: row.Population_Genetic_region.split('_'), axis='columns', result_type='expand')
-    metadata_labels = pd.concat([metadata_labels['sample'], population_info], axis='columns')[1:]
-    metadata_labels = metadata_labels.rename(columns={0: 'Population', 1: 'Superpopulation'})
-
-    # identify 1000G samples (using column: db)
-    db_labels = pd.Categorical(['HGDP']*len(metadata_labels['Population']), categories=['1000G', 'HGDP'])
-    db_labels[metadata_labels['Population'].isin(mappings.label_order_1000G_fine + ['CEU', 'GBR', 'STU', 'ITU'])] = '1000G'
-    metadata_labels['db'] = db_labels
-    metadata_labels = metadata_labels.set_index('sample').loc[sample.tolist()]
-
-    # Load unrelated individuals counts
-    unrelated = pd.read_csv(unrelated_sampleid_1000G_path, header=None)
-    unrelated = unrelated[0].tolist()
-
-    thG_data = metadata_labels[metadata_labels['db']=='1000G']
-    # This is a set of unrelated indivuals in unrelated_sampleid_1000G_path 
-    unrelated_bool_idx = thG_data.index.isin(unrelated)
-    unrelated_idx = thG_data.index[unrelated_bool_idx]
-    
-    print('Removed {} related individuals'.format((~unrelated_bool_idx).sum()))
-    
-    # Note: 'NA12546', 'NA12830', 'NA18874' appear in unrelated but not in 1000G data
-    full_tokeep = metadata_labels[metadata_labels['db']=='HGDP'].index.tolist() + unrelated_idx.tolist()
-    
-    sample_df = pd.DataFrame({'sample': sample})
-    tmp_df = pd.merge(sample_df, pd.DataFrame(inputs), left_index=True, right_index=True)
-    tmp_df = tmp_df.set_index('sample')
-
-    inputs = tmp_df.loc[full_tokeep].values
-    metadata_labels = metadata_labels.loc[full_tokeep]
-    sample = full_tokeep
-    
-    return inputs, class_labels, sample, snp_names, class_label_names, metadata_labels
-
-
-def load_data_MHI(data_path: str, 
-                  metadata_path: str) -> Tuple[np.ndarray, 
-                                               np.ndarray, 
-                                               np.ndarray,
-                                               np.ndarray, 
-                                               np.ndarray, 
-                                               pd.DataFrame]:
-
-    with h5py.File(data_path, 'r') as hf:
-        inputs = hf['inputs'][:]
-        class_label_names = hf['class_label_names'][:]
-        class_labels = hf['class_labels'][:]
-        samples = hf['samples'][:]
-        snp_names = hf['snp_names'][:]
-
-    samples = np.char.decode(samples)
-
-    metadata_labels = pd.read_csv(metadata_path, sep='\t')
-
-    # Set the 'ID' column as the index
-    metadata_labels_indexed = metadata_labels.set_index('ID')
-
-    # remove labels that dont appear in df
-    intersection = metadata_labels_indexed.index.isin(samples.tolist()) 
-    metadata_labels_indexed = metadata_labels_indexed[intersection]
-
-    # remove samples in df that dont appear in labels
-    intersection2 = pd.DataFrame(samples)[0].isin(metadata_labels_indexed.index)
-    samples = samples[intersection2]
-    inputs = inputs[intersection2]
-
-    # Reorder the DataFrame based on id_reorder
-    metadata_labels_reordered = metadata_labels_indexed.loc[samples.tolist()]
-
-    return inputs, class_labels, samples, snp_names, class_label_names, metadata_labels_reordered
+from pyplink import PyPlink
+import tqdm
+from mappings import make_palette_label_order_HGDP
 
 def load_data_1000G(file_path: str) -> Tuple[np.ndarray, 
                                              np.ndarray, 
@@ -147,27 +52,40 @@ def preprocess_labels_1000G(class_labels: np.ndarray, class_label_names: np.ndar
     
     return label_names_fine, label_names_coarse
 
-def load_metadata(file_path: str) -> pd.DataFrame:
-    """Load metadata from a CSV file.
+def load_data_HGDP(exp_path):
+    # Load HGDP data
+    try:
+        genotypes_array = np.load(exp_path + 'V4_raw_genotypes.npy')
+    except:
+        fname = 'gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.match1000G_GSAs_dietnet'
+        data_path = os.path.join(exp_path, fname)
+        pedfile = PyPlink(data_path)
+        genotypes_array = np.zeros([pedfile.get_nb_samples(), pedfile.get_nb_markers()], dtype=np.int8)
 
-    Args:
-        file_path (str): Path to the CSV file.
+        for i, (marker_id, genotypes) in tqdm.tqdm(enumerate(pedfile)):
+            genotypes_array[:,i] = genotypes
 
-    Returns:
-        pd.DataFrame: Metadata as a DataFrame.
-    """
-    return pd.read_csv(file_path, sep='\t')
+        np.save(exp_path + 'V4_raw_genotypes.npy', genotypes_array)
 
+    labels = pd.read_csv(os.path.join(exp_path, 'gnomad.genomes.v3.1.2.hgdp_1kg_subset_sample_meta.reduced.tsv'), sep='\t')
 
-def preprocess_labels_sarscov2(metadata):
-    # labels fine
-    metadata['WHO'] = metadata['WHO'].replace(mappings.replace_dict)  # replace_dict should be defined/imported
-    metadata['WHO'] = np.where(metadata['WHO'].isin(mappings.allowed_labels), 
-                                   metadata['WHO'], 
-                                   'Other')
+    genotypes_array = genotypes_array[1:] # remove first row
+    labels = labels[1:] # remove first row
+
+    # Load filter data
+    filter_info = pd.read_csv(os.path.join(exp_path, '4.3/gnomad_derived_metadata_with_filtered_sampleids.csv'), sep=',', index_col=1)
+
+    merged_metadata = labels.set_index('sample').merge(filter_info, left_index=True, right_index=True)
+
+    # load relatedness
+    relatedness = pd.read_csv(os.path.join(exp_path, '4.3/HGDP+1KGP_MattEstimated_king_relatedness_matrix.csv'), sep=',', index_col=0)
+    #cols_to_filter = relatedness.index[(~merged_metadata.loc[relatedness.index]['filter_king_related']).values].values
+    #relatedness_none_related = relatedness[(~merged_metadata.loc[relatedness.index]['filter_king_related']).values][cols_to_filter]
     
-    #labels coarse
-    #labels = merged[~((merged['WHO'] == 'Other') | (merged['WHO'] == 'Unassigned'))]['WHO']
-    labels_coarse = metadata['WHO'].apply(lambda x: 'Omicron' if x.startswith('Omicron') else x)
-
-    return metadata['WHO'], labels_coarse
+    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine = make_palette_label_order_HGDP(merged_metadata['Population'], merged_metadata['Genetic_region'])
+    
+    return merged_metadata, relatedness, genotypes_array, (pop_palette_hgdp_coarse, 
+                                                           pop_palette_hgdp_fine, 
+                                                           label_order_hgdp_coarse, 
+                                                           label_order_hgdp_fine)
+    

@@ -1,6 +1,7 @@
 import copy
 import seaborn as sns
 import numpy as np
+import mappings
 
 # 1000G
 super_pops_1000G = {'EAS': ['JPT', 'CHB', 'CHS', 'CDX', 'KHV'], 
@@ -152,14 +153,14 @@ import copy
 
 def make_palette_label_order_HGDP(populations, superpopulations):
     # SAS -> CSA + add MID, OCE
-    pop_palette_hgdp_coarse = copy.deepcopy(pop_pallette_1000G_coarse)
-    pop_palette_hgdp_coarse['CSA'] = pop_pallette_1000G_coarse['SAS']
+    pop_palette_hgdp_coarse = copy.deepcopy(mappings.pop_pallette_1000G_coarse)
+    pop_palette_hgdp_coarse['CSA'] = mappings.pop_pallette_1000G_coarse['SAS']
     pop_palette_hgdp_coarse.pop('SAS')
 
     pop_palette_hgdp_coarse['MID'] = 'grey'
     pop_palette_hgdp_coarse['OCE'] = 'yellow'
 
-    label_order_hgdp_coarse = copy.deepcopy(label_order_1000G_coarse)
+    label_order_hgdp_coarse = copy.deepcopy(mappings.label_order_1000G_coarse)
     label_order_hgdp_coarse.remove('SAS')
     label_order_hgdp_coarse += ['CSA', 'MID', 'OCE']
 
@@ -170,7 +171,7 @@ def make_palette_label_order_HGDP(populations, superpopulations):
             label_order_hgdp_fine.append(pop)
 
     # create tmp object to hold the original 26 populations
-    mapping_26 = copy.deepcopy(pop_pallette_1000G_fine)
+    mapping_26 = copy.deepcopy(mappings.pop_pallette_1000G_fine)
     mapping_26['GBR'] = mapping_26['CEUGBR']
     mapping_26['CEU'] = mapping_26['CEUGBR']
     mapping_26['STU'] = mapping_26['STUITU']

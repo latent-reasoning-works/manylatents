@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from data_loader import load_data_HGDP, load_data_1000G
+from data_loader import load_data_1000G, load_data_HGDP
 import os
 from preprocess import maf_scale
 
@@ -111,16 +111,11 @@ if __name__ == "__main__":
     if data_name == '1KGP':    
         DATA_PATH = SCRATCH_PATH + '1KGP/V3/'
         fname = '1000G.2504_WGS30x.GSA17k_MHI.intersectGSA.miss10perc.maf0.05.pruned.autosomes.noHLA.phased_imputed.hdf5'
-        data, class_labels, samples, snp_names, class_label_names = load_data_1000G(os.path.join(DATA_PATH, fname))
+        data, class_labels, _, _, _ = load_data_1000G(os.path.join(DATA_PATH, fname))
     elif data_name == 'HGDP':
-        DATA_PATH = SCRATCH_PATH + 'HGDP+1KGP/'
-        fname = 'gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.match1000G_GSAs_dietnet.hdf5'
-        metadata_file = 'labels.tsv'
-        unrelated_sampleid_1000G_path = DATA_PATH + '1000G_unrelated_samples_set_2504.txt'
-        data_path = os.path.join(DATA_PATH, fname)
-        metadata_path = os.path.join(DATA_PATH, metadata_file)
-        data, class_labels, sample, snp_names, class_label_names, metadata_labels = load_data_HGDP(data_path, metadata_path, unrelated_sampleid_1000G_path)
-
+        DATA_PATH = SCRATCH_PATH + 'HGDP+1KGP/V4/'
+        _, _, data, _= load_data_HGDP(DATA_PATH)
+        
     maf_scaled_data = maf_scale(data)
     data_tensor = torch.from_numpy(maf_scaled_data).float()
 
