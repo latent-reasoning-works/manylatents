@@ -1,12 +1,14 @@
 import os
 import copy
 import numpy as np
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import scprep
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
+from scipy.sparse import vstack as svstack
 from sklearn.utils.extmath import randomized_svd
 from sklearn.kernel_approximation import RBFSampler
 from sklearn.random_projection import GaussianRandomProjection
@@ -15,10 +17,6 @@ from pyplink import PyPlink
 #import tqdm
 import phate
 from sklearn.decomposition import PCA, KernelPCA
-
-os.chdir('../../src')
-import mappings
-#import data_loader
 
 def load_data():
     # Load HGDP
@@ -37,12 +35,17 @@ def load_data():
 
         np.save(exp_path + '_raw_genotypes.npy', genotypes_array)
     labels = pd.read_csv(os.path.join(exp_path, 'gnomad.genomes.v3.1.2.hgdp_1kg_subset_sample_meta.reduced.tsv'), sep='\t')
+    
+    # remove duplicate info (appears in filter info too)
+    labels = labels.drop(columns=['Project', 'Population', 'Genetic_region'])
 
     genotypes_array = genotypes_array[1:] # remove first row
     labels = labels[1:] # remove first row
 
     # Load filter data
     filter_info = pd.read_csv(os.path.join(exp_path, '4.3/gnomad_derived_metadata_with_filtered_sampleids.csv'), sep=',', index_col=1)
+    
+    
 
     merged_metadata = labels.set_index('sample').merge(filter_info, left_index=True, right_index=True)
 
@@ -51,14 +54,22 @@ def load_data():
     #cols_to_filter = relatedness.index[(~merged_metadata.loc[relatedness.index]['filter_king_related']).values].values
     #relatedness_none_related = relatedness[(~merged_metadata.loc[relatedness.index]['filter_king_related']).values][cols_to_filter]
     
-    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine = make_palette_label_order_HGDP(merged_metadata['Population'], merged_metadata['Genetic_region'])
+#    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine = make_palette_label_order_HGDP(merged_metadata['Population'], merged_metadata['Genetic_region_merged'])
+
+    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, _, _ = make_palette_label_order_HGDP(merged_metadata)
+
     
     return merged_metadata, relatedness, genotypes_array, (pop_palette_hgdp_coarse, 
                                                            pop_palette_hgdp_fine, 
-                                                           label_order_hgdp_coarse, 
-                                                           label_order_hgdp_fine)
+                                                           None, 
+                                                           None)
 
-def make_palette_label_order_HGDP(populations, superpopulations):
+def make_palette_label_order_HGDP_old(populations, superpopulations):
+
+    os.chdir('../../src')
+    import mappings
+    #import data_loader
+
     # SAS -> CSA + add MID, OCE
     pop_palette_hgdp_coarse = copy.deepcopy(mappings.pop_pallette_1000G_coarse)
     pop_palette_hgdp_coarse['CSA'] = mappings.pop_pallette_1000G_coarse['SAS']
@@ -96,15 +107,60 @@ def make_palette_label_order_HGDP(populations, superpopulations):
 
     return pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine
 
+def make_palette_label_order_HGDP(metadata):
+    # get color palette
+    pop_pallette_1000G_coarse = {'East_Asia': 'blue',
+                                'Europe': 'purple',
+                                'America': 'red',
+                                'Africa': 'green',
+                                'Central_South_Asia': 'orange'
+                               }
+    label_order_1000G_fine = ['YRI', 'ESN', 'GWD', 'LWK', 'MSL', 'ACB', 'ASW',
+                               'IBS',  'CEUGBR', 'TSI', 'FIN',
+                               'PJL', 'BEB', 'GIH', 'STUITU',
+                               'CHB', 'CHS', 'CDX', 'KHV', 'JPT',
+                               'MXL', 'CLM', 'PEL', 'PUR']
+    pop_colors=["#C7E9C0","#A1D99B","#74C476","#41AB5D","#238B45","#006D2C","#00441B",
+                "#EFBBFF","#D896FF","#BE29EC","#800080",
+                "#FEEDDE","#FDBE85","#FD8D3C","#E6550D",
+                "#DEEBF7","#9ECAE1","#008080","#0ABAB5","#08519C",
+               "#BC544B","#E3242B","#E0115F","#900D09","#7E2811"]
+    pop_pallette_1000G_fine = {label:color for label,color in zip(label_order_1000G_fine, pop_colors)}
+
+    pop_palette_hgdp_coarse = copy.deepcopy(pop_pallette_1000G_coarse)
+    pop_palette_hgdp_coarse['Middle_East'] = 'grey'
+    pop_palette_hgdp_coarse['Oceania'] = 'yellow'
+
+    # create tmp object to hold the original 26 populations
+    mapping_26 = copy.deepcopy(pop_pallette_1000G_fine)
+    mapping_26['GBR'] = mapping_26['CEUGBR']
+    mapping_26['CEU'] = mapping_26['CEUGBR']
+    mapping_26['STU'] = mapping_26['STUITU']
+    mapping_26['ITU'] = mapping_26['STUITU']
+
+    pop_palette_hgdp_fine = {}
+    superpopulations = metadata['Genetic_region_merged']
+    populations = metadata['Population']
+
+    for super_pop in np.unique(superpopulations):
+        for pop in np.unique(populations[superpopulations==super_pop]):
+            if pop not in mapping_26.keys():
+                # just use superpop color for now
+                pop_palette_hgdp_fine[pop] = pop_palette_hgdp_coarse[super_pop]
+            else:
+                pop_palette_hgdp_fine[pop] = mapping_26[pop]
+    return pop_palette_hgdp_coarse, pop_palette_hgdp_fine, None, None
+
 def replace_negative_one_with_nan(array):
     # Replace all occurrences of -1 with np.nan
     return np.where(array == -1, np.nan, array)
 
-def compute_non_missing_overlap(non_missing_mask, save_path="non_missing_overlap.npz"):
+def compute_non_missing_overlap(non_missing_mask, recompute=False, save_path="non_missing_overlap.npz"):
     # Check if the result already exists
-    if os.path.exists(save_path):
+    if os.path.exists(save_path) and not recompute:
         print("Loading previously computed non-missing overlap matrix...")
-        return np.load(save_path)['overlap_matrix']
+        prev_comp = np.load(save_path)['overlap_matrix']
+        return prev_comp
 
     # Convert non-missing mask to sparse format, treating False as 1 and True as 0
     sparse_mask = csr_matrix((~non_missing_mask).astype(int))
@@ -115,7 +171,7 @@ def compute_non_missing_overlap(non_missing_mask, save_path="non_missing_overlap
     # Iterate over each row with tqdm for progress tracking
     for i in tqdm(range(sparse_mask.shape[0]), desc="Computing row-wise non-missing overlaps"):
         # Compute addition of row `i` with all rows in `sparse_mask`
-        replicated_row = vstack([sparse_mask[i]] * sparse_mask.shape[0])
+        replicated_row = svstack([sparse_mask[i]] * sparse_mask.shape[0])
 
         # Count non-zero entries for each pair (row i + row j)
         nonzero_counts = (replicated_row+sparse_mask).getnnz(axis=1)
@@ -146,7 +202,7 @@ def hwe_normalize(genotypes_array):
     normalized_matrix = centered_matrix / np.sqrt(hwe_variance)
     return normalized_matrix
 
-def preprocess_data_matrix(genotypes_array):
+def preprocess_data_matrix(genotypes_array, recompute_overlap_counts=False):
     
     # Compute hwe normalized matrix
     genotypes_array = replace_negative_one_with_nan(genotypes_array)
@@ -159,8 +215,8 @@ def preprocess_data_matrix(genotypes_array):
     normalized_matrix = np.where(non_missing_mask, normalized_matrix, 0)
 
     # speeds up computation by exploiting sparsity
-    overlap_counts = compute_non_missing_overlap(non_missing_mask)
-    assert np.allclose(overlap_counts[:2], np.dot(non_missing_mask[0:2].astype(int), non_missing_mask.T))    
+    overlap_counts = compute_non_missing_overlap(non_missing_mask, recompute_overlap_counts)
+    assert np.allclose(overlap_counts[:2], np.dot(non_missing_mask[0:2].astype(int), non_missing_mask.T))
     return normalized_matrix, overlap_counts
 
 def approximate_kernel_random_projection(normalized_matrix, n_components=2000):
@@ -251,18 +307,18 @@ def compute_pca_from_kernel(gsm,
     return pca_input, None
 
 
-def compute_pca_from_hail(hail_pca_path, merged_metadata):
+def compute_pca_from_hail(hail_pca_path, merged_metadata, num_pcs):
     pca_emb = pd.read_csv(hail_pca_path, sep='\t')
     to_return = merged_metadata.merge(pca_emb.set_index('s'), how='left', left_index=True, right_index=True)
-    to_return = to_return[to_return.columns[to_return.columns.str.startswith('PC')].tolist()].values
+    to_return = to_return[to_return.columns[to_return.columns.str.startswith('PC')].tolist()].values[:,:num_pcs]
     return to_return, None
 
 
-def compute_phate(pca_input, to_fit_on, to_transform_on, knn=5, t=5):
+def compute_phate(pca_input, to_fit_on, to_transform_on, **phate_params):
     phate_emb = np.zeros((len(pca_input), 2))
 
     # Step 4: Run PHATE on PCA-reduced data
-    phate_operator = phate.PHATE(random_state=42, knn=knn, t=t, n_pca=None)
+    phate_operator = phate.PHATE(random_state=42, n_pca=None, **phate_params)
     
     # Fit PHATE on either the filtered unrelated or all data, based on phate_fit_related
     phate_operator.fit(pca_input[to_fit_on, :])
@@ -334,17 +390,19 @@ def plot_pca_phate_data_matrix(data,
                                pop_palette,
                                pop_labels,
                                fit_phate_on_both_sets=True,
-                               ax=None):
+                               ax=None,
+                               num_pcs=50,
+                               phate_params={'knn': 5, 't': 5}):
     pca_emb, pca_obj = compute_pca_from_data_matrix(data,
                                            fit_indices,
                                            transform_indices,
-                                           n_components=50)
+                                           n_components=num_pcs)
     
     phate_fit_set, phate_trans_set, plot_set = get_fit_transform_sets(fit_indices, 
                                                                       transform_indices, 
                                                                       fit_phate_on_both_sets)
         
-    phate_emb = compute_phate(pca_emb, phate_fit_set, phate_trans_set, knn=5, t=5)
+    phate_emb = compute_phate(pca_emb, phate_fit_set, phate_trans_set, **phate_params)
     plot_pca_phate(pca_emb, phate_emb, plot_set, pop_palette, pop_labels, ax)
     return pca_emb, pca_obj
 
@@ -354,17 +412,19 @@ def plot_pca_phate_kernel_matrix(gsm,
                                  pop_palette,
                                  pop_labels,
                                  fit_phate_on_both_sets=True,
-                                 ax=None):
+                                 ax=None,
+                                 num_pcs=50,
+                                 phate_params={'knn': 5, 't': 5}):
     pca_emb, _ = compute_pca_from_kernel(gsm,
                                       fit_indices,
                                       transform_indices,
-                                      n_components=50)
+                                      n_components=num_pcs)
     
     phate_fit_set, phate_trans_set, plot_set = get_fit_transform_sets(fit_indices, 
                                                                       transform_indices, 
                                                                       fit_phate_on_both_sets)
 
-    phate_emb = compute_phate(pca_emb, phate_fit_set, phate_trans_set, knn=5, t=5)
+    phate_emb = compute_phate(pca_emb, phate_fit_set, phate_trans_set, **phate_params)
     plot_pca_phate(pca_emb, phate_emb, plot_set, pop_palette, pop_labels, ax)
     return pca_emb, None
 
@@ -375,9 +435,10 @@ def plot_pca_phate_hail(hail_pca_path,
                         pop_palette,
                         pop_labels,
                         fit_phate_on_both_sets=True,
+                        num_pcs=50,
                         ax=None):
     
-    pca_emb, _ = compute_pca_from_hail(hail_pca_path, merged_metadata)
+    pca_emb, _ = compute_pca_from_hail(hail_pca_path, merged_metadata, num_pcs)
     
     phate_fit_set, phate_trans_set, plot_set = get_fit_transform_sets(fit_indices, 
                                                                       transform_indices, 
