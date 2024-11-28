@@ -8,6 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from itertools import product
 
+
 def sweep_HDBSCAN(data, true_labels, param_grid, **kwargs):
     """
     Sweep HDBSCAN parameters using a grid and calculate ARI.
@@ -127,4 +128,3 @@ def make_confusion_heatmap(true_labels, clusterer_labels, ax=None, colorbar=True
         cbar = heatmap.collections[0].colorbar
         cbar.ax.tick_params(labelsize=12)
     return heatmap
-
