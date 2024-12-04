@@ -22,35 +22,49 @@ def load_data():
     # Load HGDP
     exp_path = '/lustre06/project/6065672/shared/MattDataSharing/1KGP+HGDP/V4'
     fname = 'gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.match1000G_GSAs_dietnet'
-    data_path = os.path.join(exp_path, fname)
+    data_path = os.path.join(exp_path, 
+                             fname)
 
     pedfile = PyPlink(data_path)
     try:
         genotypes_array = np.load(exp_path + '_raw_genotypes.npy')
     except:
-        genotypes_array = np.zeros([pedfile.get_nb_samples(), pedfile.get_nb_markers()], dtype=np.int8)
+        genotypes_array = np.zeros([pedfile.get_nb_samples(), 
+                                    pedfile.get_nb_markers()], 
+                                   dtype=np.int8)
 
         for i, (marker_id, genotypes) in tqdm.tqdm(enumerate(pedfile)):
             genotypes_array[:,i] = genotypes
 
-        np.save(exp_path + '_raw_genotypes.npy', genotypes_array)
-    labels = pd.read_csv(os.path.join(exp_path, 'gnomad.genomes.v3.1.2.hgdp_1kg_subset_sample_meta.reduced.tsv'), sep='\t')
-    
+        np.save(exp_path + '_raw_genotypes.npy', 
+                genotypes_array)
+    labels = pd.read_csv(os.path.join(exp_path, 
+                                      'gnomad.genomes.v3.1.2.hgdp_1kg_subset_sample_meta.reduced.tsv'), 
+                         sep='\t')
+
     # remove duplicate info (appears in filter info too)
-    labels = labels.drop(columns=['Project', 'Population', 'Genetic_region'])
+    labels = labels.drop(columns=['Project', 
+                                  'Population', 
+                                  'Genetic_region'])
 
     genotypes_array = genotypes_array[1:] # remove first row
     labels = labels[1:] # remove first row
 
     # Load filter data
-    filter_info = pd.read_csv(os.path.join(exp_path, '4.3/gnomad_derived_metadata_with_filtered_sampleids.csv'), sep=',', index_col=1)
-    
-    
+    filter_info = pd.read_csv(os.path.join(exp_path, 
+                                           '4.3/gnomad_derived_metadata_with_filtered_sampleids.csv'), 
+                              sep=',', 
+                              index_col=1)
 
-    merged_metadata = labels.set_index('sample').merge(filter_info, left_index=True, right_index=True)
+    merged_metadata = labels.set_index('sample').merge(filter_info, 
+                                                       left_index=True, 
+                                                       right_index=True)
 
     # load relatedness
-    relatedness = pd.read_csv(os.path.join(exp_path, '4.3/HGDP+1KGP_MattEstimated_king_relatedness_matrix.csv'), sep=',', index_col=0)
+    relatedness = pd.read_csv(os.path.join(exp_path, 
+                                           '4.3/HGDP+1KGP_MattEstimated_king_relatedness_matrix.csv'), 
+                              sep=',', 
+                              index_col=0)
     #cols_to_filter = relatedness.index[(~merged_metadata.loc[relatedness.index]['filter_king_related']).values].values
     #relatedness_none_related = relatedness[(~merged_metadata.loc[relatedness.index]['filter_king_related']).values][cols_to_filter]
     
