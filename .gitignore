@@ -13,3 +13,6 @@ data/HGDP_VCF/
 
 .env
 *.crc
+
+notebooks/HGDP/non_missing_overlap.npz
+notebooks/HGDP/experimental/
