@@ -5,6 +5,11 @@ This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. Once 
 ```bash
 uv sync  # Creates a virtual environment and installs dependencies in it.
 ```
+You can then activate the virtual environment with:
+
+```bash
+source .venv/bin/activate # Activates the phate-genetics environment
+```
 
 ## Project layout
 
