@@ -1,7 +1,12 @@
 [project]
 name = "phate-genetics"
 version = "0.1.0"
-description = "Add your description here"
+description = "PHATE for genetics" ## change to something more descriptive
+authors = [
+    { name = "César Miguel Valdez Córdova", email = "cesar.valdez@mila.quebec" },
+    { name = "Shuang Ni", email = "shuang.ni@mila.quebec"},
+    { name = "Matthew Scicluna", email = "matthew.scicluna@mila.quebec"}
+]
 readme = "README.md"
 requires-python = ">=3.10"
 
