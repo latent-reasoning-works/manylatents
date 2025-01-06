@@ -1,6 +1,6 @@
 ## Installation
 
-This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. Once uv is installed in your local environment, all dependencies can be installed with:
+This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. Once uv is installed locally, all dependencies can be installed with:
 
 ```bash
 uv sync  # Creates a virtual environment and installs dependencies in it.
