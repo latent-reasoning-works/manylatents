@@ -1,0 +1,18 @@
+## Installation
+
+This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. Once uv is installed in your local environment, all dependencies can be installed with:
+
+```bash
+uv sync  # Creates a virtual environment and installs dependencies in it.
+```
+
+## Project layout
+
+```
+pyproject.toml   # Project metadata and dependencies
+requirements.txt # same as above, deprecated? 
+src/
+    mainfile.py  # to fill... currently doesn't exist
+notebooks/       # description
+data/            # data
+```
