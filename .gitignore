@@ -12,6 +12,8 @@ data/HGDP/
 data/1KGP_VCF/
 data/HGDP_VCF/
 
+notebooks/debug.ipynb
+
 .env
 *.crc
 
