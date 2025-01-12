@@ -1,0 +1,4 @@
+embeddings:
+  phate:
+    random_state: 42
+    n_landmark: null

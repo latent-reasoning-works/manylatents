@@ -1,0 +1,19 @@
+defaults:
+  - data: default
+  - hyperparameters: default
+  - embeddings: phate
+  - _self_
+
+project:
+  name: "PHATE_Hyperparameter_Search"
+  repo_root: "${hydra:runtime.cwd}"
+  log_level: "INFO"
+
+paths:
+  # Base directories
+  output_dir: "./outputs"
+  data_dir: "./data"
+  admixture_dir: "./data/1000G_admix_ratios"
+  # Subdirectories
+  model_dir: "${paths.output_dir}/models"
+  plot_dir: "${paths.output_dir}/plots"
