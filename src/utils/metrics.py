@@ -64,3 +64,26 @@ def compute_topological_metrics(emb, metadata, phate_operator):
                     'component_sizes': component_Sizes}
     
     return metrics_dict
+
+# Helper to compute and append metrics
+def compute_and_append_metrics(method_name, emb, pca_input, metadata, admixtures_k, admixture_ratios_list, hyperparam_dict, operator, results):
+    # Compute metrics
+    metrics_dict = compute_quality_metrics(emb, metadata, admixtures_k, admixture_ratios_list)
+    
+    # Add empty topological metrics if not computed
+    if method_name in ["pca (2D)", "pca (50D)", "t-SNE"]:
+        topological_dict = {'connected_components': None, 
+                            'component_sizes': None}
+    else:
+        topological_dict = compute_topological_metrics(emb, metadata, operator)
+
+    pca_metric_dict = compute_pca_metrics(pca_input, emb, metadata)
+
+    metrics_dict.update(pca_metric_dict)
+    metrics_dict.update(topological_dict)
+    metrics_dict.update(hyperparam_dict)
+    metrics_dict.update({'method': method_name})
+
+
+    
+    results.append(metrics_dict)

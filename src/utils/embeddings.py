@@ -4,7 +4,7 @@ import numpy as np
 import phate
 from sklearn.manifold import TSNE
 
-from .pickling import load_pickle, save_pickle
+from .utils import load_pickle, save_pickle
 
 
 # Compute PHATE embeddings or load if available

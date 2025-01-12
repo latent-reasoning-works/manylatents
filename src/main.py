@@ -7,9 +7,10 @@ import pandas as pd
 import tqdm
 from omegaconf import DictConfig, OmegaConf
 
-from src.utils.metrics import compute_or_load_phate, compute_tsne
-from src.utils.plotting import plot_phate_results
-from src.utils.utils import compute_and_append_metrics, load_data
+from utils.embeddings import compute_or_load_phate, compute_tsne
+from utils.metrics import compute_and_append_metrics
+from utils.plotting import plot_phate_results
+from utils.utils import load_data
 
 # Set up logging and project details
 PROJECT_NAME = Path(__file__).parent.name
@@ -17,7 +18,7 @@ REPO_ROOTDIR = Path(__file__).parent.parent
 logger = logging.getLogger(__name__)
 
 @hydra.main(
-    config_path="src/configs", 
+    config_path="configs", 
     config_name="config",
     version_base="1.2",
 )
