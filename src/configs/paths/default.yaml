@@ -1,0 +1,7 @@
+base_path: null # Path to the base directory of the 1KGP files
+fname: null  # Name of the 1KGP file
+output_dir: "./outputs"
+data_dir: "./data"
+admixture_dir: "./data/1000G_admix_ratios"
+model_dir: "${paths.output_dir}/models"
+plot_dir: "${paths.output_dir}/plots"
