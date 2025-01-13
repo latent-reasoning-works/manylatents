@@ -16,9 +16,9 @@ def load_pickle(path):
     with open(path, 'rb') as f:
         return pickle.load(f)
 
-def load_data(admixtures_k, data_dir, admixture_dir):
+def load_data(admixtures_k, data_dir, admixture_dir, base_path, fname):
     # Step -1: Load data
-    merged_metadata, relatedness, genotypes_array, mapping_info = helpers.load_data()
+    merged_metadata, relatedness, genotypes_array, mapping_info = helpers.load_data(base_path, fname)
 
     # Step 0: Pre-process data
     normalized_matrix, overlap_counts = helpers.preprocess_data_matrix(genotypes_array)

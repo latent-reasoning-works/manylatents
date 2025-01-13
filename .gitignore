@@ -4,14 +4,22 @@ slurm_files/
 figures/
 depricated/
 results/
-shuang/
 outputs/
+
+# Ignore everything in the paths folder
+# except for __init__.py and default.yaml
+# (privacy reasons)
+src/configs/paths/*
+!src/configs/paths/__init__.py
+!src/configs/paths/default.yaml
 
 data/1000G/
 data/HGDP/
 data/1KGP_VCF/
 data/HGDP_VCF/
+data/phate_genetics_files/
 
+src/configs/paths
 notebooks/debug.ipynb
 
 .env
