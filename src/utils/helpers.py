@@ -59,8 +59,8 @@ def load_data(base_path, fname):
 
     # load relatedness
     relatedness = pd.read_csv(os.path.join(base_path, 
-                                           '4.3/HGDP+1KGP_MattEstimated_king_relatedness_matrix.csv'), 
-                              sep=',', 
+                                           'HGDP+1KGP_MattEstimated_related_samples.tsv'), 
+                              sep='\t', 
                               index_col=0)
 
     pop_palette_hgdp_coarse, pop_palette_hgdp_fine, _, _ = make_palette_label_order_HGDP(merged_metadata)

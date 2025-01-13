@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from utils import helpers
+from utils import metrics
 
 # Helper function to save/load objects
 
@@ -33,7 +34,7 @@ def load_data(admixtures_k, data_dir, admixture_dir, base_path, fname):
     to_transform_on = (~related_indices) & filtered_indices
 
     pca_emb, _ = helpers.compute_pca_from_hail(
-        os.path.join(data_dir, 'pca_scores_hailcomputed.csv'),
+        os.path.join(base_path, 'pca_scores_hailcomputed.csv'),
         merged_metadata,
         50
     )
