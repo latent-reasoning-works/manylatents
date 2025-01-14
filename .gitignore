@@ -24,6 +24,7 @@ notebooks/debug.ipynb
 
 .env
 *.crc
+*.npz
 
 notebooks/HGDP/non_missing_overlap.npz
 notebooks/HGDP/experimental/
