@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
     config_name="config",
     version_base="1.2",
 )
+
 def main(cfg: DictConfig):
     """
     Main entry point for the PHATE hyperparameter search script.
@@ -44,7 +45,7 @@ def main(cfg: DictConfig):
     # Load data
     admixtures_k = cfg.data.admixtures_k
     pca_input, metadata, fit_idx, transform_idx, admixture_ratios_list, cmap = load_data(
-        admixtures_k, data_dir, admixture_dir, cfg.paths.base_path, cfg.paths.fname
+        admixtures_k, data_dir, admixture_dir, base_path, fname
     )
 
     results = []

@@ -1,7 +1,7 @@
 [project]
-name = "phate-genetics"
+name = "manifold-genetics"
 version = "0.1.0"
-description = "PHATE for genetics" ## change to something more descriptive
+description = "placeholder" ## change to something more descriptive
 authors = [
     { name = "César Miguel Valdez Córdova", email = "cesar.valdez@mila.quebec" },
     { name = "Shuang Ni", email = "shuang.ni@mila.quebec"},
@@ -73,7 +73,11 @@ dependencies = [
     "hydra-core>=1.3.2",
     "tqdm>=4.67.1",
     "pyplink>=1.3.7",
+    "grae",
 ]
 
 [tool.uv]
 managed = true
+
+[tool.uv.sources]
+grae = { git = "https://github.com/KevinMoonLab/GRAE.git" }

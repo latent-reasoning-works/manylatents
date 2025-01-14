@@ -1,2 +1,0 @@
-from .simplex_deformation import SimplexSphereProjection
-from .stereo_sphere_projection import StereoSphereProjection
