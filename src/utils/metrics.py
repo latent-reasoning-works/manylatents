@@ -1,31 +1,21 @@
-import os
-import copy
 import hashlib
+import os
 import pickle
-import pandas as pd
-import seaborn as sns
+
 import networkx as nx
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-import phate
-from sklearn.manifold import TSNE
-import tqdm
-
-import scprep
+import pandas as pd
+from scipy.sparse.csgraph import connected_components, shortest_path
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import spearmanr
-from sklearn.metrics.pairwise import haversine_distances
 from sklearn.neighbors import kneighbors_graph
-from scipy.sparse.csgraph import shortest_path, connected_components
-from scipy.sparse import csr_matrix
 
 # Cache directory for geodesic distances
-CACHE_DIR = "./results/geodesic_cache"
+CACHE_DIR = ".outputs/results/geodesic_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 # Cache directory for graph Laplacians
-LAPLACIAN_CACHE_DIR = "./results/laplacian_cache"
+LAPLACIAN_CACHE_DIR = ".outputs/results/laplacian_cache"
 os.makedirs(LAPLACIAN_CACHE_DIR, exist_ok=True)
 
 # Compute quality metrics

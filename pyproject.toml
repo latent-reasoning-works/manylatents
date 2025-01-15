@@ -73,11 +73,7 @@ dependencies = [
     "hydra-core>=1.3.2",
     "tqdm>=4.67.1",
     "pyplink>=1.3.7",
-    "grae",
 ]
 
 [tool.uv]
 managed = true
-
-[tool.uv.sources]
-grae = { git = "https://github.com/KevinMoonLab/GRAE.git" }

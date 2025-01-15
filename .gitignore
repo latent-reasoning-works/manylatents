@@ -1,30 +1,28 @@
-__pycache__/
-slurm_files/
-.ipynb_checkpoints/
-figures/
-depricated/
-results/
-outputs/
-
 # Ignore everything in the paths folder
 # except for __init__.py and default.yaml
 # (privacy reasons)
+
 src/configs/paths/*
 !src/configs/paths/__init__.py
 !src/configs/paths/default.yaml
 
-data/1000G/
-data/HGDP/
-data/1KGP_VCF/
-data/HGDP_VCF/
-data/phate_genetics_files/
+# similarly for data,
+data/*
+!data/**/__init__.py
 
-src/configs/paths
+# and outputs.
+outputs/*
+!outputs/**/__init__.py
+
+# python cache files.
+__pycache__/
+*.pyc
+*.pyo
+
+#notebooks
 notebooks/debug.ipynb
+.ipynb_checkpoints/
 
 .env
 *.crc
 *.npz
-
-notebooks/HGDP/non_missing_overlap.npz
-notebooks/HGDP/experimental/
