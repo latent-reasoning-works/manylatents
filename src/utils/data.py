@@ -11,116 +11,6 @@ from pyplink import PyPlink
 
 from utils.mappings import make_palette_label_order_HGDP
 
-
-def load_data(paths, data_cfg):
-    """
-    Load project-specific data, including metadata, PCA scores, and admixture data.
-
-    Args:
-        paths (DictConfig): Paths configuration.
-        data_cfg (DictConfig): Data configuration.
-
-    Returns:
-        Tuple: Merged metadata, PCA scores, and admixture data.
-    """
-    # Resolve directories
-    genotype_dir = Path(paths.genotype_dir)
-    admixture_dir = Path(paths.admixture_dir)
-
-    # Load metadata
-    metadata_file = genotype_dir / data_cfg.metadata_file
-    metadata = pd.read_csv(metadata_file, sep=",")
-    metadata = metadata.drop(columns=["Project", "Population", "Genetic_region"], errors="ignore")
-
-    # Load PCA scores
-    pca_file = Path(paths.data_dir) / data_cfg.pca_file
-    pca_scores = pd.read_csv(pca_file, sep=",")
-
-    # Load admixture metadata
-    admixture_data = {
-        f: pd.read_csv(admixture_dir / f, sep="\t")
-        for f in data_cfg.admixture_files
-    }
-
-    return metadata, pca_scores, admixture_data
-
-def load_hgdp_data(data_dir, genotype_dir, metadata_file, relatedness_file, filters, genotype_prefix):
-    """
-    Load HGDP genotypes, metadata, and relatedness data.
-
-    Args:
-        data_dir (str): Base directory containing data files.
-        genotype_dir (str): Subdirectory containing genotype files (relative to data_dir).
-        metadata_file (str): Path to the metadata file relative to data_dir.
-        relatedness_file (str): Path to the relatedness file relative to data_dir.
-        filters (list): List of filters to apply to metadata.
-        genotype_prefix (str): Prefix of the genotype files (e.g., "gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs").
-
-    Returns:
-        Tuple: Merged metadata, relatedness matrix, genotypes array, and colormap mappings.
-    """
-    ##TODO: Add possibility of computing PCA from relatedness file
-    # Resolve paths
-    metadata_file = os.path.join(genotype_dir, metadata_file)
-    #relatedness_file = os.path.join(data_dir, relatedness_file)
-
-    # Check for required genotype files with the given prefix
-    required_files = ["bed", "bim", "fam"]
-    missing_files = [ext for ext in required_files if not os.path.exists(os.path.join(genotype_dir, f"{genotype_prefix}.{ext}"))]
-
-    if missing_files:
-        raise FileNotFoundError(f"Missing required genotype files in {genotype_dir}: {', '.join(missing_files)}")
-
-    # Load genotype data
-    try:
-        genotypes_array = np.load(os.path.join(genotype_dir, '_raw_genotypes.npy'))
-    except FileNotFoundError:
-        pedfile = PyPlink(os.path.join(genotype_dir, f"{genotype_prefix}"))
-        genotypes_array = np.zeros((pedfile.get_nb_samples(), pedfile.get_nb_markers()), dtype=np.int8)
-
-        for i, (_, genotypes) in tqdm(enumerate(pedfile), desc="Loading genotypes"):
-            genotypes_array[:, i] = genotypes
-
-        np.save(os.path.join(genotype_dir, '_raw_genotypes.npy'), genotypes_array)
-
-    # Load metadata
-    metadata = pd.read_csv(metadata_file, sep=",")
-    metadata.columns = metadata.columns.str.strip()
-    #metadata = metadata.drop(columns=["Project", "Population", "Genetic_region"], errors="ignore")
-
-    populations = metadata.get("Population")
-    superpopulations = metadata.get("Superpopulation")
-    
-    if populations is None or superpopulations is None:
-        raise KeyError(
-            f"Missing required columns in metadata: "
-            f"{'Population' if populations is None else ''} "
-            f"{'Superpopulation' if superpopulations is None else ''}"
-        )
-
-    populations = populations.values
-    superpopulations = superpopulations.values
-
-    # Apply filters
-    if filters:
-        for filter_name in filters:
-            if filter_name in metadata.columns:
-                metadata = metadata[~metadata[filter_name]]
-
-    # Load relatedness data
-    #relatedness = pd.read_csv(relatedness_file, sep="\t", index_col=0)
-    relatedness = None
-
-    # Generate colormaps
-    populations = metadata.get("Population")
-    superpopulations = metadata.get("Superpopulation")
-    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine = make_palette_label_order_HGDP(
-        populations, superpopulations
-    )
-
-    return metadata, relatedness, genotypes_array, (pop_palette_hgdp_coarse, pop_palette_hgdp_fine)
-
-
 def replace_negative_one_with_nan(array):
     # Replace all occurrences of -1 with np.nan
     return np.where(array == -1, np.nan, array)
@@ -195,65 +85,6 @@ def compute_pca_from_hail(hail_pca_path, merged_metadata, num_pcs):
     to_return = to_return[to_return.columns[to_return.columns.str.startswith('PC')].tolist()].values[:,:num_pcs]
     return to_return, None
 
-def preprocess_data(admixtures_k, data_dir, admixture_dir, genotype_dir, pca_file, metadata_file, relatedness_file, filters):
-    """
-    Preprocess data for downstream analysis.
-
-    Args:
-        admixtures_k (list): List of admixture components (e.g., [2, 3, 4, ...]).
-        data_dir (str): Base directory containing data files.
-        admixture_dir (str): Directory containing admixture metadata files.
-        genotype_dir (str): Directory containing genotype files.
-        pca_file (str): Path to the precomputed PCA file.
-        metadata_file (str): Path to the metadata file.
-        relatedness_file (str): Path to the relatedness file.
-        filters (list): List of filters to apply to metadata.
-
-    Returns:
-        tuple: PCA embeddings, metadata, indices for fitting and transforming,
-               admixture ratios list, and colormap mapping.
-    """
-    # Step -1: Load HGDP data
-    merged_metadata, relatedness, genotypes_array, mapping_info = load_hgdp_data(
-        data_dir=data_dir,
-        fname="gnomad.genomes.v3.1.2.hgdp_1kg_subset_sample_meta.reduced.tsv",
-        metadata_file=metadata_file,
-        relatedness_file=relatedness_file,
-        filters=filters
-    )
-
-    # Step 0: Preprocess genotype data
-    normalized_matrix, overlap_counts = preprocess_data_matrix(genotypes_array)
-
-    # Filter unrelated samples
-    filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
-    _filtered_indices = merged_metadata[merged_metadata[filters].any(axis=1)].index
-    filtered_indices = ~merged_metadata.index.isin(_filtered_indices)
-    related_indices = ~merged_metadata['filter_king_related'].values
-
-    to_fit_on = related_indices & filtered_indices
-    to_transform_on = (~related_indices) & filtered_indices
-
-    # Compute PCA embeddings
-    pca_emb, _ = compute_pca_from_hail(pca_file, merged_metadata, 50)
-
-    # Load admixture ratios
-    admixture_ratios_list = []
-    for n_comps in admixtures_k:
-        admixture_file = os.path.join(admixture_dir, f"global.{n_comps}_metadata.tsv")
-        admix_ratios = pd.read_csv(admixture_file, sep="\t", header=None)
-
-        # Fill zeros for non-admixture rows
-        admixture_ratios_nonzero = admix_ratios.loc[:, 1:n_comps].values
-        admixture_ratios = np.zeros((pca_emb.shape[0], admixture_ratios_nonzero.shape[1]))
-
-        index = to_fit_on | to_transform_on
-        admixture_ratios[index] = admixture_ratios_nonzero
-        admixture_ratios_list.append(admixture_ratios)
-
-    return pca_emb, merged_metadata, to_fit_on, to_transform_on, admixture_ratios_list, mapping_info[1]
-
-import numpy as np
 
 def calculate_maf(genotypes):
     """
@@ -290,3 +121,136 @@ def maf_scale(genotypes):
     scaled_data = (genotypes - 2 * maf) / np.sqrt(2 * maf * (1 - maf))  # Apply MAF scaling
     
     return scaled_data
+
+def load_hgdp_data(genotype_dir, metadata_file, genotype_prefix, filters):
+    """
+    Load HGDP genotypes and metadata.
+
+    Args:
+        genotype_dir (str): Directory containing genotype files.
+        metadata_file (str): Path to the metadata file relative to genotype_dir.
+        genotype_prefix (str): Prefix of the genotype files.
+        filters (list): List of filters to apply to metadata.
+
+    Returns:
+        Tuple: Merged metadata, genotypes array, and colormap mappings.
+    """
+    # Resolve paths
+    metadata_file_path = os.path.join(genotype_dir, metadata_file)
+    required_files = ["bed", "bim", "fam"]
+
+    # Check for required genotype files
+    missing_files = [
+        ext for ext in required_files if not os.path.exists(f"{genotype_dir}/{genotype_prefix}.{ext}")
+    ]
+    if missing_files:
+        raise FileNotFoundError(f"Missing required genotype files: {', '.join(missing_files)}")
+
+    # Load genotype data
+    try:
+        genotypes_array = np.load(os.path.join(genotype_dir, "_raw_genotypes.npy"))
+    except FileNotFoundError:
+        pedfile = PyPlink(os.path.join(genotype_dir, genotype_prefix))
+        genotypes_array = np.zeros((pedfile.get_nb_samples(), pedfile.get_nb_markers()), dtype=np.int8)
+        for i, (_, genotypes) in tqdm(enumerate(pedfile), desc="Loading genotypes"):
+            genotypes_array[:, i] = genotypes
+        np.save(os.path.join(genotype_dir, "_raw_genotypes.npy"), genotypes_array)
+
+    # Load metadata
+    metadata = pd.read_csv(metadata_file_path, sep=",")
+    metadata.columns = metadata.columns.str.strip()
+
+    # Apply filters
+    for filter_name in filters:
+        if filter_name in metadata.columns:
+            metadata = metadata[~metadata[filter_name]]
+
+    # Generate colormaps
+    if "Population" not in metadata.columns or "Superpopulation" not in metadata.columns:
+        raise KeyError("Metadata must contain 'Population' and 'Superpopulation' columns.")
+    populations = metadata["Population"].values
+    superpopulations = metadata["Superpopulation"].values
+    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, _, _ = make_palette_label_order_HGDP(
+        populations, superpopulations
+    )
+
+    return metadata, genotypes_array, (pop_palette_hgdp_coarse, pop_palette_hgdp_fine)
+
+def preprocess_data(admixtures_k, data_dir, admixture_dir, genotype_dir, metadata_file, genotype_prefix, filters):
+    """
+    Preprocess data for downstream analysis.
+
+    Args:
+        admixtures_k (list): List of admixture components (K values).
+        data_dir (str): Base directory containing data files.
+        admixture_dir (str): Directory containing admixture metadata files.
+        genotype_dir (str): Directory containing genotype files.
+        metadata_file (str): Path to the metadata file relative to genotype_dir.
+        genotype_prefix (str): Prefix for genotype files.
+        filters (list): List of filters to apply to metadata.
+
+    Returns:
+        tuple: PCA embeddings, metadata, indices for fitting and transforming,
+               admixture ratios list, and colormap mapping.
+    """
+    # Load HGDP data
+    metadata, genotypes_array, colormaps = load_hgdp_data(
+        genotype_dir=genotype_dir,
+        metadata_file=metadata_file,
+        genotype_prefix=genotype_prefix,
+        filters=filters
+    )
+
+    # Preprocess genotype data
+    normalized_matrix, overlap_counts = preprocess_data_matrix(genotypes_array)
+
+    # Filter indices for unrelated and uncontaminated samples
+    _filtered_indices = metadata[metadata[filters].any(axis=1)].index
+    filtered_indices = ~metadata.index.isin(_filtered_indices)
+    related_indices = ~metadata["filter_king_related"]
+
+    fit_idx = related_indices & filtered_indices
+    transform_idx = ~related_indices & filtered_indices
+
+    # Compute PCA embeddings
+    pca_file_path = os.path.join(data_dir, "pca_scores_hailcomputed.csv")
+    pca_emb, _ = compute_pca_from_hail(pca_file_path, metadata, 50)
+
+    # Load admixture ratios
+    admixture_ratios_list = []
+    for k in admixtures_k:
+        admixture_file_path = os.path.join(admixture_dir, f"global.{k}_metadata.tsv")
+        admixture_data = pd.read_csv(admixture_file_path, sep="\t", header=None)
+        admixture_ratios = np.zeros((pca_emb.shape[0], k))
+
+        indices_to_fill = fit_idx | transform_idx
+        admixture_ratios[indices_to_fill] = admixture_data.iloc[:, 1:k + 1].values
+        admixture_ratios_list.append(admixture_ratios)
+
+    return pca_emb, metadata, fit_idx, transform_idx, admixture_ratios_list, colormaps
+
+def load_preprocessed_data(admixtures_k, data_dir, admixture_dir, genotype_dir, metadata_file, genotype_prefix, filters):
+    """
+    Wrapper for preprocessing data and preparing for hyperparameter sweeps.
+
+    Args:
+        admixtures_k (list): List of admixture components (K values).
+        data_dir (str): Directory containing data files.
+        admixture_dir (str): Directory containing admixture metadata files.
+        genotype_dir (str): Directory containing genotype files.
+        metadata_file (str): Path to the metadata file relative to genotype_dir.
+        genotype_prefix (str): Prefix for genotype files.
+        filters (list): List of filters to apply to metadata.
+
+    Returns:
+        tuple: PCA embeddings, metadata, fit/transform indices, admixture ratios list, and colormap mappings.
+    """
+    return preprocess_data(
+        admixtures_k=admixtures_k,
+        data_dir=data_dir,
+        admixture_dir=admixture_dir,
+        genotype_dir=genotype_dir,
+        metadata_file=metadata_file,
+        genotype_prefix=genotype_prefix,
+        filters=filters
+    )
