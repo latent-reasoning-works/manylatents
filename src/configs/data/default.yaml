@@ -7,9 +7,12 @@ admixture_files:
   - "global.7_metadata.tsv"
   - "global.8_metadata.tsv"
   - "global.9_metadata.tsv"
-metadata_file: "genotypes/gnomad_derived_metadata_with_filtered_sampleids.csv"
-pca_file: "pca_scores_hailcomputed.csv"
 admixtures_k: [2, 3, 4, 5, 6, 7, 8, 9]
+## more files
+metadata_file: "gnomad_derived_metadata_with_filtered_sampleids.csv" ## currently assumes that the metadata is in the same directory as the genotype files
+relatedness_file: "HGDP+1KGP_MattEstimated_related_samples.tsv"
+genotype_prefix: "gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.match1000G_GSAs_dietnet"
+pca_file: "pca_scores_hailcomputed.csv"
 filters:
   - "filter_pca_outlier"
   - "hard_filtered"

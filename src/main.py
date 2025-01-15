@@ -6,7 +6,7 @@ import pandas as pd
 import tqdm
 from omegaconf import DictConfig, OmegaConf
 
-from utils.data import preprocess_data
+from utils.data import preprocess_data, load_hgdp_data
 from utils.embeddings import compute_or_load_phate, compute_tsne
 from utils.metrics import compute_and_append_metrics
 from utils.plotting import plot_phate_results
@@ -31,17 +31,14 @@ def main(cfg: DictConfig):
     prepare_directories(cfg)
 
     # Load data
-    pca_emb, metadata, to_fit_on, to_transform_on, admixture_ratios_list, _ = preprocess_data(
-        admixtures_k=cfg.data.admixtures_k,
+    metadata, relatedness, genotypes_array, colormap = load_hgdp_data(
         data_dir=cfg.paths.data_dir,
-        admixture_dir=cfg.paths.admixture_dir,
         genotype_dir=cfg.paths.genotype_dir,
-        pca_file=cfg.data.pca_file,
         metadata_file=cfg.data.metadata_file,
-        relatedness_file="HGDP+1KGP_MattEstimated_related_samples.tsv",
-        filters=cfg.data.filters
+        relatedness_file=cfg.data.relatedness_file,
+        filters=cfg.data.filters,
+        genotype_prefix=cfg.data.genotype_prefix
     )
-
 
     results = []
 

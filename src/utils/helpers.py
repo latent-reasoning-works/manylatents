@@ -1,3 +1,5 @@
+## FOR REFERENCE PURPOSES ONLY, BEING PHASED OUT
+
 import copy
 import os
 

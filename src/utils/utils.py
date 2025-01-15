@@ -29,31 +29,30 @@ def create_directory(dir_path, condition=True):
 
 def prepare_directories(cfg):
     """
-    Prepare directories based on the configuration and Hydra's run directory.
+    Prepare directories based on the configuration.
 
     Args:
         cfg (DictConfig): Configuration object.
     """
-    # Get Hydra's working directory
-    base_dir = Path.cwd()
+    # Hydra's working directory is set to the run's output folder for specific outputs
+    ## TODO: leverage specific hydra outputs
+    run_dir = Path.cwd()
 
-    # Fixed directory
-    ckpt_dir = base_dir / "ckpt"
-    create_directory(ckpt_dir)
+    create_directory(cfg.paths.ckpt_dir)
 
-    # Conditional directories
     if cfg.project.plotting:
-        plot_dir = base_dir / "plots"
+        plot_dir = run_dir / "plots"
         create_directory(plot_dir)
 
-    if cfg.project.caching:
-        cache_dir = base_dir / "cache"
-        geodesic_dir = cache_dir / "geodesic"
-        laplacian_dir = cache_dir / "laplacian"
+    # General cache directory outside Hydra run-specific folders
+    cache_dir = Path(cfg.paths.cache_dir)
+    geodesic_dir = cache_dir / "geodesic"
+    laplacian_dir = cache_dir / "laplacian"
 
+    if cfg.project.caching:
         create_directory(cache_dir)
         create_directory(geodesic_dir)
-        create_directory(laplacian_dir)
+        create_directory(laplacian_dir)        
         
 # Convert results to DataFrame
 def create_results_dataframe(results):

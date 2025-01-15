@@ -6,6 +6,10 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from scipy.sparse import vstack as svstack
 from tqdm import tqdm
+from pyplink import PyPlink
+
+
+from utils.mappings import make_palette_label_order_HGDP
 
 
 def load_data(paths, data_cfg):
@@ -40,42 +44,62 @@ def load_data(paths, data_cfg):
 
     return metadata, pca_scores, admixture_data
 
-def load_hgdp_data(data_dir, fname, metadata_file, relatedness_file, filters):
+def load_hgdp_data(data_dir, genotype_dir, metadata_file, relatedness_file, filters, genotype_prefix):
     """
     Load HGDP genotypes, metadata, and relatedness data.
 
     Args:
         data_dir (str): Base directory containing data files.
-        fname (str): Filename for the genotype data.
+        genotype_dir (str): Subdirectory containing genotype files (relative to data_dir).
         metadata_file (str): Path to the metadata file relative to data_dir.
         relatedness_file (str): Path to the relatedness file relative to data_dir.
         filters (list): List of filters to apply to metadata.
+        genotype_prefix (str): Prefix of the genotype files (e.g., "gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs").
 
     Returns:
         Tuple: Merged metadata, relatedness matrix, genotypes array, and colormap mappings.
     """
+    ##TODO: Add possibility of computing PCA from relatedness file
     # Resolve paths
-    genotype_file = os.path.join(data_dir, fname)
-    metadata_file = os.path.join(data_dir, metadata_file)
-    relatedness_file = os.path.join(data_dir, relatedness_file)
+    metadata_file = os.path.join(genotype_dir, metadata_file)
+    #relatedness_file = os.path.join(data_dir, relatedness_file)
+
+    # Check for required genotype files with the given prefix
+    required_files = ["bed", "bim", "fam"]
+    missing_files = [ext for ext in required_files if not os.path.exists(os.path.join(genotype_dir, f"{genotype_prefix}.{ext}"))]
+
+    if missing_files:
+        raise FileNotFoundError(f"Missing required genotype files in {genotype_dir}: {', '.join(missing_files)}")
 
     # Load genotype data
-    genotypes_array = None
     try:
-        genotypes_array = np.load(os.path.join(data_dir, '_raw_genotypes.npy'))
+        genotypes_array = np.load(os.path.join(genotype_dir, '_raw_genotypes.npy'))
     except FileNotFoundError:
-        from pyplink import PyPlink
-        pedfile = PyPlink(genotype_file)
-        genotypes_array = np.zeros([pedfile.get_nb_samples(), pedfile.get_nb_markers()], dtype=np.int8)
+        pedfile = PyPlink(os.path.join(genotype_dir, f"{genotype_prefix}"))
+        genotypes_array = np.zeros((pedfile.get_nb_samples(), pedfile.get_nb_markers()), dtype=np.int8)
 
         for i, (_, genotypes) in tqdm(enumerate(pedfile), desc="Loading genotypes"):
             genotypes_array[:, i] = genotypes
 
-        np.save(os.path.join(data_dir, '_raw_genotypes.npy'), genotypes_array)
+        np.save(os.path.join(genotype_dir, '_raw_genotypes.npy'), genotypes_array)
 
     # Load metadata
     metadata = pd.read_csv(metadata_file, sep=",")
-    metadata = metadata.drop(columns=["Project", "Population", "Genetic_region"], errors="ignore")
+    metadata.columns = metadata.columns.str.strip()
+    #metadata = metadata.drop(columns=["Project", "Population", "Genetic_region"], errors="ignore")
+
+    populations = metadata.get("Population")
+    superpopulations = metadata.get("Superpopulation")
+    
+    if populations is None or superpopulations is None:
+        raise KeyError(
+            f"Missing required columns in metadata: "
+            f"{'Population' if populations is None else ''} "
+            f"{'Superpopulation' if superpopulations is None else ''}"
+        )
+
+    populations = populations.values
+    superpopulations = superpopulations.values
 
     # Apply filters
     if filters:
@@ -84,13 +108,18 @@ def load_hgdp_data(data_dir, fname, metadata_file, relatedness_file, filters):
                 metadata = metadata[~metadata[filter_name]]
 
     # Load relatedness data
-    relatedness = pd.read_csv(relatedness_file, sep="\t", index_col=0)
+    #relatedness = pd.read_csv(relatedness_file, sep="\t", index_col=0)
+    relatedness = None
 
-    # Generate colormap placeholders (customize as needed)
-    pop_palette_hgdp_coarse = None
-    pop_palette_hgdp_fine = None
+    # Generate colormaps
+    populations = metadata.get("Population")
+    superpopulations = metadata.get("Superpopulation")
+    pop_palette_hgdp_coarse, pop_palette_hgdp_fine, label_order_hgdp_coarse, label_order_hgdp_fine = make_palette_label_order_HGDP(
+        populations, superpopulations
+    )
 
     return metadata, relatedness, genotypes_array, (pop_palette_hgdp_coarse, pop_palette_hgdp_fine)
+
 
 def replace_negative_one_with_nan(array):
     # Replace all occurrences of -1 with np.nan
