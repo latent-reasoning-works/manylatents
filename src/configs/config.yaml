@@ -2,10 +2,11 @@ defaults:
   - paths: default
   - data: default
   - hyperparameters: default
+  - model: default
   - embeddings: phate
   - _self_
 
 project:
-  name: "PHATE_Hyperparameter_Search"
-  repo_root: "${hydra:runtime.cwd}"
   log_level: "INFO"
+  plotting: true
+  caching: true

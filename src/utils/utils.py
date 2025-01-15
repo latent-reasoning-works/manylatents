@@ -1,11 +1,9 @@
 import os
 import pickle
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-from utils import helpers
-from utils import metrics
 
 # Helper function to save/load objects
 
@@ -16,44 +14,47 @@ def save_pickle(obj, path):
 def load_pickle(path):
     with open(path, 'rb') as f:
         return pickle.load(f)
+    
+def create_directory(dir_path, condition=True):
+    """
+    Create a directory if the condition is True.
 
-def load_data(admixtures_k, data_dir, admixture_dir, base_path, fname):
-    # Step -1: Load data
-    merged_metadata, relatedness, genotypes_array, mapping_info = helpers.load_data(base_path, fname)
+    Args:
+        dir_path (str or Path): Path to the directory.
+        condition (bool): Whether to create the directory.
+    """
+    if condition:
+        os.makedirs(dir_path, exist_ok=True)
 
-    # Step 0: Pre-process data
-    normalized_matrix, overlap_counts = helpers.preprocess_data_matrix(genotypes_array)
 
-    # Fit PCA model on unrelated samples
-    filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
-    _filtered_indices = merged_metadata[merged_metadata[filters].any(axis=1)].index
-    filtered_indices = ~merged_metadata.index.isin(_filtered_indices)
-    related_indices = ~merged_metadata['filter_king_related'].values
+def prepare_directories(cfg):
+    """
+    Prepare directories based on the configuration and Hydra's run directory.
 
-    to_fit_on = related_indices & filtered_indices
-    to_transform_on = (~related_indices) & filtered_indices
+    Args:
+        cfg (DictConfig): Configuration object.
+    """
+    # Get Hydra's working directory
+    base_dir = Path.cwd()
 
-    pca_emb, _ = helpers.compute_pca_from_hail(
-        os.path.join(base_path, 'pca_scores_hailcomputed.csv'),
-        merged_metadata,
-        50
-    )
+    # Fixed directory
+    ckpt_dir = base_dir / "ckpt"
+    create_directory(ckpt_dir)
 
-    admixture_ratios_list = []
-    prefix = 'global'
-    for n_comps in admixtures_k:
-        fname = f"{prefix}.{n_comps}_metadata.tsv"
-        admix_ratios = pd.read_csv(os.path.join(admixture_dir, fname), sep='\t', header=None)
+    # Conditional directories
+    if cfg.project.plotting:
+        plot_dir = base_dir / "plots"
+        create_directory(plot_dir)
 
-        admixture_ratios_nonzero = admix_ratios.loc[:, 1:n_comps].values
-        admixture_ratios = np.zeros((pca_emb.shape[0], admixture_ratios_nonzero.shape[1]))
+    if cfg.project.caching:
+        cache_dir = base_dir / "cache"
+        geodesic_dir = cache_dir / "geodesic"
+        laplacian_dir = cache_dir / "laplacian"
 
-        index = to_fit_on | to_transform_on
-        admixture_ratios[index] = admixture_ratios_nonzero
-        admixture_ratios_list.append(admixture_ratios)
-
-    return pca_emb, merged_metadata, to_fit_on, to_transform_on, admixture_ratios_list, mapping_info[1]
-
+        create_directory(cache_dir)
+        create_directory(geodesic_dir)
+        create_directory(laplacian_dir)
+        
 # Convert results to DataFrame
 def create_results_dataframe(results):
     # Get all possible keys

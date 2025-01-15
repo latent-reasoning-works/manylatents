@@ -1,7 +1,7 @@
-base_path: null # Path to the base directory of the 1KGP files
-fname: null  # Name of the 1KGP file
-output_dir: "./outputs"
-data_dir: "./data"
-admixture_dir: "./data/1000G_admix_ratios"
-model_dir: "${paths.output_dir}/models"
-plot_dir: "${paths.output_dir}/plots"
+data_dir: "./data"                 # Base directory for data
+genotype_dir: "./data/genotypes"   # Directory for genotypes
+admixture_dir: "./data/admixture"  # Directory for admixture
+output_dir: "./outputs"            # Base directory for outputs
+ckpt_dir: "./outputs/ckpt"         # Model-related outputs
+cache_dir: "./outputs/cache"       # Intermediate files
+plot_dir: "./outputs/plots"        # Plots

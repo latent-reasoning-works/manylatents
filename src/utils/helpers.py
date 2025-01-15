@@ -1,22 +1,20 @@
-import os
 import copy
-import numpy as np
+import os
 
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
-import scprep
-from tqdm import tqdm
-from scipy.sparse import csr_matrix
-from scipy.sparse import vstack as svstack
-from sklearn.utils.extmath import randomized_svd
-from sklearn.kernel_approximation import RBFSampler
-from sklearn.random_projection import GaussianRandomProjection
+import numpy as np
+import pandas as pd
 
-from pyplink import PyPlink
 #import tqdm
 import phate
-from sklearn.decomposition import PCA, KernelPCA
+import scprep
+from pyplink import PyPlink
+from scipy.sparse import csr_matrix
+from scipy.sparse import vstack as svstack
+from sklearn.decomposition import PCA
+from sklearn.random_projection import GaussianRandomProjection
+from tqdm import tqdm
+
 
 def load_data(base_path, fname):
     # Load HGDP
