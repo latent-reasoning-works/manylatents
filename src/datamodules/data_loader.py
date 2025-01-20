@@ -1,12 +1,16 @@
+## ignore for now
+
 import os
+from typing import List, Tuple
+
 import h5py
+import mappings
 import numpy as np
 import pandas as pd
-from typing import Tuple, List
-import mappings
-from pyplink import PyPlink
 import tqdm
 from mappings import make_palette_label_order_HGDP
+from pyplink import PyPlink
+
 
 def load_data_1000G(file_path: str) -> Tuple[np.ndarray, 
                                              np.ndarray, 
