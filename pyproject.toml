@@ -80,3 +80,6 @@ dependencies = [
 
 [tool.uv]
 managed = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

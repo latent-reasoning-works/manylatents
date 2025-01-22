@@ -5,12 +5,6 @@ from lightning import LightningDataModule, Trainer
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
-from src.experiment_utils import (
-    evaluate_model,
-    instantiate_algorithm,
-    train_model,
-)
-
 
 def train(
     cfg: DictConfig,

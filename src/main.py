@@ -1,16 +1,10 @@
 import logging
-from pathlib import Path
 
 import hydra
-import pandas as pd
-import tqdm
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
-from utils.data import preprocess_data, load_hgdp_data
-from utils.embeddings import compute_or_load_phate, compute_tsne
-from utils.metrics import compute_and_append_metrics
-from utils.plotting import plot_phate_results
-from utils.utils import prepare_directories
+import src  # noqa: F401
+from src.experiment import instantiate_datamodule, instantiate_trainer, run_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -22,76 +16,22 @@ logger = logging.getLogger(__name__)
 
 def main(cfg: DictConfig):
     """
-    Main entry point for the PHATE hyperparameter search script.
+    Main entry point. High-level logic:
+      - Instantiate the datamodule
+      - Instantiate the trainer
+      - Call run_pipeline to handle DR, training, evaluation, etc.
     """
-    logger.setLevel(cfg.project.log_level)
-    logger.info("Starting the PHATE hyperparameter search...")
-    logger.info(f"Loaded configuration:\n{OmegaConf.to_yaml(cfg)}")
+    logger.info(f"Running pipeline in '{cfg.mode}' mode.")
 
-    prepare_directories(cfg)
+    # 1) Instantiate data module
+    datamodule = instantiate_datamodule(cfg)
 
-    # Load data
-    metadata, relatedness, genotypes_array, colormap = load_hgdp_data(
-        data_dir=cfg.paths.data_dir,
-        genotype_dir=cfg.paths.genotype_dir,
-        metadata_file=cfg.data.metadata_file,
-        relatedness_file=cfg.data.relatedness_file,
-        filters=cfg.data.filters,
-        genotype_prefix=cfg.data.genotype_prefix
-    )
+    # 2) Instantiate the trainer (Lightning trainer + callbacks, loggers, etc.)
+    trainer = instantiate_trainer(cfg)
 
-    results = []
+    # 3) Hand off control to run_pipeline
+    run_pipeline(cfg, datamodule, trainer)
 
-    # Compute PCA and t-SNE metrics
-    logger.info("Computing PCA and t-SNE metrics...")
-    compute_and_append_metrics(
-        "pca (50D)", pca_input, pca_input, metadata, cfg.data.admixtures_k, admixture_ratios_list,
-        {"gamma": "NA", "decay": "NA", "knn": "NA", "t": "NA"}, None, results
-    )
-    compute_and_append_metrics(
-        "pca (2D)", pca_input[:, :2], pca_input, metadata, cfg.data.admixtures_k, admixture_ratios_list,
-        {"gamma": "NA", "decay": "NA", "knn": "NA", "t": "NA"}, None, results
-    )
-    tsne_emb, tsne_obj = compute_tsne(pca_input, fit_idx, transform_idx, init="pca")
-    compute_and_append_metrics(
-        "t-SNE", tsne_emb, pca_input, metadata, cfg.data.admixtures_k, admixture_ratios_list,
-        {"gamma": "NA", "decay": "NA", "knn": "NA", "t": "NA"}, None, results
-    )
-
-    # Hyperparameter search
-    logger.info("Starting hyperparameter search...")
-    for gamma in cfg.hyperparameters.gammas:
-        for decay in cfg.hyperparameters.decays:
-            embeddings_list_k = []
-            for knn in tqdm.tqdm(cfg.hyperparameters.knns, desc=f"gamma={gamma}, decay={decay}"):
-                embeddings_list, phate_operator = compute_or_load_phate(
-                    pca_input, fit_idx, transform_idx, cfg.hyperparameters.ts,
-                    cfg.paths.ckpt_dir,
-                    n_landmark=cfg.embeddings.phate.n_landmark,
-                    knn=knn, decay=decay, gamma=gamma,
-                    cache_dir=cfg.paths.laplacian_cache_dir if cfg.project.caching else None
-                )
-
-                for t, emb in tqdm.tqdm(zip(cfg.hyperparameters.ts, embeddings_list), desc=f"Metrics knn={knn}"):
-                    compute_and_append_metrics(
-                        "phate", emb, pca_input, metadata, cfg.data.admixtures_k, admixture_ratios_list,
-                        {"gamma": gamma, "decay": decay, "knn": knn, "t": t}, phate_operator, results
-                    )
-                embeddings_list_k.append(embeddings_list)
-
-            # Save plots if enabled
-            if cfg.project.plotting:
-                plot_phate_results(
-                    embeddings_list_k, metadata, cfg.hyperparameters.ts, cfg.hyperparameters.knns,
-                    "knn", cmap, Path(cfg.paths.plot_dir) / f"results_gamma={gamma}_decay={decay}.png"
-                )
-
-    # Save metrics to CSV
-    logger.info("Saving results to CSV...")
-    results_df = pd.DataFrame(results)
-    results_file = Path(cfg.paths.output_dir) / "results.csv"
-    results_df.to_csv(results_file, index=False)
-    logger.info(f"Results saved to {results_file}")
 
 if __name__ == "__main__":
     main()
