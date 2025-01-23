@@ -1,12 +1,7 @@
 defaults:
-  - paths: default
-  - data: default
-  - hyperparameters: default
-  - model: default
-  - embeddings: phate
   - _self_
-
-project:
-  log_level: "INFO"
-  plotting: true
-  caching: true
+  - algorithm: null
+  - data: default
+  - experiment: null
+  - hydra: default
+  - paths: default
