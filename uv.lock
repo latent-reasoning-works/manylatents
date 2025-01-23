@@ -598,6 +598,20 @@ wheels = [
 ]
 
 [[package]]
+name = "hydra-zen"
+version = "0.13.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "hydra-core" },
+    { name = "omegaconf" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/a9/747cd74012a33f61fbe7b079e91385214d0d0dc707721cd95afb2c823a75/hydra_zen-0.13.0.tar.gz", hash = "sha256:1b53d74aa1f0baa04fafdac6aba7a94ae40929e7b0a5a5081d8740f74322052d", size = 1329558 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/ca/8f984e7a8e39ed2bf1622a1ae0fe26e65011fed150548a9319217e92925f/hydra_zen-0.13.0-py3-none-any.whl", hash = "sha256:6050b62be96d2a47b2abf0e9c0ebcce1e9a4e259e173870338ab049b833f26cf", size = 103784 },
+]
+
+[[package]]
 name = "idna"
 version = "3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -846,6 +860,7 @@ dependencies = [
     { name = "hail" },
     { name = "heatgeo" },
     { name = "hydra-core" },
+    { name = "hydra-zen" },
     { name = "ipykernel" },
     { name = "ipython" },
     { name = "jedi" },
@@ -915,6 +930,7 @@ requires-dist = [
     { name = "hail", specifier = ">=0.2" },
     { name = "heatgeo" },
     { name = "hydra-core", specifier = ">=1.3.2" },
+    { name = "hydra-zen", specifier = ">=0.13.0" },
     { name = "ipykernel", specifier = "==6.29.4" },
     { name = "ipython", specifier = "==7.34.0" },
     { name = "jedi", specifier = "==0.19.1" },

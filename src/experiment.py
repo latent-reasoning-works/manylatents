@@ -1,44 +1,13 @@
+import logging
 from typing import Optional, Union
 
+import hydra
 import numpy as np
 from lightning import LightningDataModule, Trainer
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
-
-def train(
-    cfg: DictConfig,
-    trainer: Trainer,
-    datamodule: Union[LightningDataModule, DataLoader],
-    embeddings: Optional[np.ndarray] = None,
-):
-    # 1) Instantiate the model to train (LightningModule)
-    model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
-
-    # 2) Fit the model
-    trainer.fit(model, datamodule=datamodule)
-
-    # 3) Optionally: save checkpoint
-    if cfg.paths.model_ckpt:
-        trainer.save_checkpoint(cfg.paths.model_ckpt)
-
-
-def evaluate(
-    cfg: DictConfig,
-    trainer: Trainer,
-    datamodule: Union[LightningDataModule, DataLoader],
-    embeddings: Optional[np.ndarray] = None,
-):
-    # 1) Instantiate or load your model
-    model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
-    if cfg.paths.model_ckpt:
-        # If you want to load from checkpoint, you can do:
-        # model = ModelClass.load_from_checkpoint(cfg.paths.model_ckpt)
-        pass
-
-    # 2) Evaluate
-    trainer.test(model, datamodule=datamodule)
-
+logger = logging.getLogger(__name__)
 
 def instantiate_algorithm(
     cfg: DictConfig,
@@ -47,55 +16,109 @@ def instantiate_algorithm(
     embeddings: Optional[np.ndarray] = None,
 ):
     """
-    A "smart" algorithm factory. 
-      - If stage == 'dimensionality_reduction', load from cfg.algorithm (for DR).
-      - If stage == 'learning', load from cfg.model (for NN or other classifier/regressor).
-      - If embeddings is not None and stage != 'dimensionality_reduction', we might just skip DR?
+    A "smart" algorithm factory:
+      - If stage == 'dimensionality_reduction', load from cfg.algorithm.
+      - If stage == 'learning', load from cfg.model (e.g., a LightningModule).
+      - If embeddings is not None (and stage != 'dimensionality_reduction'), you might skip DR.
     """
     if stage == "dimensionality_reduction":
-        # Example: DR config
+        # Example DR config
         dr_config = cfg.algorithm
         dr_type = dr_config.type.lower()
 
-        # Potentially handle multiple DR methods
         if dr_type == "pca":
             from sklearn.decomposition import PCA
             logger.info("Performing PCA on the dataset to produce embeddings...")
-            # Example logic: you'd iterate over the datamodule or a train_dataloader
+
+            # Example logic for a datamodule with train_dataloader
             data_arrays = []
             for batch in datamodule.train_dataloader():
-                # Convert to CPU numpy (assuming your batch is a simple tensor)
+                # Convert each batch to a NumPy array (assuming it's a simple Tensor)
                 data_arrays.append(batch.cpu().numpy())
             data_np = np.concatenate(data_arrays, axis=0)
 
             pca = PCA(n_components=dr_config.n_components)
             return pca.fit_transform(data_np)
 
-        # Alternatively: if dr_type == 'umap', ...
         else:
             raise NotImplementedError(f"DR algorithm not implemented: {dr_type}")
 
     elif stage == "learning":
-        # Example: model config
-        # Hydra will instantiate your model class, e.g., AANet
+        # Hydra will instantiate your model class (e.g., AANet) from cfg.model
         model_config = cfg.model
         return hydra.utils.instantiate(model_config)
 
     else:
         raise ValueError(f"Unknown stage: {stage}")
 
+def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLoader]:
+    """
+    Dynamically instantiate the data module (or dataloader) from the config.
+    """
+    if "datamodule" in cfg and cfg.datamodule is not None:
+        dm = hydra.utils.instantiate(cfg.datamodule)
+        dm.setup()
+        return dm
+    if "dataloader" in cfg and cfg.dataloader is not None:
+        # If you want to instantiate a simple DataLoader instead
+        return hydra.utils.instantiate(cfg.dataloader)
+    raise ValueError("No valid 'datamodule' or 'dataloader' found in the config.")
+
 
 def instantiate_trainer(cfg: DictConfig) -> Trainer:
-    # If the user has trainer callbacks or loggers in config, instantiate them:
+    """
+    Dynamically instantiate the PyTorch Lightning Trainer from the config.
+    Handles callbacks and loggers if specified.
+    """
     callbacks = hydra.utils.instantiate(cfg.trainer.callbacks) if "callbacks" in cfg.trainer else None
     loggers = hydra.utils.instantiate(cfg.trainer.loggers) if "loggers" in cfg.trainer else None
 
-    # Trainer arguments can come directly from cfg.trainer
     return Trainer(
         **cfg.trainer,
         callbacks=callbacks,
         logger=loggers,
     )
+
+
+
+
+def train_model(
+    cfg: DictConfig,
+    trainer: Trainer,
+    datamodule: Union[LightningDataModule, DataLoader],
+    embeddings: Optional[np.ndarray] = None,
+):
+    """
+    Train stage:
+      - Instantiate the model to train.
+      - Call trainer.fit().
+      - Optionally save checkpoint.
+    """
+    model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
+    trainer.fit(model, datamodule=datamodule)
+
+    if cfg.paths.model_ckpt:
+        trainer.save_checkpoint(cfg.paths.model_ckpt)
+
+
+def evaluate_model(
+    cfg: DictConfig,
+    trainer: Trainer,
+    datamodule: Union[LightningDataModule, DataLoader],
+    embeddings: Optional[np.ndarray] = None,
+):
+    """
+    Evaluation stage:
+      - Instantiate (or load) the model.
+      - Call trainer.test().
+    """
+    model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
+    if cfg.paths.model_ckpt:
+        # If you want to load from checkpoint, you could do:
+        # model = YourLightningModuleClass.load_from_checkpoint(cfg.paths.model_ckpt)
+        pass
+
+    trainer.test(model, datamodule=datamodule)
 
 
 def run_pipeline(
@@ -104,19 +127,17 @@ def run_pipeline(
     trainer: Trainer,
 ):
     """
-    Orchestrates the entire pipeline. Decides what to do based on cfg.mode.
-    Also decides how to chain DR -> Learning -> Evaluation or skip steps.
-
-    Possible modes (example):
-      - 'dimensionality_reduction': compute embeddings only.
-      - 'train': do DR if needed, train a model, maybe save checkpoints.
-      - 'evaluate': do DR if needed or load existing embeddings, evaluate a model.
+    Orchestrates the entire pipeline, deciding what to do based on cfg.mode.
+    Possible modes:
+      - 'dimensionality_reduction': Only compute DR embeddings.
+      - 'train': DR if needed, then train a model, maybe save checkpoints.
+      - 'evaluate': Possibly do DR or load existing embeddings, then evaluate.
     """
 
     mode = cfg.mode
     embeddings = None
 
-    # 1) If we are doing DR (or training which requires DR), call DR logic
+    # 1) DR if "dimensionality_reduction" or "train"
     if mode in {"dimensionality_reduction", "train"}:
         embeddings = instantiate_algorithm(
             cfg,
@@ -128,14 +149,14 @@ def run_pipeline(
                 np.save(cfg.paths.embeddings_file, embeddings)
             return  # Stop here if DR-only
 
-    # 2) If we are training, call training logic
+    # 2) Training
     if mode == "train":
         train_model(cfg, trainer, datamodule, embeddings)
 
-    # 3) If we are evaluating, call evaluation logic
+    # 3) Evaluation
     elif mode == "evaluate":
-        # Possibly we do DR first or just load precomputed embeddings:
-        #   embeddings = load_precomputed_embeddings(cfg.paths.embeddings_file)
+        # If you want to load precomputed embeddings:
+        # embeddings = np.load(cfg.paths.embeddings_file)
         evaluate_model(cfg, trainer, datamodule, embeddings)
 
     else:
