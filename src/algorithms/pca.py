@@ -8,4 +8,5 @@ class PCA:
     def fit_transform(self, data: np.ndarray) -> np.ndarray:
         ## TODO: Implement PCA
         # Perform PCA on the data
+        print('found PCA')
         return np.random.rand(data.shape[0], self.n_components)
