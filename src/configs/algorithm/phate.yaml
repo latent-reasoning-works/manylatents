@@ -1,0 +1,7 @@
+defaults:
+  - network: null # specify a neural network
+  - _self_
+
+_target_: src.algorithms.pca.PCA
+_partial_: true
+

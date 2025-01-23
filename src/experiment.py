@@ -1,51 +1,68 @@
 import logging
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import hydra
 import numpy as np
-from lightning import LightningDataModule, Trainer
+import torch
+from lightning import Trainer
 from omegaconf import DictConfig
+from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
 logger = logging.getLogger(__name__)
 
 def instantiate_algorithm(
     cfg: DictConfig,
-    stage: str,
-    datamodule: Optional[Union[LightningDataModule, DataLoader]] = None,
-    embeddings: Optional[np.ndarray] = None,
-):
+    datamodule: Optional[LightningDataModule] = None,
+) -> Tuple[Optional[np.ndarray], Optional[torch.nn.Module]]:
     """
+    Instantiates the necessary algorithms based on the configuration.
+
+    Scenarios:
+    - Only Embedding
+    - Only Network
+    - Both Embedding and Network
+
+    Args:
+        cfg (DictConfig): Hydra configuration.
+        datamodule (Optional[LightningDataModule]): Data module for data loading.
+
+    Returns:
+        Tuple[Optional[np.ndarray], Optional[torch.nn.Module]]: 
+            - embeddings_result: Embeddings if DR is performed.
+            - model: Instantiated network model.
     """
-    if stage == "dimensionality_reduction":
-        # Example DR config
-        dr_config = cfg.algorithm
-        dr_type = dr_config.type.lower()
+    embeddings_result = None
+    model = None
 
-        if dr_type == "pca":
-            from sklearn.decomposition import PCA
-            logger.info("Performing PCA on the dataset to produce embeddings...")
+    # Instantiate embedding algorithm if specified
+    if cfg.algorithm is not None:
+        logger.info(f"Instantiating embedding algorithm: {cfg.algorithm._target_.split('.')[-1]}")
+        algorithm = hydra.utils.instantiate(cfg.algorithm)
+        
+        if datamodule is None:
+            raise ValueError("DataModule must be provided for embedding.")
 
-            # Example logic for a datamodule with train_dataloader
-            data_arrays = []
-            for batch in datamodule.train_dataloader():
-                # Convert each batch to a NumPy array (assuming it's a simple Tensor)
-                data_arrays.append(batch.cpu().numpy())
-            data_np = np.concatenate(data_arrays, axis=0)
+        # Collect data from datamodule's train dataloader
+        data_loader = datamodule.train_dataloader()
+        data = []
+        for batch in data_loader:
+            inputs, _ = batch  # Assuming batch is (inputs, targets)
+            data.append(inputs.cpu().numpy())
+        data_np = np.concatenate(data, axis=0)
+        logger.debug(f"Data shape for embedding: {data_np.shape}")
 
-            pca = PCA(n_components=dr_config.n_components)
-            return pca.fit_transform(data_np)
+        # Perform embedding
+        embeddings_result = algorithm.fit_transform(data_np)
+        logger.info(f"Embedding {cfg.algorithm._target_.split('.')[-1].upper()} completed with shape: {embeddings_result.shape}")
 
-        else:
-            raise NotImplementedError(f"DR algorithm not implemented: {dr_type}")
+    # Instantiate network if specified
+    if cfg.network is not None:
+        logger.info("Instantiating Neural Network...")
+        model = hydra.utils.instantiate(cfg.network)
+        logger.info(f"Network instantiated: {cfg.network._target_}")
 
-    elif stage == "learning":
-        # Hydra will instantiate your model class (e.g., AANet) from cfg.model
-        model_config = cfg.model
-        return hydra.utils.instantiate(model_config)
-
-    else:
-        raise ValueError(f"Unknown stage: {stage}")
+    return embeddings_result, model
 
 def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLoader]:
     """
@@ -74,8 +91,6 @@ def instantiate_trainer(cfg: DictConfig) -> Trainer:
         callbacks=callbacks,
         logger=loggers,
     )
-
-
 
 
 def train_model(
@@ -119,41 +134,48 @@ def evaluate_model(
 
 def run_pipeline(
     cfg: DictConfig,
-    datamodule: Union[LightningDataModule, DataLoader],
+    datamodule: LightningDataModule,
     trainer: Trainer,
 ):
     """
-    Orchestrates the entire pipeline, deciding what to do based on cfg.mode.
-    Possible modes:
-      - 'dimensionality_reduction': Only compute DR embeddings.
-      - 'train': DR if needed, then train a model, maybe save checkpoints.
-      - 'evaluate': Possibly do DR or load existing embeddings, then evaluate.
+    Orchestrates the entire pipeline based on the configuration.
+    Executes dimensionality reduction, training, or both.
     """
-
-    mode = cfg.mode
     embeddings = None
+    embeddings_path = cfg.paths.embeddings_file if 'embeddings_file' in cfg.paths else None
 
-    # 1) DR if "dimensionality_reduction" or "train"
-    if mode in {"dimensionality_reduction", "train"}:
-        embeddings = instantiate_algorithm(
-            cfg,
-            stage="dimensionality_reduction",
-            datamodule=datamodule
-        )
-        if mode == "dimensionality_reduction":
-            if cfg.paths.embeddings_file:
-                np.save(cfg.paths.embeddings_file, embeddings)
-            return  # Stop here if DR-only
+    # Determine if Dimensionality Reduction (DR) should be performed
+    perform_dr = cfg.algorithm.method is not None and embeddings_path is not None
 
-    # 2) Training
-    if mode == "train":
-        train_model(cfg, trainer, datamodule, embeddings)
+    # Determine if Network (training) should be performed
+    perform_training = cfg.network is not None
 
-    # 3) Evaluation
-    elif mode == "evaluate":
-        # If you want to load precomputed embeddings:
-        # embeddings = np.load(cfg.paths.embeddings_file)
-        evaluate_model(cfg, trainer, datamodule, embeddings)
+    # 1. Perform Dimensionality Reduction if needed
+    if perform_dr:
+        logger.info("Performing Dimensionality Reduction (DR)...")
+        embeddings, _ = instantiate_algorithm(cfg, datamodule=datamodule)
+        if embeddings is not None and embeddings_path:
+            np.save(embeddings_path, embeddings)
+            logger.info(f"Embeddings saved to {embeddings_path}")
 
-    else:
-        raise ValueError(f"Unsupported mode: {mode}")
+    # 2. Instantiate and train the network if specified
+    if perform_training:
+        _, model = instantiate_algorithm(cfg, embeddings=embeddings)
+        if model is None:
+            raise ValueError("Model configuration is missing for training.")
+
+        logger.info("Starting training pipeline...")
+        trainer.fit(model, datamodule=datamodule)
+
+        # Save model checkpoint if path is specified
+        if 'model_ckpt' in cfg.paths and cfg.paths.model_ckpt:
+            trainer.save_checkpoint(cfg.paths.model_ckpt)
+            logger.info(f"Model checkpoint saved to {cfg.paths.model_ckpt}")
+
+    # 3. Handle Evaluation if specified
+    if 'mode' in cfg and cfg.mode == "evaluate":
+        if perform_training and 'model_ckpt' in cfg.paths and cfg.paths.model_ckpt:
+            logger.info("Starting evaluation pipeline...")
+            evaluate_model(cfg, trainer, datamodule, embeddings)
+        else:
+            logger.warning("Evaluation requires a trained model. Skipping evaluation.")

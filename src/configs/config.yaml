@@ -2,6 +2,7 @@ defaults:
   - _self_
   - algorithm: null
   - data: default
-  - experiment: null
   - hydra: default
   - paths: default
+
+experiment: null
