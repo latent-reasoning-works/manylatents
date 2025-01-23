@@ -1,1 +1,4 @@
-## specify network here
+defaults:
+  - network: default
+
+embedding: default

@@ -16,10 +16,6 @@ def instantiate_algorithm(
     embeddings: Optional[np.ndarray] = None,
 ):
     """
-    A "smart" algorithm factory:
-      - If stage == 'dimensionality_reduction', load from cfg.algorithm.
-      - If stage == 'learning', load from cfg.model (e.g., a LightningModule).
-      - If embeddings is not None (and stage != 'dimensionality_reduction'), you might skip DR.
     """
     if stage == "dimensionality_reduction":
         # Example DR config

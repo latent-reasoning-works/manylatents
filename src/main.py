@@ -5,6 +5,7 @@ from omegaconf import DictConfig
 
 import src  # noqa: F401
 from src.experiment import (
+    instantiate_algorithm,
     instantiate_datamodule,
     instantiate_trainer,
     run_pipeline,
