@@ -1,3 +1,4 @@
+## deprecated in current form, ignore
 admixture_files:
   - "global.2_metadata.tsv"
   - "global.3_metadata.tsv"

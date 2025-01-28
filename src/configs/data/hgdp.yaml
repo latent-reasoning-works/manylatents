@@ -1,0 +1,6 @@
+  plink_prefix: "./data/hgdp"  # Path to PLINK file prefix
+  metadata_path: "./data/metadata.csv"  # Path to metadata
+  batch_size: 32
+  num_workers: 4
+  mode: "genotypes"
+  mmap_mode: null

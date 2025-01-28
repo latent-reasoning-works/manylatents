@@ -22,8 +22,8 @@ def main(cfg: DictConfig):
       - Hand off to run_pipeline
     """
     logger.info("Starting the experiment pipeline...")
-    algorithm = instantiate_algorithm(cfg)
     datamodule = instantiate_datamodule(cfg)
+    algorithm = instantiate_algorithm(cfg)
     trainer = instantiate_trainer(cfg)
     run_pipeline(cfg, datamodule, trainer)
 
