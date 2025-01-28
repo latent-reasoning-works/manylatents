@@ -187,10 +187,10 @@ class PlinkDataset(Dataset):
         """
         sets indices to fit and transform on using metadata.
         """
-        pass 
+        raise NotImplementedError
     
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
         loads metadata.
         """
-        pass
+        raise NotImplementedError
