@@ -1,58 +1,36 @@
-from typing import Optional
+import os
+import hashlib
+import tqdm
+from typing import Optional, Any, Tuple
+import numpy as np
+import pandas as pd
+from pyplink import PyPlink
+from torch.utils.data import Dataset
 
-from lightning import LightningDataModule
-from torch.utils.data import DataLoader
+from plink_dataset import PlinkDataset
 
-# from .hgdp_dataset import HGDPDataset  # Uncomment when dataset logic is implemented
-
-class HGDPModule(LightningDataModule):
+class HGDPDataset(PlinkDataset):
     """
-    PyTorch Lightning DataModule for the Human Genome Diversity Project (HGDP) dataset.
-
-    Encapsulates all data-related operations, including downloading, preprocessing, and
-    preparing data loaders.
+    PyTorch  Dataset for the Thousand Genomes Project + Human Genome Diversity Project (HGDP) dataset.
     """
 
-    def __init__(self, batch_size: int = 32, num_workers: int = 4, data_dir: str = "./data"):
-        """
-        Initializes the HGDPModule with configuration parameters.
+    def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
+        filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+        _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
+        filtered_indices = ~self.metadata.index.isin(_filtered_indices)
+        related_indices = ~self.metadata['filter_king_related'].values
 
-        Args:
-            batch_size (int): The number of samples per batch. Default is 32.
-            num_workers (int): Number of subprocesses to use for data loading. Default is 4.
-            data_dir (str): Path to the dataset directory. Default is "./data".
-        """
-        super().__init__()
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.data_dir = data_dir
+        to_fit_on = related_indices & filtered_indices
+        to_transform_on = (~related_indices) & filtered_indices
 
-    def prepare_data(self) -> None:
-        """Prepare data for use (e.g., downloading, saving to disk)."""
-        pass
+        return to_fit_on, to_transform_on
 
-    def setup(self, stage: Optional[str] = None) -> None:
-        """
-        Set up datasets for training, validation, and testing.
+    def load_metadata(self, metadata_path: str) -> pd.DataFrame:
+        metadata = pd.read_csv(metadata_path)
 
-        Args:
-            stage (Optional[str]): One of 'fit', 'validate', 'test', or 'predict'. Default is None.
-        """
-        pass
-
-    def train_dataloader(self) -> DataLoader:
-        """Return DataLoader for training."""
-        return DataLoader(None, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def val_dataloader(self) -> DataLoader:
-        """Return DataLoader for validation."""
-        return DataLoader(None, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def test_dataloader(self) -> DataLoader:
-        """Return DataLoader for testing."""
-        return DataLoader(None, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def predict_dataloader(self) -> DataLoader:
-        """Return DataLoader for prediction."""
-        return DataLoader(None, batch_size=self.batch_size, num_workers=self.num_workers)
-
+        # because HGDP metadata is missing first row, we manually add dummy first row
+        null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
+        for _filter in  ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]:
+            null_row[_filter] = False
+        metadata = pd.concat([null_row, metadata], ignore_index=True)
+        return metadata.set_index('project_meta.sample_id')
