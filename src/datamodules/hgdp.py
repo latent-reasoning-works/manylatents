@@ -5,9 +5,7 @@ from torch.utils.data import DataLoader
 
 from .hgdp_dataset import HGDPDataset
 
-# from .hgdp_dataset import HGDPDataset  # Uncomment when dataset logic is implemented
-
-class HGDPModule(LightningDataModule):
+class HGDPDataModule(LightningDataModule):
     """
     PyTorch Lightning DataModule for the Human Genome Diversity Project (HGDP) dataset.
     """

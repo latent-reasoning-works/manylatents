@@ -3,11 +3,7 @@ mode: "train"  # can be: "train", "evaluate", "dimensionality_reduction"
 
 seed: 42
 
-datamodule:
-  _target_: "src.datamodules.MyLightningDataModule"
-  batch_size: 32
-  num_workers: 4
-  data_dir: "./data"
+datamodule: hgdp
 
 trainer:
   max_epochs: 5

@@ -73,7 +73,6 @@ def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLo
         dm.setup()
         return dm
     if "dataloader" in cfg and cfg.dataloader is not None:
-        # If you want to instantiate a simple DataLoader instead
         return hydra.utils.instantiate(cfg.dataloader)
     raise ValueError("No valid 'datamodule' or 'dataloader' found in the config.")
 

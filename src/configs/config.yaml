@@ -1,8 +1,7 @@
 defaults:
   - _self_
   - algorithm: null
-  - data: default
+  - datamodule: hgdp
   - hydra: default
   - paths: default
-
-experiment: null
+  - experiment: null
