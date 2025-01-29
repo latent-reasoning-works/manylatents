@@ -32,7 +32,9 @@ fi
 # Download required files
 gsutil cp gs://gcp-public-data--gnomad/release/3.1/secondary_analyses/hgdp_1kg_v2/metadata_and_qc/gnomad_meta_updated.tsv "${data_folder}/"
 gsutil cp gs://gcp-public-data--gnomad/release/3.1/secondary_analyses/hgdp_1kg_v2/pca/pca_outliers.txt "${data_folder}/"
-gsutil cp -r gs://gcp-public-data--gnomad/release/3.1/secondary_analyses/hgdp_1kg_v2/pca_preprocessing/related_sample_ids.ht "${data_folder}/"
+
+# We converted to csv to remove hail dependency
+#gsutil cp -r gs://gcp-public-data--gnomad/release/3.1/secondary_analyses/hgdp_1kg_v2/pca_preprocessing/related_sample_ids.ht "${data_folder}/"
 
 # Process metadata
 python "${exp_root}/scripts/make_metadata_file.py" --data_root "${data_folder}"
