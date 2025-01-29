@@ -13,14 +13,14 @@ from src.experiment import (
 
 logger = logging.getLogger(__name__)
 
-@hydra.main(config_path="configs", config_name="config", version_base="1.2")
+@hydra.main(config_path="../src/configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     """
     Main entry point:
-      - Instantiate datamodule
-      - Instantiate trainer
+      - Instantiate datamodule, algorithm, trainer
       - Hand off to run_pipeline
     """
+    logger.info(f"Config: {cfg}")
     logger.info("Starting the experiment pipeline...")
     logger.info("Instantiating the datamodule...")
     datamodule = instantiate_datamodule(cfg)
