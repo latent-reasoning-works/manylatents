@@ -1,28 +1,31 @@
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
 from .plink_dataset import PlinkDataset
+
 
 class HGDPDataset(PlinkDataset):
     """
-    PyTorch  Dataset for the Thousand Genomes Project + Human Genome Diversity Project (HGDP) dataset.
+    PyTorch Dataset for the Thousand Genomes Project + Human Genome Diversity Project (HGDP) dataset.
     """
 
-    def __init__(self, plink_prefix: str, metadata_path: str, 
-                 mode: str = 'genotypes', mmap_mode: Optional[str] = None):
+    def __init__(self, filenames: Dict[str, str], cache_dir: str, mode: str = 'genotypes', mmap_mode: Optional[str] = None):
         """
         Initializes the HGDP dataset with configuration parameters.
 
         Args:
-            plink_prefix (str): Path to the PLINK file prefix (excluding extensions).
-            metadata_path (str): Path to the metadata CSV file.
+            filenames (dict): Dictionary containing filenames for plink and metadata.
             mode (str): Determines the type of data returned ('genotypes' or 'pca').
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
         """
-        super().__init__(plink_prefix=plink_prefix, 
-                         metadata_path=metadata_path, 
-                         mmap_mode=mmap_mode, mode=mode)
+        super().__init__(
+            filenames=filenames,
+            cache_dir=cache_dir,
+            mmap_mode=mmap_mode, 
+            mode=mode
+        )
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
@@ -36,11 +39,16 @@ class HGDPDataset(PlinkDataset):
         return to_fit_on, to_transform_on
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
-        metadata = pd.read_csv(metadata_path)
+        import os
+        full_path = os.path.abspath(metadata_path)
+        print(f"Loading metadata from: {full_path}")  # Debugging
 
-        # because HGDP metadata is missing first row, we manually add dummy first row
+        metadata = pd.read_csv(full_path)
+
+        # HGDP metadata is missing the first row, so we manually add a dummy first row
         null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
-        for _filter in  ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]:
+        for _filter in ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]:
             null_row[_filter] = False
         metadata = pd.concat([null_row, metadata], ignore_index=True)
+
         return metadata.set_index('project_meta.sample_id')

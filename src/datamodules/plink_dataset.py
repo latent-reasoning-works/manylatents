@@ -1,15 +1,13 @@
-import os
 import hashlib
-import tqdm
-from typing import Optional, Any, Tuple
+import os
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
 import pandas as pd
+import tqdm
 from pyplink import PyPlink
 from torch.utils.data import Dataset
 
-
-# TODO: clean this up
-CACHE_DIR = '.'
 
 def replace_negative_one_with_nan(array: np.array) -> np.array:
     # Replace all occurrences of -1 with np.nan
@@ -110,65 +108,50 @@ def convert_plink_to_npy(plink_prefix: str,
     np.save(fname, 
             normalized_matrix)
 
-
 class PlinkDataset(Dataset):
     """
     PyTorch Dataset for plink formatted genetic datasets.
     """
 
     def __init__(self, 
-                 plink_prefix: str,
-                 metadata_path: str,
-                 mmap_mode: Optional[str] = None,
+                 filenames: Dict[str, str], 
+                 cache_dir: str,  
+                 mmap_mode: Optional[str] = None, 
                  mode: str = 'genotypes') -> None:
         """
-        Initializes the HGDP dataset with configuration parameters.
+        Initializes the PLINK dataset.
 
         Args:
-            plink_prefix (str): Path to the plink file + name (excluding extension).
-            metadata_path (str): Path to metadata to load
-            mmap_mode (Optional[str]): Mode for memory-mapped files. 
-                                       Use 'r' for read-only to handle large datasets.
-            mode: return processed genotype data or pc transformed data
+            filenames (dict): Dictionary containing paths for plink and metadata files.
+            cache_dir (str): Directory for caching preprocessed data.
+            mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
+            mode (str): Determines type of data returned ('genotypes' or 'pca').
         """
         super().__init__()
-        self.plink_prefix = plink_prefix
+        self.filenames = filenames
+        self.cache_dir = cache_dir 
+        self.plink_prefix = filenames["plink"]
+        self.metadata_path = filenames["metadata"]
         self.mmap_mode = mmap_mode
 
-        # load metadata
-        self.metadata = self.load_metadata(metadata_path)
+        # Load metadata
+        self.metadata = self.load_metadata(self.metadata_path)
 
-        # extract samples to fit on vs transform
+        # Extract fit and transform indices
         self.fit_idx, self.trans_idx = self.extract_indices()
 
-        # Create a unique hash for the input arguments
+        # Generate unique cache file paths
         file_hash = generate_hash(self.plink_prefix, self.fit_idx, self.trans_idx)
-        self.npy_cache_file = os.path.join(CACHE_DIR, f".{file_hash}.npy")
-        self.pca_cache_file = os.path.join(CACHE_DIR, f".{file_hash}.pca.npy")
+        self.npy_cache_file = os.path.join(self.cache_dir, f".{file_hash}.npy")
+        self.pca_cache_file = os.path.join(self.cache_dir, f".{file_hash}.pca.npy")
 
         if mode == 'genotypes':
-            # if cached file does not exist, create it
             if not os.path.exists(self.npy_cache_file):
-                # else load from pedfile and cache
-                convert_plink_to_npy(self.plink_prefix,
-                                     self.npy_cache_file,
-                                     self.fit_idx,
-                                     self.trans_idx)
-            self.X = np.load(self.npy_cache_file,
-                             mmap_mode=self.mmap_mode)
+                convert_plink_to_npy(self.plink_prefix, self.npy_cache_file, self.fit_idx, self.trans_idx)
+            self.X = np.load(self.npy_cache_file, mmap_mode=self.mmap_mode)
 
         if mode == 'pca':
-            raise NotImplementedError
-            #             # if PCA file does not exist, create it
-            #             if not os.path.exists(self.pca_cache_file):
-            #                 from hail_pca import compute_pca_from_hail
-            #                 compute_pca_from_hail(self.plink_prefix,
-            #                                       self.pca_cache_file,
-            #                                       self.metadata,
-            #                                       self.fit_idx,
-            #                                       self.trans_idx)
-
-            #             self.X = load_pca_from_hail(self.pca_cache_file)
+            raise NotImplementedError  # PCA logic will be implemented later
 
     def __getitem__(self, index: int) -> Any:
         """

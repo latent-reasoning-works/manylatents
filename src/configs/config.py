@@ -10,6 +10,7 @@ from .configs import Config
 class DataModuleConfig:
     batch_size: int = 32
     num_workers: int = 4
+    cache_dir: str = "${paths.cache_dir}"  
 
 @dataclass
 class AlgorithmConfig:

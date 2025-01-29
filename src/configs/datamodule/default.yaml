@@ -1,0 +1,3 @@
+batch_size: 32
+num_workers: 4
+cache_dir: ${paths.cache_dir}
