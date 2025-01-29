@@ -2,7 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-import hail as hl
+#import hail as hl
 import argparse
 
 def fix_array(arr):
@@ -49,10 +49,12 @@ def main(data_root):
     filtered_samples = hard_filtered_samples.tolist() + contaminated_samples
 
     # Load related samples from Hail Table
-    hl.init(spark_conf={'spark.driver.memory': '4g', 'spark.executor.memory': '4g'})
-    related_samples_path = os.path.join(data_root, 'related_sample_ids.ht')
-    related_samples = hl.read_table(related_samples_path).to_pandas()['node'].tolist()
-    hl.stop()
+    # hl.init(spark_conf={'spark.driver.memory': '4g', 'spark.executor.memory': '4g'})
+    # related_samples_path = os.path.join(data_root, 'related_sample_ids.ht')
+    # related_samples = hl.read_table(related_samples_path).to_pandas()['node'].tolist()
+    # hl.stop()
+    related_samples = pd.read_csv(os.path.join(data_root,
+                                               'HGDP+1KGP_related_samples.csv'))['node'].tolist()
 
     # Load PCA outliers
     pca_outliers_path = os.path.join(data_root, 'pca_outliers.txt')
