@@ -2,9 +2,15 @@
 
 # Reproducible Dataset Construction
 
-# Define root path for the experiment
-exp_root="path/to/manifold_genetics"
+script_dir="$(dirname "$(realpath "$0")")"
+exp_root="$(realpath "$script_dir/..")"  # Moves up one directory to project root
+
+echo "Detected project root: $exp_root"
+
 data_folder="${exp_root}/data"
+
+echo "Data folder: $data_folder"
+echo "Script directory: ${exp_root}/scripts"
 
 # Load environment
 if [ -f ".venv/bin/activate" ]; then
@@ -16,6 +22,12 @@ fi
 
 # Create data directory if it doesn't exist
 mkdir -p "${data_folder}"
+
+# Verify gsutil exists
+if ! command -v gsutil &> /dev/null; then
+  echo "Error: gsutil not found! Install Google Cloud SDK."
+  exit 1
+fi
 
 # Download required files
 gsutil cp gs://gcp-public-data--gnomad/release/3.1/secondary_analyses/hgdp_1kg_v2/metadata_and_qc/gnomad_meta_updated.tsv "${data_folder}/"
