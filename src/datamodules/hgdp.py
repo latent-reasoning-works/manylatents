@@ -50,7 +50,8 @@ class HGDPDataModule(LightningDataModule):
         self.dataset = HGDPDataset(
             files=self.files,
             cache_dir=self.cache_dir,
-            mode=self.mode
+            mode=self.mode,
+            mmap_mode=self.mmap_mode
         )
 
     def train_dataloader(self) -> DataLoader:

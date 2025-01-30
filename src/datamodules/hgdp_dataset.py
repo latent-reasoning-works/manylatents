@@ -1,11 +1,32 @@
+import logging
 import os
 from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
+from src.utils.data import load_metadata
+
 from .plink_dataset import PlinkDataset
 
+logger = logging.getLogger(__name__)
+
+
+def hgdp_add_dummy_row(metadata: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds a dummy row to the metadata DataFrame to account for missing data in the first row.
+
+    Args:
+        metadata (pd.DataFrame): The original metadata DataFrame.
+
+    Returns:
+        pd.DataFrame: The modified metadata DataFrame with a dummy row.
+    """
+    null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
+    for _filter in ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]:
+        null_row[_filter] = False
+    metadata = pd.concat([null_row, metadata], ignore_index=True)
+    return metadata
 
 class HGDPDataset(PlinkDataset):
     """
@@ -42,15 +63,29 @@ class HGDPDataset(PlinkDataset):
         return to_fit_on, to_transform_on
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
+        """
+        Loads and processes metadata for the HGDP dataset.
+
+        Args:
+            metadata_path (str): Path to the metadata file.
+
+        Returns:
+            pd.DataFrame: Processed metadata DataFrame.
+        """
         full_path = os.path.abspath(metadata_path)
-        print(f"Loading metadata from: {full_path}")  # Debugging
+        logger.info(f"Loading metadata from: {full_path}")  # Debugging
 
-        metadata = pd.read_csv(full_path)
+        # Define required columns
+        required_columns = ['project_meta.sample_id',] 
+                            #'filter_king_related', 
+                            #'filter_pca_outlier', 
+                            #'hard_filtered', 
+                            #'filter_contaminated']
 
-        # HGDP metadata is missing the first row, so we manually add a dummy first row
-        null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
-        for _filter in ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]:
-            null_row[_filter] = False
-        metadata = pd.concat([null_row, metadata], ignore_index=True)
+        metadata = load_metadata(
+            file_path=full_path,
+            required_columns=required_columns,
+            additional_processing=hgdp_add_dummy_row
+        )
 
         return metadata.set_index('project_meta.sample_id')

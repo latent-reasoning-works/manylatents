@@ -1,6 +1,8 @@
+import logging
 import os
 import pickle
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -66,3 +68,26 @@ def create_results_dataframe(results):
 
     # Convert to DataFrame
     return pd.DataFrame(normalized_results)
+
+def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
+    """
+    Detects the delimiter of a file using csv.Sniffer.
+
+    Args:
+        file_path (str): Path to the file.
+        sample_size (int): Number of bytes to read for detection.
+
+    Returns:
+        Optional[str]: Detected delimiter or None if detection fails.
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            sample = f.read(sample_size)
+            sniffer = csv.Sniffer()
+            dialect = sniffer.sniff(sample)
+            delimiter = dialect.delimiter
+            logging.info(f"Detected delimiter '{delimiter}' for file '{file_path}'.")
+            return delimiter
+    except Exception as e:
+        logging.warning(f"Could not detect delimiter for file '{file_path}': {e}")
+        return None
