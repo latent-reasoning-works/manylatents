@@ -23,8 +23,13 @@ def hgdp_add_dummy_row(metadata: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: The modified metadata DataFrame with a dummy row.
     """
     null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
-    for _filter in ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]:
-        null_row[_filter] = False
+    
+    # Conditionally set filter columns if they exist
+    filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+    for _filter in filter_columns:
+        if _filter in metadata.columns:
+            null_row[_filter] = False
+    
     metadata = pd.concat([null_row, metadata], ignore_index=True)
     return metadata
 
