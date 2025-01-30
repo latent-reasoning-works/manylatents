@@ -12,7 +12,7 @@ class HGDPDataModule(LightningDataModule):
 
     def __init__(
         self,
-        filenames: dict,
+        files: dict,
         mode: str,
         batch_size: int,
         num_workers: int,
@@ -31,7 +31,7 @@ class HGDPDataModule(LightningDataModule):
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
         """
         super().__init__()
-        self.filenames = filenames
+        self.files = files
         self.mode = mode
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -48,7 +48,7 @@ class HGDPDataModule(LightningDataModule):
         Set up datasets for training, validation, and testing.
         """
         self.dataset = HGDPDataset(
-            filenames=self.filenames,
+            files=self.files,
             cache_dir=self.cache_dir,
             mode=self.mode
         )

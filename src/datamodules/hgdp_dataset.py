@@ -1,3 +1,4 @@
+import os
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -11,17 +12,19 @@ class HGDPDataset(PlinkDataset):
     PyTorch Dataset for the Thousand Genomes Project + Human Genome Diversity Project (HGDP) dataset.
     """
 
-    def __init__(self, filenames: Dict[str, str], cache_dir: str, mode: str = 'genotypes', mmap_mode: Optional[str] = None):
+    def __init__(self, 
+                 files: Dict[str, str], cache_dir: str, 
+                 mode: str = 'genotypes', mmap_mode: Optional[str] = None):
         """
         Initializes the HGDP dataset with configuration parameters.
 
         Args:
-            filenames (dict): Dictionary containing filenames for plink and metadata.
+            files (dict): Dictionary containing the file paths for plink and metadata.
             mode (str): Determines the type of data returned ('genotypes' or 'pca').
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
         """
         super().__init__(
-            filenames=filenames,
+            files=files,
             cache_dir=cache_dir,
             mmap_mode=mmap_mode, 
             mode=mode
@@ -39,7 +42,6 @@ class HGDPDataset(PlinkDataset):
         return to_fit_on, to_transform_on
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
-        import os
         full_path = os.path.abspath(metadata_path)
         print(f"Loading metadata from: {full_path}")  # Debugging
 

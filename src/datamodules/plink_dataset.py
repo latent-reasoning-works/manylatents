@@ -114,7 +114,7 @@ class PlinkDataset(Dataset):
     """
 
     def __init__(self, 
-                 filenames: Dict[str, str], 
+                 files: Dict[str, str], 
                  cache_dir: str,  
                  mmap_mode: Optional[str] = None, 
                  mode: str = 'genotypes') -> None:
@@ -128,10 +128,10 @@ class PlinkDataset(Dataset):
             mode (str): Determines type of data returned ('genotypes' or 'pca').
         """
         super().__init__()
-        self.filenames = filenames
+        self.filenames = files
         self.cache_dir = cache_dir 
-        self.plink_prefix = filenames["plink"]
-        self.metadata_path = filenames["metadata"]
+        self.plink_prefix = files["plink"]
+        self.metadata_path = files["metadata"]
         self.mmap_mode = mmap_mode
 
         # Load metadata

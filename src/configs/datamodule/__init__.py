@@ -6,7 +6,6 @@ from config import BaseDataModuleConfig
 #from hydra.core.config_store import ConfigStore
 from hydra_zen import store
 
-datamodule_store = store(group="datamodule")
 
 @dataclass
 class HGDPDataModuleConfig(BaseDataModuleConfig):
@@ -20,10 +19,9 @@ class HGDPDataModuleConfig(BaseDataModuleConfig):
     metadata_path: str = "${paths.data_dir}/${datamodule.filenames.metadata}" 
     mode: str = None
     mmap_mode: Optional[str] = None
-
-#cs = ConfigStore.instance()
-#cs.store(
-#    group="datamodule",
-#    name="hgdp",
-#    node=HGDPDataModuleConfig(),
-#)
+    
+store(
+    HGDPDataModuleConfig,
+    group="datamodule",
+    name="hgdp"
+)
