@@ -125,8 +125,7 @@ class PlinkDataset(Dataset):
     def __init__(self, 
                  files: Dict[str, str], 
                  cache_dir: str,  
-                 mmap_mode: Optional[str] = None, 
-                 mode: str = 'genotypes') -> None:
+                 mmap_mode: Optional[str] = None,) -> None:
         """
         Initializes the PLINK dataset.
 
@@ -154,13 +153,9 @@ class PlinkDataset(Dataset):
         self.npy_cache_file = os.path.join(self.cache_dir, f".{file_hash}.npy")
         self.pca_cache_file = os.path.join(self.cache_dir, f".{file_hash}.pca.npy")
 
-        if mode == 'genotypes':
-            if not os.path.exists(self.npy_cache_file):
-                convert_plink_to_npy(self.plink_path, self.npy_cache_file, self.fit_idx, self.trans_idx)
-            self.X = np.load(self.npy_cache_file, mmap_mode=self.mmap_mode)
-
-        if mode == 'pca':
-            raise NotImplementedError  # PCA logic will be implemented later
+        if not os.path.exists(self.npy_cache_file):
+            convert_plink_to_npy(self.plink_path, self.npy_cache_file, self.fit_idx, self.trans_idx)
+        self.X = np.load(self.npy_cache_file, mmap_mode=self.mmap_mode)
 
     def __getitem__(self, index: int) -> Any:
         """

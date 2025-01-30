@@ -2,7 +2,6 @@ defaults:
   - default
 
 _target_: src.datamodules.hgdp.HGDPDataModule
-mode: "genotypes"
 mmap_mode: null
 
 files:
