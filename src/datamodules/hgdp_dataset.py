@@ -62,10 +62,10 @@ class HGDPDataset(PlinkDataset):
         filtered_indices = ~self.metadata.index.isin(_filtered_indices)
         related_indices = ~self.metadata['filter_king_related'].values
 
-        to_fit_on = related_indices & filtered_indices
-        to_transform_on = (~related_indices) & filtered_indices
+        fit_idx = related_indices & filtered_indices
+        trans_idx = (~related_indices) & filtered_indices
 
-        return to_fit_on, to_transform_on
+        return fit_idx, trans_idx 
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """

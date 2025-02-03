@@ -25,7 +25,6 @@ def main(cfg: DictConfig):
     logger.info("Starting the experiment pipeline...")
     logger.info("Instantiating the datamodule...")
     datamodule = instantiate_datamodule(cfg)
-    datamodule.setup()
     logger.info("Instantiating the algorithm...")
     algorithm = instantiate_algorithm(cfg)
     logger.info("Instantiating the trainer...")

@@ -146,6 +146,7 @@ class PlinkDataset(Dataset):
         self.metadata = self.load_metadata(self.metadata_path)
 
         # Extract fit and transform indices
+        ## these will go into the dataloader
         self.fit_idx, self.trans_idx = self.extract_indices()
 
         # Generate unique cache file paths
@@ -155,6 +156,7 @@ class PlinkDataset(Dataset):
 
         if not os.path.exists(self.npy_cache_file):
             convert_plink_to_npy(self.plink_path, self.npy_cache_file, self.fit_idx, self.trans_idx)
+            ## this creates the X matrix
         self.X = np.load(self.npy_cache_file, mmap_mode=self.mmap_mode)
 
     def __getitem__(self, index: int) -> Any:
