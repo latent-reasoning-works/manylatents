@@ -13,7 +13,6 @@ class HGDPDataModule(LightningDataModule):
     def __init__(
         self,
         files: dict,
-        mode: str,
         batch_size: int,
         num_workers: int,
         cache_dir: str,
@@ -27,12 +26,10 @@ class HGDPDataModule(LightningDataModule):
             filenames (dict): Dictionary containing paths for plink and metadata files.
             batch_size (int): The number of samples per batch.
             num_workers (int): Number of subprocesses to use for data loading.
-            mode (str): Determines the type of data returned ('genotypes' or 'pca').
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
         """
         super().__init__()
         self.files = files
-        self.mode = mode
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cache_dir = cache_dir
@@ -50,7 +47,6 @@ class HGDPDataModule(LightningDataModule):
         self.dataset = HGDPDataset(
             files=self.files,
             cache_dir=self.cache_dir,
-            mode=self.mode,
             mmap_mode=self.mmap_mode
         )
 

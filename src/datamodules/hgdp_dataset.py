@@ -40,20 +40,18 @@ class HGDPDataset(PlinkDataset):
 
     def __init__(self, 
                  files: Dict[str, str], cache_dir: str, 
-                 mode: str = 'genotypes', mmap_mode: Optional[str] = None):
+                 mmap_mode: Optional[str] = None):
         """
         Initializes the HGDP dataset with configuration parameters.
 
         Args:
             files (dict): Dictionary containing the file paths for plink and metadata.
-            mode (str): Determines the type of data returned ('genotypes' or 'pca').
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
         """
         super().__init__(
             files=files,
             cache_dir=cache_dir,
             mmap_mode=mmap_mode, 
-            mode=mode
         )
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
