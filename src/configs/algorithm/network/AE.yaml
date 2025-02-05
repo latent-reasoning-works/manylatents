@@ -1,0 +1,5 @@
+_target_: src.networks.AE
+emb_dim: 32
+w: 64
+activation_fn:
+  _target_: torch.nn.ReLU
