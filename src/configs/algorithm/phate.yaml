@@ -1,8 +1,9 @@
 defaults:
   - network: null # specify a neural network
+  - dimensionality_reduction: null # specify a dimensionality reduction algorithm
   - _self_
 
-_target_: src.algorithms.pca.PCA
+_target_: src.algorithms.phate.PHATE
 _partial_: true
 
 n_components: 2
