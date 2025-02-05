@@ -2,7 +2,13 @@ import numpy as np
 import phate
 
 class PHATE:
-    def __init__(self, n_components: int = 2, knn: int = 5, t: str = 'auto', gamma: float = 1.0, random_state: int = None, **kwargs):
+    def __init__(self, 
+                 n_components: int = 2, 
+                 knn: int = 5, 
+                 t: str = 'auto', 
+                 gamma: float = 1.0, 
+                 random_state: int = None, 
+                 **kwargs):
         """
         PHATE Wrapper for dimensionality reduction.
 
@@ -22,7 +28,13 @@ class PHATE:
 
     def _create_phate(self):
         """Instantiate the PHATE object with specified parameters."""
-        return phate.PHATE(n_components=self.n_components, knn=self.knn, t=self.t, random_state=self.random_state, **self.phate_params)
+        return phate.PHATE(
+                            n_components=self.n_components, 
+                            knn=self.knn, 
+                            t=self.t, 
+                            random_state=self.random_state, 
+                            **self.phate_params
+                            )
 
     def fit(self, data: np.ndarray):
         """Fit PHATE on the input data."""
@@ -42,12 +54,11 @@ class PHATE:
             return self.phate_obj.fit_transform(data)
 
         # Fit PHATE on the selected indices
-        self.phate_obj = self._create_phate()
-        self.phate_obj.fit(data[fit_idx])
+        self.fit(data[fit_idx])
 
         # Transform both fit and transform indices
-        phate_fit_emb = self.phate_obj.transform(data[fit_idx])
-        phate_transform_emb = self.phate_obj.transform(data[transform_idx])
+        phate_fit_emb = self.transform(data[fit_idx])
+        phate_transform_emb = self.transform(data[transform_idx])
 
         # Concatenate transformed embeddings into original order
         phate_emb = np.zeros((data.shape[0], phate_fit_emb.shape[1]), dtype=np.float32)

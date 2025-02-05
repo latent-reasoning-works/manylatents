@@ -28,14 +28,15 @@ class PCA:
         if fit_idx is None or transform_idx is None:
             return self.pca_obj.fit_transform(data)
         
-        self.pca_obj.fit(data[fit_idx])
-        pca_fit_emb = self.pca_obj.transform(data[fit_idx])
-        pca_transform_emb = self.pca_obj.transform(data[transform_idx])
+        self.fit(data[fit_idx])
+        pca_fit_emb = self.transform(data[fit_idx])
+        pca_transform_emb = self.transform(data[transform_idx])
 
         # concatenate the fit and transform data
-        pca_emb = np.zeros((data.shape[0], pca_fit_emb.shape[1]))
+        pca_emb = np.zeros((data.shape[0], pca_fit_emb.shape[1]), dtype=np.float32)
         pca_emb[fit_idx] = pca_fit_emb
         pca_emb[transform_idx] = pca_transform_emb
+
         return pca_emb
 
     

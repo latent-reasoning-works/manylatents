@@ -3,12 +3,14 @@ defaults:
   - dimensionality_reduction: null # specify a dimensionality reduction algorithm
   - _self_
 
-_target_: src.algorithms.phate.PHATE
+_target_: src.algorithms.pca.PCA
 _partial_: true
 
 n_components: 2
 random_state: 42
-t: 5
-knn: 5
-gamma: 1.0
-kwargs: null
+n_neighbors: 20
+kwargs:
+  min_dist: 0.05
+  metric: "cosine"
+  spread: 1.0
+  n_epochs: 500
