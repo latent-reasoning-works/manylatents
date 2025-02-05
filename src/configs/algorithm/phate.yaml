@@ -5,3 +5,8 @@ defaults:
 _target_: src.algorithms.pca.PCA
 _partial_: true
 
+n_components: 2
+random_state: 42
+t: 5
+knn: 5
+gamma: 1.0
