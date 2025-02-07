@@ -11,6 +11,18 @@ from torch.utils.data import DataLoader
 
 logger = logging.getLogger(__name__)
 
+def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLoader]:
+    """
+    Dynamically instantiate the data module (or dataloader) from the config.
+    """
+    if "datamodule" in cfg and cfg.datamodule is not None:
+        dm = hydra.utils.instantiate(cfg.datamodule)
+        dm.setup()
+        return dm
+    if "dataloader" in cfg and cfg.dataloader is not None:
+        return hydra.utils.instantiate(cfg.dataloader)
+    raise ValueError("No valid 'datamodule' or 'dataloader' found in the config.")
+
 def instantiate_algorithm(
     cfg: DictConfig,
     datamodule: Optional[LightningDataModule] = None,
@@ -63,19 +75,6 @@ def instantiate_algorithm(
         logger.info(f"Network instantiated: {cfg.network._target_}")
 
     return embeddings_result, model
-
-def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLoader]:
-    """
-    Dynamically instantiate the data module (or dataloader) from the config.
-    """
-    if "datamodule" in cfg and cfg.datamodule is not None:
-        dm = hydra.utils.instantiate(cfg.datamodule)
-        dm.setup()
-        return dm
-    if "dataloader" in cfg and cfg.dataloader is not None:
-        return hydra.utils.instantiate(cfg.dataloader)
-    raise ValueError("No valid 'datamodule' or 'dataloader' found in the config.")
-
 
 def instantiate_trainer(cfg: DictConfig) -> Trainer:
     """
