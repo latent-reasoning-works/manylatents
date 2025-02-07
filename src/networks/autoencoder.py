@@ -1,46 +1,7 @@
-
 import torch
 import numpy as np
-import lightning as L
-
-
-class MLP(torch.nn.Module):
-    def __init__(self, dim, out_dim=None, w=64, activation_fn=torch.nn.ReLU()):
-        super().__init__()
-        if out_dim is None:
-            out_dim = dim // 2
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(dim, w),
-            activation_fn,
-            torch.nn.Linear(w, w),
-            activation_fn,
-            torch.nn.Linear(w, w),
-            activation_fn,
-            torch.nn.Linear(w, out_dim),
-        )
-
-    def forward(self, x):
-        x = self.net(x)
-        return x
-
-
-class BaseAE(torch.nn.Module):
-    def __init__(self, dim, emb_dim, w=64, activation_fn=torch.nn.ReLU()):
-        super().__init__()
-        self.dim = dim
-        self.emb_dim = emb_dim
-
-        self.encoder = MLP(dim, emb_dim, w=w, activation_fn=activation_fn)
-        self.decoder = MLP(emb_dim, dim, w=w, activation_fn=activation_fn)
-
-    def encode(self, x):
-        return self.encoder(x)
-
-    def decode(self, x):
-        return self.decoder(x)
-
-    def forward(self, x):
-        return self.decoder(x)
+from lightning import LightningModule
+from src.networks.BaseAE import BaseAE
 
 
 class AE(BaseAE):
@@ -48,10 +9,10 @@ class AE(BaseAE):
         self,
         dim,
         emb_dim,
-        w=64,
+        width=64,
         activation_fn=torch.nn.ReLU(),
     ):
-        super().__init__(dim, emb_dim, w=w, activation_fn=activation_fn)
+        super().__init__(dim, emb_dim, width=width, activation_fn=activation_fn)
 
     def forward(self, x):
         z = self.encoder(x)
@@ -72,7 +33,7 @@ class AE(BaseAE):
         return self.decode(self.encode(x))
     
 
-class LitAE(L.LightningModule):
+class LitAE(LightningModule):
     def __init__(self, model, optimizer, lr=1e-3, noise=None):
         super().__init__()
         self.model = model

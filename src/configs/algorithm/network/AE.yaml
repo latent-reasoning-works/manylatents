@@ -1,5 +1,6 @@
-_target_: src.networks.AE
+_target_: src.network.autoencoder.AE
 emb_dim: 32
-w: 64
+width: 64
+depth: 4
 activation_fn:
   _target_: torch.nn.ReLU
