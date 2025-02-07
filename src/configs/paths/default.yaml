@@ -1,6 +1,4 @@
 data_dir: "./data"                 # Base directory for data
-genotype_dir: "./data/genotypes"   # Directory for genotypes
-admixture_dir: "./data/admixture"  # Directory for admixture
 output_dir: "./outputs"            # Base directory for outputs
 ckpt_dir: "./outputs/ckpt"         # Model-related outputs
 cache_dir: "./outputs/cache"       # Intermediate files
