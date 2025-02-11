@@ -1,20 +1,15 @@
-import hashlib
 import logging
 import os
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import tqdm
-from pyplink import PyPlink
 from torch.utils.data import Dataset
 
-from src.utils.data import(
+from src.utils.data import (
     convert_plink_to_npy,
     generate_hash,
-    preprocess_data_matrix,
-    hwe_normalize,
-    replace_negative_one_with_nan,)
+)
 
 logger = logging.getLogger(__name__)
 
