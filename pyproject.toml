@@ -76,6 +76,7 @@ dependencies = [
     "lightning>=2.5.0.post0",
     "gsutil>=5.33",
     "hydra-zen>=0.13.0",
+    "torchmetrics>=1.6.1",
 ]
 
 [tool.uv]
