@@ -1,12 +1,65 @@
-import numpy as np
+from typing import Literal, Optional, Tuple
+
+import torch
+from lightning import LightningModule
+from sklearn.decomposition import PCA
+from torch import Tensor
 
 
-class PCA:
-    def __init__(self, n_components: int):
+class PCAModule(LightningModule):
+    def __init__(
+        self,
+        n_components: int = 2,
+        datamodule=None,  # Reference to the datamodule if needed downstream
+        network: Optional[torch.nn.Module] = None,  # Unused for PCA; kept for interface consistency
+        init_seed: int = 42,
+        fit_fraction: float = 1.0,  # Fraction of the first batch to use for fitting PCA
+    ):
+        super().__init__()
         self.n_components = n_components
+        self.datamodule = datamodule
+        self.init_seed = init_seed
+        self.fit_fraction = fit_fraction
+        self.model = PCA(n_components=self.n_components)
+        self._is_fitted = False
 
-    def fit_transform(self, data: np.ndarray) -> np.ndarray:
-        ## TODO: Implement PCA
-        # Perform PCA on the data
-        print('found PCA')
-        return np.random.rand(data.shape[0], self.n_components)
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Applies PCA transformation to the input tensor x.
+        On the first call, fits PCA using only a fraction of the batch (if specified).
+        """
+        x_np = x.detach().cpu().numpy()
+        if not self._is_fitted:
+            n_samples = x_np.shape[0]
+            # Use only a fraction of the first batch for fitting.
+            n_fit = max(1, int(self.fit_fraction * n_samples))
+            self.model.fit(x_np[:n_fit])
+            self._is_fitted = True
+        # Transform the full batch using the fitted PCA model.
+        embedding = self.model.transform(x_np)
+        return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+
+    def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
+        return self.shared_step(batch, batch_idx, phase="train")
+
+    def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
+        return self.shared_step(batch, batch_idx, phase="val")
+
+    def test_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
+        return self.shared_step(batch, batch_idx, phase="test")
+    
+    def shared_step(
+        self,
+        batch: Tuple[Tensor, Tensor],
+        batch_idx: int,
+        phase: Literal["train", "val", "test"],
+    ):
+        """
+        Applies PCA to the input batch and returns a dictionary containing:
+          - a dummy loss (for compatibility with Lightning),
+          - the PCA embedding,
+          - the original labels.
+        """
+        x, y = batch
+        embedding = self(x)
+        return {"embedding": embedding}
