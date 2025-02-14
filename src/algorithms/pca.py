@@ -12,15 +12,15 @@ class PCAModule(LightningModule):
         n_components: int = 2,
         datamodule=None,  # Reference to the datamodule if needed downstream
         network: Optional[torch.nn.Module] = None,  # Unused for PCA; kept for interface consistency
-        init_seed: int = 42,
+        random_state: int = 42,
         fit_fraction: float = 1.0,  # Fraction of the first batch to use for fitting PCA
     ):
         super().__init__()
         self.n_components = n_components
         self.datamodule = datamodule
-        self.init_seed = init_seed
+        self.random_state = random_state
         self.fit_fraction = fit_fraction
-        self.model = PCA(n_components=self.n_components)
+        self.model = PCA(n_components=self.n_components, random_state=self.random_state)
         self._is_fitted = False
 
     def forward(self, x: Tensor) -> Tensor:
