@@ -2,6 +2,15 @@ defaults:
   - network: null # specify a neural network
   - _self_
 
-_target_: src.algorithms.pca.PCA
+_target_: src.algorithms.tsne.TSNEModule
 _partial_: true
+
+n_components: 2
+random_state: 42
+perplexity: 30
+fit_fraction: 1.0
+kwargs:
+  n_iter: 1000
+  learning_rate: 'auto'
+  metric: "euclidean"
 
