@@ -1,9 +1,9 @@
 from typing import Literal, Optional, Tuple
-
+# isort: skip_file
 import torch
+from torch import Tensor
 from lightning import LightningModule
 from sklearn.decomposition import PCA
-from torch import Tensor
 
 
 class PCAModule(LightningModule):

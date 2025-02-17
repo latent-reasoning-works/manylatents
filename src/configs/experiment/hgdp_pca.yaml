@@ -1,6 +1,5 @@
 # @package _global_
 
-
 defaults:
   - override /algorithm: default
   - override /algorithm/dimensionality_reduction: pca
