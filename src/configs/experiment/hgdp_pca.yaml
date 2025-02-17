@@ -1,0 +1,15 @@
+# @package _global_
+
+
+defaults:
+  - override /algorithm: default
+  - override /algorithm/dimensionality_reduction: pca
+  - override /datamodule: hgdp
+
+algorithm:
+  _target_: src.algorithms.pca.PCAModule
+  n_components: 50
+
+name: null
+
+seed: 42

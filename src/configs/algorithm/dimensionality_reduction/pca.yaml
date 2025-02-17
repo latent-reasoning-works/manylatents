@@ -1,0 +1,5 @@
+_target_: src.algorithms.pca.PCA
+_partial_: true
+
+n_components: 50
+

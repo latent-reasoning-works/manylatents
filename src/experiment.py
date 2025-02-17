@@ -9,18 +9,25 @@ from omegaconf import DictConfig
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
+from src.utils.utils import check_or_make_dirs
+
 logger = logging.getLogger(__name__)
 
 def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLoader]:
     """
     Dynamically instantiate the data module (or dataloader) from the config.
     """
+    check_or_make_dirs(cfg.paths.cache_dir)
+    logger.info(f"Cache directory ensured at: {cfg.paths.cache_dir}")
+    
     if "datamodule" in cfg and cfg.datamodule is not None:
         dm = hydra.utils.instantiate(cfg.datamodule)
         dm.setup()
         return dm
+    
     if "dataloader" in cfg and cfg.dataloader is not None:
         return hydra.utils.instantiate(cfg.dataloader)
+    
     raise ValueError("No valid 'datamodule' or 'dataloader' found in the config.")
 
 def instantiate_algorithm(
