@@ -1,10 +1,9 @@
 from typing import Literal, Optional, Tuple
 # isort: skip_file
+#from sklearn.decomposition import PCA
 import torch
 from torch import Tensor
 from lightning import LightningModule
-from sklearn.decomposition import PCA
-
 
 class PCAModule(LightningModule):
     def __init__(

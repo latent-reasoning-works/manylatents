@@ -1,9 +1,9 @@
 import logging
 from typing import Optional, Tuple, Union
-
+# isort: skip_file
+import torch
 import hydra
 import numpy as np
-import torch
 from lightning import Trainer
 from omegaconf import DictConfig
 from pytorch_lightning import LightningDataModule

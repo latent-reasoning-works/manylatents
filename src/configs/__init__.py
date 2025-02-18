@@ -3,6 +3,9 @@ from omegaconf import OmegaConf
 
 from .configs import Config
 
+## doesn't currently import algos, networks, 
+## dimensionality_reduction or datamodules, to be completed.
+
 cs = ConfigStore.instance()
 cs.store(name="base_config", node=Config)
 

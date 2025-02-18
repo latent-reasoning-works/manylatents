@@ -2,6 +2,6 @@ defaults:
   - network: null # specify a neural network
   - _self_
 
-_target_: src.algorithms.pca.PCA
+_target_: src.algorithms.phate.PHATEModule
 _partial_: true
 

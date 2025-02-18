@@ -1,4 +1,4 @@
-_target_: src.algorithms.pca.PCA
+_target_: src.algorithms.pca.PCAModule
 _partial_: true
 
 n_components: 50
