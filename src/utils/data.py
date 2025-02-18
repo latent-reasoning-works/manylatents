@@ -10,8 +10,21 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import vstack as svstack
 import hashlib
 import tqdm
+from lightning import LightningDataModule
+from torch.utils.data import DataLoader
 
 from .mappings import make_palette_label_order_HGDP
+
+class DummyDataModule(LightningDataModule):
+    def __init__(self, dataset, batch_size, num_workers):
+        super().__init__()
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+    def train_dataloader(self):
+        return DataLoader(self.dataset, batch_size=self.batch_size, num_workers=self.num_workers)
+
 
 def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
     """

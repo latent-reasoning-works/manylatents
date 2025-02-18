@@ -1,46 +1,36 @@
 import logging
 from typing import Optional, Tuple, Union
-# isort: skip_file
 import torch
 import hydra
 import numpy as np
-from lightning import Trainer
+from lightning import Trainer, LightningDataModule
 from omegaconf import DictConfig
-from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
-
+from src.utils.data import DummyDataModule
 from src.utils.utils import check_or_make_dirs
 
 logger = logging.getLogger(__name__)
 
-def instantiate_datamodule(cfg: DictConfig) -> Union[LightningDataModule, DataLoader]:
-    """
-    Dynamically instantiate the data module (or dataloader) from the config.
-    """
+def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     check_or_make_dirs(cfg.paths.cache_dir)
     logger.info(f"Cache directory ensured at: {cfg.paths.cache_dir}")
-    
+
     if cfg.datamodule.get("debug", False):
         logger.info("DEBUG MODE: Using a dummy datamodule with limited data.")
         dummy_data = torch.randn(100, 10)
         dummy_labels = torch.zeros(100)
         dataset = torch.utils.data.TensorDataset(dummy_data, dummy_labels)
-        dataloader = DataLoader(
-            dataset, 
-            batch_size=cfg.datamodule.batch_size, 
-            num_workers=cfg.datamodule.num_workers
-        )
-        return dataloader
- 
+        return DummyDataModule(dataset, batch_size=cfg.datamodule.batch_size, num_workers=cfg.datamodule.num_workers)
+
     if "datamodule" in cfg and cfg.datamodule is not None:
         dm = hydra.utils.instantiate(cfg.datamodule)
         dm.setup()
         return dm
-    
+
     if "dataloader" in cfg and cfg.dataloader is not None:
-        return hydra.utils.instantiate(cfg.dataloader)
-    
-    raise ValueError("No valid 'datamodule' or 'dataloader' found in the config.")
+        raise ValueError("Use a LightningDataModule instead of a raw DataLoader.")
+
+    raise ValueError("No valid 'datamodule' found in the config.")
 
 def instantiate_algorithm(
     cfg: DictConfig,
@@ -66,34 +56,41 @@ def instantiate_algorithm(
     embeddings_result = None
     model = None
 
-    # Instantiate embedding algorithm if specified
     if cfg.algorithm is not None:
-        logger.info(f"Instantiating embedding algorithm: {cfg.algorithm._target_.split('.')[-1]}")
-        algorithm = hydra.utils.instantiate(cfg.algorithm)
-        
+        if "_target_" in cfg.algorithm:
+            logger.info(f"Instantiating algorithm: {cfg.algorithm._target_.split('.')[-1]}")
+            algorithm = hydra.utils.instantiate(cfg.algorithm)
+        elif "dimensionality_reduction" in cfg.algorithm:
+            dr_cfg = cfg.algorithm.dimensionality_reduction
+            if "_target_" not in dr_cfg:
+                raise ValueError("Missing _target_ in dimensionality_reduction config")
+            logger.info(f"Instantiating dimensionality reduction: {dr_cfg._target_.split('.')[-1]}")
+            algorithm = hydra.utils.instantiate(dr_cfg)
+        else:
+            raise ValueError("Algorithm configuration is invalid.")
+
         if datamodule is None:
             raise ValueError("DataModule must be provided for embedding.")
 
-        # Collect data from datamodule's train dataloader
         data_loader = datamodule.train_dataloader()
-        data = []
-        for batch in data_loader:
-            inputs, _ = batch  # Assuming batch is (inputs, targets)
-            data.append(inputs.cpu().numpy())
+        data = [inputs.cpu().numpy() for inputs, _ in data_loader]
         data_np = np.concatenate(data, axis=0)
         logger.debug(f"Data shape for embedding: {data_np.shape}")
 
-        # Perform embedding
+        # Compute embeddings
         embeddings_result = algorithm.fit_transform(data_np)
-        logger.info(f"Embedding {cfg.algorithm._target_.split('.')[-1].upper()} completed with shape: {embeddings_result.shape}")
+        logger.info(f"Embedding completed with shape: {embeddings_result.shape}")
 
-    # Instantiate network if specified
-    if cfg.network is not None:
+    if "network" in cfg.algorithm:
         logger.info("Instantiating Neural Network...")
-        model = hydra.utils.instantiate(cfg.network)
-        logger.info(f"Network instantiated: {cfg.network._target_}")
+        model_cfg = cfg.algorithm.network
+        if "_target_" not in model_cfg:
+            raise ValueError("Missing _target_ in network config")
+        model = hydra.utils.instantiate(model_cfg)
+        logger.info(f"Network instantiated: {model_cfg._target_}")
 
     return embeddings_result, model
+
 
 def instantiate_trainer(cfg: DictConfig) -> Trainer:
     """
