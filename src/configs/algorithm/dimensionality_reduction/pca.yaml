@@ -2,4 +2,6 @@ _target_: src.algorithms.pca.PCAModule
 #_partial_: true
 
 n_components: 2
+random_state: 42
+fit_fraction: 1.0
 
