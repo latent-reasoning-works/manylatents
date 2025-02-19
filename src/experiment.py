@@ -1,11 +1,13 @@
 import logging
 from typing import Optional, Tuple, Union
-import torch
+
 import hydra
 import numpy as np
-from lightning import Trainer, LightningDataModule
+import torch
+from lightning import LightningDataModule, Trainer
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
+
 from src.utils.data import DummyDataModule
 from src.utils.utils import check_or_make_dirs
 
@@ -145,51 +147,39 @@ def evaluate_model(
 
     trainer.test(model, datamodule=datamodule)
 
+def run_pipeline(cfg: DictConfig, datamodule: LightningDataModule, trainer: Trainer):
+    """
+    Orchestrates the entire pipeline:
+    - Performs dimensionality reduction (if applicable)
+    - Trains a model (if specified)
+    - Evaluates (if specified)
+    """
 
-def run_pipeline(
-    cfg: DictConfig,
-    datamodule: LightningDataModule,
-    trainer: Trainer,
-):
-    """
-    Orchestrates the entire pipeline based on the configuration.
-    Executes dimensionality reduction, training, or both.
-    """
+    logger.info("Running pipeline...")
     embeddings = None
-    embeddings_path = cfg.paths.embeddings_file if 'embeddings_file' in cfg.paths else None
+    embeddings_path = cfg.paths.embeddings_file if "embeddings_file" in cfg.paths else None
 
-    # Determine if Dimensionality Reduction (DR) should be performed
-    perform_dr = cfg.algorithm.method is not None and embeddings_path is not None
+    # Check if dimensionality reduction is needed
+    perform_dr = "dimensionality_reduction" in cfg.algorithm
+    perform_training = "network" in cfg.algorithm
 
-    # Determine if Network (training) should be performed
-    perform_training = cfg.network is not None
-
-    # 1. Perform Dimensionality Reduction if needed
+    # 1. Perform PCA or other dimensionality reduction
     if perform_dr:
         logger.info("Performing Dimensionality Reduction (DR)...")
         embeddings, _ = instantiate_algorithm(cfg, datamodule=datamodule)
+
         if embeddings is not None and embeddings_path:
             np.save(embeddings_path, embeddings)
             logger.info(f"Embeddings saved to {embeddings_path}")
 
-    # 2. Instantiate and train the network if specified
+    # 2. Train network if applicable
     if perform_training:
-        _, model = instantiate_algorithm(cfg, embeddings=embeddings)
+        _, model = instantiate_algorithm(cfg)
         if model is None:
             raise ValueError("Model configuration is missing for training.")
 
-        logger.info("Starting training pipeline...")
-        trainer.fit(model, datamodule=datamodule)
+        train_model(cfg, trainer, datamodule, model)
 
-        # Save model checkpoint if path is specified
-        if 'model_ckpt' in cfg.paths and cfg.paths.model_ckpt:
-            trainer.save_checkpoint(cfg.paths.model_ckpt)
-            logger.info(f"Model checkpoint saved to {cfg.paths.model_ckpt}")
-
-    # 3. Handle Evaluation if specified
-    if 'mode' in cfg and cfg.mode == "evaluate":
-        if perform_training and 'model_ckpt' in cfg.paths and cfg.paths.model_ckpt:
-            logger.info("Starting evaluation pipeline...")
-            evaluate_model(cfg, trainer, datamodule, embeddings)
-        else:
-            logger.warning("Evaluation requires a trained model. Skipping evaluation.")
+    # 3. Run evaluation if specified
+    if cfg.get("mode", "train") == "evaluate" and perform_training:
+        evaluate_model(cfg, trainer, datamodule, model)
