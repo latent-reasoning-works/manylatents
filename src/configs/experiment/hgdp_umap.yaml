@@ -1,0 +1,11 @@
+# @package _global_
+
+defaults:
+  - override /algorithm: default
+  - override /algorithm/dimensionality_reduction: umap
+  - override /datamodule: hgdp
+  - override /paths: shuang_path
+
+name: null
+
+seed: 42

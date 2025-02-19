@@ -1,0 +1,12 @@
+defaults:
+  - network: null # specify a neural network
+  - dimensionality_reduction: null # specify a dimensionality reduction algorithm
+  - _self_
+
+_target_: src.algorithms.umap.UMAPModule
+
+n_components: 2
+random_state: 42
+n_neighbors: 20
+n_epochs: 500
+fit_fraction: 1.0
