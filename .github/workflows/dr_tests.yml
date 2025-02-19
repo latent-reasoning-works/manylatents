@@ -1,0 +1,55 @@
+name: 🧬 Dimensionality Reduction Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dr-tests:
+    name: Run DR Tests on CPU
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ✅ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ✅ Install uv package manager
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ✅ Install dependencies
+      - name: Install dependencies
+        run: |
+          uv sync
+          source .venv/bin/activate
+          pip install pytest pytest-cov
+
+      # ✅ Run Dimensionality Reduction Tests
+      - name: Run DR Tests
+        run: |
+          source .venv/bin/activate
+          pytest src/algorithms/dimensionality_reduction_test.py
+          pytest src/tests/algorithms/dr_compliance_test.py
+
+      # ✅ Upload Coverage Report (Optional)
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-dr-tests
+          path: ./coverage.xml
