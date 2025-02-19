@@ -57,7 +57,7 @@ def instantiate_algorithm(
     """
     embeddings_result = None
     model = None
-
+    
     if cfg.algorithm is not None:
         if "_target_" in cfg.algorithm:
             logger.info(f"Instantiating algorithm: {cfg.algorithm._target_.split('.')[-1]}")
@@ -74,15 +74,18 @@ def instantiate_algorithm(
         if datamodule is None:
             raise ValueError("DataModule must be provided for embedding.")
 
+        # Load data from datamodule
         data_loader = datamodule.train_dataloader()
         data = [inputs.cpu().numpy() for inputs, _ in data_loader]
         data_np = np.concatenate(data, axis=0)
         logger.debug(f"Data shape for embedding: {data_np.shape}")
 
-        # Compute embeddings
-        embeddings_result = algorithm.fit_transform(data_np)
+        # 🚀 Separate fit and transform
+        algorithm.fit(torch.tensor(data_np))
+        embeddings_result = algorithm.transform(torch.tensor(data_np))
         logger.info(f"Embedding completed with shape: {embeddings_result.shape}")
 
+    # Neural Network Instantiation
     if "network" in cfg.algorithm:
         logger.info("Instantiating Neural Network...")
         model_cfg = cfg.algorithm.network
@@ -92,7 +95,6 @@ def instantiate_algorithm(
         logger.info(f"Network instantiated: {model_cfg._target_}")
 
     return embeddings_result, model
-
 
 def instantiate_trainer(cfg: DictConfig) -> Trainer:
     """

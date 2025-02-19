@@ -1,5 +1,4 @@
 from typing import Literal, Optional, Tuple
-# isort: skip_file
 from sklearn.decomposition import PCA
 import torch
 from torch import Tensor
@@ -22,62 +21,58 @@ class PCAModule(LightningModule):
         self.model = PCA(n_components=self.n_components)
         self._is_fitted = False
 
-    def forward(self, x: Tensor) -> Tensor:
+    def fit(self, x: Tensor) -> None:
         """
-        Applies PCA transformation to the input tensor x.
-        On the first call, fits PCA using only a fraction of the batch (if specified).
+        Fits PCA on a subset of data.
         """
         x_np = x.detach().cpu().numpy()
+        n_samples = x_np.shape[0]
+        n_fit = max(1, int(self.fit_fraction * n_samples))
+        self.model.fit(x_np[:n_fit])
+        self._is_fitted = True
+
+    def transform(self, x: Tensor) -> Tensor:
+        """
+        Transforms data using the fitted PCA model.
+        """
         if not self._is_fitted:
-            n_samples = x_np.shape[0]
-            # Use only a fraction of the first batch for fitting.
-            n_fit = max(1, int(self.fit_fraction * n_samples))
-            self.model.fit(x_np[:n_fit])
-            self._is_fitted = True
-        # Transform the full batch using the fitted PCA model.
+            raise RuntimeError("PCA model is not fitted yet. Call `fit` first.")
+        x_np = x.detach().cpu().numpy()
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
-    
-    def fit_transform(self, x: Tensor) -> Tensor:
+
+    def forward(self, x: Tensor) -> Tensor:
         """
-        Fits PCA to the input tensor x and returns the transformed data.
+        Forward pass for Lightning. Wraps the transform method.
         """
-        ## Ugly, type check coming out of the dataloader
-        ## This is a temporary fix, will be fixed in the next version
-        if isinstance(x, torch.Tensor):
-            device = x.device
-            dtype = x.dtype
-            x_np = x.detach().cpu().numpy()
-        else:
-            device = torch.device("cpu")
-            dtype = torch.float32
-            x_np = x
+        return self.transform(x)
 
-        embedding_np = self.model.fit_transform(x_np)
-        self._is_fitted = True
-        return torch.tensor(embedding_np, device=device, dtype=dtype)
-
-    def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
-        return self.shared_step(batch, batch_idx, phase="train")
-
-    def validation_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
-        return self.shared_step(batch, batch_idx, phase="val")
-
-    def test_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
-        return self.shared_step(batch, batch_idx, phase="test")
-    
-    def shared_step(
-        self,
-        batch: Tuple[Tensor, Tensor],
-        batch_idx: int,
-        phase: Literal["train", "val", "test"],
-    ):
+    def training_step(self, batch, batch_idx):
         """
-        Applies PCA to the input batch and returns a dictionary containing:
-          - a dummy loss (for compatibility with Lightning),
-          - the PCA embedding,
-          - the original labels.
+        Lightning's training step. Fit PCA on the first batch if not already fitted.
+        """
+        x, y = batch
+        if not self._is_fitted:
+            self.fit(x)  # Fit on first batch (or fit outside trainer before)
+        embedding = self(x)  # Calls forward
+        self.log('train/embedding_mean', embedding.mean())
+        return {"embedding": embedding}
+
+    def validation_step(self, batch, batch_idx):
+        """
+        Validation step: only transform data, no fitting.
         """
         x, y = batch
         embedding = self(x)
+        self.log('val/embedding_mean', embedding.mean())
         return {"embedding": embedding}
+
+    def test_step(self, batch, batch_idx):
+        """
+        Test step: same as validation.
+        """
+        x, y = batch
+        embedding = self(x)
+        self.log('test/embedding_mean', embedding.mean())
+        return {"embedding": embedding}
+    
