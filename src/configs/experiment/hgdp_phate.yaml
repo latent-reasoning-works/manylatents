@@ -1,0 +1,10 @@
+# @package _global_
+
+defaults:
+  - override /algorithm: default
+  - override /algorithm/dimensionality_reduction: phate
+  - override /datamodule: hgdp
+
+name: null
+
+seed: 42
