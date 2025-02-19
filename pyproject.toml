@@ -78,6 +78,7 @@ dependencies = [
     "hydra-zen>=0.13.0",
     "torchmetrics>=1.6.1",
     "pydantic>=2.9.2",
+    "pytest>=8.3.4",
 ]
 
 [tool.uv]

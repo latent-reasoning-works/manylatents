@@ -16,8 +16,23 @@ from torch.utils.data import DataLoader
 from .mappings import make_palette_label_order_HGDP
 
 class DummyDataModule(LightningDataModule):
-    def __init__(self, dataset, batch_size, num_workers):
+    def __init__(self, dataset=None, batch_size=32, num_workers=0, num_samples=100, num_features=20):
+        """
+        Dummy DataModule for testing.
+
+        Args:
+            dataset (Optional[TensorDataset]): If provided, uses this dataset.
+            batch_size (int): Batch size for DataLoader.
+            num_workers (int): Number of workers for DataLoader.
+            num_samples (int): Number of synthetic samples if dataset is None.
+            num_features (int): Number of synthetic features if dataset is None.
+        """
         super().__init__()
+        if dataset is None:
+            # Generate synthetic data
+            data = torch.randn(num_samples, num_features)
+            labels = torch.randint(0, 2, (num_samples,))
+            dataset = TensorDataset(data, labels)
         self.dataset = dataset
         self.batch_size = batch_size
         self.num_workers = num_workers
