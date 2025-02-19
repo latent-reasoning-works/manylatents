@@ -3,7 +3,6 @@ defaults:
   - _self_
 
 _target_: src.algorithms.phate.PHATEModule
-_partial_: true
 
 n_components: 2
 random_state: 42
@@ -11,5 +10,4 @@ t: 5
 knn: 5
 gamma: 1.0
 fit_fraction: 1.0
-kwargs: null
 

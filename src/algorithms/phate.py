@@ -15,8 +15,7 @@ class PHATEModule(LightningModule):
         knn: int = 5,
         t: int = 30,
         gamma: float = 1.0, 
-        fit_fraction: float = 1.0,  # Fraction of the first batch to use for fitting PCA
-        **kwargs
+        fit_fraction: float = 1.0  # Fraction of the first batch to use for fitting PCA
     ):
         super().__init__()
         self.n_components = n_components
@@ -25,7 +24,6 @@ class PHATEModule(LightningModule):
         self.knn = knn
         self.t = t
         self.gamma = gamma
-        self.add_params = kwargs # Additional PHATE parameters
         self.fit_fraction = fit_fraction
         self._is_fitted = False
         self.model = PHATE(
@@ -33,16 +31,23 @@ class PHATEModule(LightningModule):
                             random_state=self.random_state, 
                             knn=self.knn, 
                             t=self.t, 
-                            gamma=self.gamma,
-                            **self.add_params
+                            gamma=self.gamma
                             )
 
-    def forward(self, x: Tensor) -> Tensor:
+    def fit_transform(self, x: Tensor) -> Tensor:
         """
         Applies PHATE transformation to the input tensor x.
         On the first call, fits PHATE using only a fraction of the batch (if specified).
         """
-        x_np = x.detach().cpu().numpy()
+        if isinstance(x, torch.Tensor):
+            device = x.device
+            dtype = x.dtype
+            x_np = x.detach().cpu().numpy()
+        else:
+            device = torch.device("cpu")
+            dtype = torch.float32
+            x_np = x
+            
         if not self._is_fitted:
             n_samples = x_np.shape[0]
             # Use only a fraction of the first batch for fitting.
@@ -51,7 +56,7 @@ class PHATEModule(LightningModule):
             self._is_fitted = True
         # Transform the full batch using the fitted PHATE model.
         embedding = self.model.transform(x_np)
-        return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+        return torch.tensor(embedding, device=device, dtype=dtype)
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
         return self.shared_step(batch, batch_idx, phase="train")

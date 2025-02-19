@@ -4,6 +4,7 @@ defaults:
   - override /algorithm: default
   - override /algorithm/dimensionality_reduction: phate
   - override /datamodule: hgdp
+  - override /paths: shuang_path
 
 name: null
 
