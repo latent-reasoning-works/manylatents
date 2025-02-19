@@ -1,10 +1,9 @@
 from typing import Literal, Optional, Tuple
-
-import torch
-from lightning import LightningModule
+# isort: skip_file
 from sklearn.decomposition import PCA
+import torch
 from torch import Tensor
-
+from lightning import LightningModule
 
 class PCAModule(LightningModule):
     def __init__(
@@ -38,6 +37,25 @@ class PCAModule(LightningModule):
         # Transform the full batch using the fitted PCA model.
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+    
+    def fit_transform(self, x: Tensor) -> Tensor:
+        """
+        Fits PCA to the input tensor x and returns the transformed data.
+        """
+        ## Ugly, type check coming out of the dataloader
+        ## This is a temporary fix, will be fixed in the next version
+        if isinstance(x, torch.Tensor):
+            device = x.device
+            dtype = x.dtype
+            x_np = x.detach().cpu().numpy()
+        else:
+            device = torch.device("cpu")
+            dtype = torch.float32
+            x_np = x
+
+        embedding_np = self.model.fit_transform(x_np)
+        self._is_fitted = True
+        return torch.tensor(embedding_np, device=device, dtype=dtype)
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int):
         return self.shared_step(batch, batch_idx, phase="train")

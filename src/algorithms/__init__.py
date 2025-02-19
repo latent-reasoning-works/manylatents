@@ -1,19 +1,21 @@
 
 from hydra_zen import builds, store
 
-from .pca import PCA
+from .pca import PCAModule
 from .phate import PHATE
 from .tsne import tSNE
 
 algorithm_store = store(group="algorithm")
 
 pca_config = builds(
-    PCA,
+    PCAModule,
     n_components="${cfg.algorithm.n_components:50}",
     populate_full_signature=True  # Ensures all parameters are exposed for overrides
 )
 algorithm_store(pca_config, name="pca")
 
+
+## review PHATE and TSNE after they're implemented, currently placeholders
 phate_config = builds(
     PHATE,
     n_components="${cfg.algorithm.n_components:50}",

@@ -26,9 +26,10 @@ def main(cfg: DictConfig):
     
     logger.info("Instantiating the datamodule...")
     datamodule = instantiate_datamodule(cfg)
+    logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
     
     logger.info("Instantiating the algorithm...")
-    algorithm = instantiate_algorithm(cfg)
+    algorithm = instantiate_algorithm(cfg, datamodule=datamodule)
     
     logger.info("Instantiating the trainer...")
     trainer = instantiate_trainer(cfg)
