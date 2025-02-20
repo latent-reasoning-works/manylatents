@@ -14,8 +14,8 @@ from src.utils.utils import check_or_make_dirs
 logger = logging.getLogger(__name__)
 
 def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
-    check_or_make_dirs(cfg.paths.cache_dir)
-    logger.info(f"Cache directory ensured at: {cfg.paths.cache_dir}")
+    check_or_make_dirs(cfg.cache_dir)
+    logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
 
     if cfg.datamodule.get("debug", False):
         logger.info("DEBUG MODE: Using a dummy datamodule with limited data.")

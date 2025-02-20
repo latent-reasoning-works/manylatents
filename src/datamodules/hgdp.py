@@ -16,7 +16,8 @@ class HGDPDataModule(LightningDataModule):
         batch_size: int,
         num_workers: int,
         cache_dir: str,
-        mmap_mode: str = None
+        mmap_mode: str = None,
+        precomputed_path: str = None,
 
     ):
         """
@@ -35,6 +36,7 @@ class HGDPDataModule(LightningDataModule):
         self.cache_dir = cache_dir
         self.mmap_mode = mmap_mode
         self.dataset = None
+        self.precomputed_path = precomputed_path
 
     def prepare_data(self) -> None:
         """Prepare data for use (e.g., downloading, saving to disk)."""

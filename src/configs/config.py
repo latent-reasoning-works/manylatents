@@ -11,4 +11,4 @@ class Config:
     seed: int = field(default_factory=lambda: random.randint(0, int(1e5)))
     debug: bool = False
     verbose: bool = False
-    ckpt_path: Optional[str] = None
+    cache_dir: Optional[str] = "outputs/cache"
