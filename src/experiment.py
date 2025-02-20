@@ -60,22 +60,17 @@ def instantiate_algorithm(
     """
     embeddings_result = None
     model = None
-    
-    if cfg.algorithm is not None:
-        if "_target_" in cfg.algorithm:
-            logger.info(f"Instantiating algorithm: {cfg.algorithm._target_.split('.')[-1]}")
-            algorithm = hydra.utils.instantiate(cfg.algorithm)
-        elif "dimensionality_reduction" in cfg.algorithm:
-            dr_cfg = cfg.algorithm.dimensionality_reduction
-            if "_target_" not in dr_cfg:
-                raise ValueError("Missing _target_ in dimensionality_reduction config")
-            logger.info(f"Instantiating dimensionality reduction: {dr_cfg._target_.split('.')[-1]}")
-            algorithm = hydra.utils.instantiate(dr_cfg)
-        else:
-            raise ValueError("Algorithm configuration is invalid.")
+
+    if "dimensionality_reduction" in cfg.algorithm:
+        dr_cfg = cfg.algorithm.dimensionality_reduction
+        if "_target_" not in dr_cfg:
+            raise ValueError("Missing _target_ in dimensionality_reduction config")
+
+        logger.info(f"Instantiating dimensionality reduction: {dr_cfg._target_.split('.')[-1]}")
+        dr_algorithm = hydra.utils.instantiate(dr_cfg)
 
         if datamodule is None:
-            raise ValueError("DataModule must be provided for embedding.")
+            raise ValueError("DataModule must be provided for dimensionality reduction.")
 
         # Load data from datamodule
         data_loader = datamodule.train_dataloader()
@@ -83,22 +78,19 @@ def instantiate_algorithm(
         data_np = np.concatenate(data, axis=0)
         logger.debug(f"Data shape for embedding: {data_np.shape}")
 
-        # 🚀 Separate fit and transform
-        algorithm.fit(torch.tensor(data_np))
-        embeddings_result = algorithm.transform(torch.tensor(data_np))
+        dr_algorithm.fit(torch.tensor(data_np))
+        embeddings_result = dr_algorithm.transform(torch.tensor(data_np))
         logger.info(f"Embedding completed with shape: {embeddings_result.shape}")
 
-    # Neural Network Instantiation
     if "network" in cfg.algorithm:
-        logger.info("Instantiating Neural Network...")
         model_cfg = cfg.algorithm.network
         if "_target_" not in model_cfg:
             raise ValueError("Missing _target_ in network config")
+
+        logger.info(f"Instantiating Neural Network: {model_cfg._target_}")
         model = hydra.utils.instantiate(model_cfg)
-        logger.info(f"Network instantiated: {model_cfg._target_}")
 
     return embeddings_result, model
-
 def instantiate_trainer(cfg: DictConfig) -> Trainer:
     """
     Dynamically instantiate the PyTorch Lightning Trainer from the config.
@@ -129,8 +121,8 @@ def train_model(
     model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
     trainer.fit(model, datamodule=datamodule)
 
-    if cfg.paths.model_ckpt:
-        trainer.save_checkpoint(cfg.paths.model_ckpt)
+    if cfg.ckpt_dir:
+        trainer.save_checkpoint(cfg.ckpt_dir)
 
 
 def evaluate_model(
@@ -145,46 +137,57 @@ def evaluate_model(
       - Call trainer.test().
     """
     model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
-    if cfg.paths.model_ckpt:
+    if cfg.ckpt_dir:
         # If you want to load from checkpoint, you could do:
-        # model = YourLightningModuleClass.load_from_checkpoint(cfg.paths.model_ckpt)
+        # model = YourLightningModuleClass.load_from_checkpoint(cfg.ckpt_dir)
         pass
 
     trainer.test(model, datamodule=datamodule)
 
-def run_pipeline(cfg: DictConfig, datamodule: LightningDataModule, trainer: Trainer):
+def run_pipeline(
+    cfg: DictConfig,
+    datamodule: LightningDataModule,
+    trainer: Trainer,
+    algorithm: Optional[torch.nn.Module] = None,
+    embeddings: Optional[np.ndarray] = None,
+):
     """
     Orchestrates the entire pipeline:
     - Performs dimensionality reduction (if applicable)
     - Trains a model (if specified)
     - Evaluates (if specified)
     """
-
-    logger.info("Running pipeline...")
-    embeddings = None
-    embeddings_path = cfg.paths.embeddings_file if "embeddings_file" in cfg.paths else None
-
-    # Check if dimensionality reduction is needed
     perform_dr = "dimensionality_reduction" in cfg.algorithm
     perform_training = "network" in cfg.algorithm
+    
+    if isinstance(embeddings, torch.Tensor):
+        embeddings = embeddings.cpu().numpy() ## ugly, to be fixed with type checks
 
-    # 1. Perform PCA or other dimensionality reduction
-    if perform_dr:
+    if embeddings is not None and embeddings.size > 0:
+        logger.info(f"Using precomputed embeddings with shape: {embeddings.shape}")
+
+    elif perform_dr:
         logger.info("Performing Dimensionality Reduction (DR)...")
-        embeddings, _ = instantiate_algorithm(cfg, datamodule=datamodule)
+        data_loader = datamodule.train_dataloader()
+        data = [inputs.cpu().numpy() for inputs, _ in data_loader]
+        data_np = np.concatenate(data, axis=0)
+        algorithm.fit(torch.tensor(data_np))
+        embeddings = algorithm.transform(torch.tensor(data_np))
+        
+        if isinstance(embeddings, torch.Tensor):
+            embeddings = embeddings.cpu().numpy()
 
-        if embeddings is not None and embeddings_path:
-            np.save(embeddings_path, embeddings)
-            logger.info(f"Embeddings saved to {embeddings_path}")
+        logger.info(f"Embedding completed with shape: {embeddings.shape}")
 
-    # 2. Train network if applicable
+    elif perform_training and (embeddings is None or embeddings.size == 0):
+        logger.info("No DR applied — using raw data for Neural Network.")
+        data_loader = datamodule.train_dataloader()
+        data = [inputs.cpu().numpy() for inputs, _ in data_loader]
+        embeddings = np.concatenate(data, axis=0)
+
     if perform_training:
-        _, model = instantiate_algorithm(cfg)
-        if model is None:
-            raise ValueError("Model configuration is missing for training.")
+        logger.info("Training Neural Network...")
+        train_model(cfg, trainer, datamodule, embeddings)
 
-        train_model(cfg, trainer, datamodule, model)
-
-    # 3. Run evaluation if specified
     if cfg.get("mode", "train") == "evaluate" and perform_training:
-        evaluate_model(cfg, trainer, datamodule, model)
+        evaluate_model(cfg, trainer, datamodule, embeddings)

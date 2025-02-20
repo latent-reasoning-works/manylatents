@@ -2,9 +2,9 @@ from typing import Literal, Optional, Tuple
 from sklearn.decomposition import PCA
 import torch
 from torch import Tensor
-from lightning import LightningModule
+from .dimensionality_reduction import DimensionalityReductionModule
 
-class PCAModule(LightningModule):
+class PCAModule(DimensionalityReductionModule):
     def __init__(
         self,
         n_components: int = 2,

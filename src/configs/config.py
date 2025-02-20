@@ -12,3 +12,4 @@ class Config:
     debug: bool = False
     verbose: bool = False
     cache_dir: Optional[str] = "outputs/cache"
+    ckpt_dir: Optional[str] = "outputs/ckpt"

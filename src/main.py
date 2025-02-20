@@ -33,13 +33,13 @@ def main(cfg: DictConfig):
     logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
     
     logger.info("Instantiating the algorithm...")
-    algorithm = instantiate_algorithm(cfg, datamodule=datamodule)
+    embeddings, algorithm = instantiate_algorithm(cfg, datamodule=datamodule)
     
     logger.info("Instantiating the trainer...")
     trainer = instantiate_trainer(cfg)
     
     logger.info("Running the pipeline...")
-    run_pipeline(cfg, datamodule, trainer)
+    run_pipeline(cfg, datamodule, trainer, algorithm=algorithm, embeddings=embeddings)
 
 if __name__ == "__main__":
     main()
