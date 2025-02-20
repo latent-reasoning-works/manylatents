@@ -11,8 +11,12 @@ from src.experiment import (
     run_pipeline,
 )
 
+from src.configs import register_configs
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+register_configs()
 
 @hydra.main(config_path="../src/configs", config_name="config", version_base=None)
 def main(cfg: DictConfig):

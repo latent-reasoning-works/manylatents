@@ -1,5 +1,5 @@
-debug: true # provides dummy data for quick testing
-
 batch_size: 32
 num_workers: 1
-cache_dir: ${paths.cache_dir}
+cache_dir: ${hydra.run.dir}/cache
+debug: false # provides dummy data for quick testing
+

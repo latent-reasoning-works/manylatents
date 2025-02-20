@@ -5,6 +5,4 @@ defaults:
   - override /algorithm/dimensionality_reduction: pca
   - override /datamodule: hgdp
 
-name: null
-
 seed: 42

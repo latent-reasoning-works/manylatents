@@ -22,12 +22,15 @@ def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
         dummy_data = torch.randn(100, 10)
         dummy_labels = torch.zeros(100)
         dataset = torch.utils.data.TensorDataset(dummy_data, dummy_labels)
-        return DummyDataModule(dataset, batch_size=cfg.datamodule.batch_size, num_workers=cfg.datamodule.num_workers)
+        return DummyDataModule(dataset=dataset, 
+                               batch_size=cfg.datamodule.batch_size, 
+                               num_workers=cfg.datamodule.num_workers
+                               )
 
-    if "datamodule" in cfg and cfg.datamodule is not None:
-        dm = hydra.utils.instantiate(cfg.datamodule)
-        dm.setup()
-        return dm
+    datamodule_cfg = {k: v for k, v in cfg.datamodule.items() if k != "debug"}
+    dm = hydra.utils.instantiate(datamodule_cfg)
+    dm.setup()
+    return dm
 
     if "dataloader" in cfg and cfg.dataloader is not None:
         raise ValueError("Use a LightningDataModule instead of a raw DataLoader.")
