@@ -5,7 +5,7 @@ _target_: src.datamodules.hgdp.HGDPDataModule
 mmap_mode: null
 
 files:
-  plink:  ""./data/HGDP+1KG/genotypes/gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.match1000G_GSAs_dietnet"
-  metadata: "data/HGDP+1KG/gnomad_derived_metadata_with_filtered_sampleids.csv"
+  plink:  "./data/HGDP+1KG/genotypes/gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.match1000G_GSAs_dietnet"
+  metadata: "./data/HGDP+1KG/gnomad_derived_metadata_with_filtered_sampleids.csv"
 
 precomputed_path: null 
