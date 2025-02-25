@@ -55,10 +55,10 @@ class HGDPDataset(PlinkDataset):
         """
         super().__init__(files=files, 
                          cache_dir=cache_dir, 
-                         mmap_mode=mmap_mode,)
+                         mmap_mode=mmap_mode,
+                         delimiter=delimiter)
 
         self.precomputed_path = precomputed_path
-        self.delimiter = delimiter
         self.metadata = metadata if metadata is not None else self.load_metadata(files["metadata"])
         
         # Load precomputed embeddings if provided

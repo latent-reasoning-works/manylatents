@@ -21,15 +21,16 @@ class PlinkDataset(Dataset):
     def __init__(self, 
                  files: Dict[str, str], 
                  cache_dir: str,  
-                 mmap_mode: Optional[str] = None,) -> None:
+                 mmap_mode: Optional[str] = None,
+                 delimiter: Optional[str] = ",") -> None:
         """
         Initializes the PLINK dataset.
 
         Args:
-            filenames (dict): Dictionary containing paths for PLINK and metadata files.
+            files (dict): Dictionary containing paths for PLINK and metadata files.
             cache_dir (str): Directory for caching preprocessed data.
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
-            mode (str): Determines type of data returned ('genotypes' or 'pca').
+            delimiter (Optional[str]): Delimiter for reading metadata files.
         """
         super().__init__()
         self.filenames = files
@@ -37,12 +38,12 @@ class PlinkDataset(Dataset):
         self.plink_path = files["plink"]
         self.metadata_path = files["metadata"]
         self.mmap_mode = mmap_mode
+        self.delimiter = delimiter
 
         # Load metadata
         self.metadata = self.load_metadata(self.metadata_path)
 
         # Extract fit and transform indices
-        ## these will go into the dataloader
         self.fit_idx, self.trans_idx = self.extract_indices()
 
         # Generate unique cache file paths
@@ -53,10 +54,10 @@ class PlinkDataset(Dataset):
         if not os.path.exists(self.npy_cache_file):
             logger.info("Converting PLINK data to numpy format...")
             convert_plink_to_npy(self.plink_path, self.npy_cache_file, self.fit_idx, self.trans_idx)
-            
+
         logger.info(f"Loading processed PLINK data from {self.npy_cache_file}")
         self.X = np.load(self.npy_cache_file, mmap_mode=self.mmap_mode)
-
+        
     def __getitem__(self, index: int) -> Any:
         """
         Args:
