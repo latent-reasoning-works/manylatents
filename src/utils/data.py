@@ -78,7 +78,13 @@ def load_metadata(file_path, required_columns=None, delimiter=None, additional_p
         logging.info(f"Using delimiter: '{delimiter}'")
 
     try:
-        metadata = pd.read_csv(file_path, sep=delimiter, engine='python')
+        metadata = pd.read_csv(
+            file_path, 
+            sep=delimiter, 
+            engine='python',
+            index_col=0
+        )
+        metadata.columns = metadata.columns.str.strip()
         logging.info(f"Successfully loaded metadata with delimiter '{delimiter}'.")
     except pd.errors.ParserError as e:
         logging.error(f"ParserError while reading {file_path}: {e}")

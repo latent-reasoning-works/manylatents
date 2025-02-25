@@ -1,4 +1,5 @@
 
+import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
@@ -39,7 +40,7 @@ class HGDPDataModule(LightningDataModule):
         self.dataset = None
         self.delimiter = delimiter
         self.precomputed_path = precomputed_path
-
+            
     def prepare_data(self) -> None:
         """Prepare data for use (e.g., downloading, saving to disk)."""
         pass
@@ -57,12 +58,28 @@ class HGDPDataModule(LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         """Return DataLoader for training."""
-        return DataLoader(self.dataset, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.dataset, 
+                          batch_size=self.batch_size, 
+                          num_workers=self.num_workers,
+                          collate_fn=self._collate_fn)
 
     def val_dataloader(self) -> DataLoader:
         """Return DataLoader for validation."""
-        return DataLoader(self.dataset, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.dataset, 
+                          batch_size=self.batch_size, 
+                          num_workers=self.num_workers,
+                          collate_fn=self._collate_fn)
 
     def test_dataloader(self) -> DataLoader:
         """Return DataLoader for testing."""
-        return DataLoader(self.dataset, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.dataset, 
+                          batch_size=self.batch_size, 
+                          num_workers=self.num_workers,
+                          collate_fn=self._collate_fn)
+
+    @staticmethod
+    def _collate_fn(batch):
+        samples, metadata = zip(*batch)
+        samples = torch.stack([torch.tensor(s, dtype=torch.float32) for s in samples])
+        return samples, metadata
+

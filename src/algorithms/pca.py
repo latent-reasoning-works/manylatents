@@ -1,8 +1,11 @@
-from typing import Literal, Optional, Tuple
-from sklearn.decomposition import PCA
+from typing import Optional
+
 import torch
+from sklearn.decomposition import PCA
 from torch import Tensor
+
 from .dimensionality_reduction import DimensionalityReductionModule
+
 
 class PCAModule(DimensionalityReductionModule):
     def __init__(

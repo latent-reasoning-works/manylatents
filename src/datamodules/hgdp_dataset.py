@@ -104,7 +104,6 @@ class HGDPDataset(PlinkDataset):
         full_path = os.path.abspath(metadata_path)
         logger.info(f"Loading metadata from: {full_path}")
 
-        # Define required columns
         required_columns = ['project_meta.sample_id', 
                             'filter_king_related', 
                             'filter_pca_outlier', 

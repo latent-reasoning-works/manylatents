@@ -57,16 +57,13 @@ class PlinkDataset(Dataset):
 
         logger.info(f"Loading processed PLINK data from {self.npy_cache_file}")
         self.X = np.load(self.npy_cache_file, mmap_mode=self.mmap_mode)
-        
-    def __getitem__(self, index: int) -> Any:
-        """
-        Args:
-            index (int): Index
 
-        Returns:
-            (Any): Sample and metadata data, optionally transformed by the respective transforms.
-        """
-        return self.X[index], self.metadata.iloc[index]
+    def __getitem__(self, index: int) -> Any:
+        sample = self.X[index] 
+        metadata_row = self.metadata.iloc[index].to_dict()  
+
+        metadata_row = {k.strip(): v for k, v in metadata_row.items()}
+        return sample, metadata_row  
 
     def __len__(self) -> int:
         return len(self.X)
