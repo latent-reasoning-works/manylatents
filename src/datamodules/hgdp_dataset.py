@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from src.utils.data import load_metadata
+
 from .plink_dataset import PlinkDataset
 
 logger = logging.getLogger(__name__)
@@ -36,12 +37,13 @@ class HGDPDataset(PlinkDataset):
     """
     PyTorch Dataset for HGDP + 1000 Genomes data.
     """
-
     def __init__(self, 
                  files: Dict[str, str], 
                  cache_dir: str, 
                  mmap_mode: Optional[str] = None, 
-                 precomputed_path: Optional[str] = None):
+                 precomputed_path: Optional[str] = None,
+                 metadata: Optional[pd.DataFrame] = None,
+                 delimiter: Optional[str] = ","):
         """
         Initializes the HGDP dataset.
 
@@ -51,13 +53,14 @@ class HGDPDataset(PlinkDataset):
             mmap_mode (Optional[str]): Memory-mapping mode.
             precomputed_path (Optional[str]): Path to precomputed embeddings if available.
         """
-        super().__init__(files=files, cache_dir=cache_dir, mmap_mode=mmap_mode)
+        super().__init__(files=files, 
+                         cache_dir=cache_dir, 
+                         mmap_mode=mmap_mode,)
 
         self.precomputed_path = precomputed_path
-
-        # Load metadata (used for filters and indices)
-        self.metadata = self.load_metadata(self.metadata_path)
-
+        self.delimiter = delimiter
+        self.metadata = metadata if metadata is not None else self.load_metadata(files["metadata"])
+        
         # Load precomputed embeddings if provided
         if self.precomputed_path and os.path.exists(self.precomputed_path):
             logger.info(f"Loading precomputed embeddings from {self.precomputed_path}")
@@ -111,7 +114,8 @@ class HGDPDataset(PlinkDataset):
         metadata = load_metadata(
             file_path=full_path,
             required_columns=required_columns,
-            additional_processing=hgdp_add_dummy_row  # Optional preprocessing
+            additional_processing=hgdp_add_dummy_row,
+            delimiter=self.delimiter
         )
 
         return metadata.set_index('project_meta.sample_id')

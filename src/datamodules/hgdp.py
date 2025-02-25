@@ -18,6 +18,7 @@ class HGDPDataModule(LightningDataModule):
         cache_dir: str,
         mmap_mode: str = None,
         precomputed_path: str = None,
+        delimiter: str = ",",
 
     ):
         """
@@ -36,6 +37,7 @@ class HGDPDataModule(LightningDataModule):
         self.cache_dir = cache_dir
         self.mmap_mode = mmap_mode
         self.dataset = None
+        self.delimiter = delimiter
         self.precomputed_path = precomputed_path
 
     def prepare_data(self) -> None:
@@ -49,7 +51,8 @@ class HGDPDataModule(LightningDataModule):
         self.dataset = HGDPDataset(
             files=self.files,
             cache_dir=self.cache_dir,
-            mmap_mode=self.mmap_mode
+            mmap_mode=self.mmap_mode,
+            delimiter=self.delimiter
         )
 
     def train_dataloader(self) -> DataLoader:
