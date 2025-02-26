@@ -2,7 +2,8 @@ defaults:
   - base_config
   - _self_
   - datamodule: null
+  - callbacks: default
   - hydra: default
-  - trainer: default
   - algorithm: null
+  - trainer: null # instantiate only if network is being passed
   - experiment: null

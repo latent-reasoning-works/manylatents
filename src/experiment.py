@@ -81,6 +81,17 @@ def instantiate_algorithm(
         embeddings_result = dr_algorithm.transform(torch.tensor(data_np))
         logger.info(f"Embedding completed with shape: {embeddings_result.shape}")
 
+        if "dimensionality_reduction" in cfg.callbacks:
+            callback_cfg = cfg.callbacks.dimensionality_reduction
+            dr_callback = hydra.utils.instantiate(callback_cfg)  # Hydra resolves save_dir
+            logger.info(f"Instantiated callback: {dr_callback.__class__.__name__}")
+            
+            if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
+                logger.info("Calling on_dr_end() to save embeddings...")
+                dr_callback.on_dr_end(embeddings_result)
+            else:
+                logger.warning("Callback has no on_dr_end(). Skipping.")
+
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         model_cfg = cfg.algorithm.network
         if "_target_" not in model_cfg:

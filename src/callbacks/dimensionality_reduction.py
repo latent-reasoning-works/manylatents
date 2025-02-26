@@ -46,18 +46,24 @@ class SaveEmbeddings(DimensionalityReductionCallback):
         self.save_dir = save_dir
         self.save_format = save_format
         os.makedirs(self.save_dir, exist_ok=True)
+        logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
-    def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+    def save_embeddings(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+        logger.info(f"save_embeddings() called with embeddings shape: {embeddings.shape}")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"embeddings_{timestamp}.{self.save_format}"
         save_path = os.path.join(self.save_dir, filename)
-
-        metadata = None
-        if labels is not None:
-            metadata = {"labels": labels}
+        logger.info(f"Computed save path: {save_path}")
         
+        metadata = {"labels": labels} if labels is not None else None
+
         try:
             save_embeddings(embeddings, save_path, format=self.save_format, metadata=metadata)
             logger.info(f"Saved embeddings successfully to {save_path}")
         except Exception as e:
+            logger.error(f"Failed to save embeddings: {e}")
             warnings.warn(f"Failed to save embeddings: {e}")
+
+    def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+        logger.info("on_dr_end() called; delegating to save_embeddings()")
+        self.save_embeddings(embeddings, labels)
