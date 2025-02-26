@@ -1,23 +1,36 @@
 import csv
+import hashlib
 import logging
 import os
-from typing import Callable, Optional
+from typing import Optional
 
 import numpy as np
 import pandas as pd
-from pyplink import PyPlink
-from scipy.sparse import csr_matrix
-from scipy.sparse import vstack as svstack
-import hashlib
+import torch
 import tqdm
 from lightning import LightningDataModule
-from torch.utils.data import DataLoader
+from pyplink import PyPlink
+from torch.utils.data import DataLoader, TensorDataset
 
-from .mappings import make_palette_label_order_HGDP
 
 class DummyDataModule(LightningDataModule):
-    def __init__(self, dataset, batch_size, num_workers):
+    def __init__(self, dataset=None, batch_size=32, num_workers=0, num_samples=100, num_features=20):
+        """
+        Dummy DataModule for testing.
+
+        Args:
+            dataset (Optional[TensorDataset]): If provided, uses this dataset.
+            batch_size (int): Batch size for DataLoader.
+            num_workers (int): Number of workers for DataLoader.
+            num_samples (int): Number of synthetic samples if dataset is None.
+            num_features (int): Number of synthetic features if dataset is None.
+        """
         super().__init__()
+        if dataset is None:
+            # Generate synthetic data
+            data = torch.randn(num_samples, num_features)
+            labels = torch.randint(0, 2, (num_samples,))
+            dataset = TensorDataset(data, labels)
         self.dataset = dataset
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -55,35 +68,23 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
         logging.warning(f"Unexpected error while detecting delimiter for '{file_path}': {e}")
         return None
 
-def load_metadata(
-    file_path: str,
-    required_columns: Optional[list] = None,
-    additional_processing: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None
-) -> pd.DataFrame:
-    """
-    Loads metadata from a file, handling delimiter detection and basic validation.
-
-    Args:
-        file_path (str): Path to the metadata file.
-        required_columns (Optional[list]): List of columns that must be present.
-        additional_processing (Optional[Callable[[pd.DataFrame], pd.DataFrame]]): 
-            A function to perform additional processing on the DataFrame.
-
-    Returns:
-        pd.DataFrame: Loaded and processed metadata.
-    """
+def load_metadata(file_path, required_columns=None, delimiter=None, additional_processing=None):
     logging.info(f"Loading metadata from: {file_path}")
 
-    # Detect delimiter
-    delimiter = detect_separator(file_path)
-
-    # Fallback to tab if detection fails
     if delimiter is None:
-        logging.warning(f"Falling back to tab separator for file: {file_path}")
-        delimiter = '\t'
+        logging.info(f"Detecting delimiter for file: {file_path}")
+        detected_delimiter = detect_separator(file_path)
+        delimiter = detected_delimiter if detected_delimiter else ','
+        logging.info(f"Using delimiter: '{delimiter}'")
 
     try:
-        metadata = pd.read_csv(file_path, sep=delimiter, engine='python')
+        metadata = pd.read_csv(
+            file_path, 
+            sep=delimiter, 
+            engine='python',
+            index_col=0
+        )
+        metadata.columns = metadata.columns.str.strip()
         logging.info(f"Successfully loaded metadata with delimiter '{delimiter}'.")
     except pd.errors.ParserError as e:
         logging.error(f"ParserError while reading {file_path}: {e}")
@@ -95,18 +96,17 @@ def load_metadata(
         logging.error(f"Unexpected error while reading {file_path}: {e}")
         raise
 
-    # Validate required columns
     if required_columns:
         missing_columns = [col for col in required_columns if col not in metadata.columns]
         if missing_columns:
             logging.error(f"Missing required columns {missing_columns} in metadata file: {file_path}")
             raise KeyError(f"Missing required columns {missing_columns} in metadata file: {file_path}")
 
-    # Perform additional processing if provided
     if additional_processing:
         metadata = additional_processing(metadata)
 
     return metadata
+
 
 ### Plink Dataset
 def replace_negative_one_with_nan(array: np.array) -> np.array:

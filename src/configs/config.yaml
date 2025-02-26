@@ -1,8 +1,8 @@
 defaults:
+  - base_config
   - _self_
   - datamodule: null
   - hydra: default
-  - paths: default
   - trainer: default
   - algorithm: null
   - experiment: null

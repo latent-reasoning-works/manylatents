@@ -35,35 +35,88 @@ def hgdp_add_dummy_row(metadata: pd.DataFrame) -> pd.DataFrame:
 
 class HGDPDataset(PlinkDataset):
     """
-    PyTorch Dataset for the Thousand Genomes Project + Human Genome Diversity Project (HGDP) dataset.
+    PyTorch Dataset for HGDP + 1000 Genomes data.
     """
-
     def __init__(self, 
-                 files: Dict[str, str], cache_dir: str, 
-                 mmap_mode: Optional[str] = None):
+                 files: Dict[str, str], 
+                 cache_dir: str, 
+                 filter_related: bool = True,
+                 data_split: str = "full",
+                 mmap_mode: Optional[str] = None, 
+                 precomputed_path: Optional[str] = None,
+                 metadata: Optional[pd.DataFrame] = None,
+                 delimiter: Optional[str] = ","):
         """
-        Initializes the HGDP dataset with configuration parameters.
+        Initializes the HGDP dataset.
 
         Args:
-            files (dict): Dictionary containing the file paths for plink and metadata.
-            mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
+            files (dict): Paths for PLINK and metadata files.
+            cache_dir (str): Directory for caching.
+            filter_related (bool): Whether to filter related samples.
+            data_split (str): 'train', 'test', or 'full' split.
+            mmap_mode (Optional[str]): Memory-mapping mode.
+            precomputed_path (Optional[str]): Path to precomputed embeddings if available.
+            metadata (Optional[pd.DataFrame]): Preloaded metadata.
+            delimiter (Optional[str]): Delimiter for CSV files.
         """
-        super().__init__(
-            files=files,
-            cache_dir=cache_dir,
-            mmap_mode=mmap_mode, 
-        )
+        self.filter_related = filter_related
+        self.data_split = data_split
+
+        super().__init__(files=files, 
+                         cache_dir=cache_dir, 
+                         mmap_mode=mmap_mode,
+                         delimiter=delimiter,)
+
+        self.precomputed_path = precomputed_path
+        self.metadata = metadata if metadata is not None else self.load_metadata(files["metadata"])
+        
+        # Load precomputed embeddings if provided
+        if self.precomputed_path and os.path.exists(self.precomputed_path):
+            logger.info(f"Loading precomputed embeddings from {self.precomputed_path}")
+            if self.precomputed_path.endswith(".npy"):
+                self.X = np.load(self.precomputed_path, mmap_mode=self.mmap_mode)
+            elif self.precomputed_path.endswith(".csv"):
+                self.X = np.loadtxt(self.precomputed_path, delimiter=",")
+            else:
+                raise ValueError(f"Unsupported file format: {self.precomputed_path}")
+
+        self.fit_idx, self.trans_idx = self.extract_indices()
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Extracts fit/transform indices based on metadata filters.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Indices for fitting and transforming.
+        """
         filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
         _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
         filtered_indices = ~self.metadata.index.isin(_filtered_indices)
-        related_indices = ~self.metadata['filter_king_related'].values
+        
+        if self.filter_related:
+            related_indices = ~self.metadata['filter_king_related'].values
+        else:
+            related_indices = np.ones(len(self.metadata), dtype=bool)
 
         fit_idx = related_indices & filtered_indices
         trans_idx = (~related_indices) & filtered_indices
 
-        return fit_idx, trans_idx 
+        return fit_idx, trans_idx
+
+    def __getitem__(self, idx):
+        if self.data_split == 'train':
+            indices = np.where(self.fit_idx)[0]
+        elif self.data_split == 'test':
+            indices = np.where(self.trans_idx)[0]
+        elif self.data_split == 'full':
+            indices = np.arange(len(self.X))
+        else:
+            raise ValueError(f"Invalid data_split '{self.data_split}'. Use 'train', 'test', or 'full'.")
+
+        real_idx = indices[idx]
+        sample = self.X[real_idx]
+        meta = self.metadata.iloc[real_idx]
+        return sample, meta
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
@@ -76,19 +129,19 @@ class HGDPDataset(PlinkDataset):
             pd.DataFrame: Processed metadata DataFrame.
         """
         full_path = os.path.abspath(metadata_path)
-        logger.info(f"Loading metadata from: {full_path}")  # Debugging
+        logger.info(f"Loading metadata from: {full_path}")
 
-        # Define required columns
-        required_columns = ['project_meta.sample_id',] 
-                            #'filter_king_related', 
-                            #'filter_pca_outlier', 
-                            #'hard_filtered', 
-                            #'filter_contaminated']
+        required_columns = ['project_meta.sample_id', 
+                            'filter_king_related', 
+                            'filter_pca_outlier', 
+                            'hard_filtered', 
+                            'filter_contaminated']
 
         metadata = load_metadata(
             file_path=full_path,
             required_columns=required_columns,
-            additional_processing=hgdp_add_dummy_row
+            additional_processing=hgdp_add_dummy_row,
+            delimiter=self.delimiter
         )
 
         return metadata.set_index('project_meta.sample_id')

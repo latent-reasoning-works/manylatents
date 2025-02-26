@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - override /algorithm: default
+  - override /algorithm/dimensionality_reduction: pca
+  - override /datamodule: hgdp
+  - override /callbacks/dimensionality_reduction: default
+
+datamodule:
+  mode: full
+
+seed: 42
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.n_components: 2,50

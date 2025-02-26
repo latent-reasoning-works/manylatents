@@ -1,0 +1,4 @@
+defaults:
+- network: null
+- dimensionality_reduction: null
+- _self_

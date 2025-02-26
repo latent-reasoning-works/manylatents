@@ -1,5 +1,0 @@
-data_dir: "./data"                 # Base directory for data
-output_dir: ${hydra.run.dir}       # Base directory for outputs
-ckpt_dir: "./outputs/ckpt"         # Model-related outputs
-cache_dir: "./outputs/cache"       # Intermediate files
-plot_dir: "./outputs/plots"        # Plots
