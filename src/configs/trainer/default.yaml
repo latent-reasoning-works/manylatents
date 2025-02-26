@@ -1,7 +1,3 @@
-defaults:
-  - callbacks: default.yaml
-  - logger: null
-
 _target_: lightning.Trainer
 accelerator: auto
 strategy: auto
