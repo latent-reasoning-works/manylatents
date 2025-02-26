@@ -4,14 +4,14 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 import src  # noqa: F401
+from src.configs import register_configs
 from src.experiment import (
+    evaluate_model,
     instantiate_algorithm,
     instantiate_datamodule,
     instantiate_trainer,
-    run_pipeline,
+    train_model,
 )
-
-from src.configs import register_configs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,13 +33,18 @@ def main(cfg: DictConfig):
     logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
     
     logger.info("Instantiating the algorithm...")
-    embeddings, algorithm = instantiate_algorithm(cfg, datamodule=datamodule)
+    embeddings, model = instantiate_algorithm(cfg, datamodule=datamodule)
     
     logger.info("Instantiating the trainer...")
     trainer = instantiate_trainer(cfg)
     
-    logger.info("Running the pipeline...")
-    run_pipeline(cfg, datamodule, trainer, algorithm=algorithm, embeddings=embeddings)
-
+    logger.info("Running training...")
+    train_model(cfg, trainer, datamodule, model, embeddings)
+    
+    logger.info("Running evaluation...")
+    evaluate_model(cfg, trainer, datamodule, model, embeddings)
+    
+    logger.info("Experiment complete.")
+    
 if __name__ == "__main__":
     main()

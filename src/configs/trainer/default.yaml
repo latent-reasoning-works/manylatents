@@ -1,2 +1,19 @@
+defaults:
+  - callbacks: default.yaml
+  - logger: null
+
+_target_: lightning.Trainer
+accelerator: auto
+strategy: auto
+devices: 1
+
+deterministic: false
+
+fast_dev_run: false
+
 min_epochs: 1
-max_epochs: 1
+max_epochs: 10
+
+default_root_dir: ${hydra:runtime.output_dir}
+
+detect_anomaly: false

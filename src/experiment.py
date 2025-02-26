@@ -5,7 +5,7 @@ import hydra
 import numpy as np
 import torch
 from lightning import LightningDataModule, Trainer
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.utils.data import DummyDataModule
@@ -91,103 +91,50 @@ def instantiate_algorithm(
         model = hydra.utils.instantiate(model_cfg)
 
     return embeddings_result, model
+
 def instantiate_trainer(cfg: DictConfig) -> Trainer:
     """
     Dynamically instantiate the PyTorch Lightning Trainer from the config.
     Handles callbacks and loggers if specified.
     """
-    callbacks = hydra.utils.instantiate(cfg.trainer.callbacks) if "callbacks" in cfg.trainer else None
-    loggers = hydra.utils.instantiate(cfg.trainer.loggers) if "loggers" in cfg.trainer else None
+    trainer_config = OmegaConf.to_container(cfg.trainer, resolve=True)
 
-    return Trainer(
-        **cfg.trainer,
-        callbacks=callbacks,
-        logger=loggers,
-    )
+    # Load callbacks & logger from separate configs
+    callbacks = hydra.utils.instantiate(cfg.callbacks) if "callbacks" in cfg else []
+    loggers = hydra.utils.instantiate(cfg.logger) if "logger" in cfg and cfg.logger is not None else None
 
+    # Remove from trainer config to avoid duplicate passing
+    trainer_config.pop("callbacks", None)
+    trainer_config.pop("logger", None)
+
+    return hydra.utils.instantiate(trainer_config, callbacks=callbacks, logger=loggers)
 
 def train_model(
     cfg: DictConfig,
     trainer: Trainer,
     datamodule: Union[LightningDataModule, DataLoader],
+    model: torch.nn.Module,
     embeddings: Optional[np.ndarray] = None,
 ):
     """
-    Train stage:
-      - Instantiate the model to train.
-      - Call trainer.fit().
-      - Optionally save checkpoint.
+    Train the model using PyTorch Lightning Trainer.
     """
-    model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
+    if model is None:
+        raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
+    
     trainer.fit(model, datamodule=datamodule)
-
-    if cfg.ckpt_dir:
-        trainer.save_checkpoint(cfg.ckpt_dir)
-
-
+    
 def evaluate_model(
     cfg: DictConfig,
     trainer: Trainer,
     datamodule: Union[LightningDataModule, DataLoader],
+    model: torch.nn.Module,
     embeddings: Optional[np.ndarray] = None,
 ):
     """
-    Evaluation stage:
-      - Instantiate (or load) the model.
-      - Call trainer.test().
+    Evaluate the model on the test set.
     """
-    model = instantiate_algorithm(cfg, stage="learning", embeddings=embeddings)
-    if cfg.ckpt_dir:
-        # If you want to load from checkpoint, you could do:
-        # model = YourLightningModuleClass.load_from_checkpoint(cfg.ckpt_dir)
-        pass
+    if model is None:
+        raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
 
-    trainer.test(model, datamodule=datamodule)
-
-def run_pipeline(
-    cfg: DictConfig,
-    datamodule: LightningDataModule,
-    trainer: Trainer,
-    algorithm: Optional[torch.nn.Module] = None,
-    embeddings: Optional[np.ndarray] = None,
-):
-    """
-    Orchestrates the entire pipeline:
-    - Performs dimensionality reduction (if applicable)
-    - Trains a model (if specified)
-    - Evaluates (if specified)
-    """
-    perform_dr = "dimensionality_reduction" in cfg.algorithm
-    perform_training = "network" in cfg.algorithm
-    
-    if isinstance(embeddings, torch.Tensor):
-        embeddings = embeddings.cpu().numpy() ## ugly, to be fixed with type checks
-
-    if embeddings is not None and embeddings.size > 0:
-        logger.info(f"Using precomputed embeddings with shape: {embeddings.shape}")
-
-    elif perform_dr:
-        logger.info("Performing Dimensionality Reduction (DR)...")
-        data_loader = datamodule.train_dataloader()
-        data = [inputs.cpu().numpy() for inputs, _ in data_loader]
-        data_np = np.concatenate(data, axis=0)
-        algorithm.fit(torch.tensor(data_np))
-        embeddings = algorithm.transform(torch.tensor(data_np))
-        
-        if isinstance(embeddings, torch.Tensor):
-            embeddings = embeddings.cpu().numpy()
-
-        logger.info(f"Embedding completed with shape: {embeddings.shape}")
-
-    elif perform_training and (embeddings is None or embeddings.size == 0):
-        logger.info("No DR applied — using raw data for Neural Network.")
-        data_loader = datamodule.train_dataloader()
-        data = [inputs.cpu().numpy() for inputs, _ in data_loader]
-        embeddings = np.concatenate(data, axis=0)
-
-    if perform_training:
-        logger.info("Training Neural Network...")
-        train_model(cfg, trainer, datamodule, embeddings)
-
-    if cfg.get("mode", "train") == "evaluate" and perform_training:
-        evaluate_model(cfg, trainer, datamodule, embeddings)
+    trainer.test(model, datamodule=datamodule)  

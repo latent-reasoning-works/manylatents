@@ -1,0 +1,3 @@
+_target_: src.algorithms.callbacks.dimensionality_reduction_metrics.DimensionalityReductionMetricsCallback
+save_dir: ${hydra:runtime.output_dir}
+save_format: "csv"

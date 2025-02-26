@@ -1,3 +1,4 @@
+import csv
 import logging
 import os
 import pickle
@@ -9,7 +10,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-# Helper function to save/load objects
+logger = logging.getLogger(__name__)
 
 def save_pickle(obj, path):
     with open(path, 'wb') as f:
@@ -99,7 +100,19 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
         return None
 
 def save_embeddings(embeddings, path, format='npy', metadata=None):
+    """
+    Saves embeddings in the specified format.
+
+    Args:
+        embeddings (np.ndarray): The computed embeddings.
+        path (str): File path for saving.
+        format (str): One of ['npy', 'csv', 'pt', 'h5'].
+        metadata (dict, optional): Extra metadata (e.g., labels).
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    if isinstance(embeddings, torch.Tensor):
+        embeddings = embeddings.cpu().numpy()
 
     if format == 'npy':
         np.save(path, embeddings)
@@ -117,4 +130,4 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
     else:
         raise ValueError(f"Unsupported format: {format}")
 
-    print(f"Saved embeddings to {path}")
+    logger.info(f"Saved embeddings to {path}")
