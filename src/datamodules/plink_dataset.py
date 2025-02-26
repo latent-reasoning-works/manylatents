@@ -61,7 +61,6 @@ class PlinkDataset(Dataset):
     def __getitem__(self, index: int) -> Any:
         sample = self.X[index] 
         metadata_row = self.metadata.iloc[index].to_dict()  
-
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
         return sample, metadata_row  
 

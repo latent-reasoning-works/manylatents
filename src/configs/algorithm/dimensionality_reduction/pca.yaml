@@ -1,5 +1,3 @@
 _target_: src.algorithms.pca.PCAModule
 #_partial_: true
 
-n_components: 2
-

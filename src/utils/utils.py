@@ -4,8 +4,10 @@ import pickle
 from pathlib import Path
 from typing import Optional
 
+import h5py
 import numpy as np
 import pandas as pd
+import torch
 
 # Helper function to save/load objects
 
@@ -95,3 +97,24 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
     except Exception as e:
         logging.warning(f"Could not detect delimiter for file '{file_path}': {e}")
         return None
+
+def save_embeddings(embeddings, path, format='npy', metadata=None):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    if format == 'npy':
+        np.save(path, embeddings)
+    elif format == 'csv':
+        df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
+        if metadata is not None:
+            for key, value in metadata.items():
+                df[key] = value
+        df.to_csv(path, index=False)
+    elif format == 'pt':
+        torch.save(embeddings, path)
+    elif format == 'h5':
+        with h5py.File(path, 'w') as f:
+            f.create_dataset('embeddings', data=embeddings)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+
+    print(f"Saved embeddings to {path}")

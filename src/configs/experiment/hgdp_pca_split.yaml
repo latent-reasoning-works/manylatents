@@ -5,4 +5,13 @@ defaults:
   - override /algorithm/dimensionality_reduction: pca
   - override /datamodule: hgdp
 
+datamodule:
+  mode: splits
+
 seed: 42
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.n_components: 2,50

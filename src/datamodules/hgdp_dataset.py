@@ -40,6 +40,8 @@ class HGDPDataset(PlinkDataset):
     def __init__(self, 
                  files: Dict[str, str], 
                  cache_dir: str, 
+                 filter_related: bool = True,
+                 data_split: str = "full",
                  mmap_mode: Optional[str] = None, 
                  precomputed_path: Optional[str] = None,
                  metadata: Optional[pd.DataFrame] = None,
@@ -50,13 +52,20 @@ class HGDPDataset(PlinkDataset):
         Args:
             files (dict): Paths for PLINK and metadata files.
             cache_dir (str): Directory for caching.
+            filter_related (bool): Whether to filter related samples.
+            data_split (str): 'train', 'test', or 'full' split.
             mmap_mode (Optional[str]): Memory-mapping mode.
             precomputed_path (Optional[str]): Path to precomputed embeddings if available.
+            metadata (Optional[pd.DataFrame]): Preloaded metadata.
+            delimiter (Optional[str]): Delimiter for CSV files.
         """
+        self.filter_related = filter_related
+        self.data_split = data_split
+
         super().__init__(files=files, 
                          cache_dir=cache_dir, 
                          mmap_mode=mmap_mode,
-                         delimiter=delimiter)
+                         delimiter=delimiter,)
 
         self.precomputed_path = precomputed_path
         self.metadata = metadata if metadata is not None else self.load_metadata(files["metadata"])
@@ -71,7 +80,6 @@ class HGDPDataset(PlinkDataset):
             else:
                 raise ValueError(f"Unsupported file format: {self.precomputed_path}")
 
-        # Extract indices based on metadata (even for precomputed)
         self.fit_idx, self.trans_idx = self.extract_indices()
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -84,12 +92,31 @@ class HGDPDataset(PlinkDataset):
         filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
         _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
         filtered_indices = ~self.metadata.index.isin(_filtered_indices)
-        related_indices = ~self.metadata['filter_king_related'].values
+        
+        if self.filter_related:
+            related_indices = ~self.metadata['filter_king_related'].values
+        else:
+            related_indices = np.ones(len(self.metadata), dtype=bool)
 
         fit_idx = related_indices & filtered_indices
         trans_idx = (~related_indices) & filtered_indices
 
         return fit_idx, trans_idx
+
+    def __getitem__(self, idx):
+        if self.data_split == 'train':
+            indices = np.where(self.fit_idx)[0]
+        elif self.data_split == 'test':
+            indices = np.where(self.trans_idx)[0]
+        elif self.data_split == 'full':
+            indices = np.arange(len(self.X))
+        else:
+            raise ValueError(f"Invalid data_split '{self.data_split}'. Use 'train', 'test', or 'full'.")
+
+        real_idx = indices[idx]
+        sample = self.X[real_idx]
+        meta = self.metadata.iloc[real_idx]
+        return sample, meta
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
