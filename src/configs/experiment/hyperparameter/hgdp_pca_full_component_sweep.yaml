@@ -11,6 +11,8 @@ datamodule:
 
 seed: 42
 
-algorithm:
-  dimensionality_reduction:
-    n_components: 2
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.n_components: 2,50

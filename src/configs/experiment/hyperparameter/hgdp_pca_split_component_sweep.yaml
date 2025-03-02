@@ -4,9 +4,10 @@ defaults:
   - override /algorithm: default
   - override /algorithm/dimensionality_reduction: pca
   - override /datamodule: hgdp
+  - override /callbacks/dimensionality_reduction: save_embeddings
 
 datamodule:
-  mode: splits
+  mode: split
 
 seed: 42
 

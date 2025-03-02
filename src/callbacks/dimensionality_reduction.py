@@ -5,7 +5,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Union
 
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 from torch import Tensor
 from typing_extensions import NotRequired, Required, TypedDict
@@ -49,7 +51,7 @@ class SaveEmbeddings(DimensionalityReductionCallback):
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
     def save_embeddings(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
-        logger.info(f"save_embeddings() called with embeddings shape: {embeddings.shape}")
+        logger.debug(f"save_embeddings() called with embeddings shape: {embeddings.shape}")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"embeddings_{timestamp}.{self.save_format}"
         save_path = os.path.join(self.save_dir, filename)
@@ -64,6 +66,37 @@ class SaveEmbeddings(DimensionalityReductionCallback):
             logger.error(f"Failed to save embeddings: {e}")
             warnings.warn(f"Failed to save embeddings: {e}")
 
+    def plot_embeddings(self, embeddings: np.ndarray, labels: np.ndarray = None, save_path: str = None) -> None:
+            """
+            Generates and saves a scatter plot of the embeddings.
+            """
+            if embeddings.shape[1] != 2:
+                logger.info("Skipping plot: Embeddings must be 2D for visualization.")
+                return
+
+            logger.info("Generating embedding plot...")
+            plt.figure(figsize=(8, 6))
+
+            if labels is not None:
+                sns.scatterplot(x=embeddings[:, 0], y=embeddings[:, 1], hue=labels, palette="viridis", alpha=0.7)
+            else:
+                plt.scatter(embeddings[:, 0], embeddings[:, 1], alpha=0.7)
+
+            plt.xlabel("Component 1")
+            plt.ylabel("Component 2")
+            plt.title("Dimensionality Reduction Visualization")
+            plt.legend()
+
+            if save_path:
+                plot_path = save_path.replace(f".{self.save_format}", ".png")
+            else:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                plot_path = os.path.join(self.save_dir, f"embedding_plot_{timestamp}.png")
+
+            plt.savefig(plot_path)
+            plt.close()
+            logger.info(f"Saved plot to {plot_path}")
+
     def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
-        logger.info("on_dr_end() called; delegating to save_embeddings()")
+        logger.debug("on_dr_end() called; delegating to save_embeddings()")
         self.save_embeddings(embeddings, labels)

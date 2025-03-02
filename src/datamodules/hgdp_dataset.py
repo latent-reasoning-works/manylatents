@@ -59,18 +59,15 @@ class HGDPDataset(PlinkDataset):
             metadata (Optional[pd.DataFrame]): Preloaded metadata.
             delimiter (Optional[str]): Delimiter for CSV files.
         """
+        self.data_split = data_split        
         self.filter_related = filter_related
-        self.data_split = data_split
-
         super().__init__(files=files, 
                          cache_dir=cache_dir, 
                          mmap_mode=mmap_mode,
                          delimiter=delimiter,)
-
-        self.precomputed_path = precomputed_path
-        self.metadata = metadata if metadata is not None else self.load_metadata(files["metadata"])
         
         # Load precomputed embeddings if provided
+        self.precomputed_path = precomputed_path
         if self.precomputed_path and os.path.exists(self.precomputed_path):
             logger.info(f"Loading precomputed embeddings from {self.precomputed_path}")
             if self.precomputed_path.endswith(".npy"):
@@ -79,8 +76,6 @@ class HGDPDataset(PlinkDataset):
                 self.X = np.loadtxt(self.precomputed_path, delimiter=",")
             else:
                 raise ValueError(f"Unsupported file format: {self.precomputed_path}")
-
-        self.fit_idx, self.trans_idx = self.extract_indices()
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -103,21 +98,6 @@ class HGDPDataset(PlinkDataset):
 
         return fit_idx, trans_idx
 
-    def __getitem__(self, idx):
-        if self.data_split == 'train':
-            indices = np.where(self.fit_idx)[0]
-        elif self.data_split == 'test':
-            indices = np.where(self.trans_idx)[0]
-        elif self.data_split == 'full':
-            indices = np.arange(len(self.X))
-        else:
-            raise ValueError(f"Invalid data_split '{self.data_split}'. Use 'train', 'test', or 'full'.")
-
-        real_idx = indices[idx]
-        sample = self.X[real_idx]
-        meta = self.metadata.iloc[real_idx]
-        return sample, meta
-
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
         Loads and processes metadata for the HGDP dataset.
@@ -131,12 +111,16 @@ class HGDPDataset(PlinkDataset):
         full_path = os.path.abspath(metadata_path)
         logger.info(f"Loading metadata from: {full_path}")
 
-        required_columns = ['project_meta.sample_id', 
-                            'filter_king_related', 
-                            'filter_pca_outlier', 
-                            'hard_filtered', 
-                            'filter_contaminated']
+        # Define required columns (ensuring any future dependencies are included)
+        required_columns = [
+            'project_meta.sample_id',
+            'filter_king_related',
+            'filter_pca_outlier',
+            'hard_filtered',
+            'filter_contaminated'
+        ]
 
+        # Load metadata with additional processing
         metadata = load_metadata(
             file_path=full_path,
             required_columns=required_columns,
@@ -144,4 +128,19 @@ class HGDPDataset(PlinkDataset):
             delimiter=self.delimiter
         )
 
-        return metadata.set_index('project_meta.sample_id')
+        # Ensure correct index is set
+        if 'project_meta.sample_id' not in metadata.columns:
+            raise ValueError("Missing required column: 'project_meta.sample_id' in metadata.")
+
+        metadata = metadata.set_index('project_meta.sample_id')
+
+        # Ensure filter columns exist and have correct types (Boolean)
+        filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+        for col in filter_columns:
+            if col in metadata.columns:
+                metadata[col] = metadata[col].astype(bool)
+            else:
+                logger.warning(f"Missing filter column in metadata: {col}. Filling with False.")
+                metadata[col] = False
+
+        return metadata
