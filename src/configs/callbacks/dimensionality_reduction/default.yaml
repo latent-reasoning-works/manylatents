@@ -1,0 +1,4 @@
+defaults:
+  - save_embeddings
+  - additional_metrics
+  - _self_

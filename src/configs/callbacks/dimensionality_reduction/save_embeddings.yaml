@@ -1,3 +1,5 @@
-_target_: src.callbacks.dimensionality_reduction.SaveEmbeddings
-save_dir: ${hydra:runtime.output_dir}
-save_format: "csv"
+
+save_embeddings:
+  _target_: src.callbacks.dimensionality_reduction.SaveEmbeddings
+  save_dir: ${hydra:runtime.output_dir}
+  save_format: "csv"

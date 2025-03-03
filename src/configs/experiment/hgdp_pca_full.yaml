@@ -4,7 +4,7 @@ defaults:
   - override /algorithm: default
   - override /algorithm/dimensionality_reduction: pca
   - override /datamodule: hgdp
-  - override /callbacks/dimensionality_reduction: save_embeddings
+  - override /callbacks/dimensionality_reduction: default
 
 datamodule:
   mode: full

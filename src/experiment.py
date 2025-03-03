@@ -12,6 +12,8 @@ from torch.utils.data import DataLoader
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.utils.data import DummyDataModule
 from src.utils.utils import check_or_make_dirs
+from src.metrics.handler import MetricsHandler
+
 
 logger = logging.getLogger(__name__)
 
@@ -88,13 +90,30 @@ def evaluate_dr(
     **kwargs,
 ) -> Tuple[str, Optional[float], dict]:
     """
-    Evaluate the DR algorithm.
+    Evaluate the DR algorithm and, if configured, compute additional metrics using a metrics handler.
     """
     if embeddings is None:
         raise ValueError("No embeddings were computed. Check your DR algorithm configuration.")
     
-    error_metric = algorithm.evaluate(embeddings)
-    return "error", error_metric, {}
+    # Compute the base error metric from the DR module if available
+    error_metric = algorithm.evaluate(embeddings) 
+    
+    # Optionally compute additional metrics via the metrics handler if "metrics" is in the config.
+    metrics_results = {}
+    if "metrics" in cfg:
+        try:
+            metrics_handler = MetricsHandler(cfg.metrics)
+            # Expect the metadata to be provided via kwargs.
+            metadata = kwargs.get("original_data", None)
+            if metadata is None:
+                logger.warning("No metadata provided for metrics computation. Skipping additional metrics.")
+            else:
+                metrics_results = metrics_handler.compute_all(original=original_data, embedded=embeddings)
+        except Exception as e:
+            logger.error(f"Failed to compute additional metrics: {e}")
+    
+    return "error", error_metric, metrics_results
+
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(

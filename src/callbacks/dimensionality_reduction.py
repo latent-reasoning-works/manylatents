@@ -13,6 +13,7 @@ from torch import Tensor
 from typing_extensions import NotRequired, Required, TypedDict
 
 from src.utils.utils import save_embeddings
+from src.metrics.handler import MetricsHandler
 
 logger = logging.getLogger(__name__)
 
@@ -100,3 +101,33 @@ class SaveEmbeddings(DimensionalityReductionCallback):
     def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
         logger.debug("on_dr_end() called; delegating to save_embeddings()")
         self.save_embeddings(embeddings, labels)
+
+class AdditionalMetrics(DimensionalityReductionCallback):
+    def __init__(self, metrics_config, metadata: np.ndarray = None):
+        """
+        Initializes the callback with a metrics configuration and optionally the original data.
+
+        Args:
+            metrics_config: A Hydra config (or dict) specifying the metrics to compute.
+            metadata (np.ndarray, optional): Additional experimental data for metrics computation.
+        """
+        self.metrics_handler = MetricsHandler(metrics_config)
+        self.metadata = metadata
+
+    def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+        """
+        Computes additional metrics using the MetricsHandler and logs the results.
+        """
+        if self.metadata is None:
+            logger.warning("No metadata provided for metrics computation. Skipping additional metrics.")
+            return
+
+        try:
+            results = self.metrics_handler.compute_all(
+                original=self.metadata, 
+                embedded=embeddings,
+                labels=labels
+            )
+            logger.info(f"Computed DR metrics: {results}")
+        except Exception as e:
+            logger.error(f"Error while computing DR metrics: {e}")

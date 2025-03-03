@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from torch import Tensor
-
+import numpy as np
 
 class DimensionalityReductionModule(ABC):
     def __init__(self, n_components: int = 2, init_seed: int = 42):
@@ -24,3 +24,13 @@ class DimensionalityReductionModule(ABC):
         """Fit and then transform data."""
         self.fit(x)
         return self.transform(x)
+    
+    def evaluate(self, embeddings:np.array) -> float:
+        """
+        Compute a metric for this DR module.
+        Child classes can override this to compute, e.g.,
+        - trustworthiness
+        - etc.
+        If not overriden, returns a dictionary with an error key.
+        """
+        return {"error": 0.0}
