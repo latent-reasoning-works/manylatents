@@ -8,9 +8,10 @@ from lightning import LightningDataModule
 from omegaconf import DictConfig, OmegaConf
 
 import src  # noqa: F401
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.configs import register_configs
 from src.experiment import (
-    evaluate_model,
+    evaluate,
     instantiate_datamodule,
     instantiate_trainer,
     train_model,
@@ -40,30 +41,39 @@ def main(cfg: DictConfig):
     datamodule = instantiate_datamodule(cfg)
     logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
 
-    embeddings, model = None, None
+    dr_module, embeddings, model = instantiate_algorithm(cfg, datamodule=datamodule)
 
     # Run DR if configured
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         logger.info("Running Dimensionality Reduction (DR)...")
-        embeddings, _ = instantiate_algorithm(cfg, datamodule=datamodule)
         logger.info(f"DR completed. Embedding shape: {embeddings.shape if embeddings is not None else 'N/A'}")
+        
+        dr_metric_name, dr_error, dr_metrics = evaluate(
+            dr_module,
+            cfg=cfg,
+            datamodule=datamodule,
+            embeddings=embeddings,
+            
+        )
     else:
         logger.info("No DR algorithm specified. Proceeding with raw/precomputed data.")
 
     # Run training and evaluation if a neural network is configured
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         logger.info("Instantiating Neural Network model...")
-        # Instantiate only the NN component; embeddings remain None at this stage
-        _, model = instantiate_algorithm(cfg, datamodule=datamodule)
-
         logger.info("Instantiating the trainer...")
         trainer = instantiate_trainer(cfg)
-
         logger.info("Running training...")
         train_model(cfg, trainer, datamodule, model, embeddings)
-
-        logger.info("Running evaluation...")
-        evaluate_model(cfg, trainer, datamodule, model, embeddings)
+        
+        model_metric_name, model_error, model_metrics = evaluate(
+            model,
+            cfg=cfg,
+            datamodule=datamodule,
+            model=model,
+            embeddings=embeddings,
+        )
+        logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
     else:
         logger.info("No neural network specified. Skipping training and evaluation.")
 
@@ -72,11 +82,11 @@ def main(cfg: DictConfig):
 def instantiate_algorithm(
     cfg: DictConfig,
     datamodule: Optional[LightningDataModule] = None,
-) -> Tuple[Optional[np.ndarray], Optional[torch.nn.Module]]:
+) -> Tuple[Optional[DimensionalityReductionModule], Optional[np.ndarray], Optional[torch.nn.Module]]:
     """
     Instantiates the algorithms specified in the configuration.
     
-    The function returns a tuple: (embeddings, model).
+    The function returns a tuple: (dr module, embeddings, lightning module).
     
     - If a Dimensionality Reduction (DR) algorithm is configured, 
       the DR method is run immediately on the training data to compute embeddings.
@@ -94,6 +104,7 @@ def instantiate_algorithm(
             - embeddings: Computed embeddings from the DR algorithm, or None if using NN only.
             - model: Instantiated neural network model, or None if only DR is used.
     """
+    dr_algorithm: Optional[torch.nn.Module] = None
     embeddings_result: Optional[np.ndarray] = None
     model: Optional[torch.nn.Module] = None
 
@@ -136,7 +147,7 @@ def instantiate_algorithm(
         logger.info(f"Instantiating Neural Network: {model_cfg._target_}")
         model = hydra.utils.instantiate(model_cfg)
 
-    return embeddings_result, model
+    return dr_algorithm, embeddings_result, model
 
 if __name__ == "__main__":
     main()

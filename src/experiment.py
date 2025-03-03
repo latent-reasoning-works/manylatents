@@ -1,13 +1,15 @@
+import functools
 import logging
-from typing import Optional, Union
+from typing import Any, Optional, Tuple, Union
 
 import hydra
 import numpy as np
 import torch
-from lightning import LightningDataModule, Trainer
+from lightning import LightningDataModule, LightningModule, Trainer
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.utils.data import DummyDataModule
 from src.utils.utils import check_or_make_dirs
 
@@ -65,19 +67,61 @@ def train_model(
     
     trainer.fit(model, datamodule=datamodule)
     
-def evaluate_model(
+@functools.singledispatch
+def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
+    """Evaluates the algorithm.
+
+    Returns the name of the 'error' metric for this run, its value, and a dict of metrics.
+    """
+    raise NotImplementedError(
+        f"There is no registered handler for evaluating algorithm {algorithm} of type "
+        f"{type(algorithm)}! (kwargs: {kwargs})"
+    )
+    
+@evaluate.register(DimensionalityReductionModule)
+def evaluate_dr(
+    algorithm: DimensionalityReductionModule,
+    *,
+    cfg: DictConfig,
+    datamodule: Union[LightningDataModule, DataLoader],
+    embeddings: Optional[np.ndarray] = None,
+    **kwargs,
+) -> Tuple[str, Optional[float], dict]:
+    """
+    Evaluate the DR algorithm.
+    """
+    if embeddings is None:
+        raise ValueError("No embeddings were computed. Check your DR algorithm configuration.")
+    
+    error_metric = algorithm.evaluate(embeddings)
+    return "error", error_metric, {}
+
+@evaluate.register(LightningModule)
+def evaluate_lightningmodule(
+    algorithm: LightningModule,
+    *,
     cfg: DictConfig,
     trainer: Trainer,
     datamodule: Union[LightningDataModule, DataLoader],
-    model: torch.nn.Module,
     embeddings: Optional[np.ndarray] = None,
-):
+) -> Tuple[str, Optional[float], dict]:
     """
     Evaluate the model on the test set.
     Sets the model to evaluation mode before testing.
     """
-    if model is None:
+    if algorithm is None:
         raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
 
-    model.eval()  # Set the model to evaluation mode for inference
-    trainer.test(model, datamodule=datamodule)
+    results = trainer.test(model=algorithm, datamodule=datamodule)
+    if not results:
+        return "fail", 9999.0, {}
+
+    # Suppose we want 'loss' or 'accuracy' from results
+    metrics = results[0]
+    if "test/accuracy" in metrics:
+        acc = metrics["test/accuracy"]
+        return "accuracy", (1.0 - acc), metrics
+    elif "test/loss" in metrics:
+        return "loss", metrics["test/loss"], metrics
+    else:
+        return "unknown", None, metrics
