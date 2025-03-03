@@ -1,7 +1,7 @@
 defaults:
   - default
 
-_target_: src.datamodules.hgdp.HGDPDataModule
+_target_: src.data.hgdp.HGDPDataModule
 mmap_mode: null
 
 files:
