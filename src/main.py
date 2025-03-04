@@ -55,6 +55,17 @@ def main(cfg: DictConfig):
             embeddings=embeddings,
             
         )
+
+    if "dimensionality_reduction" in cfg.callbacks:
+        callback_cfg = cfg.callbacks.dimensionality_reduction
+        dr_callback = hydra.utils.instantiate(callback_cfg)
+        if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
+            # Pass the original data and embeddings to the callback.
+            original_data = datamodule.train_dataset.full_data
+            dr_callback.on_dr_end(original_data, embeddings_result)
+        else:
+            logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
+
     else:
         logger.info("No DR algorithm specified. Proceeding with raw/precomputed data.")
 

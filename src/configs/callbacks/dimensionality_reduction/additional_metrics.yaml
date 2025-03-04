@@ -1,9 +1,11 @@
 additional_metrics:
   _target_: src.callbacks.dimensionality_reduction.AdditionalMetrics
-  metrics_config:
-      trustworthiness:
-        _target_: src.metrics.dimensionality_reduction.Trustworthiness
-        n_neighbors: 5
-        metric: euclidean
+  ## the recursive call avoids calling metrics 
+  ## directly before data is ready
+  _recursive_: false
+  trustworthiness:
+      _target_: sklearn.manifold.trustworthiness
+      n_neighbors: 5
+      metric: euclidean
   metadata: null 
 

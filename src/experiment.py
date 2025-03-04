@@ -10,10 +10,9 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.metrics.handler import MetricsHandler
 from src.utils.data import DummyDataModule
 from src.utils.utils import check_or_make_dirs
-from src.metrics.handler import MetricsHandler
-
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +107,7 @@ def evaluate_dr(
             if metadata is None:
                 logger.warning("No metadata provided for metrics computation. Skipping additional metrics.")
             else:
-                metrics_results = metrics_handler.compute_all(original=original_data, embedded=embeddings)
+                metrics_results = metrics_handler.compute_all(metadata=metadata, embedded=embeddings)
         except Exception as e:
             logger.error(f"Failed to compute additional metrics: {e}")
     

@@ -12,8 +12,8 @@ import torch
 from torch import Tensor
 from typing_extensions import NotRequired, Required, TypedDict
 
-from src.utils.utils import save_embeddings
 from src.metrics.handler import MetricsHandler
+from src.utils.utils import save_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -102,32 +102,27 @@ class SaveEmbeddings(DimensionalityReductionCallback):
         logger.debug("on_dr_end() called; delegating to save_embeddings()")
         self.save_embeddings(embeddings, labels)
 
-class AdditionalMetrics(DimensionalityReductionCallback):
-    def __init__(self, metrics_config, metadata: np.ndarray = None):
+class AdditionalMetrics:
+    def __init__(self, **kwargs):
         """
-        Initializes the callback with a metrics configuration and optionally the original data.
+        Grabs extra fields in the main callback config (e.g. 'trustworthiness')
+        and stores them in a dict. Pops out keys that are not metrics, metadata here.
+        QUITE FLIMSY, but it works for now.
+        """
+        self.metadata = kwargs.pop("metadata", None)
+        # The remaining kwargs are assumed to be metric configurations.
+        self.metrics_cfg = kwargs
 
-        Args:
-            metrics_config: A Hydra config (or dict) specifying the metrics to compute.
-            metadata (np.ndarray, optional): Additional experimental data for metrics computation.
+    def on_dr_end(self, original, embedded):
         """
-        self.metrics_handler = MetricsHandler(metrics_config)
-        self.metadata = metadata
+        Compute all metrics using the stored configuration.
+        The metric functions will be called only at runtime when you pass in the data.
+        """
+        results = {}
+        for metric_name, cfg in self.metrics_cfg.items():
+            # Here we use hydra.utils.call to invoke the function with runtime arguments.
+            # This prevents Hydra from instantiating the metric function prematurely.
+            results[metric_name] = hydra.utils.call(cfg, X=original, X_embedded=embedded)
+            logger.info(f"{metric_name}: {results[metric_name]:.4f}")
+        return results
 
-    def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
-        """
-        Computes additional metrics using the MetricsHandler and logs the results.
-        """
-        if self.metadata is None:
-            logger.warning("No metadata provided for metrics computation. Skipping additional metrics.")
-            return
-
-        try:
-            results = self.metrics_handler.compute_all(
-                original=self.metadata, 
-                embedded=embeddings,
-                labels=labels
-            )
-            logger.info(f"Computed DR metrics: {results}")
-        except Exception as e:
-            logger.error(f"Error while computing DR metrics: {e}")

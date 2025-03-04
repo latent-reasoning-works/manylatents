@@ -93,6 +93,13 @@ class PlinkDataset(Dataset):
             Tuple[np.ndarray, np.ndarray]: Boolean arrays for fit and transform indices.
         """
         pass
+
+    @property
+    def full_data(self) -> np.ndarray:
+        """
+        Returns the full, unbatched data.
+        """
+        return self.X
     
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
