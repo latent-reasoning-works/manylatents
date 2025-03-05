@@ -62,7 +62,7 @@ def main(cfg: DictConfig):
         if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
             # Pass the original data and embeddings to the callback.
             original_data = datamodule.train_dataset.full_data
-            dr_callback.on_dr_end(original_data, embeddings_result)
+            dr_callback.on_dr_end(original_data, embeddings)
         else:
             logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
 

@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Union
 
+import hydra
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -12,7 +13,6 @@ import torch
 from torch import Tensor
 from typing_extensions import NotRequired, Required, TypedDict
 
-from src.metrics.handler import MetricsHandler
 from src.utils.utils import save_embeddings
 
 logger = logging.getLogger(__name__)
@@ -105,24 +105,19 @@ class SaveEmbeddings(DimensionalityReductionCallback):
 class AdditionalMetrics:
     def __init__(self, **kwargs):
         """
-        Grabs extra fields in the main callback config (e.g. 'trustworthiness')
-        and stores them in a dict. Pops out keys that are not metrics, metadata here.
-        QUITE FLIMSY, but it works for now.
+        - `metrics_cfg` is a DictConfig that contains all your metric definitions.
+        - Because `_recursive_: false` is set at `metrics_cfg`, Hydra won't
+        instantiate `trustworthiness` prematurely.
         """
         self.metadata = kwargs.pop("metadata", None)
-        # The remaining kwargs are assumed to be metric configurations.
+        # All remaining keys are assumed to be metric configs.
         self.metrics_cfg = kwargs
 
     def on_dr_end(self, original, embedded):
-        """
-        Compute all metrics using the stored configuration.
-        The metric functions will be called only at runtime when you pass in the data.
-        """
         results = {}
         for metric_name, cfg in self.metrics_cfg.items():
-            # Here we use hydra.utils.call to invoke the function with runtime arguments.
-            # This prevents Hydra from instantiating the metric function prematurely.
-            results[metric_name] = hydra.utils.call(cfg, X=original, X_embedded=embedded)
-            logger.info(f"{metric_name}: {results[metric_name]:.4f}")
+            score = hydra.utils.call(cfg, original, embedded)
+            logger.info(f"{metric_name}: {score:.4f}")
+            results[metric_name] = score
         return results
 
