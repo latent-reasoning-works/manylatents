@@ -1,5 +1,3 @@
-# File: src/callbacks/dimensionality_reduction/plot_embeddings.py
-
 import logging
 import os
 from datetime import datetime
@@ -34,31 +32,38 @@ class PlotEmbeddings(DimensionalityReductionCallback):
 
     def on_dr_end(self, original: np.ndarray, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
         """
-        Plots the 2D embeddings (e.g. PC1 vs PC2) and saves them as a PNG.
+        Plots the first two dimensions of the embeddings and saves them as a PNG.
+        If the embeddings have more than 2 dimensions, only the first two (PC1 and PC2) are used.
 
         Args:
-            original (np.ndarray): The original data (ignored here, but part of the DR callback signature).
-            embeddings (np.ndarray): The computed embeddings of shape (N, 2).
+            original (np.ndarray): The original data (ignored here).
+            embeddings (np.ndarray): The computed embeddings of shape (N, D) where D >= 2.
             labels (np.ndarray, optional): Optional labels for color-coding in the scatter plot.
         """
-        if embeddings.shape[1] != 2:
-            logger.warning("Skipping plot: Embeddings must be 2D for visualization.")
+        if embeddings.shape[1] < 2:
+            logger.warning("Not enough dimensions for plotting (need at least 2). Skipping plot.")
             return
 
-        # Create figure and axes
+        # If more than 2 dimensions, select only the first two.
+        if embeddings.shape[1] > 2:
+            embeddings_to_plot = embeddings[:, :2]
+            logger.info("Embeddings have more than 2 dimensions; using the first 2 (PC1 and PC2) for plotting.")
+        else:
+            embeddings_to_plot = embeddings
+
         plt.figure(figsize=self.figsize)
 
         if labels is not None:
             sns.scatterplot(
-                x=embeddings[:, 0],
-                y=embeddings[:, 1],
+                x=embeddings_to_plot[:, 0],
+                y=embeddings_to_plot[:, 1],
                 hue=labels,
                 palette="viridis",
                 alpha=0.7
             )
             plt.legend()
         else:
-            plt.scatter(embeddings[:, 0], embeddings[:, 1], alpha=0.7)
+            plt.scatter(embeddings_to_plot[:, 0], embeddings_to_plot[:, 1], alpha=0.7)
 
         plt.xlabel("PC1")
         plt.ylabel("PC2")
