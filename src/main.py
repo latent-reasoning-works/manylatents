@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 import hydra
 import numpy as np
 import torch
-from lightning import LightningDataModule
+from lightning import LightningModule
 from omegaconf import DictConfig, OmegaConf
 
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
@@ -41,19 +41,28 @@ def main(cfg: DictConfig):
     logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
 
     # 2. Instantiate the algorithm(s)
-    dr_module, dr_embedding, lightning_module = instantiate_algorithm(cfg, datamodule=datamodule)
+    dr_module, lightning_module = instantiate_algorithm(cfg)
 
     # 3. Run DR if configured, evaluate, and run callbacks
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         logger.info("Running Dimensionality Reduction (DR)...")
-        logger.info(f"DR completed. Embedding shape: {dr_embedding.shape if dr_embedding is not None else 'N/A'}")
+        
+        if datamodule is None:
+            raise ValueError("DataModule must be provided for Dimensionality Reduction.")
+        data_loader = datamodule.train_dataloader()
+        data_list = [inputs.cpu().numpy() for inputs, _ in data_loader]
+        data_np = np.concatenate(data_list, axis=0)
+        
+        dr_module.fit(torch.tensor(data_np))
+        dr_embedding = dr_module.transform(torch.tensor(data_np))
+        
+        logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
         
         dr_metric_name, dr_error, dr_metrics = evaluate(
             dr_module,
             cfg=cfg,
             datamodule=datamodule,
             embeddings=dr_embedding,
-            
         )
         
         if "dimensionality_reduction" in cfg.callbacks:
@@ -93,33 +102,20 @@ def main(cfg: DictConfig):
     
 def instantiate_algorithm(
     cfg: DictConfig,
-    datamodule: Optional[LightningDataModule] = None,
-) -> Tuple[Optional[DimensionalityReductionModule], Optional[np.ndarray], Optional[torch.nn.Module]]:
+) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
     """
-    Instantiates the algorithms specified in the configuration.
-    
-    The function returns a tuple: (dr module, embeddings, lightning module).
-    
-    - If a Dimensionality Reduction (DR) algorithm is configured, 
-      the DR method is run immediately on the training data to compute embeddings.
-    - If only a Neural Network (NN) is configured, the function returns the NN model
-      and leaves the embeddings as None (to be extracted later via the model's forward pass).
-    - If both DR and NN are specified, the DR embeddings are computed first and can be used
-      as inputs for the NN training process.
+    Instantiates the algorithms specified in the configuration.    
     
     Args:
-        cfg (DictConfig): Hydra configuration.
-        datamodule (Optional[LightningDataModule]): Data module for data loading.
+        cfg (DictConfig): Hydra configuration. UPDATE WITH ALGORITHM CONFIG
     
     Returns:
-        Tuple[Optional[torch.nn.Module], Optional[np.ndarray], Optional[torch.nn.Module]]:
+        Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
             - dr_module: Instantiated DR algorithm, or None if not specified.
-            - dr_embedding: Computed embeddings from the DR algorithm, or None if using NN only.
             - lightning_module: Instantiated neural network model, or None if only DR is used.
     """
     dr_module: Optional[DimensionalityReductionModule] = None
-    dr_embedding: Optional[np.ndarray] = None
-    lightning_module: Optional[torch.nn.Module] = None
+    lightning_module: Optional[LightningModule] = None
 
     # --- DR Setup ---
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
@@ -129,18 +125,7 @@ def instantiate_algorithm(
 
         logger.info(f"Instantiating Dimensionality Reduction: {dr_cfg._target_.split('.')[-1]}")
         dr_module = hydra.utils.instantiate(dr_cfg)
-
-        if datamodule is None:
-            raise ValueError("DataModule must be provided for Dimensionality Reduction.")
-
-        data_loader = datamodule.train_dataloader()
-        data_list = [inputs.cpu().numpy() for inputs, _ in data_loader]
-        data_np = np.concatenate(data_list, axis=0)
-
-        dr_module.fit(torch.tensor(data_np))
-        dr_embedding = dr_module.transform(torch.tensor(data_np))
-        logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
-
+ 
     # --- NN Setup ---
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         model_cfg = cfg.algorithm.network
@@ -150,7 +135,7 @@ def instantiate_algorithm(
         logger.info(f"Instantiating Neural Network: {model_cfg._target_}")
         lightning_module = hydra.utils.instantiate(model_cfg)
 
-    return dr_module, dr_embedding, lightning_module
+    return dr_module, lightning_module
 
 if __name__ == "__main__":
     main()
