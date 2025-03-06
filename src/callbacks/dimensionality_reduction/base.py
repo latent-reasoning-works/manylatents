@@ -20,6 +20,9 @@ class DimensionalityReductionOutputs(TypedDict, total=False):
     embeddings: Required[Tensor]
     """Reduced embeddings from the model, e.g. PHATE, UMAP, PCA."""
     
+    original: NotRequired[np.ndarray]
+    """Optional original data used for DR."""
+    
     loss: NotRequired[Union[torch.Tensor, float]]
     """Optional loss value from the training/validation step."""
     
@@ -28,11 +31,12 @@ class DimensionalityReductionOutputs(TypedDict, total=False):
     
 class DimensionalityReductionCallback(BaseCallback, ABC):
     @abstractmethod
-    def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+    def on_dr_end(self, original:np.ndarray, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
         """
         Called when the Dimensionality Reduction process is complete.
         
         Args:
+            original (np.ndarray): The original data.
             embeddings (np.ndarray): The computed embeddings.
             labels (np.ndarray, optional): Optional labels associated with the embeddings.
         """

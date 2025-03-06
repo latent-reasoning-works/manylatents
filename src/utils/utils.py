@@ -117,10 +117,9 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
     if format == 'npy':
         np.save(path, embeddings)
     elif format == 'csv':
-        df = pd.DataFrame(embeddings, columns=[f"dim_{i}" for i in range(embeddings.shape[1])])
-        if metadata is not None:
-            for key, value in metadata.items():
-                df[key] = value
+        df = pd.DataFrame(embeddings, columns=[f"Component_{i+1}" for i in range(embeddings.shape[1])])
+        if metadata is not None and metadata.get("labels") is not None:
+            df["label"] = metadata["labels"]
         df.to_csv(path, index=False)
     elif format == 'pt':
         torch.save(embeddings, path)
@@ -129,5 +128,3 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
             f.create_dataset('embeddings', data=embeddings)
     else:
         raise ValueError(f"Unsupported format: {format}")
-
-    logger.info(f"Saved embeddings to {path}")

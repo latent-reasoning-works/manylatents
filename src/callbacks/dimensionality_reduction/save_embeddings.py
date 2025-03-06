@@ -1,6 +1,5 @@
 import logging
 import os
-import warnings
 from datetime import datetime
 
 import numpy as np
@@ -14,6 +13,7 @@ class SaveEmbeddings(DimensionalityReductionCallback):
     def __init__(self, save_dir: str = "outputs", save_format: str = "npy") -> None:
         self.save_dir = save_dir
         self.save_format = save_format
+        
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
@@ -31,9 +31,8 @@ class SaveEmbeddings(DimensionalityReductionCallback):
             logger.info(f"Saved embeddings successfully to {save_path}")
         except Exception as e:
             logger.error(f"Failed to save embeddings: {e}")
-            warnings.warn(f"Failed to save embeddings: {e}")
-
-    def on_dr_end(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+ 
+    def on_dr_end(self, original:np.ndarray, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
         logger.debug("on_dr_end() called; delegating to save_embeddings()")
         self.save_embeddings(embeddings, labels)
 
