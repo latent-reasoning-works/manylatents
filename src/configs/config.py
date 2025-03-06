@@ -15,3 +15,5 @@ class Config:
     verbose: bool = False
     cache_dir: Optional[str] = "outputs/cache"
     ckpt_dir: Optional[str] = "outputs/ckpt"
+    name: str = "default"
+    

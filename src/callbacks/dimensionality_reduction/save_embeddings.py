@@ -10,17 +10,20 @@ from src.utils.utils import save_embeddings
 logger = logging.getLogger(__name__)
 
 class SaveEmbeddings(DimensionalityReductionCallback):
-    def __init__(self, save_dir: str = "outputs", save_format: str = "npy") -> None:
+    def __init__(self, save_dir: str = "outputs", 
+                 save_format: str = "npy", 
+                 experiment_name: str = "experiment") -> None:
+        
         self.save_dir = save_dir
         self.save_format = save_format
-        
+        self.experiment_name = experiment_name
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
     def save_embeddings(self, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
         logger.debug(f"save_embeddings() called with embeddings shape: {embeddings.shape}")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"embeddings_{timestamp}.{self.save_format}"
+        filename = f"embeddings_{self.experiment_name}_{timestamp}.{self.save_format}"
         save_path = os.path.join(self.save_dir, filename)
         logger.info(f"Computed save path: {save_path}")
         

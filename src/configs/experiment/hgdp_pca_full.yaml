@@ -1,4 +1,5 @@
 # @package _global_
+name: hgdp_pca_full # logging purposes
 
 defaults:
   - override /algorithm: default
