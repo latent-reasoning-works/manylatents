@@ -1,8 +1,7 @@
 additional_metrics:
-  _target_: src.callbacks.dimensionality_reduction.AdditionalMetrics
+  _target_: src.callbacks.dimensionality_reduction.additional_metrics.AdditionalMetrics
   trustworthiness:
     _target_: sklearn.manifold.trustworthiness
-    _partial_: true
     n_neighbors: 5
     metric: euclidean
   metadata: null 

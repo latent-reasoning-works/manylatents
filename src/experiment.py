@@ -63,6 +63,8 @@ def train_model(
     """
     Train the model using PyTorch Lightning Trainer.
     """
+    ## CURRENTLY DOESN'T USE EMBEDDINGS, REVISE
+    ## BEFORE ADDING TRAINING SUPPORT
     if model is None:
         raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
     

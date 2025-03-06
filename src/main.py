@@ -7,7 +7,6 @@ import torch
 from lightning import LightningDataModule
 from omegaconf import DictConfig, OmegaConf
 
-import src  # noqa: F401
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.configs import register_configs
 from src.experiment import (
@@ -36,53 +35,55 @@ def main(cfg: DictConfig):
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
     logger.info("Starting the experiment pipeline...")
 
-    # Instantiate the datamodule
-    logger.info("Instantiating the datamodule...")
+    # 1. Instantiate the datamodule
+    logger.debug("Instantiating the datamodule...")
     datamodule = instantiate_datamodule(cfg)
     logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
 
-    dr_module, embeddings, model = instantiate_algorithm(cfg, datamodule=datamodule)
+    # 2. Instantiate the algorithm(s)
+    dr_module, dr_embedding, lightning_module = instantiate_algorithm(cfg, datamodule=datamodule)
 
-    # Run DR if configured
+    # 3. Run DR if configured, evaluate, and run callbacks
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         logger.info("Running Dimensionality Reduction (DR)...")
-        logger.info(f"DR completed. Embedding shape: {embeddings.shape if embeddings is not None else 'N/A'}")
+        logger.info(f"DR completed. Embedding shape: {dr_embedding.shape if dr_embedding is not None else 'N/A'}")
         
         dr_metric_name, dr_error, dr_metrics = evaluate(
             dr_module,
             cfg=cfg,
             datamodule=datamodule,
-            embeddings=embeddings,
+            embeddings=dr_embedding,
             
         )
-
-    if "dimensionality_reduction" in cfg.callbacks:
-        callback_cfg = cfg.callbacks.dimensionality_reduction
-        dr_callback = hydra.utils.instantiate(callback_cfg)
-        if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-            # Pass the original data and embeddings to the callback.
-            original_data = datamodule.train_dataset.full_data
-            dr_callback.on_dr_end(original_data, embeddings)
+        
+        if "dimensionality_reduction" in cfg.callbacks:
+            dr_callbacks = cfg.callbacks.dimensionality_reduction
+            for name, cb_cfg in dr_callbacks.items():
+                dr_callback = hydra.utils.instantiate(cb_cfg)
+                if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
+                # Pass the original data and embeddings to the callback.
+                    X = datamodule.train_dataset.full_data
+                    dr_callback.on_dr_end(X, dr_embedding)
+                else:
+                    logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
         else:
-            logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
+            logger.info("No DR algorithm specified. Proceeding with raw/precomputed data.")
 
-    else:
-        logger.info("No DR algorithm specified. Proceeding with raw/precomputed data.")
-
-    # Run training and evaluation if a neural network is configured
+    # 4. Run training and evaluation if a neural network is configured
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         logger.info("Instantiating Neural Network model...")
         logger.info("Instantiating the trainer...")
         trainer = instantiate_trainer(cfg)
         logger.info("Running training...")
-        train_model(cfg, trainer, datamodule, model, embeddings)
+        train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
         
+        ## verify correctness, module is being called twice
         model_metric_name, model_error, model_metrics = evaluate(
-            model,
+            lightning_module,
             cfg=cfg,
             datamodule=datamodule,
-            model=model,
-            embeddings=embeddings,
+            model=lightning_module,
+            embeddings=dr_embedding,
         )
         logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
     else:
@@ -111,21 +112,23 @@ def instantiate_algorithm(
         datamodule (Optional[LightningDataModule]): Data module for data loading.
     
     Returns:
-        Tuple[Optional[np.ndarray], Optional[torch.nn.Module]]:
-            - embeddings: Computed embeddings from the DR algorithm, or None if using NN only.
-            - model: Instantiated neural network model, or None if only DR is used.
+        Tuple[Optional[torch.nn.Module], Optional[np.ndarray], Optional[torch.nn.Module]]:
+            - dr_module: Instantiated DR algorithm, or None if not specified.
+            - dr_embedding: Computed embeddings from the DR algorithm, or None if using NN only.
+            - lightning_module: Instantiated neural network model, or None if only DR is used.
     """
-    dr_algorithm: Optional[torch.nn.Module] = None
-    embeddings_result: Optional[np.ndarray] = None
-    model: Optional[torch.nn.Module] = None
+    dr_module: Optional[DimensionalityReductionModule] = None
+    dr_embedding: Optional[np.ndarray] = None
+    lightning_module: Optional[torch.nn.Module] = None
 
+    # --- DR Setup ---
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         dr_cfg = cfg.algorithm.dimensionality_reduction
         if "_target_" not in dr_cfg:
             raise ValueError("Missing _target_ in dimensionality_reduction config")
 
         logger.info(f"Instantiating Dimensionality Reduction: {dr_cfg._target_.split('.')[-1]}")
-        dr_algorithm = hydra.utils.instantiate(dr_cfg)
+        dr_module = hydra.utils.instantiate(dr_cfg)
 
         if datamodule is None:
             raise ValueError("DataModule must be provided for Dimensionality Reduction.")
@@ -133,32 +136,21 @@ def instantiate_algorithm(
         data_loader = datamodule.train_dataloader()
         data_list = [inputs.cpu().numpy() for inputs, _ in data_loader]
         data_np = np.concatenate(data_list, axis=0)
-        logger.debug(f"Data shape for embedding: {data_np.shape}")
 
-        dr_algorithm.fit(torch.tensor(data_np))
-        embeddings_result = dr_algorithm.transform(torch.tensor(data_np))
-        logger.info(f"Embedding completed with shape: {embeddings_result.shape}")
+        dr_module.fit(torch.tensor(data_np))
+        dr_embedding = dr_module.transform(torch.tensor(data_np))
+        logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
 
-        if "dimensionality_reduction" in cfg.callbacks:
-            callback_cfg = cfg.callbacks.dimensionality_reduction
-            dr_callback = hydra.utils.instantiate(callback_cfg)  # Hydra resolves save_dir
-            logger.info(f"Instantiated callback: {dr_callback.__class__.__name__}")
-            
-            if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-                logger.debug("Calling on_dr_end() to save embeddings...")
-                dr_callback.on_dr_end(embeddings_result)
-            else:
-                logger.warning("Callback has no on_dr_end(). Skipping.")
-
+    # --- NN Setup ---
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         model_cfg = cfg.algorithm.network
         if "_target_" not in model_cfg:
             raise ValueError("Missing _target_ in network config")
 
         logger.info(f"Instantiating Neural Network: {model_cfg._target_}")
-        model = hydra.utils.instantiate(model_cfg)
+        lightning_module = hydra.utils.instantiate(model_cfg)
 
-    return dr_algorithm, embeddings_result, model
+    return dr_module, dr_embedding, lightning_module
 
 if __name__ == "__main__":
     main()
