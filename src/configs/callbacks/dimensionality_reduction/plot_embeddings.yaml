@@ -1,0 +1,5 @@
+plot_embeddings:
+  _target_: src.callbacks.dimensionality_reduction.plot_embeddings.PlotEmbeddings
+  save_dir: ${hydra:runtime.output_dir}
+  filename: "${name}.png"
+  figsize: [8, 6]

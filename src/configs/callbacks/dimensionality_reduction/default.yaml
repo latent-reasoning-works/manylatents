@@ -1,4 +1,5 @@
 defaults:
   - save_embeddings
   - additional_metrics
+  - plot_embeddings
   - _self_
