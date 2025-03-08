@@ -79,6 +79,8 @@ dependencies = [
     "torchmetrics>=1.6.1",
     "pydantic>=2.9.2",
     "pytest>=8.3.4",
+    "wandb>=0.19.8",
+    "rich>=13.9.4",
 ]
 
 [tool.uv]

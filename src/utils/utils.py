@@ -8,6 +8,8 @@ from typing import Optional
 import h5py
 import numpy as np
 import pandas as pd
+import rich
+import rich.logging
 import torch
 
 logger = logging.getLogger(__name__)
@@ -128,3 +130,28 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
             f.create_dataset('embeddings', data=embeddings)
     else:
         raise ValueError(f"Unsupported format: {format}")
+    
+def setup_logging(debug: bool = False):
+    """
+    Configures logging dynamically using Hydra's built-in system.
+    
+    Args:
+        debug (bool): If True, enables local-only logging without WandB.
+    """
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    # Remove existing handlers to avoid duplicate logs
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    # Console Logging (Rich Formatting)
+    console_handler = rich.logging.RichHandler(
+        markup=True, rich_tracebacks=True, tracebacks_width=100, tracebacks_show_locals=False
+    )
+    console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    logger.addHandler(console_handler)
+
+    logger.info("Logging system initialized successfully.")
+

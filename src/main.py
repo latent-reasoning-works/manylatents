@@ -4,6 +4,7 @@ from typing import Optional, Tuple
 import hydra
 import numpy as np
 import torch
+import wandb
 from lightning import LightningModule
 from omegaconf import DictConfig, OmegaConf
 
@@ -15,9 +16,10 @@ from src.experiment import (
     instantiate_trainer,
     train_model,
 )
+from src.utils.utils import setup_logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 register_configs()
 
@@ -32,18 +34,25 @@ def main(cfg: DictConfig):
     Note: For network-only configurations, embeddings remain None at instantiation 
     and should be extracted later from the trained model.
     """
+    setup_logging(debug=cfg.debug)
+
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
+    
+    if cfg.debug:
+        wandb.init(mode="disabled")
+    else:
+        wandb.init(
+            ## add project name?
+            name=cfg.name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+        )
+
+    datamodule = instantiate_datamodule(cfg)
+    dr_module, lightning_module = instantiate_algorithm(cfg)
+    dr_metrics = {}
+    
     logger.info("Starting the experiment pipeline...")
 
-    # 1. Instantiate the datamodule
-    logger.debug("Instantiating the datamodule...")
-    datamodule = instantiate_datamodule(cfg)
-    logger.info(f"Datamodule instance: {datamodule} (type: {type(datamodule)})")
-
-    # 2. Instantiate the algorithm(s)
-    dr_module, lightning_module = instantiate_algorithm(cfg)
-
-    # 3. Run DR if configured, evaluate, and run callbacks
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         logger.info("Running Dimensionality Reduction (DR)...")
         
@@ -64,7 +73,7 @@ def main(cfg: DictConfig):
             datamodule=datamodule,
             embeddings=dr_embedding,
         )
-        
+
         if "dimensionality_reduction" in cfg.callbacks:
             dr_callbacks = cfg.callbacks.dimensionality_reduction
             for name, cb_cfg in dr_callbacks.items():
@@ -77,8 +86,12 @@ def main(cfg: DictConfig):
                     logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
         else:
             logger.info("No DR algorithm specified. Proceeding with raw/precomputed data.")
+            
+            if not cfg.debug: ## todo: interface metrics with callbacks
+                wandb.log({"DR Error": dr_error, **dr_metrics})
+                wandb.log({"DR Embeddings": wandb.Image(dr_embedding.numpy())})
 
-    # 4. Run training and evaluation if a neural network is configured
+
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         logger.info("Instantiating Neural Network model...")
         logger.info("Instantiating the trainer...")
@@ -99,6 +112,9 @@ def main(cfg: DictConfig):
         logger.info("No neural network specified. Skipping training and evaluation.")
 
     logger.info("Experiment complete.")
+
+    if wandb.run:
+        wandb.finish()
     
 def instantiate_algorithm(
     cfg: DictConfig,
