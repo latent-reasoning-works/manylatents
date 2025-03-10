@@ -70,7 +70,7 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         if isinstance(dataset, HGDPDataset):
             try:
                 # Extract populations from the metadata using the specified label column.
-                populations = dataset.metadata[self.label_col].values
+                populations = dataset.metadata[self.label_col].astype(str).values
                 # Attempt to extract superpopulations; fall back to populations if not available.
                 if "Superpopulation" in dataset.metadata.columns:
                     superpopulations = dataset.metadata["Superpopulation"].values
