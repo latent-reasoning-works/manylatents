@@ -114,3 +114,17 @@ class PlinkDataset(Dataset):
         logger.info(f"Loading metadata from: {metadata_path}")
         return pd.read_csv(metadata_path, delimiter=self.delimiter)
 
+    @abstractmethod
+    def get_labels(self, label_col: str = "Population") -> np.ndarray:
+        """
+        Abstract method that should return an array of labels for the dataset.
+        
+        Args:
+            label_col (str): Name of the column to use as labels.
+        
+        Returns:
+            np.ndarray: Array of labels.
+        """
+        pass
+
+

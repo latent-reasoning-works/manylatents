@@ -1,13 +1,14 @@
 import logging
+import os
 from typing import Optional, Tuple
 
 import hydra
 import numpy as np
 import torch
-import wandb
 from lightning import LightningModule
 from omegaconf import DictConfig, OmegaConf
 
+import wandb
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.configs import register_configs
 from src.experiment import (
@@ -46,10 +47,13 @@ def main(cfg: DictConfig):
             name=cfg.name,
             config=OmegaConf.to_container(cfg, resolve=True),
         )
+        
+        if wandb.run:
+            wandb.run.config.update({k: v for k, v in os.environ.items() if k.startswith("SLURM")})
+            ## log slurm variables; check if useful, usable across cluster envs
 
     datamodule = instantiate_datamodule(cfg)
     dr_module, lightning_module = instantiate_algorithm(cfg)
-    dr_metrics = {}
     
     logger.info("Starting the experiment pipeline...")
 
@@ -58,6 +62,7 @@ def main(cfg: DictConfig):
         
         if datamodule is None:
             raise ValueError("DataModule must be provided for Dimensionality Reduction.")
+        
         data_loader = datamodule.train_dataloader()
         data_list = [inputs.cpu().numpy() for inputs, _ in data_loader]
         data_np = np.concatenate(data_list, axis=0)
@@ -73,28 +78,28 @@ def main(cfg: DictConfig):
             datamodule=datamodule,
             embeddings=dr_embedding,
         )
+        
+        callback_outputs = []
 
         if "dimensionality_reduction" in cfg.callbacks:
             dr_callbacks = cfg.callbacks.dimensionality_reduction
             for name, cb_cfg in dr_callbacks.items():
                 dr_callback = hydra.utils.instantiate(cb_cfg)
                 if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-                # Pass the original data and embeddings to the callback.
-                    X = datamodule.train_dataset.full_data
-                    dr_callback.on_dr_end(X, dr_embedding)
+                    # pass dataset and embeddings to the callback,
+                    # dataset specific label, plotting logic is handled by the callback
+                    output = dr_callback.on_dr_end(
+                        dataset=datamodule.train_dataset, 
+                        embeddings=dr_embedding,
+                        )
+                    callback_outputs.append((name, output))
                 else:
                     logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
-        else:
-            logger.info("No DR algorithm specified. Proceeding with raw/precomputed data.")
-            
-            if not cfg.debug: ## todo: interface metrics with callbacks
-                wandb.log({"DR Error": dr_error, **dr_metrics})
-                wandb.log({"DR Embeddings": wandb.Image(dr_embedding.numpy())})
-
-
+                    
+    model_error = None
+    
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
-        logger.info("Instantiating Neural Network model...")
-        logger.info("Instantiating the trainer...")
+        logger.info("Instantiating the Neural Network model...")
         trainer = instantiate_trainer(cfg)
         logger.info("Running training...")
         train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
@@ -108,14 +113,21 @@ def main(cfg: DictConfig):
             embeddings=dr_embedding,
         )
         logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
-    else:
-        logger.info("No neural network specified. Skipping training and evaluation.")
-
-    logger.info("Experiment complete.")
 
     if wandb.run:
+        for name, output in callback_outputs:
+            if isinstance(output, dict):  # metrics
+                wandb.log(output)
+            elif isinstance(output, str) and output.endswith(".png"):  # image
+                wandb.log({f"{name}_plot": wandb.Image(output)})
+            elif isinstance(output, str):  # embeddings
+                wandb.save(output)
+                
         wandb.finish()
-    
+
+    logger.info("Experiment complete.")
+    return {"DR Error": dr_error, "Model Error": model_error}
+
 def instantiate_algorithm(
     cfg: DictConfig,
 ) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:

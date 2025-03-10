@@ -144,3 +144,19 @@ class HGDPDataset(PlinkDataset):
                 metadata[col] = False
 
         return metadata
+    
+    def get_labels(self, label_col: str = "Population") -> np.ndarray:
+        """
+        Returns label array (e.g., Population, Genetic_region_merged) for coloring plots.
+
+        Args:
+            label_col (str): Name of the column to use as label.
+
+        Returns:
+            np.ndarray: Array of labels.
+        """
+        if label_col not in self.metadata.columns:
+            raise ValueError(f"Label column '{label_col}' not found in metadata.")
+        
+        return self.metadata[label_col].values
+

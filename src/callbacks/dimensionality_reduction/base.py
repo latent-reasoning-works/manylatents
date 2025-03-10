@@ -1,9 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
-import torch
 from torch import Tensor
 from typing_extensions import NotRequired, Required, TypedDict
 
@@ -23,7 +22,7 @@ class DimensionalityReductionOutputs(TypedDict, total=False):
     original: NotRequired[np.ndarray]
     """Optional original data used for DR."""
     
-    loss: NotRequired[Union[torch.Tensor, float]]
+    loss: NotRequired[Union[Tensor, float]]
     """Optional loss value from the training/validation step."""
     
     label: NotRequired[Tensor]
@@ -31,13 +30,16 @@ class DimensionalityReductionOutputs(TypedDict, total=False):
     
 class DimensionalityReductionCallback(BaseCallback, ABC):
     @abstractmethod
-    def on_dr_end(self, original:np.ndarray, embeddings: np.ndarray, labels: np.ndarray = None) -> None:
+    def on_dr_end(self, dataset: Any, embeddings: np.ndarray) -> Any:
         """
         Called when the Dimensionality Reduction process is complete.
         
         Args:
-            original (np.ndarray): The original data.
+            dataset (Any): A dataset object that exposes properties/methods 
+                           like `full_data` and `get_labels()`.
             embeddings (np.ndarray): The computed embeddings.
-            labels (np.ndarray, optional): Optional labels associated with the embeddings.
+        
+        Returns:
+            Any: A result, for example a file path or a dictionary of metrics.
         """
         pass
