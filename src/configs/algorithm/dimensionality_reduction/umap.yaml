@@ -1,0 +1,8 @@
+_target_: src.algorithms.umap.UMAPModule
+n_components: 2
+random_state: 42
+n_neighbors: 15
+n_epochs: 500
+metric: 'euclidean'
+learning_rate: 1.0
+fit_fraction: 1.0

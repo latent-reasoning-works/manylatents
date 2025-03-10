@@ -1,4 +1,4 @@
-_target_: src.algorithms.phate.PHATEModule
+_target_: src.algorithms.diffusionmap.DiffusionMapModule
 n_components: 2
 random_state: 42
 t: 5

@@ -2,12 +2,11 @@
 import torch
 from torch import Tensor
 from typing import Optional, Union
-from phate import PHATE
+from .utils.diffusion_map import DiffusionMap
 
 from .dimensionality_reduction import DimensionalityReductionModule
 
-
-class PHATEModule(DimensionalityReductionModule):
+class DiffusionMapModule(DimensionalityReductionModule):
     def __init__(
         self,
         n_components: int = 2,
@@ -24,7 +23,7 @@ class PHATEModule(DimensionalityReductionModule):
     ):
         super().__init__(n_components, random_state, knn, t, decay, gamma, n_pca, n_landmark, n_jobs, verbose)
         self.fit_fraction = fit_fraction
-        self.model = PHATE(n_components=self.n_components, 
+        self.model = DiffusionMap(n_components=self.n_components, 
                            random_state=self.random_state,
                            knn=self.knn,
                            t=self.t,
@@ -36,7 +35,7 @@ class PHATEModule(DimensionalityReductionModule):
                            verbose=self.verbose)
 
     def fit(self, x: Tensor) -> None:
-        """Fits PHATE on a subset of data."""
+        """Fits DiffusionMap on a subset of data."""
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
@@ -44,9 +43,9 @@ class PHATEModule(DimensionalityReductionModule):
         self._is_fitted = True
 
     def transform(self, x: Tensor) -> Tensor:
-        """Transforms data using the fitted PHATE model."""
+        """Transforms data using the fitted DiffusionMap model."""
         if not self._is_fitted:
-            raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
+            raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
         
         x_np = x.detach().cpu().numpy()
         embedding = self.model.transform(x_np)
