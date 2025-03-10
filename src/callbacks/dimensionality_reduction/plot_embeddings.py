@@ -5,6 +5,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import scprep
 
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
 from src.data.hgdp_dataset import HGDPDataset
@@ -45,6 +46,7 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         Args:
             dataset (Any): A dataset object with a .metadata attribute and a get_labels() method.
             embeddings (np.ndarray): The computed embeddings (N, D).
+            legend (bool): Whether to include a legend in the plot.
 
         Returns:
             str: The file path to the saved plot.
@@ -54,61 +56,52 @@ class PlotEmbeddings(DimensionalityReductionCallback):
             return ""
 
         # Use only the first two dimensions.
-        embeddings_to_plot = embeddings[:, :2] if embeddings.shape[1] > 2 else embeddings
+        embeddings_to_plot = embeddings.numpy()[:, :2] if embeddings.shape[1] > 2 else embeddings.numpy()
         logger.info("Using first two dimensions for plotting.")
 
         labels = None
-        palette = None
-
         # Try to retrieve labels from the dataset.
         if hasattr(dataset, "get_labels") and callable(dataset.get_labels):
             try:
                 labels = dataset.get_labels(self.label_col)
             except Exception as e:
                 logger.warning(f"Unable to retrieve labels from dataset: {e}")
-
+        metadata = dataset.metadata[1:]
+        # labels = labels[1:]
+        labels = metadata['Population'].values
+        embeddings_to_plot = embeddings_to_plot[1:]
         if isinstance(dataset, HGDPDataset):
             try:
-                # Extract populations from the metadata using the specified label column.
-                populations = dataset.metadata[self.label_col].astype(str).values
-                # Attempt to extract superpopulations; fall back to populations if not available.
-                if "Superpopulation" in dataset.metadata.columns:
-                    superpopulations = dataset.metadata["Superpopulation"].values
-                else:
-                    logger.warning(
-                        "Superpopulation column not found in metadata; using population labels as fallback."
-                    )
-                    superpopulations = populations
-
                 # Call the mapping function with both arrays.
-                coarse_dict, fine_dict, _, _ = make_palette_label_order_HGDP(populations, superpopulations)
-                palette = fine_dict
-                if labels is not None:
-                    unique_labels = np.unique(labels)
-                    # Subset the palette to only include labels present.
-                    palette = {lab: palette.get(lab, "gray") for lab in unique_labels}
+                cmap_pop, _ = make_palette_label_order_HGDP(metadata)
+
             except Exception as e:
                 logger.warning(f"Error building HGDP palette: {e}")
         else:
             logger.info("Dataset is not HGDP. Using default palette 'viridis' if labels are provided.")
-
         # Plotting
-        plt.figure(figsize=self.figsize)
+        legend=False
+        figsize = (self.figsize[0], self.figsize[1])
         if labels is not None:
-            sns.scatterplot(
-                x=embeddings_to_plot[:, 0],
-                y=embeddings_to_plot[:, 1],
-                hue=labels,
-                palette=palette if palette else "viridis",
-                alpha=0.7
-            )
-            plt.legend()
+            if legend: 
+                scprep.plot.scatter2d(embeddings_to_plot, s=8, figsize=figsize,
+                            cmap=cmap_pop, c=labels,
+                            ticks =False, legend=True,xlabel=' ', ylabel=' ',
+                            legend_loc='upper center', legend_anchor=(1.0, -0.02), legend_ncol=8,
+                            label_prefix=None, title='', fontsize=36)
+            else:
+                scprep.plot.scatter2d(embeddings_to_plot, s=8, figsize=figsize,
+                            cmap=cmap_pop, c=labels,
+                            ticks =False, legend=False,xlabel=' ', ylabel=' ',
+                            label_prefix=None, title='', fontsize=36)
         else:
-            plt.scatter(embeddings_to_plot[:, 0], embeddings_to_plot[:, 1], alpha=0.7)
+            scprep.plot.scatter2d(embeddings_to_plot, s=8, figsize=figsize,
+                            cmap='viridis', ticks =False, legend=False,xlabel=' ', ylabel=' ',
+                            label_prefix=None, title='', fontsize=36)
 
-        plt.xlabel("Dim 1")
-        plt.ylabel("Dim 2")
-        plt.title("Dimensionality Reduction Plot")
+        plt.xlabel("Dim 1", fontsize=12)
+        plt.ylabel("Dim 2", fontsize=12)
+        plt.title("Dimensionality Reduction Plot", fontsize=16)
 
         # Generate the filename following the convention: embedding_plot_{experiment_name}_{timestamp}.png
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
