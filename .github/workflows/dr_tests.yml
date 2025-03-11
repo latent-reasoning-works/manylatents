@@ -1,12 +1,12 @@
-name: Dimensionality Reduction Tests
+name: 🧬 Dimensionality Reduction Tests
 
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 permissions:
   contents: read
