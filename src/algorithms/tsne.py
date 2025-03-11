@@ -2,7 +2,7 @@
 import torch
 from torch import Tensor
 from typing import Optional, Union
-from sklearn.manifold import TSNE
+from openTSNE import TSNE
 
 from .dimensionality_reduction import DimensionalityReductionModule
 
@@ -37,11 +37,10 @@ class TSNEModule(DimensionalityReductionModule):
         self._is_fitted = True
 
     def transform(self, x: Tensor) -> Tensor:
-        """tSNE is not able to transform. Do fit_transform instead."""
-        raise RuntimeError("tSNE is not able to transform. Do fit_transform instead.")
-    
-    def fit_transform(self, x: Tensor) -> Tensor:
-        """Fit and then transform on same data."""
+        """opentSNE support transform."""
+        if not self._is_fitted:
+            raise RuntimeError("tSNE model is not fitted yet. Call `fit` first.")
+        
         x_np = x.detach().cpu().numpy()
-        embedding = self.model.fit_transform(x_np)
+        embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
