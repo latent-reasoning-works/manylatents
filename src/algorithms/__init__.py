@@ -31,7 +31,7 @@ phate_config = builds(
 algorithm_store(phate_config, name="phate")
 
 tsne_config = builds(
-    tSNE,
+    TSNEModule,
     n_components="${cfg.algorithm.n_components:50}",
     perplexity="${cfg.algorithm.perplexity:30.0}",
     learning_rate="${cfg.algorithm.learning_rate:200.0}",
