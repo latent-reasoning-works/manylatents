@@ -20,8 +20,12 @@ algorithm_store(pca_config, name="pca")
 phate_config = builds(
     PHATEModule,
     n_components="${cfg.algorithm.n_components:2}",
+    random_state="${cfg.algorithm.random_state:42}",
+    t="${cfg.algorithm.t:5}",
     knn="${cfg.algorithm.knn:30}",
     gamma="${cfg.algorithm.gamma:0.5}",
+    decay="${cfg.algorithm.decay:40}",
+    n_landmark="${cfg.algorithm.n_landmark:2000}",
     populate_full_signature=True
 )
 algorithm_store(phate_config, name="phate")
