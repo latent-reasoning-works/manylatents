@@ -23,6 +23,11 @@ __pycache__/
 notebooks/debug.ipynb
 .ipynb_checkpoints/
 
+#vscode files
+.vscode/
+
+#wandb folder
+wandb/
 .env
 *.crc
 *.npz

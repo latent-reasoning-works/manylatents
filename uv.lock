@@ -951,6 +951,7 @@ dependencies = [
     { name = "matplotlib-inline" },
     { name = "nest-asyncio" },
     { name = "numpy" },
+    { name = "opentsne" },
     { name = "packaging" },
     { name = "pandas" },
     { name = "parso" },
@@ -1025,6 +1026,7 @@ requires-dist = [
     { name = "matplotlib-inline", specifier = "==0.1.6" },
     { name = "nest-asyncio", specifier = "==1.6.0" },
     { name = "numpy", specifier = ">=1.23.5" },
+    { name = "opentsne", specifier = ">=1.0.2" },
     { name = "packaging", specifier = "==24.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "parso", specifier = "==0.8.4" },
@@ -1378,6 +1380,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/09/48/6388f1bb9da707110532cb70ec4d2822858ddfb44f1cdf1233c20a80ea4b/omegaconf-2.3.0.tar.gz", hash = "sha256:d5d4b6d29955cc50ad50c46dc269bcd92c6e00f5f90d23ab5fee7bfca4ba4cc7", size = 3298120 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e3/94/1843518e420fa3ed6919835845df698c7e27e183cb997394e4a670973a65/omegaconf-2.3.0-py3-none-any.whl", hash = "sha256:7b4df175cdb08ba400f45cae3bdcae7ba8365db4d165fc65fd04b050ab63b46b", size = 79500 },
+]
+
+[[package]]
+name = "opentsne"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/71/09/357810160298701c979a75c9d4db27e6e8996add0d7879d60cc648341171/opentsne-1.0.2.tar.gz", hash = "sha256:e2aecaa7a487100246f2d3fef9855d1bd6cc02a1c6da8fb2a54583f307aa4229", size = 251206 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/a5/72aad8de41cc577c6b34977a4cbdb97e5bf2c1141d3430191da16cd7b1dc/openTSNE-1.0.2-cp39-cp39-macosx_10_12_universal2.whl", hash = "sha256:78d1122ce9233ba3e9de07825127b34b3f330665047f3e04c3914ee0e2b3fad2", size = 1016506 },
+    { url = "https://files.pythonhosted.org/packages/02/f5/ddcead14d625cc09c1779304d22aac41d3d06552a8f8bb6680d8d67e28da/openTSNE-1.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e349d876a26f417326b0aa4e031f2ca5af167608538eaae2b5d2fbaabd353df", size = 3023094 },
+    { url = "https://files.pythonhosted.org/packages/29/28/da77c553872d16fc54a133c478173782ae3b5289d4b47314019d35a0703f/openTSNE-1.0.2-cp39-cp39-win_amd64.whl", hash = "sha256:8c927dc2b47560d06abab48a8cca0ddf388a9200a2d27fc197c786b15f644e7c", size = 472805 },
 ]
 
 [[package]]

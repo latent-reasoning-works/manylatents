@@ -3,10 +3,10 @@ name: 🧬 Dimensionality Reduction Tests
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 permissions:
   contents: read
@@ -37,15 +37,12 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-          source .venv/bin/activate
-          pip install pytest pytest-cov
 
       # ✅ Run Dimensionality Reduction Tests
       - name: Run DR Tests
         run: |
-          source .venv/bin/activate
-          pytest src/algorithms/dimensionality_reduction_test.py
-          pytest src/tests/algorithms/dr_compliance_test.py
+          uv run pytest src/algorithms/dimensionality_reduction_test.py
+          uv run pytest src/tests/algorithms/dr_compliance_test.py
 
       # ✅ Upload Coverage Report (Optional)
       - name: Upload coverage report

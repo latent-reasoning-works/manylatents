@@ -3,14 +3,16 @@ import logging
 import os
 import pickle
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Dict, Optional
 
 import h5py
+import hydra
 import numpy as np
 import pandas as pd
 import rich
 import rich.logging
 import torch
+from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
 
@@ -155,3 +157,23 @@ def setup_logging(debug: bool = False):
 
     logger.info("Logging system initialized successfully.")
 
+class MetricHandler:
+    def __init__(self, metric_configs: DictConfig):
+        self.metric_configs = metric_configs
+        self.metrics = self._instantiate_metrics()
+
+    def _instantiate_metrics(self) -> Dict[str, Callable]:
+        return {
+            name: hydra.utils.instantiate(cfg)
+            for name, cfg in self.metric_configs.items()
+        }
+
+    def compute_all(self, dataset: Any, embeddings: np.ndarray) -> Dict[str, float]:
+        results = {}
+        for name, metric_fn in self.metrics.items():
+            try:
+                score = metric_fn(dataset=dataset, embeddings=embeddings)
+                results[name] = score
+            except Exception as e:
+                print(f"[MetricHandler] Failed to compute '{name}': {e}")
+        return results

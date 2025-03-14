@@ -2,8 +2,8 @@
 from hydra_zen import builds, store
 
 from .pca import PCAModule
-from .phate import PHATE
-from .tsne import tSNE
+from .phate import PHATEModule
+from .tsne import TSNEModule
 
 algorithm_store = store(group="algorithm")
 
@@ -17,7 +17,7 @@ algorithm_store(pca_config, name="pca")
 
 ## review PHATE and TSNE after they're implemented, currently placeholders
 phate_config = builds(
-    PHATE,
+    PHATEModule,
     n_components="${cfg.algorithm.n_components:50}",
     knn="${cfg.algorithm.knn:30}",
     gamma="${cfg.algorithm.gamma:0.5}",
@@ -26,11 +26,13 @@ phate_config = builds(
 algorithm_store(phate_config, name="phate")
 
 tsne_config = builds(
-    tSNE,
-    n_components="${cfg.algorithm.n_components:50}",
+    TSNEModule,
+    n_components="${cfg.algorithm.n_components:2}",
+    random_state="${cfg.algorithm.random_state:42}",
     perplexity="${cfg.algorithm.perplexity:30.0}",
     learning_rate="${cfg.algorithm.learning_rate:200.0}",
     n_iter="${cfg.algorithm.n_iter:1000}",
+    metric="${cfg.algorithm.metric:euclidean}",
     populate_full_signature=True
 )
 algorithm_store(tsne_config, name="tsne")
