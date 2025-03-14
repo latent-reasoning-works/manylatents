@@ -1,35 +1,27 @@
 import logging
 
 import numpy as np
-from sklearn.manifold import trustworthiness
 
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
 
 logger = logging.getLogger(__name__)
 
 class AdditionalMetrics(DimensionalityReductionCallback):
-    def __init__(self, **kwargs):
+    def __init__(self, metadata=None, **kwargs):
         """
-        Hydra will pass in metric definitions as keyword arguments.
-        The 'metadata' key is popped separately.
-        All remaining keys are assumed to be metric configurations.
+        Store metric configs as they are (expected to be partial) for later calling.
         """
-        self.metadata = kwargs.pop("metadata", None)
-        self.metrics_cfg = kwargs  # remaining keys are metric configs
+        self.metadata = metadata
+        self.metrics_cfg = kwargs  # All extra kwargs are metric definitions.
 
     def on_dr_end(self, dataset: any, embeddings: np.ndarray):
-        original = dataset.full_data  # retrieve the original data from the dataset
+        logger.info("Computing additional metrics on DR result...")
         results = {}
-        for metric_name, cfg in self.metrics_cfg.items():
+        for metric_name, metric_fn in self.metrics_cfg.items():
             try:
-                if metric_name == "trustworthiness":
-                    score = trustworthiness(original, embeddings, **cfg)
-                else:
-                    logger.warning(f"Metric '{metric_name}' is not implemented. Skipping.")
-                    continue
-
-                logger.info(f"{metric_name}: {score:.4f}")
-                results[metric_name] = score
+                metric_value = metric_fn(dataset=dataset, embeddings=embeddings)
+                logger.info(f"{metric_name}: {metric_value:.4f}")
+                results[metric_name] = metric_value
             except Exception as e:
                 logger.error(f"Error computing metric '{metric_name}': {e}")
         return results
