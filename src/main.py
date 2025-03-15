@@ -17,7 +17,7 @@ from src.experiment import (
     instantiate_trainer,
     train_model,
 )
-from src.utils.utils import setup_logging
+from src.utils.utils import aggregate_metrics, setup_logging
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +54,8 @@ def main(cfg: DictConfig):
 
     datamodule = instantiate_datamodule(cfg)
     dr_module, lightning_module = instantiate_algorithm(cfg)
+    dr_metrics, dr_error, model_metrics, model_error = None, None, None, None
+
     
     logger.info("Starting the experiment pipeline...")
 
@@ -114,16 +116,21 @@ def main(cfg: DictConfig):
         )
         logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
 
-    if wandb.run:
-        for name, output in callback_outputs:
-            if isinstance(output, dict):  # metrics
-                wandb.log(output)
-            elif isinstance(output, str) and output.endswith(".png"):  # image
-                wandb.log({f"{name}_plot": wandb.Image(output)})
-            elif isinstance(output, str):  # embeddings
-                wandb.save(output)
-                
+    aggregated_metrics = {}
+
+    aggregated_metrics = aggregate_metrics(
+        dr_metrics=dr_metrics,
+        dr_error=dr_error,
+        model_metrics=model_metrics if model_metrics else None,
+        model_error=model_error,
+        callback_outputs=callback_outputs
+    )
+    
+    if hasattr(wandb, "run") and wandb.run is not None:
+        wandb.log(aggregated_metrics)
         wandb.finish()
+    else:
+        logger.info("wandb.run not active; skipping wandb.log")
 
     logger.info("Experiment complete.")
     return {"DR Error": dr_error, "Model Error": model_error}
