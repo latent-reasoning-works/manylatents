@@ -1,6 +1,6 @@
+import graphtools
 import numpy as np
 import scipy
-import graphtools
 
 
 def compute_dm(K, alpha=0., verbose=0):
@@ -365,7 +365,7 @@ class DiffusionMap():
             del params["random_state"]
         if "verbose" in params:
             self.verbose = params["verbose"]
-            _logger.set_level(self.verbose)
+            logger.set_level(self.verbose)
             self._set_graph_params(verbose=params["verbose"])
             del params["verbose"]
             
