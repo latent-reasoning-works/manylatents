@@ -1,8 +1,6 @@
-from typing import Dict, Optional
+from typing import Optional
 
-import numpy as np
 import torch
-from scipy.spatial.distance import pdist
 from sklearn.decomposition import PCA
 from torch import Tensor
 
@@ -10,15 +8,13 @@ from .dimensionality_reduction import DimensionalityReductionModule
 
 
 class PCAModule(DimensionalityReductionModule):
-    def __init__(
-        self,
-        n_components: int = 2,
-        init_seed: int = 42,
-        fit_fraction: float = 1.0,  # Fraction of data used for fitting
-    ):
+    def __init__(self, n_components: int = 2, 
+                 init_seed: int = 42, 
+                 fit_fraction: float = 1.0):
         super().__init__(n_components, init_seed)
         self.fit_fraction = fit_fraction
         self.model = PCA(n_components=self.n_components)
+        self._is_fitted = False
 
     def fit(self, x: Tensor) -> None:
         """Fits PCA on a subset of data."""
@@ -37,48 +33,31 @@ class PCAModule(DimensionalityReductionModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
     
-    def _compute_correlation(self, x: Tensor, embeddings: Tensor) -> float:
+    def evaluate(self, original_x: torch.Tensor, embeddings: Optional[torch.Tensor] = None) -> dict:
         """
-        Compute the Pearson correlation between the pairwise distances in the 
-        original data and the PCA-transformed embedding.
-        """
-        x_np = x.detach().cpu().numpy()
-        embeddings_np = embeddings.detach().cpu().numpy()
-        orig_dists = pdist(x_np)
-        pca_dists = pdist(embeddings_np)
-        corr = np.corrcoef(orig_dists, pca_dists)[0, 1]
-        return corr
-    
-    def evaluate(self, x: Tensor, embeddings: Optional[Tensor] = None) -> Dict[str, float]:
-        """
-        Compute PCA-specific metrics.
+        Compute PCA-specific metrics by extending the general DR metrics.
         
         Args:
-            x: Original high-dimensional data tensor.
-            embeddings: (Optional) Precomputed PCA embeddings. 
-                        If not provided, it will be computed from x.
-        
+            original_x: The original high-dimensional data tensor.
+            embeddings: Optional precomputed PCA embeddings. If not provided,
+                        they are computed via self.transform(original_x).
+                        
         Returns:
-            A dictionary with metric names as keys and computed values as floats.
-            For example: {'pca_correlation': 0.95, 'variance_explained': 0.85}
+            A tuple of (error_metric, metrics_dict), where error_metric might be 
+            the pca_correlation and metrics_dict contains additional metrics.
         """
-        if not self._is_fitted:
-            raise RuntimeError("PCA model is not fitted yet. Cannot evaluate.")
-        
-        # Use precomputed embeddings if available, otherwise compute them.
         if embeddings is None:
-            embeddings = self.transform(x)
+            embeddings = self.transform(original_x)
+
+        # Call the parent's evaluate method to compute general DR metrics,
+        # e.g., the default correlation metric.
+        metrics = super().evaluate(original_x, embeddings)
+
+        # Extend the metrics with PCA-specific evaluations.
+        # For example, compute the total variance explained by the selected components.
+        variance_explained = self.model.explained_variance_ratio_.sum() if self._is_fitted else None
         
-        # Compute PCA-specific metrics
-        pca_corr = self._compute_correlation(x, embeddings)
+        # Add additional PCA metrics as needed.
+        metrics.update({"pca_variance_explained": variance_explained})
         
-        # If you add more PCA metrics, compute them here.
-        # For example:
-        # variance_explained = self._compute_variance_explained(x, embeddings)
-        
-        # Aggregate metrics into a dictionary.
-        metrics = {
-            "pca_correlation": pca_corr,
-            # "variance_explained": variance_explained,
-        }
         return metrics

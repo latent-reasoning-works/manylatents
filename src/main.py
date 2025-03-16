@@ -54,7 +54,7 @@ def main(cfg: DictConfig):
 
     datamodule = instantiate_datamodule(cfg)
     dr_module, lightning_module = instantiate_algorithm(cfg)
-    dr_metrics, dr_error, model_metrics, model_error = None, None, None, None
+    dr_metrics, dr_scores, model_metrics, model_error = None, None, None, None
 
     
     logger.info("Starting the experiment pipeline...")
@@ -74,12 +74,14 @@ def main(cfg: DictConfig):
         
         logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
         
-        dr_metric_name, dr_error, dr_metrics = evaluate(
+        dr_metrics = evaluate(
             dr_module,
             cfg=cfg,
             datamodule=datamodule,
             embeddings=dr_embedding,
         )
+        ## parse dr_scores from values in dr_metrics, if succesfully computed
+        dr_scores = dr_metrics[next(iter(dr_metrics))] if dr_metrics else None
         
         callback_outputs = []
 
@@ -120,7 +122,7 @@ def main(cfg: DictConfig):
 
     aggregated_metrics = aggregate_metrics(
         dr_metrics=dr_metrics,
-        dr_error=dr_error,
+        dr_scores=dr_scores,
         model_metrics=model_metrics if model_metrics else None,
         model_error=model_error,
         callback_outputs=callback_outputs
@@ -133,7 +135,7 @@ def main(cfg: DictConfig):
         logger.info("wandb.run not active; skipping wandb.log")
 
     logger.info("Experiment complete.")
-    return {"DR Error": dr_error, "Model Error": model_error}
+    return {"DR Score": dr_scores, "Model Error": model_error}
 
 def instantiate_algorithm(
     cfg: DictConfig,

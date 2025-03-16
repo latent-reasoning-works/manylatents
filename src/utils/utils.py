@@ -159,7 +159,7 @@ def setup_logging(debug: bool = False):
     
 def aggregate_metrics(
     dr_metrics: dict = None,
-    dr_error: float = None,
+    dr_scores: float = None,
     model_metrics: dict = None,
     model_error: float = None,
     callback_outputs: list = None
@@ -176,8 +176,8 @@ def aggregate_metrics(
     # Merge DR metrics.
     if dr_metrics:
         aggregated_metrics.update(dr_metrics)
-    if dr_error is not None:
-        aggregated_metrics["DR_Error"] = dr_error
+    if dr_scores is not None:
+        aggregated_metrics["DR_score"] = dr_scores
 
     # Merge network (model) metrics.
     if model_metrics:

@@ -88,18 +88,17 @@ def evaluate_dr(
     datamodule: Union[LightningDataModule, DataLoader],
     embeddings: Optional[np.ndarray] = None,
     **kwargs,
-) -> Tuple[str, Optional[float], dict]:
+) -> Tuple[str, Optional[float]]:
     """
     Evaluate the DR algorithm. Additional metrics are handled via callbacks (if configured).
     """
-    if embeddings is None: 
-        raise ValueError("No embeddings were computed. Check your DR algorithm configuration.")
+    original_data = getattr(datamodule, "full_data", None)
+    if original_data is not None:
+        metrics = algorithm.evaluate(original_data, embeddings)
+    else:
+        metrics = algorithm.evaluate(embeddings)
     
-    error_metric = algorithm.evaluate(embeddings) 
-    metrics_results = {}
-
-    return "error", error_metric, metrics_results
-
+    return metrics
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(
