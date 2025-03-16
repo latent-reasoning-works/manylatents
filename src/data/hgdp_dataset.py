@@ -71,9 +71,9 @@ class HGDPDataset(PlinkDataset):
         if self.precomputed_path and os.path.exists(self.precomputed_path):
             logger.info(f"Loading precomputed embeddings from {self.precomputed_path}")
             if self.precomputed_path.endswith(".npy"):
-                self.X = np.load(self.precomputed_path, mmap_mode=self.mmap_mode)
+                self.original_data = np.load(self.precomputed_path, mmap_mode=self.mmap_mode)
             elif self.precomputed_path.endswith(".csv"):
-                self.X = np.loadtxt(self.precomputed_path, delimiter=",")
+                self.original_data = np.loadtxt(self.precomputed_path, delimiter=",")
             else:
                 raise ValueError(f"Unsupported file format: {self.precomputed_path}")
 

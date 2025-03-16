@@ -222,7 +222,7 @@ def compute_quality_metrics(
 # 5) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def geo_preservation_metric(dataset, embeddings: np.ndarray) -> float:
+def GeographicPreservation(dataset, embeddings: np.ndarray) -> float:
     """
     Minimal wrapper so callback can do dataset -> float.
     """
@@ -232,7 +232,7 @@ def geo_preservation_metric(dataset, embeddings: np.ndarray) -> float:
         longitude=dataset.longitude
     )
 
-def admixture_preservation_metric(dataset, embeddings: np.ndarray) -> float:
+def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:
     """
     Another single-value wrapper returning Spearman correlation.
     """
@@ -242,7 +242,7 @@ def admixture_preservation_metric(dataset, embeddings: np.ndarray) -> float:
         population_label=dataset.population_label
     )
 
-def admixture_laplacian_metric(dataset, embeddings: np.ndarray) -> float:
+def AdmixtureLaplacian(dataset, embeddings: np.ndarray) -> float:
     """
     Laplacian-based metric -> single float for callback usage.
     """

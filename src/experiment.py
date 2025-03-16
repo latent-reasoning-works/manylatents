@@ -88,16 +88,25 @@ def evaluate_dr(
     datamodule: Union[LightningDataModule, DataLoader],
     embeddings: Optional[np.ndarray] = None,
     **kwargs,
-) -> Tuple[str, Optional[float]]:
+) -> dict:
     """
-    Evaluate the DR algorithm. Additional metrics are handled via callbacks (if configured).
+    Evaluate the DR algorithm and return a dictionary of metrics.
+    This function ensures that the original high-dimensional data is passed
+    to the evaluate method.
     """
-    original_data = getattr(datamodule, "full_data", None)
-    if original_data is not None:
-        metrics = algorithm.evaluate(original_data, embeddings)
-    else:
-        metrics = algorithm.evaluate(embeddings)
+    # Try to get original data from datamodule
+    original_data = getattr(datamodule.train_dataset, "original_data", None)
+    logger.info(f"Original data shape: {original_data.shape if original_data is not None else None}")
+    # If datamodule does not provide it, attempt to use one passed via kwargs.
+    if original_data is None and "original_data" in kwargs:
+        original_data = kwargs["original_data"]
     
+    # If still not available, raise an error.
+    if original_data is None:
+        raise ValueError("No original data available for evaluation.")
+    
+    # Call the module's evaluate method with original high-dimensional data.
+    metrics = algorithm.evaluate(original_data, embeddings)
     return metrics
 
 @evaluate.register(LightningModule)

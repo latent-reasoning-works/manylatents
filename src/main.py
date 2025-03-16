@@ -83,6 +83,8 @@ def main(cfg: DictConfig):
         ## parse dr_scores from values in dr_metrics, if succesfully computed
         dr_scores = dr_metrics[next(iter(dr_metrics))] if dr_metrics else None
         
+        logger.info(f"DR evaluation completed. Metrics {dr_metrics}, Scores: {dr_scores}")
+        
         callback_outputs = []
 
         if "dimensionality_reduction" in cfg.callbacks:

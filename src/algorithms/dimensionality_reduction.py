@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
-from scipy.spatial.distance import pdist
 from torch import Tensor
+
+from src.metrics.correlation import PearsonCorrelation
+from src.metrics.trustworthiness import Trustworthiness
 
 
 class DimensionalityReductionModule(ABC):
@@ -28,22 +30,6 @@ class DimensionalityReductionModule(ABC):
         self.fit(x)
         return self.transform(x)
     
-    def _compute_correlation(self, original_x: torch.Tensor, embeddings: torch.Tensor) -> float:
-        """
-        Compute the Pearson correlation between the pairwise distances of the original data
-        and the embeddings.
-        """
-        # Convert tensors to numpy arrays
-        orig_np = original_x.detach().cpu().numpy()
-        emb_np = embeddings.detach().cpu().numpy()
-        # Compute pairwise distances
-        orig_dists = pdist(orig_np)
-        emb_dists = pdist(emb_np)
-        # Compute and return the Pearson correlation coefficient
-        corr = np.corrcoef(orig_dists, emb_dists)[0, 1]
-        return corr
-    
-    
     def evaluate(self, original_x: torch.Tensor, embeddings: np.array) -> dict:
         """
         Default evaluation that returns general DR metrics.
@@ -55,8 +41,10 @@ class DimensionalityReductionModule(ABC):
             
         Returns:
             A dictionary mapping metric names to their computed values.
-            For example: {"correlation": 0.92}
+            For example: {"pearson_correlation": 0.92}
         """
-        correlation = self._compute_correlation(original_x, embeddings)
+        pearson_correlation = PearsonCorrelation(original_x, embeddings)
+        trustworthiness = Trustworthiness(original_x, embeddings)
         # You can extend this dictionary with additional metrics if needed.
-        return {"correlation": correlation}
+        return {"correlation": pearson_correlation,
+                "trustworthiness": trustworthiness}

@@ -58,7 +58,7 @@ class PlinkDataset(Dataset):
             'full': np.arange(len(self.metadata))
         }
 
-        self.X = self.load_or_convert_data()
+        self.original_data = self.load_or_convert_data()
 
     def load_or_convert_data(self) -> np.ndarray:
         """
@@ -79,7 +79,7 @@ class PlinkDataset(Dataset):
 
     def __getitem__(self, index: int) -> Any:
         real_idx = self.split_indices[self.data_split][index]
-        sample = self.X[real_idx]
+        sample = self.original_data[real_idx]
         metadata_row = self.metadata.iloc[real_idx].to_dict()
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
         return sample, metadata_row  
@@ -95,11 +95,11 @@ class PlinkDataset(Dataset):
         pass
 
     @property
-    def full_data(self) -> np.ndarray:
+    def get_original_data(self) -> np.ndarray:
         """
-        Returns the full, unbatched data.
+        Returns the original, unbatched data.
         """
-        return self.X
+        return self.original_data
     
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
