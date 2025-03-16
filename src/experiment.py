@@ -10,6 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.metrics.preservation import AdmixturePreservation, GeographicPreservation
 from src.utils.data import DummyDataModule
 from src.utils.utils import check_or_make_dirs
 
@@ -85,28 +86,32 @@ def evaluate_dr(
     algorithm: DimensionalityReductionModule,
     *,
     cfg: DictConfig,
-    datamodule: Union[LightningDataModule, DataLoader],
+    datamodule,
     embeddings: Optional[np.ndarray] = None,
     **kwargs,
 ) -> dict:
-    """
-    Evaluate the DR algorithm and return a dictionary of metrics.
-    This function ensures that the original high-dimensional data is passed
-    to the evaluate method.
-    """
-    # Try to get original data from datamodule
+    # Get original high-dimensional data.
     original_data = getattr(datamodule.train_dataset, "original_data", None)
-    logger.info(f"Original data shape: {original_data.shape if original_data is not None else None}")
-    # If datamodule does not provide it, attempt to use one passed via kwargs.
     if original_data is None and "original_data" in kwargs:
         original_data = kwargs["original_data"]
-    
-    # If still not available, raise an error.
     if original_data is None:
         raise ValueError("No original data available for evaluation.")
-    
-    # Call the module's evaluate method with original high-dimensional data.
+
+    # Compute general DR metrics.
     metrics = algorithm.evaluate(original_data, embeddings)
+    
+    # Optionally, add dataset-specific metrics by accessing metadata from the dataset.
+    ds = datamodule.train_dataset  # your dataset instance
+    # For example, if your dataset has latitude and longitude:
+    if hasattr(ds, "latitude") and hasattr(ds, "longitude"):
+        geo_preservation = GeographicPreservation(ds, embeddings)
+        metrics.update({"geographic_preservation": geo_preservation})
+    
+    # Similarly, if you want to add admixture-based metrics:
+    if hasattr(ds, "admixture_ratios") and hasattr(ds, "population_label"):
+        admixture_preservation = AdmixturePreservation(ds, embeddings)
+        metrics.update({"admixture_preservation": admixture_preservation})
+    
     return metrics
 
 @evaluate.register(LightningModule)

@@ -1,6 +1,0 @@
-additional_metrics:
-  _target_: src.callbacks.dimensionality_reduction.additional_metrics.AdditionalMetrics
-  - metrics/trustworthiness
-metadata: null
-
-

@@ -87,6 +87,9 @@ def main(cfg: DictConfig):
         
         callback_outputs = []
 
+        #TODO: additionalmetrics was phased out,
+        #update so it's able to plot and save lightning embeddings as well
+        # i.e. "integrate" both pipeline steps
         if "dimensionality_reduction" in cfg.callbacks:
             dr_callbacks = cfg.callbacks.dimensionality_reduction
             for name, cb_cfg in dr_callbacks.items():
@@ -126,9 +129,10 @@ def main(cfg: DictConfig):
         dr_metrics=dr_metrics,
         dr_scores=dr_scores,
         model_metrics=model_metrics if model_metrics else None,
-        model_error=model_error,
-        callback_outputs=callback_outputs
-    )
+        model_error=model_error,    
+        )
+    
+    logger.info(f"Aggregated metrics: {aggregated_metrics}")
     
     if hasattr(wandb, "run") and wandb.run is not None:
         wandb.log(aggregated_metrics)
