@@ -126,11 +126,14 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             delimiter=self.delimiter
         )
 
-        if 'project_meta.sample_id' not in metadata.columns:
-            raise ValueError("Missing required column: 'project_meta.sample_id' in metadata.")
+        # Check if the index has the required name; if not, try to set it.
+        if metadata.index.name is None or metadata.index.name.strip() != 'project_meta.sample_id':
+            if 'project_meta.sample_id' in metadata.columns:
+                metadata = metadata.set_index('project_meta.sample_id')
+            else:
+                raise ValueError("Missing required column: 'project_meta.sample_id' in metadata.")
 
-        metadata = metadata.set_index('project_meta.sample_id')
-
+        # Convert filter columns to bool.
         filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
         for col in filter_columns:
             if col in metadata.columns:
@@ -144,7 +147,7 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
         self._population_label = metadata["Population"]
 
         return metadata
-    
+
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
         Returns label array (e.g., Population) for coloring plots.

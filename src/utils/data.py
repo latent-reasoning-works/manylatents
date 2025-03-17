@@ -74,7 +74,6 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
         return None
 
 def load_metadata(file_path, required_columns=None, delimiter=None, additional_processing=None):
-
     if delimiter is None:
         logging.info(f"Detecting delimiter for file: {file_path}")
         detected_delimiter = detect_separator(file_path)
@@ -85,9 +84,8 @@ def load_metadata(file_path, required_columns=None, delimiter=None, additional_p
         metadata = pd.read_csv(
             file_path, 
             sep=delimiter, 
-            engine='python',
-            index_col=0
-        )
+            engine='python'
+            )
         metadata.columns = metadata.columns.str.strip()
         logging.info(f"Successfully loaded metadata with delimiter '{delimiter}'.")
     except pd.errors.ParserError as e:
@@ -101,7 +99,10 @@ def load_metadata(file_path, required_columns=None, delimiter=None, additional_p
         raise
 
     if required_columns:
-        missing_columns = [col for col in required_columns if col not in metadata.columns]
+        missing_columns = [
+            col for col in required_columns
+            if (col not in metadata.columns and col not in metadata.index)
+        ]
         if missing_columns:
             logging.error(f"Missing required columns {missing_columns} in metadata file: {file_path}")
             raise KeyError(f"Missing required columns {missing_columns} in metadata file: {file_path}")
@@ -110,7 +111,6 @@ def load_metadata(file_path, required_columns=None, delimiter=None, additional_p
         metadata = additional_processing(metadata)
 
     return metadata
-
 
 ### Plink Dataset
 def replace_negative_one_with_nan(array: np.array) -> np.array:

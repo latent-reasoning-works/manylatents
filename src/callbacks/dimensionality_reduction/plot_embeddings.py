@@ -4,7 +4,6 @@ from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import scprep
 
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
