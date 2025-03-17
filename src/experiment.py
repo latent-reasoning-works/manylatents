@@ -90,6 +90,7 @@ def evaluate_dr(
     **kwargs,
 ) -> dict:
     ds = datamodule.train_dataset
+    # The dataset instance should have an attribute "original_data"
     original_data = getattr(ds, "original_data", None)
     if original_data is None and "original_data" in kwargs:
         original_data = kwargs["original_data"]
@@ -100,28 +101,34 @@ def evaluate_dr(
     logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
     
     metrics = {}
-    # Get dataset-level metrics config
-    ds_metrics_cfg = cfg.metrics.get("dataset", {})
-    # Retrieve the subsample fraction without modifying the DictConfig:
-    ds_subsample_fraction = ds_metrics_cfg.get("subsample_fraction", None)
     
+    # Process dataset-level metrics (those that need metadata like latitude, longitude)
+    ds_metrics_cfg = cfg.metrics.get("dataset", {})
+    # If a subsample fraction is provided, subsample both the dataset and embeddings.
+    ds_subsample_fraction = ds_metrics_cfg.get("subsample_fraction", None)
     if ds_subsample_fraction is not None:
         ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embeddings, ds_subsample_fraction)
         logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
     else:
         ds_subsampled, embeddings_subsampled = ds, embeddings
     
-    # Iterate over each dataset metric, skipping the 'subsample_fraction' key.
+    # For each dataset-level metric, pass the (possibly subsampled) dataset and embeddings.
     for metric_name, metric_params in ds_metrics_cfg.items():
         if metric_name == "subsample_fraction":
             continue
         if metric_params.get("enabled", True):
             metric_fn = hydra.utils.instantiate(metric_params)
             metrics[metric_name] = metric_fn(ds_subsampled, embeddings_subsampled)
-        
+    
+    # Process module-level metrics (which rely mainly on original high-dimensional data)
+    module_metrics_cfg = cfg.metrics.get("module", {})
+    for metric_name, metric_params in module_metrics_cfg.items():
+        if metric_params.get("enabled", True):
+            metric_fn = hydra.utils.instantiate(metric_params)
+            # Pass the full dataset instance, from which the metric can extract original_data.
+            metrics[metric_name] = metric_fn(ds, embeddings)
+    
     return metrics
-
-
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(

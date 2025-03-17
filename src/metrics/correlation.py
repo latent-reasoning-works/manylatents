@@ -1,25 +1,38 @@
+import logging
+
 import numpy as np
 from scipy.spatial.distance import pdist
+from scipy.stats import pearsonr
 
+logger = logging.getLogger(__name__)
 
-def PearsonCorrelation(original_x, embeddings) -> float:
+def PearsonCorrelation(dataset, embeddings: np.ndarray, num_dists: int = 50000) -> float:
     """
-    Compute the Pearson correlation between the pairwise distances
-    of the original data and the embeddings. Accepts either torch.Tensors
-    or numpy arrays.
+    Compute the Pearson correlation between pairwise distances of the original
+    high-dimensional data and the low-dimensional embeddings. Uses subsampling
+    to limit the number of distance comparisons if necessary.
+    
+    Assumes that the dataset instance has an attribute `original_data`.
     """
-    # Convert to numpy arrays if needed.
-    if hasattr(original_x, "detach"):
-        orig_np = original_x.detach().cpu().numpy()
-    else:
-        orig_np = original_x
-
-    if hasattr(embeddings, "detach"):
-        emb_np = embeddings.detach().cpu().numpy()
-    else:
-        emb_np = embeddings
-
-    orig_dists = pdist(orig_np)
-    emb_dists = pdist(emb_np)
-    corr = np.corrcoef(orig_dists, emb_dists)[0, 1]
+    logger.info("Starting Pearson correlation computation.")
+    
+    # Retrieve the original data from the dataset.
+    original_data = dataset.original_data
+    if original_data is None:
+        raise ValueError("Dataset does not have 'original_data' attribute.")
+    
+    # Compute pairwise distances.
+    orig_dists = pdist(original_data)
+    emb_dists = pdist(embeddings)
+    
+    n = len(emb_dists)
+    # Choose a random subset of distances if needed.
+    subset_size = min(num_dists, n)
+    indices = np.random.choice(n, subset_size, replace=False)
+    orig_sample = orig_dists[indices]
+    emb_sample = emb_dists[indices]
+    
+    corr, _ = pearsonr(orig_sample, emb_sample)
+    
+    logger.info("Finished Pearson correlation computation.")
     return corr

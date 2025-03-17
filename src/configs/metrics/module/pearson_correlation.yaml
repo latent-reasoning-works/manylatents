@@ -1,3 +1,4 @@
 pearson_correlation:
   _target_: src.metrics.correlation.PearsonCorrelation
+  num_dists: 100
   _partial_: True

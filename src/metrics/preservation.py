@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
@@ -9,6 +11,8 @@ from src.utils.metrics import (
     compute_knn_laplacian,
     haversine_vectorized,
 )
+
+logger = logging.getLogger(__name__)
 
 ##############################################################################
 # 1) Core metric: Spearman correlation of distances
@@ -36,7 +40,7 @@ def preservation_metric(gt_dists, ac_dists, num_dists=50000, only_far=False):
 # 2) Geographic Metric
 ##############################################################################
 
-def compute_geographic_metric(
+def _compute_geographic_metric(
     ancestry_coords,
     latitude,
     longitude,
@@ -81,6 +85,82 @@ def compute_geographic_metric(
 
     return preservation_metric(gt_dists, ac_dists, only_far=only_far)
 
+## logging version for debugging
+def compute_geographic_metric(
+    ancestry_coords,
+    latitude,
+    longitude,
+    use_medians=False,
+    only_far=False,
+    subset_to_test_on=None
+):
+    """
+    Compare ground-truth haversine distances (lat/lon) vs. embedding distances (ancestry_coords).
+    Return Spearman correlation.
+    If use_medians=True, group by lat/lon and take median embedding coords.
+    If only_far=True, ignore pairs under the 10th percentile of geo distance.
+    """
+    if subset_to_test_on is not None:
+        ancestry_coords = ancestry_coords[subset_to_test_on]
+        latitude = latitude[subset_to_test_on]
+        longitude = longitude[subset_to_test_on]
+
+    # Combine lat/lon in a DataFrame.
+    ground_truth_coords = pd.concat([latitude, longitude], axis=1)
+    logger.info(f"Combined ground_truth_coords shape before dropna: {ground_truth_coords.shape}")
+    
+    # Instead of dropping na and losing alignment, create a boolean mask.
+    mask = ground_truth_coords.notna().all(axis=1)
+    ground_truth_coords = ground_truth_coords[mask]
+    logger.info(f"Combined ground_truth_coords shape after dropna: {ground_truth_coords.shape}")
+    logger.info(f"Combined ground_truth_coords head (after dropna):\n{ground_truth_coords.head()}")
+
+    # Filter the ancestry_coords with the same mask.
+    # Convert the mask to a boolean numpy array.
+    ancestry_coords = ancestry_coords[mask.values]
+
+    # Now convert the cleaned ground truth coordinates to radians.
+    ground_truth_coords_rad = np.radians(ground_truth_coords)
+
+    # Combine the radian-converted ground truth with the corresponding ancestry coordinates.
+    combined = pd.concat([
+        ground_truth_coords_rad,
+        pd.DataFrame(ancestry_coords, index=ground_truth_coords.index)
+    ], axis=1)
+    logger.info(f"Combined array shape: {combined.shape}")
+
+    if use_medians:
+        # Group by lat/lon and take median of embedding columns.
+        combined = combined.groupby(["latitude", "longitude"]).median().reset_index()
+        logger.info("After grouping by medians:")
+        logger.info(f"Combined shape: {combined.shape}")
+
+    # Extract arrays for distance computation.
+    ground_truth_arr = combined[["latitude", "longitude"]].values
+    ancestry_coords_arr = combined[[0, 1]].values  # two columns for embedding
+
+    # Compute haversine distances (ground truth).
+    gt_dists_square = haversine_vectorized(ground_truth_arr)
+    logger.info(f"Initial gt_dists_square shape: {gt_dists_square.shape}")
+
+    # Check symmetry before enforcing it.
+    symmetry_diff = np.abs(gt_dists_square - gt_dists_square.T)
+    logger.info(f"Max symmetry difference before forcing: {np.nanmax(symmetry_diff)}")
+
+    # Enforce symmetry by averaging with its transpose.
+    gt_dists_square = (gt_dists_square + gt_dists_square.T) / 2
+    symmetry_diff = np.abs(gt_dists_square - gt_dists_square.T)
+    logger.info(f"Max symmetry difference after forcing: {np.nanmax(symmetry_diff)}")
+
+    # Verify the matrix is square.
+    assert gt_dists_square.shape[0] == gt_dists_square.shape[1], "Distance matrix is not square!"
+
+    # Convert the symmetric distance matrix to condensed form.
+    gt_dists = squareform(gt_dists_square)
+    # Compute the distances in the embedding space.
+    ac_dists = pdist(ancestry_coords_arr)
+
+    return preservation_metric(gt_dists, ac_dists, only_far=only_far)
 
 ##############################################################################
 # 3) Admixture-based Metrics

@@ -1,0 +1,18 @@
+# @package _global_
+name: hgdp_phate_full_knn=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - override /algorithm: default
+  - override /algorithm/dimensionality_reduction: phate
+  - override /datamodule: hgdp
+  - override /callbacks/dimensionality_reduction: default
+  - override /metrics: hgdp_dr
+  
+datamodule:
+  mode: full
+
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2
