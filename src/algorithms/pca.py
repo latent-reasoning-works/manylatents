@@ -8,11 +8,11 @@ from .dimensionality_reduction import DimensionalityReductionModule
 
 class PCAModule(DimensionalityReductionModule):
     def __init__(self, n_components: int = 2, 
-                 init_seed: int = 42, 
+                 random_state: int = 42, 
                  fit_fraction: float = 1.0):
-        super().__init__(n_components, init_seed)
+        super().__init__(n_components, random_state)
         self.fit_fraction = fit_fraction
-        self.model = PCA(n_components=self.n_components)
+        self.model = PCA(n_components=self.n_components, random_state=self.random_state)
         self._is_fitted = False
 
     def fit(self, x: Tensor) -> None:

@@ -1,3 +1,4 @@
 _target_: src.algorithms.pca.PCAModule
 n_components: 2
+random_state: 42
 
