@@ -1,6 +1,6 @@
 _target_: src.algorithms.umap.UMAPModule
 n_components: 2
-random_state: 42
+random_state: ${seed}
 n_neighbors: 15
 n_epochs: 500
 metric: 'euclidean'

@@ -1,6 +1,6 @@
 _target_: src.algorithms.diffusionmap.DiffusionMapModule
 n_components: 2
-random_state: 42
+random_state: ${seed}
 t: 5
 knn: 'auto'
 gamma: 1.0

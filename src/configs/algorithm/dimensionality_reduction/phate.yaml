@@ -1,6 +1,6 @@
 _target_: src.algorithms.phate.PHATEModule
 n_components: 2
-random_state: 42
+random_state: ${seed}
 knn: 5
 t: 'auto'
 gamma: 1.0
