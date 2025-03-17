@@ -1,5 +1,5 @@
 # @package _global_
-name: hgdp_phate_full_knn=${algorithm.dimensionality_reduction.n_components}
+name: hgdp_phate_full
 
 defaults:
   - override /algorithm: default

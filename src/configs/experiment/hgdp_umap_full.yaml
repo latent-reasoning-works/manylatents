@@ -1,5 +1,5 @@
 # @package _global_
-name: hgdp_umap_full_n_components=${algorithm.dimensionality_reduction.n_components}
+name: hgdp_umap_full
 
 defaults:
   - override /algorithm: default

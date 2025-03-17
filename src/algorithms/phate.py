@@ -1,8 +1,9 @@
 
-import torch
-from torch import Tensor
 from typing import Optional, Union
+
+import torch
 from phate import PHATE
+from torch import Tensor
 
 from .dimensionality_reduction import DimensionalityReductionModule
 
@@ -16,24 +17,24 @@ class PHATEModule(DimensionalityReductionModule):
         t: Union[int, str] = 15, # Can be an integer or 'auto'
         decay: Optional[int] = 40,
         gamma: Optional[float] = 1, 
-        n_pca: Optional[int] = None,
+        n_pca: Optional[int] = 100,
         n_landmark: Optional[int] = 2000,
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
     ):
-        super().__init__(n_components, random_state, knn, t, decay, gamma, n_pca, n_landmark, n_jobs, verbose)
+        super().__init__(n_components, random_state)
         self.fit_fraction = fit_fraction
-        self.model = PHATE(n_components=self.n_components, 
-                           random_state=self.random_state,
-                           knn=self.knn,
-                           t=self.t,
-                           decay=self.decay,
-                           gamma=self.gamma,
-                           n_pca=self.n_pca,
-                           n_landmark=self.n_landmark,
-                           n_jobs=self.n_jobs,
-                           verbose=self.verbose)
+        self.model = PHATE(n_components=n_components, 
+                           random_state=random_state,
+                           knn=knn,
+                           t=t,
+                           decay=decay,
+                           gamma=gamma,
+                           n_pca=n_pca,
+                           n_landmark=n_landmark,
+                           n_jobs=n_jobs,
+                           verbose=verbose)
 
     def fit(self, x: Tensor) -> None:
         """Fits PHATE on a subset of data."""

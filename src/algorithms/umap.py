@@ -1,7 +1,8 @@
 
+from typing import Optional
+
 import torch
 from torch import Tensor
-from typing import Optional
 from umap import UMAP
 
 from .dimensionality_reduction import DimensionalityReductionModule
@@ -18,17 +19,17 @@ class UMAPModule(DimensionalityReductionModule):
         learning_rate: float = 1.0,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
     ):
-        super().__init__(n_components, random_state, n_neighbors, metric, n_epochs, learning_rate)
+        super().__init__(n_components, random_state)
         self.fit_fraction = fit_fraction
-        self.model = UMAP(n_components=self.n_components, 
-                           random_state=self.random_state,
-                           n_neighbors=self.n_neighbors,
-                           metric=self.metric,
-                           n_epochs=self.n_epochs,
-                           learning_rate=self.learning_rate)
+        self.model = UMAP(n_components=n_components, 
+                           random_state=random_state,
+                           n_neighbors=n_neighbors,
+                           metric=metric,
+                           n_epochs=n_epochs,
+                           learning_rate=learning_rate)
 
     def fit(self, x: Tensor) -> None:
-        """Fits PHATE on a subset of data."""
+        """Fits UMAP on a subset of data."""
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
@@ -36,7 +37,7 @@ class UMAPModule(DimensionalityReductionModule):
         self._is_fitted = True
 
     def transform(self, x: Tensor) -> Tensor:
-        """Transforms data using the fitted PHATE model. Transform is only used when x is new data (not fitted data)."""
+        """Transforms data using the fitted UMAP model. Transform is only used when x is new data (not fitted data)."""
         if not self._is_fitted:
             raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
         

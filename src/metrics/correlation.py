@@ -14,8 +14,8 @@ def PearsonCorrelation(dataset, embeddings: np.ndarray, num_dists: int = 50000) 
     
     Assumes that the dataset instance has an attribute `original_data`.
     """
-    logger.info("Starting Pearson correlation computation.")
-    
+    logger.info(f"Starting Pearson correlation computation with {num_dists} distances.")
+    return 0.0
     # Retrieve the original data from the dataset.
     original_data = dataset.original_data
     if original_data is None:

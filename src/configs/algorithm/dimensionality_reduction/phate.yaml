@@ -5,8 +5,7 @@ knn: 5
 t: 'auto'
 gamma: 1.0
 decay: 40
-gamma: 1
-n_pca: None
+n_pca: 100
 n_landmark: 2000
 n_jobs: -1
 verbose: False
