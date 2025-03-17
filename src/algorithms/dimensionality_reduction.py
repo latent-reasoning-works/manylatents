@@ -4,10 +4,10 @@ from torch import Tensor
 
 
 class DimensionalityReductionModule(ABC):
-    def __init__(self, n_components: int = 2, init_seed: int = 42):
+    def __init__(self, n_components: int = 2, random_state: int = 42):
         """Base class for dimensionality reduction modules."""
         self.n_components = n_components
-        self.init_seed = init_seed
+        self.random_state = random_state
         self._is_fitted = False
 
     @abstractmethod

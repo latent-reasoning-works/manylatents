@@ -16,3 +16,4 @@ seed: 42
 algorithm:
   dimensionality_reduction:
     n_components: 2
+    random_state: 42

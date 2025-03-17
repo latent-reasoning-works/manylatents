@@ -10,6 +10,7 @@ algorithm_store = store(group="algorithm")
 pca_config = builds(
     PCAModule,
     n_components="${cfg.algorithm.n_components:50}",
+    random_state="${cfg.algorithm.random_state:42}",
     populate_full_signature=True  # Ensures all parameters are exposed for overrides
 )
 algorithm_store(pca_config, name="pca")
