@@ -1,5 +1,3 @@
 batch_size: 32
 num_workers: 1
 cache_dir: ${cache_dir}
-debug: false # provides dummy data for quick testing
-

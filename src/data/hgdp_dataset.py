@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -8,6 +8,7 @@ import pandas as pd
 from src.utils.data import load_metadata
 
 from .plink_dataset import PlinkDataset
+from .precomputed_mixin import PrecomputedMixin
 
 logger = logging.getLogger(__name__)
 
@@ -15,27 +16,20 @@ logger = logging.getLogger(__name__)
 def hgdp_add_dummy_row(metadata: pd.DataFrame) -> pd.DataFrame:
     """
     Adds a dummy row to the metadata DataFrame to account for missing data in the first row.
-
-    Args:
-        metadata (pd.DataFrame): The original metadata DataFrame.
-
-    Returns:
-        pd.DataFrame: The modified metadata DataFrame with a dummy row.
     """
     null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
-    
-    # Conditionally set filter columns if they exist
     filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
     for _filter in filter_columns:
         if _filter in metadata.columns:
             null_row[_filter] = False
-    
     metadata = pd.concat([null_row, metadata], ignore_index=True)
     return metadata
 
-class HGDPDataset(PlinkDataset):
+
+class HGDPDataset(PlinkDataset, PrecomputedMixin):
     """
     PyTorch Dataset for HGDP + 1000 Genomes data.
+    Returns both raw data and (optionally) precomputed embeddings.
     """
     def __init__(self, 
                  files: Dict[str, str], 
@@ -48,51 +42,52 @@ class HGDPDataset(PlinkDataset):
                  delimiter: Optional[str] = ","):
         """
         Initializes the HGDP dataset.
-
-        Args:
-            files (dict): Paths for PLINK and metadata files.
-            cache_dir (str): Directory for caching.
-            filter_related (bool): Whether to filter related samples.
-            data_split (str): 'train', 'test', or 'full' split.
-            mmap_mode (Optional[str]): Memory-mapping mode.
-            precomputed_path (Optional[str]): Path to precomputed embeddings if available.
-            metadata (Optional[pd.DataFrame]): Preloaded metadata.
-            delimiter (Optional[str]): Delimiter for CSV files.
         """
         self.data_split = data_split        
         self.filter_related = filter_related
 
+        # Load raw data and metadata via the parent class.
         super().__init__(files=files, 
-                        cache_dir=cache_dir, 
-                        mmap_mode=mmap_mode,
-                        delimiter=delimiter,
-                        data_split=data_split)
+                         cache_dir=cache_dir, 
+                         mmap_mode=mmap_mode,
+                         delimiter=delimiter,
+                         data_split=data_split)
         
+        # Load precomputed embeddings using the mixin, if provided.
         self.precomputed_path = precomputed_path
+        self.precomputed_embeddings = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
         
-        # Load precomputed embeddings if provided
-        if self.precomputed_path and os.path.exists(self.precomputed_path):
-            logger.info(f"Loading precomputed embeddings from {self.precomputed_path}")
-            if self.precomputed_path.endswith(".npy"):
-                self.original_data = np.load(self.precomputed_path, mmap_mode=self.mmap_mode)
-            elif self.precomputed_path.endswith(".csv"):
-                self.original_data = np.loadtxt(self.precomputed_path, delimiter=",")
-            else:
-                raise ValueError(f"Unsupported file format: {self.precomputed_path}")
-            
+        # Note: Do NOT override self.original_data here,
+        # so that raw data remains available for evaluations.
         if self.data_split != "full":
             idx = self.split_indices[self.data_split]
             self.metadata = self.metadata.iloc[idx].copy()
             self.original_data = self.original_data[idx]
+            if self.precomputed_embeddings is not None:
+                self.precomputed_embeddings = self.precomputed_embeddings[idx]
             # Update split_indices to an identity mapping.
             self.split_indices = {self.data_split: np.arange(len(self.metadata))}
+            
+    def __getitem__(self, index: int) -> Any:
+        real_idx = self.split_indices[self.data_split][index]
+        sample_raw = self.original_data[real_idx]
+        sample_precomputed = None
+        if self.precomputed_embeddings is not None:
+            sample_precomputed = self.precomputed_embeddings[real_idx]
+        
+        metadata_row = self.metadata.iloc[real_idx].to_dict()
+        metadata_row = {k.strip(): v for k, v in metadata_row.items()}
+        
+        # Return a dict containing both raw and precomputed data.
+        return {
+            "raw": sample_raw,
+            "precomputed": sample_precomputed,
+            "metadata": metadata_row
+        }
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         """
         Extracts fit/transform indices based on metadata filters.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Indices for fitting and transforming.
         """
         filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
         _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
@@ -111,17 +106,11 @@ class HGDPDataset(PlinkDataset):
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
         Loads and processes metadata for the HGDP dataset.
-
-        Args:
-            metadata_path (str): Path to the metadata file.
-
-        Returns:
-            pd.DataFrame: Processed metadata DataFrame.
         """
         full_path = os.path.abspath(metadata_path)
         logger.info(f"Loading metadata from: {full_path}")
 
-        # Define required columns (ensuring any future dependencies are included)
+        # Define required columns.
         required_columns = [
             'project_meta.sample_id',
             'filter_king_related',
@@ -130,7 +119,6 @@ class HGDPDataset(PlinkDataset):
             'filter_contaminated'
         ]
 
-        # Load metadata with additional processing
         metadata = load_metadata(
             file_path=full_path,
             required_columns=required_columns,
@@ -159,20 +147,13 @@ class HGDPDataset(PlinkDataset):
     
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
-        Returns label array (e.g., Population, Genetic_region_merged) for coloring plots.
-
-        Args:
-            label_col (str): Name of the column to use as label.
-
-        Returns:
-            np.ndarray: Array of labels.
+        Returns label array (e.g., Population) for coloring plots.
         """
         if label_col not in self.metadata.columns:
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
         
         return self.metadata[label_col].values
    
-    # expose attributes for evaluation
     @property
     def latitude(self) -> pd.Series:
         return self._latitude

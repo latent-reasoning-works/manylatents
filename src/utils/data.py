@@ -74,7 +74,6 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
         return None
 
 def load_metadata(file_path, required_columns=None, delimiter=None, additional_processing=None):
-    logging.info(f"Loading metadata from: {file_path}")
 
     if delimiter is None:
         logging.info(f"Detecting delimiter for file: {file_path}")
@@ -279,3 +278,19 @@ def subsample_data_and_dataset(
         logger.info(f"Subsampled population_label shape: {subsampled_ds._population_label.shape}")
     
     return subsampled_ds, subsampled_embeddings
+
+def determine_data_source(loader) -> Tuple[int, str]:
+    """
+    Inspects one batch from the loader to determine which field is available.
+    Assumes each batch is a tuple (raw, precomputed, metadata).
+
+    Returns:
+        field_index (int): 0 if raw data is to be used, 1 if precomputed embeddings are available.
+        data_source (str): A descriptive string.
+    """
+    first_batch = next(iter(loader))
+    # first_batch is a tuple: (raw, precomputed, metadata)
+    if first_batch[1] is not None:
+        return 1, "precomputed embeddings"
+    else:
+        return 0, "raw data"

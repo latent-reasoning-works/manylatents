@@ -105,6 +105,7 @@ def evaluate_dr(
     logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
     
     metrics = {}
+    
     ds_metrics_cfg = cfg.metrics.get("dataset", {})
     ds_subsample_fraction = ds_metrics_cfg.get("subsample_fraction", None)
     if ds_subsample_fraction is not None:

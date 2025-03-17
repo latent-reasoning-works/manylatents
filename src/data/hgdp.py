@@ -118,7 +118,10 @@ class HGDPDataModule(LightningDataModule):
 
     @staticmethod
     def _collate_fn(batch):
-        samples, metadata = zip(*batch)
-        samples = torch.stack([torch.tensor(s, dtype=torch.float32) for s in samples])
-        return samples, metadata
-
+        raw_samples = [torch.tensor(sample["raw"], dtype=torch.float32) for sample in batch]
+        precomputed_samples = None
+        if batch[0]["precomputed"] is not None:
+            precomputed_samples = [torch.tensor(sample["precomputed"], dtype=torch.float32) for sample in batch]
+            precomputed_samples = torch.stack(precomputed_samples)
+        metadata = [sample["metadata"] for sample in batch]
+        return torch.stack(raw_samples), precomputed_samples, metadata

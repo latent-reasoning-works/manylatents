@@ -1,0 +1,11 @@
+defaults:
+  - default
+
+_target_: src.data.hgdp.HGDPDataModule
+mmap_mode: null
+
+files:
+  plink:  "./data/HGDP+1KGP/genotypes/gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.commonMHI_CaG17k.miss10perc.maf0.05.LDpruned.woLowComplexity_noHLA"
+  metadata: "./data/HGDP+1KGP/gnomad_derived_metadata_with_filtered_sampleids.csv"
+precomputed_path: "./data/embeddings/hgdp_pca_precomputed.npy"
+delimiter: ","

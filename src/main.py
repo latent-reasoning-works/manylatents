@@ -16,6 +16,7 @@ from src.experiment import (
     instantiate_trainer,
     train_model,
 )
+from src.utils.data import determine_data_source
 from src.utils.utils import aggregate_metrics, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -54,21 +55,29 @@ def main(cfg: DictConfig):
     dr_module, lightning_module = instantiate_algorithm(cfg)
     dr_metrics, dr_scores, model_metrics, model_error = None, None, None, None
 
-    
+    train_loader = datamodule.train_dataloader()
+    test_loader = datamodule.test_dataloader()
+
+    field_index, data_source = determine_data_source(train_loader)
+
     logger.info("Starting the experiment pipeline...")
 
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
-        logger.info("Running Dimensionality Reduction (DR)...")
-        
         if datamodule is None:
             raise ValueError("DataModule must be provided for Dimensionality Reduction.")
         
-        ## unroll train and test dataloaders to fit DR module
-        train_batches = [batch[0].cpu() for batch in datamodule.train_dataloader()]
+        ## Unroll train and test dataloaders to fit DR module
+        train_batches = [batch[field_index].cpu() for batch in train_loader]
         train_tensor = torch.cat(train_batches, dim=0)
         
-        test_batches = [batch[0].cpu() for batch in datamodule.test_dataloader()]
+        test_batches  = [batch[field_index].cpu() for batch in test_loader]
         test_tensor = torch.cat(test_batches, dim=0)
+
+        logger.info(
+            f"Running Dimensionality Reduction (DR) on {data_source}:\n"
+            f"Train tensor shape: {train_tensor.shape}\n"
+            f"Test tensor shape: {test_tensor.shape}"
+        )
         
         dr_module.fit(train_tensor)
         dr_embedding = dr_module.transform(test_tensor)

@@ -155,8 +155,6 @@ def setup_logging(debug: bool = False):
 
     logger.addHandler(console_handler)
 
-    logger.info("Logging system initialized successfully.")
-    
 def aggregate_metrics(
     dr_metrics: dict = None,
     dr_scores: float = None,
@@ -176,14 +174,10 @@ def aggregate_metrics(
     # Merge DR metrics.
     if dr_metrics:
         aggregated_metrics.update(dr_metrics)
-    if dr_scores is not None:
-        aggregated_metrics["DR_score"] = dr_scores
 
     # Merge network (model) metrics.
     if model_metrics:
         aggregated_metrics.update(model_metrics)
-    if model_error is not None:
-        aggregated_metrics["Model_Error"] = model_error
 
     # Process any callback outputs.
     if callback_outputs:
