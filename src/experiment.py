@@ -91,18 +91,20 @@ def evaluate_dr(
     **kwargs,
 ) -> dict:
     # Get original high-dimensional data.
-    original_data = getattr(datamodule.train_dataset, "original_data", None)
+    ds = datamodule.train_dataset
+    original_data = getattr(ds, "original_data", None)
+    
+    logger.info(f"Original data shape: {original_data.shape}")
     if original_data is None and "original_data" in kwargs:
         original_data = kwargs["original_data"]
     if original_data is None:
         raise ValueError("No original data available for evaluation.")
-
+    
+    logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
     # Compute general DR metrics.
     metrics = algorithm.evaluate(original_data, embeddings)
     
-    # Optionally, add dataset-specific metrics by accessing metadata from the dataset.
-    ds = datamodule.train_dataset  # your dataset instance
-    # For example, if your dataset has latitude and longitude:
+    # Add dataset-specific metrics by accessing metadata from the dataset.
     if hasattr(ds, "latitude") and hasattr(ds, "longitude"):
         geo_preservation = GeographicPreservation(ds, embeddings)
         metrics.update({"geographic_preservation": geo_preservation})

@@ -128,13 +128,11 @@ class HGDPDataset(PlinkDataset):
             delimiter=self.delimiter
         )
 
-        # Ensure correct index is set
         if 'project_meta.sample_id' not in metadata.columns:
             raise ValueError("Missing required column: 'project_meta.sample_id' in metadata.")
 
         metadata = metadata.set_index('project_meta.sample_id')
 
-        # Ensure filter columns exist and have correct types (Boolean)
         filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
         for col in filter_columns:
             if col in metadata.columns:
@@ -142,6 +140,10 @@ class HGDPDataset(PlinkDataset):
             else:
                 logger.warning(f"Missing filter column in metadata: {col}. Filling with False.")
                 metadata[col] = False
+
+        self._latitude = metadata["latitude"]
+        self._longitude = metadata["longitude"]
+        self._population_label = metadata["Population"]
 
         return metadata
     
@@ -159,4 +161,16 @@ class HGDPDataset(PlinkDataset):
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
         
         return self.metadata[label_col].values
+   
+    # expose attributes for evaluation
+    @property
+    def latitude(self) -> pd.Series:
+        return self._latitude
 
+    @property
+    def longitude(self) -> pd.Series:
+        return self._longitude
+
+    @property
+    def population_label(self) -> pd.Series:
+        return self._population_label

@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import spearmanr
 
-# Import your low-level utils:
 from src.utils.metrics import (
     compute_average_smoothness,
     compute_geodesic_distances,
