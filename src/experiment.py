@@ -89,8 +89,14 @@ def evaluate_dr(
     embeddings: Optional[np.ndarray] = None,
     **kwargs,
 ) -> dict:
-    ds = datamodule.train_dataset
-    # The dataset instance should have an attribute "original_data"
+    
+    if datamodule.mode == "full":
+        ds = datamodule.train_dataset  # In full mode, train == test
+    elif datamodule.mode == "split":
+        ds = datamodule.test_dataset   # Evaluate on the test set
+    else:
+        ds = datamodule.train_dataset
+    
     original_data = getattr(ds, "original_data", None)
     if original_data is None and "original_data" in kwargs:
         original_data = kwargs["original_data"]
@@ -101,10 +107,7 @@ def evaluate_dr(
     logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
     
     metrics = {}
-    
-    # Process dataset-level metrics (those that need metadata like latitude, longitude)
     ds_metrics_cfg = cfg.metrics.get("dataset", {})
-    # If a subsample fraction is provided, subsample both the dataset and embeddings.
     ds_subsample_fraction = ds_metrics_cfg.get("subsample_fraction", None)
     if ds_subsample_fraction is not None:
         ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embeddings, ds_subsample_fraction)
@@ -112,7 +115,6 @@ def evaluate_dr(
     else:
         ds_subsampled, embeddings_subsampled = ds, embeddings
     
-    # For each dataset-level metric, pass the (possibly subsampled) dataset and embeddings.
     for metric_name, metric_params in ds_metrics_cfg.items():
         if metric_name == "subsample_fraction":
             continue
@@ -120,12 +122,10 @@ def evaluate_dr(
             metric_fn = hydra.utils.instantiate(metric_params)
             metrics[metric_name] = metric_fn(ds_subsampled, embeddings_subsampled)
     
-    # Process module-level metrics (which rely mainly on original high-dimensional data)
     module_metrics_cfg = cfg.metrics.get("module", {})
     for metric_name, metric_params in module_metrics_cfg.items():
         if metric_params.get("enabled", True):
             metric_fn = hydra.utils.instantiate(metric_params)
-            # Pass the full dataset instance, from which the metric can extract original_data.
             metrics[metric_name] = metric_fn(ds, embeddings)
     
     return metrics

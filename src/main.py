@@ -3,7 +3,6 @@ import os
 from typing import Optional, Tuple
 
 import hydra
-import numpy as np
 import torch
 from lightning import LightningModule
 from omegaconf import DictConfig, OmegaConf
@@ -20,7 +19,6 @@ from src.experiment import (
 from src.utils.utils import aggregate_metrics, setup_logging
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 register_configs()
 
@@ -65,12 +63,15 @@ def main(cfg: DictConfig):
         if datamodule is None:
             raise ValueError("DataModule must be provided for Dimensionality Reduction.")
         
-        data_loader = datamodule.train_dataloader()
-        data_list = [inputs.cpu().numpy() for inputs, _ in data_loader]
-        data_np = np.concatenate(data_list, axis=0)
+        ## unroll train and test dataloaders to fit DR module
+        train_batches = [batch[0].cpu() for batch in datamodule.train_dataloader()]
+        train_tensor = torch.cat(train_batches, dim=0)
         
-        dr_module.fit(torch.tensor(data_np))
-        dr_embedding = dr_module.transform(torch.tensor(data_np))
+        test_batches = [batch[0].cpu() for batch in datamodule.test_dataloader()]
+        test_tensor = torch.cat(test_batches, dim=0)
+        
+        dr_module.fit(train_tensor)
+        dr_embedding = dr_module.transform(test_tensor)
         
         logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
         
@@ -80,7 +81,7 @@ def main(cfg: DictConfig):
             datamodule=datamodule,
             embeddings=dr_embedding,
         )
-        ## parse dr_scores from values in dr_metrics, if succesfully computed
+
         dr_scores = dr_metrics[next(iter(dr_metrics))] if dr_metrics else None
         
         logger.info(f"DR evaluation completed. Metrics {dr_metrics}, Scores: {dr_scores}")
@@ -104,9 +105,7 @@ def main(cfg: DictConfig):
                     callback_outputs.append((name, output))
                 else:
                     logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
-                    
-    model_error = None
-    
+                        
     if "network" in cfg.algorithm and cfg.algorithm.network is not None:
         logger.info("Instantiating the Neural Network model...")
         trainer = instantiate_trainer(cfg)
@@ -114,7 +113,7 @@ def main(cfg: DictConfig):
         train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
         
         ## verify correctness, module is being called twice
-        model_metric_name, model_error, model_metrics = evaluate(
+        model_metrics, model_error = evaluate(
             lightning_module,
             cfg=cfg,
             datamodule=datamodule,
@@ -140,8 +139,11 @@ def main(cfg: DictConfig):
     else:
         logger.info("wandb.run not active; skipping wandb.log")
 
+    
+    assert aggregated_metrics is not None
     logger.info("Experiment complete.")
-    return {"DR Score": dr_scores, "Model Error": model_error}
+
+    return aggregated_metrics
 
 def instantiate_algorithm(
     cfg: DictConfig,
