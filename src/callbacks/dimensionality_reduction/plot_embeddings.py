@@ -18,7 +18,8 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         save_dir: str = "outputs",
         experiment_name: str = "experiment",
         figsize: tuple = (8, 6),
-        label_col: str = "Population"
+        label_col: str = "Population",
+        legend: bool = False,
     ):
         """
         Args:
@@ -31,6 +32,7 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         self.experiment_name = experiment_name
         self.figsize = figsize
         self.label_col = label_col
+        self.legend = legend
 
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(
@@ -65,44 +67,46 @@ class PlotEmbeddings(DimensionalityReductionCallback):
                 labels = dataset.get_labels(self.label_col)
             except Exception as e:
                 logger.warning(f"Unable to retrieve labels from dataset: {e}")
+        # Use metadata from the dataset to get labels.
+        # Here, we slice the metadata and embeddings to align if necessary.
         metadata = dataset.metadata[1:]
-        # labels = labels[1:]
         labels = metadata['Population'].values
         embeddings_to_plot = embeddings_to_plot[1:]
+        
+        # Build the palette for HGDP if applicable.
         if isinstance(dataset, HGDPDataset):
             try:
-                # Call the mapping function with both arrays.
                 cmap_pop, _ = make_palette_label_order_HGDP(metadata)
-
             except Exception as e:
-                logger.warning(f"Error building HGDP palette: {e}")
+                logger.warning(f"Error building HGDP palette: {e}. Using fallback palette 'viridis'.")
+                cmap_pop = 'viridis'
         else:
-            logger.info("Dataset is not HGDP. Using default palette 'viridis' if labels are provided.")
-        # Plotting
-        legend=False
+            logger.info("Dataset is not HGDP. Using default palette 'viridis'.")
+            cmap_pop = 'viridis'
+        
         figsize = (self.figsize[0], self.figsize[1])
+        # Use self.legend in the plotting call.
         if labels is not None:
-            if legend: 
-                scprep.plot.scatter2d(embeddings_to_plot, s=8, figsize=figsize,
-                            cmap=cmap_pop, c=labels,
-                            ticks =False, legend=True,xlabel=' ', ylabel=' ',
-                            legend_loc='upper center', legend_anchor=(1.0, -0.02), legend_ncol=8,
-                            label_prefix=None, title='', fontsize=36)
-            else:
-                scprep.plot.scatter2d(embeddings_to_plot, s=8, figsize=figsize,
-                            cmap=cmap_pop, c=labels,
-                            ticks =False, legend=False,xlabel=' ', ylabel=' ',
-                            label_prefix=None, title='', fontsize=36)
+            scprep.plot.scatter2d(
+                embeddings_to_plot, s=8, figsize=figsize,
+                cmap=cmap_pop, c=labels,
+                ticks=False, legend=self.legend,
+                xlabel=' ', ylabel=' ',
+                legend_loc='upper center', legend_anchor=(1.0, -0.02), legend_ncol=8,
+                label_prefix=None, title='', fontsize=36
+            )
         else:
-            scprep.plot.scatter2d(embeddings_to_plot, s=8, figsize=figsize,
-                            cmap='viridis', ticks =False, legend=False,xlabel=' ', ylabel=' ',
-                            label_prefix=None, title='', fontsize=36)
+            scprep.plot.scatter2d(
+                embeddings_to_plot, s=8, figsize=figsize,
+                cmap='viridis', ticks=False, legend=False,
+                xlabel=' ', ylabel=' ',
+                label_prefix=None, title='', fontsize=36
+            )
 
         plt.xlabel("Dim 1", fontsize=12)
         plt.ylabel("Dim 2", fontsize=12)
         plt.title("Dimensionality Reduction Plot", fontsize=16)
 
-        # Generate the filename following the convention: embedding_plot_{experiment_name}_{timestamp}.png
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
         self.save_path = os.path.join(self.save_dir, filename)
