@@ -26,7 +26,7 @@ class PlinkDataset(Dataset):
                  cache_dir: str,  
                  mmap_mode: Optional[str] = None,
                  delimiter: Optional[str] = ",",
-                 data_split: str = "full") -> None:
+                 data_split: str = None) -> None:
         """
         Initializes the PLINK dataset.
 

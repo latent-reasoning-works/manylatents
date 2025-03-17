@@ -21,7 +21,7 @@ class HGDPDataModule(LightningDataModule):
         precomputed_path: str = None,
         delimiter: str = ",",
         filter_related: bool = True,
-        mode: str = 'full',
+        mode: str = None,
 
     ):
         """

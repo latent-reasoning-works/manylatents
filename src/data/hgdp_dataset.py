@@ -61,13 +61,16 @@ class HGDPDataset(PlinkDataset):
         """
         self.data_split = data_split        
         self.filter_related = filter_related
+
         super().__init__(files=files, 
-                         cache_dir=cache_dir, 
-                         mmap_mode=mmap_mode,
-                         delimiter=delimiter,)
+                        cache_dir=cache_dir, 
+                        mmap_mode=mmap_mode,
+                        delimiter=delimiter,
+                        data_split=data_split)
+        
+        self.precomputed_path = precomputed_path
         
         # Load precomputed embeddings if provided
-        self.precomputed_path = precomputed_path
         if self.precomputed_path and os.path.exists(self.precomputed_path):
             logger.info(f"Loading precomputed embeddings from {self.precomputed_path}")
             if self.precomputed_path.endswith(".npy"):
@@ -76,6 +79,13 @@ class HGDPDataset(PlinkDataset):
                 self.original_data = np.loadtxt(self.precomputed_path, delimiter=",")
             else:
                 raise ValueError(f"Unsupported file format: {self.precomputed_path}")
+            
+        if self.data_split != "full":
+            idx = self.split_indices[self.data_split]
+            self.metadata = self.metadata.iloc[idx].copy()
+            self.original_data = self.original_data[idx]
+            # Update split_indices to an identity mapping.
+            self.split_indices = {self.data_split: np.arange(len(self.metadata))}
 
     def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
         """

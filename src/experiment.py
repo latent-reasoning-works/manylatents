@@ -90,16 +90,14 @@ def evaluate_dr(
     **kwargs,
 ) -> dict:
     
-    if datamodule.mode == "full":
-        ds = datamodule.train_dataset  # In full mode, train == test
-    elif datamodule.mode == "split":
-        ds = datamodule.test_dataset   # Evaluate on the test set
+    if datamodule.mode == "split":
+        ds = datamodule.test_dataset
     else:
         ds = datamodule.train_dataset
-    
-    original_data = getattr(ds, "original_data", None)
-    if original_data is None and "original_data" in kwargs:
-        original_data = kwargs["original_data"]
+
+    # Subset the original data using the split indices for consistency.
+    original_data = ds.original_data[ds.split_indices[ds.data_split]]
+        
     if original_data is None:
         raise ValueError("No original data available for evaluation.")
     
