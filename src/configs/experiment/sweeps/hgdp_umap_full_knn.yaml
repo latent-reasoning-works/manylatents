@@ -1,5 +1,5 @@
 # @package _global_
-name: hgdp_umap_full_knn=${algorithm.dimensionality_reduction.umap}
+name: hgdp_umap_full_knn=${algorithm.dimensionality_reduction.knn}
 
 defaults:
   - override /algorithm: default
