@@ -10,8 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
-from src.metrics.preservation import AdmixturePreservation, GeographicPreservation
-from src.utils.data import DummyDataModule
+from src.utils.data import DummyDataModule, subsample_data_and_dataset
 from src.utils.utils import check_or_make_dirs
 
 logger = logging.getLogger(__name__)
@@ -90,31 +89,39 @@ def evaluate_dr(
     embeddings: Optional[np.ndarray] = None,
     **kwargs,
 ) -> dict:
-    # Get original high-dimensional data.
     ds = datamodule.train_dataset
     original_data = getattr(ds, "original_data", None)
-    
-    logger.info(f"Original data shape: {original_data.shape}")
     if original_data is None and "original_data" in kwargs:
         original_data = kwargs["original_data"]
     if original_data is None:
         raise ValueError("No original data available for evaluation.")
     
+    logger.info(f"Original data shape: {original_data.shape}")
     logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
-    # Compute general DR metrics.
-    metrics = algorithm.evaluate(original_data, embeddings)
     
-    # Add dataset-specific metrics by accessing metadata from the dataset.
-    if hasattr(ds, "latitude") and hasattr(ds, "longitude"):
-        geo_preservation = GeographicPreservation(ds, embeddings)
-        metrics.update({"geographic_preservation": geo_preservation})
+    metrics = {}
+    # Get dataset-level metrics config
+    ds_metrics_cfg = cfg.metrics.get("dataset", {})
+    # Retrieve the subsample fraction without modifying the DictConfig:
+    ds_subsample_fraction = ds_metrics_cfg.get("subsample_fraction", None)
     
-    # Similarly, if you want to add admixture-based metrics:
-    if hasattr(ds, "admixture_ratios") and hasattr(ds, "population_label"):
-        admixture_preservation = AdmixturePreservation(ds, embeddings)
-        metrics.update({"admixture_preservation": admixture_preservation})
+    if ds_subsample_fraction is not None:
+        ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embeddings, ds_subsample_fraction)
+        logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
+    else:
+        ds_subsampled, embeddings_subsampled = ds, embeddings
     
+    # Iterate over each dataset metric, skipping the 'subsample_fraction' key.
+    for metric_name, metric_params in ds_metrics_cfg.items():
+        if metric_name == "subsample_fraction":
+            continue
+        if metric_params.get("enabled", True):
+            metric_fn = hydra.utils.instantiate(metric_params)
+            metrics[metric_name] = metric_fn(ds_subsampled, embeddings_subsampled)
+        
     return metrics
+
+
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(

@@ -1,0 +1,3 @@
+pearson_correlation:
+  _target_: src.metrics.correlation.PearsonCorrelation
+  _partial_: True

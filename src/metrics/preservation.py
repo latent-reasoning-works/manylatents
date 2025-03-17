@@ -221,14 +221,15 @@ def compute_quality_metrics(
 # 5) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def GeographicPreservation(dataset, embeddings: np.ndarray) -> float:
+def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
     """
-    Minimal wrapper so callback can do dataset -> float.
+    Minimal wrapper that passes extra keyword arguments to compute_geographic_metric.
     """
     return compute_geographic_metric(
         ancestry_coords=embeddings,
         latitude=dataset.latitude,
-        longitude=dataset.longitude
+        longitude=dataset.longitude,
+        **kwargs
     )
 
 def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:

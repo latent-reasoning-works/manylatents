@@ -2,7 +2,8 @@ import csv
 import hashlib
 import logging
 import os
-from typing import Optional
+from copy import deepcopy
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -35,6 +36,8 @@ class DummyDataModule(LightningDataModule):
         self.dataset = dataset
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.train_dataset = self.dataset
+        self.original_data = np.empty((0,))
 
     def train_dataloader(self):
         return DataLoader(self.dataset, batch_size=self.batch_size, num_workers=self.num_workers)
@@ -241,3 +244,32 @@ def cache_result(cache_path: str, compute_func, *args, **kwargs):
         result = compute_func(*args, **kwargs)
         np.save(abs_cache_path, result)
         return result
+    
+def subsample_data_and_dataset(
+    ds, embeddings: np.ndarray, fraction: float
+) -> Tuple[object, np.ndarray]:
+    """
+    Subsamples the embeddings and creates a shallow copy of the dataset
+    with its metadata fields (like latitude, longitude, population_label) subsampled.
+
+    Assumes that the dataset exposes its metadata as properties that are Pandas Series.
+    
+    Returns:
+        A tuple of (subsampled_dataset, subsampled_embeddings)
+    """
+    num_samples = int(embeddings.shape[0] * fraction)
+    indices = np.random.choice(embeddings.shape[0], num_samples, replace=False)
+    subsampled_embeddings = embeddings[indices]
+    
+    # Create a shallow copy of the dataset (you can also implement a .subset() method on ds)
+    subsampled_ds = deepcopy(ds)
+    # Update the metadata properties (assuming these attributes are Pandas Series)
+    if hasattr(ds, "latitude"):
+        subsampled_ds._latitude = ds.latitude.iloc[indices]
+    if hasattr(ds, "longitude"):
+        subsampled_ds._longitude = ds.longitude.iloc[indices]
+    if hasattr(ds, "population_label"):
+        subsampled_ds._population_label = ds.population_label.iloc[indices]
+    # If there are other metadata attributes used by your metrics, update them similarly.
+    
+    return subsampled_ds, subsampled_embeddings

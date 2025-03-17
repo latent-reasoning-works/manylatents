@@ -1,0 +1,9 @@
+defaults:
+  - dataset:
+    - geographic_preservation
+  - module:
+    - trustworthiness
+    - pearson_correlation
+  - _self_
+
+subsample_fraction: 0.05 

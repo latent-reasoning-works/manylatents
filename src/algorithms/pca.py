@@ -1,4 +1,3 @@
-from typing import Optional
 
 import torch
 from sklearn.decomposition import PCA
@@ -33,31 +32,3 @@ class PCAModule(DimensionalityReductionModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
     
-    def evaluate(self, original_x: torch.Tensor, embeddings: Optional[torch.Tensor] = None) -> dict:
-        """
-        Compute PCA-specific metrics by extending the general DR metrics.
-        
-        Args:
-            original_x: The original high-dimensional data tensor.
-            embeddings: Optional precomputed PCA embeddings. If not provided,
-                        they are computed via self.transform(original_x).
-                        
-        Returns:
-            A tuple of (error_metric, metrics_dict), where error_metric might be 
-            the pca_correlation and metrics_dict contains additional metrics.
-        """
-        if embeddings is None:
-            embeddings = self.transform(original_x)
-
-        # Call the parent's evaluate method to compute general DR metrics,
-        # e.g., the default correlation metric.
-        metrics = super().evaluate(original_x, embeddings)
-
-        # Extend the metrics with PCA-specific evaluations.
-        # For example, compute the total variance explained by the selected components.
-        variance_explained = self.model.explained_variance_ratio_.sum() if self._is_fitted else None
-        
-        # Add additional PCA metrics as needed.
-        metrics.update({"pca_variance_explained": variance_explained})
-        
-        return metrics

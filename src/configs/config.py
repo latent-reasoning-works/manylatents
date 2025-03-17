@@ -22,6 +22,9 @@ class Config:
     trainer: Dict[str, Any] = field(default_factory=dict)
     """Trainer configuration (arguments passed to Lightning Trainer)."""
 
+    metrics: Optional[Any] = None
+    """Configuration for metrics used during training and evaluation."""
+    
     log_level: str = "info"
     """Logging level (one of: "debug", "info", "warning", "error", "critical")."""
 

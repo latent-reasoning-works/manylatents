@@ -1,5 +1,5 @@
 geographic_preservation:
-  _target_: src.metrics.preservation.GeoPreservation
+  _target_: src.metrics.preservation.GeographicPreservation
   _partial_: True
   use_medians: True
   only_far: False

@@ -6,7 +6,8 @@ defaults:
   - override /algorithm/dimensionality_reduction: pca
   - override /datamodule: hgdp
   - override /callbacks/dimensionality_reduction: default
-
+  - override /metrics: hgdp_dr
+  
 datamodule:
   mode: full
 
