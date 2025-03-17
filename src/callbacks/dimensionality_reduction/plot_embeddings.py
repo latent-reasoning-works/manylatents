@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scprep
 
+import wandb
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
 from src.data.hgdp_dataset import HGDPDataset
 from src.utils.mappings import make_palette_label_order_HGDP
@@ -114,4 +115,8 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         plt.savefig(self.save_path, bbox_inches="tight")
         plt.close()
         logger.info(f"Saved 2D embeddings plot to {self.save_path}")
+        
+        if wandb.run is not None:
+            wandb.log({"embedding_plot": wandb.Image(self.save_path)})
+
         return self.save_path
