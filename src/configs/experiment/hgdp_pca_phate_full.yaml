@@ -1,5 +1,5 @@
 # @package _global_
-name: hgdp_phate_full
+name: hgdp_pca_phate_full
 
 defaults:
   - override /algorithm: default
