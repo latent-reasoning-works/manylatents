@@ -3,7 +3,7 @@ name: hgdp_pca_umap_full
 
 defaults:
   - override /algorithm: default
-  - override /algorithm/dimensionality_reduction: phate
+  - override /algorithm/dimensionality_reduction: umap
   - override /datamodule: hgdp_pca_precomputed
   - override /callbacks/dimensionality_reduction: default
   - override /metrics: hgdp_dr

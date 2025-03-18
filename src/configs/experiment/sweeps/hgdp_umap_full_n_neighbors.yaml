@@ -1,11 +1,12 @@
 # @package _global_
-name: hgdp_umap_full_knn=${algorithm.dimensionality_reduction.knn}
+name: hgdp_umap_full_n_neighbors=${algorithm.dimensionality_reduction.n_neighbors}
 
 defaults:
   - override /algorithm: default
   - override /algorithm/dimensionality_reduction: umap
-  - override /datamodule: hgdp
+  - override /datamodule: hgdp_pca_precomputed
   - override /callbacks/dimensionality_reduction: default
+  - override /metrics: hgdp_dr
 
 datamodule:
   mode: full
@@ -16,4 +17,4 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      algorithm.dimensionality_reduction.knn:  3, 10, 50, 500, 1000, 2000, 3000, 4149
+      algorithm.dimensionality_reduction.n_neighbors:  3, 10, 50, 500, 1000, 2000, 3000, 4149
