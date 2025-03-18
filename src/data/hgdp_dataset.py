@@ -97,6 +97,19 @@ class HGDPDataset(PlinkDataset):
         trans_idx = (~related_indices) & filtered_indices
 
         return fit_idx, trans_idx
+    
+    def extract_geographic_preservation_indices(self) -> np.ndarray:
+        """
+        Extracts indices of samples that we expect to preserve geography.
+
+        Returns:
+            np.ndarray: Indices for subsetting for geographic preservation metric.        
+        """
+
+        american_idx = self.metadata['Genetic_region_merged'] == 'America'
+        rest_idx = self.metadata['Population'].isin(['ACB', 'ASW', 'CEU'])
+
+        return ~(american_idx | rest_idx)
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
@@ -117,7 +130,9 @@ class HGDPDataset(PlinkDataset):
             'filter_king_related',
             'filter_pca_outlier',
             'hard_filtered',
-            'filter_contaminated'
+            'filter_contaminated',
+            'Genetic_region_merged',
+            'Population'
         ]
 
         # Load metadata with additional processing
