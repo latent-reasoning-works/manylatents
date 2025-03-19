@@ -1,0 +1,12 @@
+# @package _global_
+name: hgdp_aanet_full_n_archetypes=${algorithm.reconstruction.network.n_archetypes}
+
+defaults:
+  - override /algorithm/network: aanet_default
+  - override /datamodule: hgdp
+  - override /trainer: default
+
+datamodule:
+  mode: full
+
+seed: 42

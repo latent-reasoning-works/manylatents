@@ -2,7 +2,6 @@
 name: hgdp_pca_phate_full
 
 defaults:
-  - override /algorithm: default
   - override /algorithm/dimensionality_reduction: phate
   - override /datamodule: hgdp_pca_precomputed
   - override /callbacks/dimensionality_reduction: default

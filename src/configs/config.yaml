@@ -4,7 +4,7 @@ defaults:
   - datamodule: null
   - callbacks: default
   - hydra: default
-  - algorithm: null
+  - algorithm: default
   - metrics: null
   - trainer: null # instantiate only if network is being passed
   - experiment: null

@@ -62,6 +62,7 @@ def main(cfg: DictConfig):
 
     logger.info("Starting the experiment pipeline...")
 
+    dr_embedding = None
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         if datamodule is None:
             raise ValueError("DataModule must be provided for Dimensionality Reduction.")

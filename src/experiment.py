@@ -57,17 +57,17 @@ def train_model(
     trainer: Trainer,
     datamodule: Union[LightningDataModule, DataLoader],
     model: torch.nn.Module,
-    embeddings: Optional[np.ndarray] = None,
+    embeddings: Optional[np.ndarray] = None,  # Allow None
 ):
     """
     Train the model using PyTorch Lightning Trainer.
     """
-    ## CURRENTLY DOESN'T USE EMBEDDINGS, REVISE
-    ## BEFORE ADDING TRAINING SUPPORT
     if model is None:
         raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
-    
+
+    logger.info(f"Training model with embeddings: {embeddings is not None}") 
     trainer.fit(model, datamodule=datamodule)
+
     
 @functools.singledispatch
 def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
