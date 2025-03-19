@@ -1,4 +1,4 @@
 defaults:
-  - network: null # specify a neural network, if applicable
+  - model: null # specify a neural network, if applicable
   - dimensionality_reduction: null # specify a dimensionality reduction algorithm
   - _self_

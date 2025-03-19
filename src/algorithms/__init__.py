@@ -15,7 +15,6 @@ pca_config = builds(
 algorithm_store(pca_config, name="pca")
 
 
-## review PHATE and TSNE after they're implemented, currently placeholders
 phate_config = builds(
     PHATEModule,
     n_components="${cfg.algorithm.n_components:50}",

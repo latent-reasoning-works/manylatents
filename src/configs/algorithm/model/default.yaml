@@ -1,0 +1,3 @@
+defaults:
+- network: null
+- optimizer: null

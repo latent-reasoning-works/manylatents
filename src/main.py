@@ -155,40 +155,27 @@ def main(cfg: DictConfig):
 
     return aggregated_metrics
 
-def instantiate_algorithm(
-    cfg: DictConfig,
-) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
-    """
-    Instantiates the algorithms specified in the configuration.    
-    
-    Args:
-        cfg (DictConfig): Hydra configuration. UPDATE WITH ALGORITHM CONFIG
-    
-    Returns:
-        Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
-            - dr_module: Instantiated DR algorithm, or None if not specified.
-            - lightning_module: Instantiated neural network model, or None if only DR is used.
-    """
-    dr_module: Optional[DimensionalityReductionModule] = None
-    lightning_module: Optional[LightningModule] = None
+def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
+    dr_module = None
+    lightning_module = None
 
-    # --- DR Setup ---
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         dr_cfg = cfg.algorithm.dimensionality_reduction
         if "_target_" not in dr_cfg:
             raise ValueError("Missing _target_ in dimensionality_reduction config")
-
         logger.info(f"Instantiating Dimensionality Reduction: {dr_cfg._target_.split('.')[-1]}")
         dr_module = hydra.utils.instantiate(dr_cfg)
- 
-    # --- NN Setup ---
-    if "network" in cfg.algorithm and cfg.algorithm.network is not None:
-        model_cfg = cfg.algorithm.network
-        if "_target_" not in model_cfg:
-            raise ValueError("Missing _target_ in network config")
 
-        logger.info(f"Instantiating Neural Network: {model_cfg._target_}")
-        lightning_module = hydra.utils.instantiate(model_cfg)
+    if "model" in cfg.algorithm and cfg.algorithm.model is not None:
+        model_cfg = cfg.algorithm.model 
+        if "_target_" not in model_cfg:
+            raise ValueError("Missing _target_ in model config")
+
+        logger.info(f"Instantiating Model: {model_cfg._target_}")
+        lightning_module = hydra.utils.instantiate(model_cfg, datamodule=datamodule)
+
+        if not isinstance(lightning_module, LightningModule):
+            raise TypeError(f"Model must be a LightningModule, got {type(lightning_module)}")
 
     return dr_module, lightning_module
 

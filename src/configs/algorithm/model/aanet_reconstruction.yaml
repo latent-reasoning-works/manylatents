@@ -1,0 +1,4 @@
+__target__: src.algorithms.reconstruction.Reconstruction
+_partial: true
+network: aanet
+optimizer: adam
