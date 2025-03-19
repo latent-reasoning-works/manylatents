@@ -52,6 +52,12 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          mmap_mode=mmap_mode,
                          delimiter=delimiter,
                          data_split=data_split)
+
+        # get properties
+        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
+        self._latitude = self.metadata["latitude"]
+        self._longitude = self.metadata["longitude"]
+        self._population_label = self.metadata["Population"]
         
         # Load precomputed embeddings using the mixin, if provided.
         self.precomputed_path = precomputed_path
@@ -103,6 +109,18 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
 
         return fit_idx, trans_idx
 
+    def extract_geographic_preservation_indices(self) -> np.ndarray:
+        """
+        Extracts indices of samples that we expect to preserve geography.
+        Returns:
+            np.ndarray: Indices for subsetting for geographic preservation metric.        
+        """
+
+        american_idx = self.metadata['Genetic_region_merged'] == 'America'
+        rest_idx = self.metadata['Population'].isin(['ACB', 'ASW', 'CEU'])
+
+        return ~(american_idx | rest_idx)
+
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
         Loads and processes metadata for the HGDP dataset.
@@ -116,7 +134,9 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             'filter_king_related',
             'filter_pca_outlier',
             'hard_filtered',
-            'filter_contaminated'
+            'filter_contaminated',
+            'Genetic_region_merged',
+            'Population'
         ]
 
         metadata = load_metadata(
@@ -142,10 +162,6 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                 logger.warning(f"Missing filter column in metadata: {col}. Filling with False.")
                 metadata[col] = False
 
-        self._latitude = metadata["latitude"]
-        self._longitude = metadata["longitude"]
-        self._population_label = metadata["Population"]
-
         return metadata
 
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
@@ -168,3 +184,7 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
     @property
     def population_label(self) -> pd.Series:
         return self._population_label
+    
+    @property
+    def geographic_preservation_indices(self) -> pd.Series:
+        return self._geographic_preservation_indices

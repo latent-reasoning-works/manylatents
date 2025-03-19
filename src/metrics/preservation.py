@@ -309,6 +309,7 @@ def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
         ancestry_coords=embeddings,
         latitude=dataset.latitude,
         longitude=dataset.longitude,
+        subset_to_test_on=dataset.geographic_preservation_indices,
         **kwargs
     )
 
