@@ -309,6 +309,22 @@ wheels = [
 ]
 
 [[package]]
+name = "cython"
+version = "3.0.12"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/25/886e197c97a4b8e254173002cdc141441e878ff29aaa7d9ba560cd6e4866/cython-3.0.12.tar.gz", hash = "sha256:b988bb297ce76c671e28c97d017b95411010f7c77fa6623dd0bb47eed1aee1bc", size = 2757617 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ff/b8/f7ee49281830663fe5af13a171e05cdba9b11c17723e02c5214a036507f8/Cython-3.0.12-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:54115fcc126840926ff3b53cfd2152eae17b3522ae7f74888f8a41413bd32f25", size = 3277061 },
+    { url = "https://files.pythonhosted.org/packages/cb/2e/7e6a45bc7a1ff327fca37c3473eb36864ec78abf81ecfb7eed0dab4a9a90/Cython-3.0.12-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:629db614b9c364596d7c975fa3fb3978e8c5349524353dbe11429896a783fc1e", size = 3637036 },
+    { url = "https://files.pythonhosted.org/packages/cf/ed/65c9b06e79f6565b0fce5422c8088c73612ff4f7e1d0d465e8ec7df18af5/Cython-3.0.12-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:af081838b0f9e12a83ec4c3809a00a64c817f489f7c512b0e3ecaf5f90a2a816", size = 3690936 },
+    { url = "https://files.pythonhosted.org/packages/30/37/35d6cff743b8778f54e85fb38cde276a0c13732bb31d79a277a8406c4d22/Cython-3.0.12-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:34ce459808f7d8d5d4007bc5486fe50532529096b43957af6cbffcb4d9cc5c8d", size = 3505994 },
+    { url = "https://files.pythonhosted.org/packages/30/bc/43c05a2693f96e003039d9bded526460e2663275fc9d6307700f0f755f9a/Cython-3.0.12-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:d6c6cd6a75c8393e6805d17f7126b96a894f310a1a9ea91c47d141fb9341bfa8", size = 3719053 },
+    { url = "https://files.pythonhosted.org/packages/47/bd/eb4e6a4a6038c96aba8dd8ce7864644bd657346ad567dd2b384b073a838f/Cython-3.0.12-cp39-cp39-win32.whl", hash = "sha256:a4032e48d4734d2df68235d21920c715c451ac9de15fa14c71b378e8986b83be", size = 2583241 },
+    { url = "https://files.pythonhosted.org/packages/6d/c8/66c63e895f6f2fea8e769c3a56ade2140403904fc63ab2e3e5b6443a5e8f/Cython-3.0.12-cp39-cp39-win_amd64.whl", hash = "sha256:dcdc3e5d4ce0e7a4af6903ed580833015641e968d18d528d8371e2435a34132c", size = 2783365 },
+    { url = "https://files.pythonhosted.org/packages/27/6b/7c87867d255cbce8167ed99fc65635e9395d2af0f0c915428f5b17ec412d/Cython-3.0.12-py2.py3-none-any.whl", hash = "sha256:0038c9bae46c459669390e53a1ec115f8096b2e4647ae007ff1bf4e6dee92806", size = 1171640 },
+]
+
+[[package]]
 name = "debugpy"
 version = "1.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -640,6 +656,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/1f/86/b9d77f604dcd3bcd1
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/26/093ecccdf1cc6db5473cf971a22f6b681570d0c1b724111faa0dde13285a/heatgeo-0.0.1-py3-none-any.whl", hash = "sha256:5f84a876f84cd946281f265d879a2e0712ae043af8dbb52ce14687a2afdb46d5", size = 18906 },
 ]
+
+[[package]]
+name = "hopcroftkarp"
+version = "1.2.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/56/7b03eba3c43008c490c9d52e69ea5334b65955f66836eb4f1962f3b0d421/hopcroftkarp-1.2.5.tar.gz", hash = "sha256:28a7887db81ad995ccd36a1b5164a4c542b16d2781e8c49334dc9d141968c0e7", size = 16856 }
 
 [[package]]
 name = "httplib2"
@@ -987,6 +1009,7 @@ dependencies = [
     { name = "pyzmq" },
     { name = "requests" },
     { name = "rich" },
+    { name = "ripser" },
     { name = "rootutils" },
     { name = "s-gd2" },
     { name = "scikit-learn" },
@@ -1063,6 +1086,7 @@ requires-dist = [
     { name = "pyzmq", specifier = "==25.1.1" },
     { name = "requests" },
     { name = "rich", specifier = ">=13.9.4" },
+    { name = "ripser", specifier = ">=0.6.12" },
     { name = "rootutils" },
     { name = "s-gd2", specifier = "==1.8.1" },
     { name = "scikit-learn", specifier = ">=1.2.2" },
@@ -1466,6 +1490,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/66/94/68e2e17afaa9169cf6412ab0f28623903be73d1b32e208d9e8e541bb086d/parso-0.8.4.tar.gz", hash = "sha256:eb3a7b58240fb99099a345571deecc0f9540ea5f4dd2fe14c2a99d6b281ab92d", size = 400609 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c6/ac/dac4a63f978e4dcb3c6d3a78c4d8e0192a113d288502a1216950c41b1027/parso-0.8.4-py2.py3-none-any.whl", hash = "sha256:a418670a20291dacd2dddc80c377c5c3791378ee1e8d12bffc35420643d43f18", size = 103650 },
+]
+
+[[package]]
+name = "persim"
+version = "0.3.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecated" },
+    { name = "hopcroftkarp" },
+    { name = "joblib" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "scikit-learn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/39/6d/fd280ba8d48cc636406b3342f6d91ad65f1c6cb5f5c07d203d764eccc41a/persim-0.3.8.tar.gz", hash = "sha256:e13d18584176b8a764d16d7e56df08dcc8ba66c6b3257a072345be3bd59ba40d", size = 51514 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/aa/41/9bd99ddfb4741d6dd2857fda7f6d71f560731f4057e69b98840778d10da1/persim-0.3.8-py3-none-any.whl", hash = "sha256:be022cef7f91d03b1ee81deee4d5c863ca1ba0d60cae804b5043aa55855bcc80", size = 48614 },
 ]
 
 [[package]]
@@ -1947,6 +1988,29 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ab/3a/0316b28d0761c6734d6bc14e770d85506c986c85ffb239e688eeaab2c2bc/rich-13.9.4.tar.gz", hash = "sha256:439594978a49a09530cff7ebc4b5c7103ef57baf48d5ea3184f21d9a2befa098", size = 223149 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/19/71/39c7c0d87f8d4e6c020a393182060eaefeeae6c01dab6a84ec346f2567df/rich-13.9.4-py3-none-any.whl", hash = "sha256:6049d5e6ec054bf2779ab3358186963bac2ea89175919d699e378b99738c2a90", size = 242424 },
+]
+
+[[package]]
+name = "ripser"
+version = "0.6.12"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cython" },
+    { name = "numpy" },
+    { name = "persim" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/a8/9c8d9fa8eb22a31569e44e78e79d10e1715d5d85517a12cf3b7b0c4e6691/ripser-0.6.12.tar.gz", hash = "sha256:06a0c4ef15a95541b9b3d3d67a94e474a2876eee67235d2b2b5176b7f29e0411", size = 98719 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/0c/43b0b985cab4d21ba92746800f2803a71718d0be09913e2539783ab5bd33/ripser-0.6.12-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:6a50eea0496a04d2c4a84ded83e639f1571019215e6154d23de8cd70034c4add", size = 162415 },
+    { url = "https://files.pythonhosted.org/packages/73/4b/9300c0971d6309b1752289be4d0dc37480326d04ea31ee2eae6ff6d83a1a/ripser-0.6.12-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:e35157da79ab96e3de2357b2cac957239a47992768b8ce59c12c3033b351542e", size = 158611 },
+    { url = "https://files.pythonhosted.org/packages/86/98/49caef954dd6622ffd1e63baa631d3f9c42a35c9cfd7bde1695c052f4695/ripser-0.6.12-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:75debaa4d2d431738b92be62c2fde363b7e665911b5c0dd2870be0a3ca0f8e1b", size = 827054 },
+    { url = "https://files.pythonhosted.org/packages/79/51/baac6cc7af92265b21fa2adee673c0c82cdbf5c2e8ffe519d6082d6ba067/ripser-0.6.12-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:376db6549bf00bb0b4e72e052ad62f501bd09b3bf163b3bac4f04eb71798833f", size = 834295 },
+    { url = "https://files.pythonhosted.org/packages/8b/12/dbdcf0e9d7a662d93541c89d4d994a1df775e206ebac4b15b505344e2886/ripser-0.6.12-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:6963359caa4068f3e255af3a912bcd01924b9ae410ec32afd4bbcbab547de8ce", size = 1796570 },
+    { url = "https://files.pythonhosted.org/packages/35/fc/914852dadf685600dbb889744689c87a58796d502e439c76b632e024fd65/ripser-0.6.12-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:58144a97e675fb52fabb7a827e0a3cc258de8e4730afec3e19ea781752ff2154", size = 1870414 },
+    { url = "https://files.pythonhosted.org/packages/2f/0b/7052e794591055ebfb6f37746090888078ba2ce75525bc41adb228579d54/ripser-0.6.12-cp39-cp39-win32.whl", hash = "sha256:034fcf9a980f094771f28ad4b1883d2d8d1fdc9413c1c4920b77a3a47efc0ad4", size = 143827 },
+    { url = "https://files.pythonhosted.org/packages/92/47/9ca6f3bb77dba0ad80fadbf8d73b586be950622674ee9762d0ddf32c0b8f/ripser-0.6.12-cp39-cp39-win_amd64.whl", hash = "sha256:b918e0dc21c67d7f2413dc24c0f6377823358e7e670f281ffb2177f5c7f9ea05", size = 150267 },
 ]
 
 [[package]]

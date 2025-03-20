@@ -1,0 +1,3 @@
+_target_: src.metrics.lid.LocalIntrinsicDimensionality
+_partial_: True
+k: 20

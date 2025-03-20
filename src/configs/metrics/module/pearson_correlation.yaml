@@ -1,4 +1,3 @@
-pearson_correlation:
-  _target_: src.metrics.correlation.PearsonCorrelation
-  num_dists: 100
-  _partial_: True
+_target_: src.metrics.correlation.PearsonCorrelation
+_partial_: True
+num_dists: 100

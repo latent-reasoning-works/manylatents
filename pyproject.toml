@@ -83,6 +83,7 @@ dependencies = [
     "rich>=13.9.4",
     "opentsne>=1.0.2",
     "umap-learn>=0.5.7",
+    "ripser>=0.6.12",
 ]
 
 [tool.uv]
