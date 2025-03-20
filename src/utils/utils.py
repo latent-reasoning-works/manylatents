@@ -179,6 +179,7 @@ def aggregate_metrics(
     if model_metrics:
         aggregated_metrics.update(model_metrics)
 
+    ## why is this here? may have to move to a different function/main
     # Process any callback outputs.
     if callback_outputs:
         for name, output in callback_outputs:

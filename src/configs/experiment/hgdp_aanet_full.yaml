@@ -5,6 +5,7 @@ defaults:
   - override /algorithm/model: aanet_reconstruction
   - override /datamodule: hgdp
   - override /trainer: default
+  - override /metrics: hgdp_dr
 
 datamodule:
   mode: full

@@ -125,3 +125,8 @@ class HGDPDataModule(LightningDataModule):
             precomputed_samples = torch.stack(precomputed_samples)
         metadata = [sample["metadata"] for sample in batch]
         return torch.stack(raw_samples), precomputed_samples, metadata
+    
+    @property
+    def dims(self):
+        sample = self.train_dataset[0]
+        return sample["raw"].shape

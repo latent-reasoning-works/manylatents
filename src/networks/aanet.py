@@ -113,6 +113,7 @@ class Vanilla(Base):
         simplex_scale: int = 1,
         device: torch.device = None,
         diffusion_extrema=None,
+        archetypal_weight: float = 1.0,
         **kwargs
     ):
         super().__init__()
@@ -124,6 +125,7 @@ class Vanilla(Base):
         self.simplex_scale = simplex_scale
         self.diffusion_extrema = diffusion_extrema
         self.device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.archetypal_weight = archetypal_weight
         
         # Build encoder layers.
         encoder_layers = []

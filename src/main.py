@@ -116,21 +116,21 @@ def main(cfg: DictConfig):
                 else:
                     logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
                         
-    if "network" in cfg.algorithm and cfg.algorithm.network is not None:
+    if lightning_module is not None:
         logger.info("Instantiating the Neural Network model...")
         trainer = instantiate_trainer(cfg)
         logger.info("Running training...")
         train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
         
-        ## verify correctness, module is being called twice
         model_metrics, model_error = evaluate(
             lightning_module,
             cfg=cfg,
+            trainer=trainer,
             datamodule=datamodule,
-            model=lightning_module,
             embeddings=dr_embedding,
         )
-        logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
+        model_error = next(iter(model_metrics.values())) if model_metrics else None
+        logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
 
     aggregated_metrics = {}
 

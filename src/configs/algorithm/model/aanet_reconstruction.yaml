@@ -1,4 +1,19 @@
 _target_: src.algorithms.reconstruction.Reconstruction
 datamodule: ${datamodule}
-network: network/aanet
-optimizer: adam
+#network: network/aanet why cant i do this?
+## resulted in a hacky configure_model at the lightningmodule level
+network:
+  _target_: src.networks.aanet.Vanilla
+  input_shape: 197675 ## can this be inferred from datamodule shape/elsewhere?
+  n_archetypes: 4
+  layer_widths: [128, 128]
+  activation_out: "tanh"
+  simplex_scale: 1
+  archetypal_weight: 1.0
+  kl_loss: "partial"
+  lr: 0.001
+##optimizer: adam ?or this
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001

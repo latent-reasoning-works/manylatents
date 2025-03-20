@@ -5,7 +5,7 @@ devices: 1
 
 deterministic: false
 
-fast_dev_run: false
+fast_dev_run: true
 
 min_epochs: 1
 max_epochs: 10

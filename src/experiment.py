@@ -6,6 +6,7 @@ import hydra
 import numpy as np
 import torch
 from lightning import LightningDataModule, LightningModule, Trainer
+from lightning.fabric.utilities.exceptions import MisconfigurationException
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
@@ -136,25 +137,43 @@ def evaluate_lightningmodule(
     cfg: DictConfig,
     trainer: Trainer,
     datamodule: Union[LightningDataModule, DataLoader],
-    embeddings: Optional[np.ndarray] = None,
-) -> Tuple[str, Optional[float], dict]:
+    embeddings: Optional[any] = None,
+    **kwargs,
+) -> dict:
     """
-    Evaluate the model on the test set.
-    Sets the model to evaluation mode before testing.
+    Evaluate the LightningModule on the test set and compute additional custom metrics.
+    
+    If the model does not implement a `test_step()`, this function will skip evaluation and return an empty dictionary.
+    
+    Returns:
+        A dictionary mapping each metric name to its computed value.
     """
-    if algorithm is None:
-        raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
+    # Optionally, you can check before calling trainer.test
+    if not hasattr(algorithm, "test_step"):
+        logger.info("Model does not define a test_step() method; skipping evaluation.")
+        return {}
 
-    results = trainer.test(model=algorithm, datamodule=datamodule)
+    try:
+        results = trainer.test(model=algorithm, datamodule=datamodule)
+    except MisconfigurationException as e:
+        logger.info(f"Skipping evaluation due to misconfiguration: {e}")
+        return {}
+    
     if not results:
-        return "fail", 9999.0, {}
+        return {}
+    base_metrics = results[0]
 
-    # Suppose we want 'loss' or 'accuracy' from results
-    metrics = results[0]
-    if "test/accuracy" in metrics:
-        acc = metrics["test/accuracy"]
-        return "accuracy", (1.0 - acc), metrics
-    elif "test/loss" in metrics:
-        return "loss", metrics["test/loss"], metrics
-    else:
-        return "unknown", None, metrics
+    custom_metrics = {}
+    model_metrics_cfg = cfg.metrics.get("model", {})
+    for metric_key, metric_params in model_metrics_cfg.items():
+        if metric_params.get("enabled", True):
+            try:
+                metric_fn = hydra.utils.instantiate(metric_params)
+                # Each metric_fn should return a tuple (name, value)
+                name, value = metric_fn(algorithm, test_results=base_metrics)
+                custom_metrics[name] = value
+            except Exception as e:
+                logger.error(f"Error computing metric '{metric_key}': {e}")
+    
+    combined_metrics = {**base_metrics, **custom_metrics}
+    return combined_metrics
