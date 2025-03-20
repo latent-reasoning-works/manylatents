@@ -1,4 +1,4 @@
-__target__: src.algorithms.reconstruction.Reconstruction
-_partial: true
-network: aanet
+_target_: src.algorithms.reconstruction.Reconstruction
+datamodule: ${datamodule}
+network: network/aanet
 optimizer: adam

@@ -52,7 +52,7 @@ def main(cfg: DictConfig):
             ## log slurm variables; check if useful, usable across cluster envs
 
     datamodule = instantiate_datamodule(cfg)
-    dr_module, lightning_module = instantiate_algorithm(cfg)
+    dr_module, lightning_module = instantiate_algorithm(cfg, datamodule)
     dr_metrics, dr_scores, model_metrics, model_error = None, None, None, None
 
     train_loader = datamodule.train_dataloader()

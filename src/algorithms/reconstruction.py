@@ -1,11 +1,13 @@
 import functools
 from collections.abc import Sequence
 from logging import getLogger
+from typing import Sequence, Union
 
 import hydra_zen
 import torch
 from lightning.pytorch.callbacks.callback import Callback
 from lightning.pytorch.core import LightningModule
+from omegaconf import DictConfig
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
 
@@ -21,14 +23,14 @@ class Reconstruction(LightningModule):
     def __init__(
         self,
         datamodule,
-        network: hydra_zen.Config,  # Hydra config for a torch.nn.Module (e.g. an AAnet variant)
-        optimizer: hydra_zen.Config,  # Hydra config for the optimizer (a functools.partial)
+        network: DictConfig,  # Hydra config for a torch.nn.Module (e.g. an AAnet variant)
+        optimizer: DictConfig,  # Hydra config for the optimizer (a functools.partial)
         init_seed: int = 42,
     ):
         """
         Parameters:
             datamodule: Object used to load train/val/test data.
-            network: The config of the network (e.g. AAnet_VAE or AAnet_vanilla) to instantiate.
+            network: The config of the network (e.g. AAnet or Autoencoder) to instantiate.
             optimizer: The config for the optimizer.
             init_seed: Seed for deterministic weight initialization.
         """
@@ -96,7 +98,7 @@ class Reconstruction(LightningModule):
         optimizer: Optimizer = optimizer_partial(self.parameters())
         return optimizer
 
-    def configure_callbacks(self) -> Sequence[Callback] | Callback:
+    def configure_callbacks(self) -> Union[Sequence[Callback], Callback]:
         """
         Optionally, return callbacks to be used during training.
         """
