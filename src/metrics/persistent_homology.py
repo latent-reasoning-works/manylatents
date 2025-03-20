@@ -1,6 +1,10 @@
+import logging
+
 import numpy as np
+import torch
 from ripser import ripser
 
+logger = logging.getLogger(__name__)
 
 def PersistentHomology(dataset, embeddings: np.ndarray, homology_dim: int = 1, persistence_threshold: float = 0.1) -> float:
     """
@@ -12,19 +16,21 @@ def PersistentHomology(dataset, embeddings: np.ndarray, homology_dim: int = 1, p
 
     Parameters:
       - dataset: Provided for protocol compliance.
-      - embeddings: A numpy array representing the low-dimensional embeddings.
+      - embeddings: A numpy array (or torch tensor) representing the low-dimensional embeddings.
       - homology_dim: Homology dimension to analyze (e.g., 0 for connected components, 1 for loops).
       - persistence_threshold: Minimum persistence for a feature to be counted.
 
     Returns:
       - Number of persistent features (float).
-
-    Note:
-      - Requires ripser, which is included in the provided environment.
     """
-
+    # Convert to numpy if necessary
+    if torch.is_tensor(embeddings):
+        embeddings = embeddings.cpu().numpy()
+        logger.info(f"PersistentHomology: Converted embeddings to numpy with shape {embeddings.shape}")
+    
     diagrams = ripser(embeddings)['dgms']
     features = diagrams[homology_dim]
     persistence = features[:, 1] - features[:, 0]
     count = np.sum(persistence > persistence_threshold)
+    logger.info(f"PersistentHomology: Found {count} features with persistence > {persistence_threshold}")
     return float(count)

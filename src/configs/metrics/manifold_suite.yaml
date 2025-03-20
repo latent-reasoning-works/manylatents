@@ -7,4 +7,3 @@ defaults:
   - persistent_homology
   - tangent_space 
 - _self_
-subsample_fraction: 0.05

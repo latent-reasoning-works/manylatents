@@ -1,6 +1,10 @@
+import logging
+
 import numpy as np
+import torch
 from sklearn.neighbors import NearestNeighbors
 
+logger = logging.getLogger(__name__)
 
 def TangentSpaceApproximation(dataset, embeddings: np.ndarray, n_neighbors: int = 10, variance_threshold: float = 0.95) -> float:
     """
@@ -11,13 +15,17 @@ def TangentSpaceApproximation(dataset, embeddings: np.ndarray, n_neighbors: int 
 
     Parameters:
       - dataset: Provided for protocol compliance.
-      - embeddings: A numpy array representing the low-dimensional embeddings.
+      - embeddings: A numpy array (or torch tensor) representing the low-dimensional embeddings.
       - n_neighbors: Number of neighbors to consider.
       - variance_threshold: Cumulative explained variance threshold for determining the dimension.
 
     Returns:
       - Average local dimension (float).
     """
+    if torch.is_tensor(embeddings):
+        embeddings = embeddings.cpu().numpy()
+        logger.info(f"TangentSpaceApproximation: Converted embeddings to numpy with shape {embeddings.shape}")
+
     nbrs = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(embeddings)
     _, indices = nbrs.kneighbors(embeddings)
     dims = []
@@ -30,4 +38,6 @@ def TangentSpaceApproximation(dataset, embeddings: np.ndarray, n_neighbors: int 
         cum_variance = np.cumsum(variance_explained)
         local_dim = np.searchsorted(cum_variance, variance_threshold) + 1
         dims.append(local_dim)
-    return float(np.mean(dims))
+    avg_dim = float(np.mean(dims))
+    logger.info(f"TangentSpaceApproximation: Average local dimension computed as {avg_dim}")
+    return avg_dim

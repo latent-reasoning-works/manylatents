@@ -1,4 +1,5 @@
-_target_: src.metrics.tangent_space.TangentSpaceApproximation
-_partial_: True
-n_neighbors: 10
-variance_threshold: 0.95
+tangent_space:
+  _target_: src.metrics.tangent_space.TangentSpaceApproximation
+  _partial_: True
+  n_neighbors: 10
+  variance_threshold: 0.95

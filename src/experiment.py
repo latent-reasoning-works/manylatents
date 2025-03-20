@@ -105,30 +105,35 @@ def evaluate_dr(
     logger.info(f"Original data shape: {original_data.shape}")
     logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
     
-    metrics = {}
+    dr_metrics = {}
     
-    ds_metrics_cfg = cfg.metrics.get("dataset", {})
-    ds_subsample_fraction = ds_metrics_cfg.get("subsample_fraction", None)
+    # Retrieve the top-level metrics configuration.
+    all_metrics_cfg = cfg.metrics
+    ds_subsample_fraction = all_metrics_cfg.get("subsample_fraction", None)
+    # Dataset-level metrics should be defined as a dict keyed by metric name.
+    ds_metrics_cfg = all_metrics_cfg.get("dataset", {})
+    
     if ds_subsample_fraction is not None:
         ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embeddings, ds_subsample_fraction)
         logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
     else:
         ds_subsampled, embeddings_subsampled = ds, embeddings
-    
-    for metric_name, metric_params in ds_metrics_cfg.items():
-        if metric_name == "subsample_fraction":
-            continue
-        if metric_params.get("enabled", True):
-            metric_fn = hydra.utils.instantiate(metric_params)
-            metrics[metric_name] = metric_fn(ds_subsampled, embeddings_subsampled)
-    
-    module_metrics_cfg = cfg.metrics.get("module", {})
-    for metric_name, metric_params in module_metrics_cfg.items():
-        if metric_params.get("enabled", True):
-            metric_fn = hydra.utils.instantiate(metric_params)
-            metrics[metric_name] = metric_fn(ds, embeddings)
-    
-    return metrics
+
+    # Compute dataset-level metrics using the provided names.
+    for metric_name, metric_config in ds_metrics_cfg.items():
+        metric_fn = hydra.utils.instantiate(metric_config)
+        result = metric_fn(ds_subsampled, embeddings_subsampled)
+        dr_metrics[metric_name] = result
+
+    # Compute module-level metrics similarly.
+    module_metrics_cfg = all_metrics_cfg.get("module", {})
+    for metric_name, metric_config in module_metrics_cfg.items():
+        metric_fn = hydra.utils.instantiate(metric_config)
+        result = metric_fn(ds, embeddings)
+        dr_metrics[metric_name] = result
+        
+    return dr_metrics
+
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(
