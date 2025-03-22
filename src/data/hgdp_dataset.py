@@ -52,12 +52,6 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          mmap_mode=mmap_mode,
                          delimiter=delimiter,
                          data_split=data_split)
-
-        # get properties
-        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
-        self._latitude = self.metadata["latitude"]
-        self._longitude = self.metadata["longitude"]
-        self._population_label = self.metadata["Population"]
         
         # Load precomputed embeddings using the mixin, if provided.
         self.precomputed_path = precomputed_path
@@ -73,7 +67,13 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                 self.precomputed_embeddings = self.precomputed_embeddings[idx]
             # Update split_indices to an identity mapping.
             self.split_indices = {self.data_split: np.arange(len(self.metadata))}
-            
+
+        # get properties
+        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
+        self._latitude = self.metadata["latitude"]
+        self._longitude = self.metadata["longitude"]
+        self._population_label = self.metadata["Population"]
+
     def __getitem__(self, index: int) -> Any:
         real_idx = self.split_indices[self.data_split][index]
         sample_raw = self.original_data[real_idx]
