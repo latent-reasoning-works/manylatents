@@ -109,7 +109,7 @@ def main(cfg: DictConfig):
                     # pass dataset and embeddings to the callback,
                     # dataset specific label, plotting logic is handled by the callback
                     output = dr_callback.on_dr_end(
-                        dataset=datamodule.train_dataset, 
+                        dataset=datamodule.test_dataset,
                         embeddings=dr_embedding,
                         )
                     callback_outputs.append((name, output))

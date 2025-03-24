@@ -9,7 +9,8 @@ import scprep
 import wandb
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
 from src.data.hgdp_dataset import HGDPDataset
-from src.utils.mappings import make_palette_label_order_HGDP
+#from src.utils.mappings import make_palette_label_order_HGDP
+from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +77,12 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         
         # Build the palette for HGDP if applicable.
         if isinstance(dataset, HGDPDataset):
-            try:
-                cmap_pop, _ = make_palette_label_order_HGDP(metadata)
-            except Exception as e:
-                logger.warning(f"Error building HGDP palette: {e}. Using fallback palette 'viridis'.")
-                cmap_pop = 'viridis'
+            # try:
+            #     cmap_pop, _ = make_palette_label_order_HGDP(metadata)
+            # except Exception as e:
+            #     logger.warning(f"Error building HGDP palette: {e}. Using fallback palette 'viridis'.")
+            #     cmap_pop = 'viridis'
+            cmap_pop = cmap_pop_HGDP
         else:
             logger.info("Dataset is not HGDP. Using default palette 'viridis'.")
             cmap_pop = 'viridis'
