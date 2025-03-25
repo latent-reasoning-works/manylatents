@@ -26,6 +26,9 @@ class PlinkDataset(Dataset):
                  cache_dir: str,  
                  mmap_mode: Optional[str] = None,
                  delimiter: Optional[str] = ",",
+                 filter_qc: Optional[bool] = False,
+                 filter_related: Optional[bool] = False,
+                 test_all: Optional[bool] = False,
                  data_split: str = None) -> None:
         """
         Initializes the PLINK dataset.
@@ -35,6 +38,10 @@ class PlinkDataset(Dataset):
             cache_dir (str): Directory for caching preprocessed data.
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
             delimiter (Optional[str]): Delimiter for reading metadata files.
+            filter_qc (Optional[bool]): Whether to filter samples based on quality control.
+            filter_related (Optional[bool]): Whether to filter related samples.
+            test_all (Optional[bool]): Whether to use all samples for testing.
+            data_split (str): Data split to use ('train', 'test', or 'full').
         """
         super().__init__()
         
@@ -126,5 +133,3 @@ class PlinkDataset(Dataset):
             np.ndarray: Array of labels.
         """
         pass
-
-

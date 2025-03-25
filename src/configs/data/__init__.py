@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from config import BaseDataModuleConfig
 from hydra_zen import store
@@ -22,6 +22,6 @@ class HGDPDataModuleConfig(BaseDataModuleConfig):
 
 store(
     HGDPDataModuleConfig,
-    group="datamodule",
+    group="data",
     name="hgdp"
 )

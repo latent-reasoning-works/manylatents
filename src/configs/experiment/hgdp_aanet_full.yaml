@@ -3,11 +3,8 @@ name: hgdp_aanet_full_n_archetypes=${algorithm.model.network.n_archetypes}
 
 defaults:
   - override /algorithm/model: aanet_reconstruction
-  - override /datamodule: hgdp
+  - override /data: hgdp
   - override /trainer: default
   - override /metrics: hgdp_dr
-
-datamodule:
-  mode: full
 
 seed: 42

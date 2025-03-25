@@ -1,7 +1,7 @@
 defaults:
   - base_config
   - _self_
-  - datamodule: null
+  - data: null
   - callbacks: default
   - hydra: default
   - algorithm: default

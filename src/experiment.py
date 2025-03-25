@@ -20,18 +20,18 @@ def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     check_or_make_dirs(cfg.cache_dir)
     logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
 
-    if cfg.datamodule.get("debug", False):
+    if cfg.data.get("debug", False):
         logger.info("DEBUG MODE: Using a dummy datamodule with limited data.")
         dummy_data = torch.randn(100, 10)
         dummy_labels = torch.zeros(100)
         dataset = torch.utils.data.TensorDataset(dummy_data, dummy_labels)
         return DummyDataModule(
             dataset=dataset, 
-            batch_size=cfg.datamodule.batch_size, 
-            num_workers=cfg.datamodule.num_workers
+            batch_size=cfg.data.batch_size, 
+            num_workers=cfg.data.num_workers
         )
 
-    datamodule_cfg = {k: v for k, v in cfg.datamodule.items() if k != "debug"}
+    datamodule_cfg = {k: v for k, v in cfg.data.items() if k != "debug"}
     dm = hydra.utils.instantiate(datamodule_cfg)
     dm.setup()
     return dm

@@ -13,8 +13,8 @@ class Config:
     algorithm: Any
     """Configuration for the algorithm (a LightningModule)."""
 
-    datamodule: Optional[Any] = None
-    """Configuration for the datamodule (dataset + transforms + dataloader creation)."""
+    data: Optional[Any] = None
+    """Configuration for the data (dataset + transforms + dataloader creation)."""
 
     callbacks: Optional[Any] = None
     """Configuration for callbacks used during training and evaluation."""

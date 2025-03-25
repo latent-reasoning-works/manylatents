@@ -7,9 +7,6 @@ defaults:
   - override /callbacks/dimensionality_reduction: default
   - override /metrics: hgdp_dr
   
-datamodule:
-  mode: full
-
 seed: 42
 
 algorithm:

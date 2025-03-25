@@ -3,11 +3,8 @@ name: hgdp_pca_full_n_components=${algorithm.dimensionality_reduction.n_componen
 
 defaults:
   - override /algorithm/dimensionality_reduction: pca
-  - override /datamodule: hgdp
+  - override /data: hgdp
   - override /callbacks/dimensionality_reduction: default
-
-datamodule:
-  mode: full
 
 seed: 42
 
