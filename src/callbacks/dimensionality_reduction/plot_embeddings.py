@@ -3,12 +3,12 @@ import os
 from datetime import datetime
 
 import matplotlib.pyplot as plt
-import numpy as np
 import scprep
 
 import wandb
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
 from src.data.hgdp_dataset import HGDPDataset
+
 #from src.utils.mappings import make_palette_label_order_HGDP
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 
@@ -41,7 +41,7 @@ class PlotEmbeddings(DimensionalityReductionCallback):
             f"PlotEmbeddings initialized with directory: {self.save_dir} and experiment name: {self.experiment_name}"
         )
 
-    def on_dr_end(self, dataset: any, embeddings: np.ndarray) -> str:
+    def on_dr_end(self, dataset: any, dr_outputs: dict) -> str:
         """
         Plots the first two dimensions of the embeddings and saves the plot as a PNG.
         If the embeddings have more than 2 dimensions, only the first two are used.
@@ -54,6 +54,7 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         Returns:
             str: The file path to the saved plot.
         """
+        embeddings = dr_outputs["embeddings"]
         if embeddings.shape[1] < 2:
             logger.warning("Not enough dimensions for plotting (need at least 2). Skipping plot.")
             return ""

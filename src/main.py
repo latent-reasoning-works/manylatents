@@ -62,7 +62,7 @@ def main(cfg: DictConfig):
 
     logger.info("Starting the experiment pipeline...")
 
-    dr_embedding = None
+    dr_embedding, dr_labels, dr_scores = None, None, None
     if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         if datamodule is None:
             raise ValueError("DataModule must be provided for Dimensionality Reduction.")
@@ -82,8 +82,12 @@ def main(cfg: DictConfig):
         
         dr_module.fit(train_tensor)
         dr_embedding = dr_module.transform(test_tensor)
-        
+
         logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
+
+        ## populate full outputs dict
+        if hasattr(datamodule.test_dataset, "get_labels"):
+            dr_labels = datamodule.test_dataset.get_labels()
         
         dr_metrics = evaluate(
             dr_module,
@@ -94,13 +98,20 @@ def main(cfg: DictConfig):
 
         dr_scores = dr_metrics[next(iter(dr_metrics))] if dr_metrics else None
         
+        dr_outputs = {
+            "embeddings": dr_embedding,
+            "label": dr_labels,
+            "scores": dr_scores,
+            "metadata": None, ## change
+        }
+        
         logger.info(f"DR evaluation completed. Metrics {dr_metrics}, Scores: {dr_scores}")
         
         callback_outputs = []
 
-        #TODO: additionalmetrics was phased out,
-        #update so it's able to plot and save lightning embeddings as well
+        #TODO: update so it's able to plot and save lightning embeddings as well
         # i.e. "integrate" both pipeline steps
+        
         if "dimensionality_reduction" in cfg.callbacks:
             dr_callbacks = cfg.callbacks.dimensionality_reduction
             for name, cb_cfg in dr_callbacks.items():
@@ -110,7 +121,7 @@ def main(cfg: DictConfig):
                     # dataset specific label, plotting logic is handled by the callback
                     output = dr_callback.on_dr_end(
                         dataset=datamodule.test_dataset,
-                        embeddings=dr_embedding,
+                        dr_outputs=dr_outputs,
                         )
                     callback_outputs.append((name, output))
                 else:
