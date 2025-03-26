@@ -96,12 +96,12 @@ def main(cfg: DictConfig):
             embeddings=dr_embedding,
         )
 
-        dr_scores = dr_metrics[next(iter(dr_metrics))] if dr_metrics else None
+        logger.info(f"DR Metrics: {dr_metrics}")
         
         dr_outputs = {
             "embeddings": dr_embedding,
             "label": dr_labels,
-            "scores": dr_scores,
+            "scores": dr_metrics,
             "metadata": None, ## change
         }
         
@@ -147,9 +147,9 @@ def main(cfg: DictConfig):
 
     aggregated_metrics = aggregate_metrics(
         dr_metrics=dr_metrics,
-        dr_scores=dr_scores,
         model_metrics=model_metrics if model_metrics else None,
-        model_error=model_error,    
+        model_error=model_error,
+        callback_outputs=callback_outputs
         )
     
     logger.info(f"Aggregated metrics: {aggregated_metrics}")

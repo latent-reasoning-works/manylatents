@@ -1,7 +1,7 @@
 _target_: src.algorithms.umap.UMAPModule
 n_components: 2
 random_state: ${seed}
-n_neighbors: 15
+n_neighbors: 3
 n_epochs: 500
 metric: 'euclidean'
 learning_rate: 1.0

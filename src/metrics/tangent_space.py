@@ -1,4 +1,5 @@
 import logging
+from typing import Union
 
 import numpy as np
 import torch
@@ -6,21 +7,16 @@ from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
 
-def TangentSpaceApproximation(dataset, embeddings: np.ndarray, n_neighbors: int = 10, variance_threshold: float = 0.95) -> float:
+def TangentSpaceApproximation(dataset, 
+                              embeddings: np.ndarray, 
+                              n_neighbors: int = 10, 
+                              variance_threshold: float = 0.95, 
+                              return_per_sample: bool = False) -> Union[float, np.ndarray]:
     """
     Estimate the local manifold dimension by approximating the tangent space via PCA.
 
-    For each point, determine the number of principal components required to explain
-    a given fraction of the variance and return the average estimated dimension.
-
-    Parameters:
-      - dataset: Provided for protocol compliance.
-      - embeddings: A numpy array (or torch tensor) representing the low-dimensional embeddings.
-      - n_neighbors: Number of neighbors to consider.
-      - variance_threshold: Cumulative explained variance threshold for determining the dimension.
-
-    Returns:
-      - Average local dimension (float).
+    If return_per_sample is False (default), returns the average local dimension (float).
+    If return_per_sample is True, returns an array of local dimensions, one per observation.
     """
     if torch.is_tensor(embeddings):
         embeddings = embeddings.cpu().numpy()
@@ -38,6 +34,12 @@ def TangentSpaceApproximation(dataset, embeddings: np.ndarray, n_neighbors: int 
         cum_variance = np.cumsum(variance_explained)
         local_dim = np.searchsorted(cum_variance, variance_threshold) + 1
         dims.append(local_dim)
-    avg_dim = float(np.mean(dims))
-    logger.info(f"TangentSpaceApproximation: Average local dimension computed as {avg_dim}")
-    return avg_dim
+    
+    if return_per_sample:
+        dims_array = np.array(dims)
+        logger.info(f"TangentSpaceApproximation: Per-sample local dimensions: {dims_array}")
+        return dims_array
+    else:
+        avg_dim = float(np.mean(dims))
+        logger.info(f"TangentSpaceApproximation: Average local dimension computed as {avg_dim}")
+        return avg_dim

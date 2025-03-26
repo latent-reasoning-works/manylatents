@@ -157,7 +157,6 @@ def setup_logging(debug: bool = False):
 
 def aggregate_metrics(
     dr_metrics: dict = None,
-    dr_scores: float = None,
     model_metrics: dict = None,
     model_error: float = None,
     callback_outputs: list = None

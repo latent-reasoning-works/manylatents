@@ -2,14 +2,14 @@ import logging
 import os
 from datetime import datetime
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
+import numpy as np
 import scprep
 
 import wandb
 from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
 from src.data.hgdp_dataset import HGDPDataset
-
-#from src.utils.mappings import make_palette_label_order_HGDP
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 
 logger = logging.getLogger(__name__)
@@ -22,94 +22,130 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         figsize: tuple = (8, 6),
         label_col: str = "Population",
         legend: bool = False,
+        color_by_score: str = None,  # e.g. "tangent_space" or any metric key
+        x_label: str = "Dim 1",
+        y_label: str = "Dim 2",
+        title: str = "Dimensionality Reduction Plot",
+        apply_norm: bool = False,    ## EXPERIMENTAL, NOT INCONSISTENT IN TSA CASE
+        alpha: float = 0.8          
     ):
         """
         Args:
             save_dir (str): Directory where the plot will be saved.
-            experiment_name (str): Name of the experiment to be used in the filename.
-            figsize (tuple): Size of the figure (width, height).
-            label_col (str): Column in the metadata to use for color-coding.
+            experiment_name (str): Name of the experiment for the filename.
+            figsize (tuple): Figure size (width, height).
+            label_col (str): Column name in metadata to use for labels (fallback).
+            legend (bool): Whether to include a legend.
+            color_by_score (str): Optional key in dr_outputs to use for continuous score-based coloring.
+            x_label (str): Label for the x-axis.
+            y_label (str): Label for the y-axis.
+            title (str): Title for the plot.
+            apply_norm (bool): Whether to apply dynamic normalization to the color array.
+            alpha (float): Transparency of the points (0 = completely transparent, 1 = opaque).
         """
         self.save_dir = save_dir
         self.experiment_name = experiment_name
         self.figsize = figsize
         self.label_col = label_col
         self.legend = legend
+        self.color_by_score = color_by_score
+        self.x_label = x_label
+        self.y_label = y_label
+        self.title = title
+        self.apply_norm = apply_norm
+        self.alpha = alpha
 
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(
             f"PlotEmbeddings initialized with directory: {self.save_dir} and experiment name: {self.experiment_name}"
         )
 
-    def on_dr_end(self, dataset: any, dr_outputs: dict) -> str:
-        """
-        Plots the first two dimensions of the embeddings and saves the plot as a PNG.
-        If the embeddings have more than 2 dimensions, only the first two are used.
+    def _get_colormap(self, dataset: any) -> str:
+        if self.color_by_score is not None:
+            return "viridis"
+        return cmap_pop_HGDP if isinstance(dataset, HGDPDataset) else "viridis"
 
-        Args:
-            dataset (Any): A dataset object with a .metadata attribute and a get_labels() method.
-            embeddings (np.ndarray): The computed embeddings (N, D).
-            legend (bool): Whether to include a legend in the plot.
-
-        Returns:
-            str: The file path to the saved plot.
-        """
+    def _get_embeddings(self, dr_outputs: dict) -> np.ndarray:
         embeddings = dr_outputs["embeddings"]
-        if embeddings.shape[1] < 2:
-            logger.warning("Not enough dimensions for plotting (need at least 2). Skipping plot.")
-            return ""
-
-        # Use only the first two dimensions.
-        embeddings_to_plot = embeddings.numpy()[:, :2] if embeddings.shape[1] > 2 else embeddings.numpy()
-        logger.info("Using first two dimensions for plotting.")
-
-        labels = None
-        # Try to retrieve labels from the dataset.
-        if hasattr(dataset, "get_labels") and callable(dataset.get_labels):
-            try:
-                labels = dataset.get_labels(self.label_col)
-            except Exception as e:
-                logger.warning(f"Unable to retrieve labels from dataset: {e}")
-        # Use metadata from the dataset to get labels.
-        # Here, we slice the metadata and embeddings to align if necessary.
-        metadata = dataset.metadata[1:]
-        labels = metadata['Population'].values
-        embeddings_to_plot = embeddings_to_plot[1:]
-        
-        # Build the palette for HGDP if applicable.
-        if isinstance(dataset, HGDPDataset):
-            # try:
-            #     cmap_pop, _ = make_palette_label_order_HGDP(metadata)
-            # except Exception as e:
-            #     logger.warning(f"Error building HGDP palette: {e}. Using fallback palette 'viridis'.")
-            #     cmap_pop = 'viridis'
-            cmap_pop = cmap_pop_HGDP
+        if hasattr(embeddings, "numpy"):
+            emb_np = embeddings.numpy()
         else:
-            logger.info("Dataset is not HGDP. Using default palette 'viridis'.")
-            cmap_pop = 'viridis'
-        
-        figsize = (self.figsize[0], self.figsize[1])
-        # Use self.legend in the plotting call.
-        if labels is not None:
-            scprep.plot.scatter2d(
-                embeddings_to_plot, s=8, figsize=figsize,
-                cmap=cmap_pop, c=labels,
-                ticks=False, legend=self.legend,
-                xlabel=' ', ylabel=' ',
-                legend_loc='upper center', legend_anchor=(1.0, -0.02), legend_ncol=8,
-                label_prefix=None, title='', fontsize=36
-            )
-        else:
-            scprep.plot.scatter2d(
-                embeddings_to_plot, s=8, figsize=figsize,
-                cmap='viridis', ticks=False, legend=False,
-                xlabel=' ', ylabel=' ',
-                label_prefix=None, title='', fontsize=36
-            )
+            emb_np = embeddings
+        embeddings_to_plot = emb_np[:, :2] if emb_np.shape[1] > 2 else emb_np
+        return embeddings_to_plot[1:]
 
-        plt.xlabel("Dim 1", fontsize=12)
-        plt.ylabel("Dim 2", fontsize=12)
-        plt.title("Dimensionality Reduction Plot", fontsize=16)
+    def _get_color_array(self, dataset: any, dr_outputs: dict) -> np.ndarray:
+        color_array = None
+        if self.color_by_score is not None:
+            scores = dr_outputs.get("scores")
+            if scores is not None and isinstance(scores, dict):
+                color_array = scores.get(self.color_by_score)
+            else:
+                color_array = dr_outputs.get(self.color_by_score)
+            if color_array is None:
+                logger.warning(
+                    f"Coloring key '{self.color_by_score}' not found in dr_outputs; falling back to label-based coloring."
+                )
+                if "label" in dr_outputs and dr_outputs["label"] is not None:
+                    color_array = dr_outputs["label"]
+                else:
+                    color_array = dataset.get_labels(self.label_col)
+            else:
+                logger.info(f"Using '{self.color_by_score}' for coloring.")
+        else:
+            if "label" in dr_outputs and dr_outputs["label"] is not None:
+                color_array = dr_outputs["label"]
+            else:
+                color_array = dataset.get_labels(self.label_col)
+        if color_array is not None:
+            if hasattr(color_array, "numpy"):
+                color_array = color_array.numpy()
+            color_array = np.asarray(color_array)
+            return color_array[1:]
+        return None
+
+    def _plot_embeddings(self, dataset: any, embeddings_to_plot: np.ndarray, color_array: np.ndarray) -> str:
+        cmap = self._get_colormap(dataset)
+        fig_size = (self.figsize[0], self.figsize[1])
+
+        norm = None
+        if self.color_by_score is not None and color_array is not None and self.apply_norm:
+            score_min = float(color_array.min())
+            score_max = float(color_array.max())
+            norm = mcolors.Normalize(vmin=score_min, vmax=score_max)
+
+        ax = scprep.plot.scatter2d(
+            embeddings_to_plot,
+            s=8,
+            figsize=fig_size,
+            cmap=cmap,
+            c=color_array,
+            ticks=False,
+            legend=self.legend,
+            xlabel=' ',
+            ylabel=' ',
+            legend_loc='upper center',
+            legend_anchor=(1.0, -0.02),
+            legend_ncol=8,
+            label_prefix=None,
+            title='',
+            fontsize=36,
+            alpha=self.alpha  # pass the alpha value here
+        )
+
+        if norm is not None and ax.collections:
+            mappable = ax.collections[0]
+            mappable.set_norm(norm)
+            mappable.set_array(np.asarray(color_array))
+
+        plt.xlabel(self.x_label, fontsize=12)
+        plt.ylabel(self.y_label, fontsize=12)
+        plt.title(self.title, fontsize=16)
+
+        if self.color_by_score is not None and ax.collections:
+            mappable = ax.collections[0]
+            cbar = plt.colorbar(mappable)
+            cbar.set_label(f"{self.color_by_score} Score")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
@@ -118,8 +154,13 @@ class PlotEmbeddings(DimensionalityReductionCallback):
         plt.savefig(self.save_path, bbox_inches="tight")
         plt.close()
         logger.info(f"Saved 2D embeddings plot to {self.save_path}")
-        
+
         if wandb.run is not None:
             wandb.log({"embedding_plot": wandb.Image(self.save_path)})
 
         return self.save_path
+
+    def on_dr_end(self, dataset: any, dr_outputs: dict) -> str:
+        embeddings_to_plot = self._get_embeddings(dr_outputs)
+        color_array = self._get_color_array(dataset, dr_outputs)
+        return self._plot_embeddings(dataset, embeddings_to_plot, color_array)

@@ -3,3 +3,4 @@ tangent_space:
   _partial_: True
   n_neighbors: 10
   variance_threshold: 0.95
+  return_per_sample: True
