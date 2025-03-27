@@ -17,7 +17,11 @@ from src.experiment import (
     train_model,
 )
 from src.utils.data import determine_data_source
-from src.utils.utils import aggregate_metrics, setup_logging
+from src.utils.utils import (
+    aggregate_metrics,
+    load_precomputed_embeddings,
+    setup_logging,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +39,6 @@ def main(cfg: DictConfig):
     and should be extracted later from the trained model.
     """
     setup_logging(debug=cfg.debug)
-
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
     
     if cfg.debug:
@@ -51,30 +54,40 @@ def main(cfg: DictConfig):
             wandb.run.config.update({k: v for k, v in os.environ.items() if k.startswith("SLURM")})
             ## log slurm variables; check if useful, usable across cluster envs
 
+    # Data instantiatoin
     datamodule = instantiate_datamodule(cfg)
-    dr_module, lightning_module = instantiate_algorithm(cfg, datamodule)
-    dr_metrics, dr_scores, model_metrics, model_error = None, None, None, None
-
     train_loader = datamodule.train_dataloader()
     test_loader = datamodule.test_dataloader()
-
     field_index, data_source = determine_data_source(train_loader)
 
+    if not cfg.eval_only:
+        dr_module, lightning_module = instantiate_algorithm(cfg, datamodule)
+    else:
+        dr_module, lightning_module = None, None
+        
     logger.info("Starting the experiment pipeline...")
 
-    dr_embedding, dr_labels, dr_scores = None, None, None
-    if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
-        if datamodule is None:
-            raise ValueError("DataModule must be provided for Dimensionality Reduction.")
-        
-        ## Unroll train and test dataloaders to fit DR module
-        train_batches = [batch[field_index].cpu() for batch in train_loader]
-        train_tensor = torch.cat(train_batches, dim=0)
-        
-        test_batches  = [batch[field_index].cpu() for batch in test_loader]
-        test_tensor = torch.cat(test_batches, dim=0)
+    dr_outputs = {}
+    dr_metrics = None
+    model_metrics, model_error = None, None
 
-        logger.info(
+    # ----------------------------- #
+    #  Dimensionality Reduction   #
+    # ----------------------------- #
+    if cfg.eval_only:
+        logger.info("Evaluation-only mode (DR): Loading precomputed DR outputs.")
+        dr_outputs = load_precomputed_embeddings(cfg)
+        dr_embedding = dr_outputs.get("embeddings")
+        if hasattr(datamodule.test_dataset, "get_labels"):
+            dr_outputs["label"] = datamodule.test_dataset.get_labels()
+    else:
+        if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
+            ## Unroll train and test dataloaders to fit DR module
+            train_batches = [batch[field_index].cpu() for batch in train_loader]
+            train_tensor = torch.cat(train_batches, dim=0)
+            test_batches  = [batch[field_index].cpu() for batch in test_loader]
+            test_tensor = torch.cat(test_batches, dim=0)
+            logger.info(
             f"Running Dimensionality Reduction (DR) on {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
@@ -82,13 +95,12 @@ def main(cfg: DictConfig):
         
         dr_module.fit(train_tensor)
         dr_embedding = dr_module.transform(test_tensor)
-
         logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
-
-        ## populate full outputs dict
         if hasattr(datamodule.test_dataset, "get_labels"):
             dr_labels = datamodule.test_dataset.get_labels()
-        
+        else:
+            dr_labels = None
+            
         dr_metrics = evaluate(
             dr_module,
             cfg=cfg,
@@ -97,42 +109,31 @@ def main(cfg: DictConfig):
         )
 
         logger.info(f"DR Metrics: {dr_metrics}")
-        
         dr_outputs = {
             "embeddings": dr_embedding,
             "label": dr_labels,
             "scores": dr_metrics,
             "metadata": None, ## change
-        }
-        
-        logger.info(f"DR evaluation completed. Metrics {dr_metrics}, Scores: {dr_scores}")
-        
-        callback_outputs = []
+        }                
 
-        #TODO: update so it's able to plot and save lightning embeddings as well
-        # i.e. "integrate" both pipeline steps
+    # ----------------------------- #
+    #         Lightning Model     #
+    # ----------------------------- #
+    if "model" in cfg.algorithm and cfg.algorithm.model is not None:
+        # In eval-only mode, if a pretrained checkpoint is provided, load it.
+        if cfg.eval_only and cfg.pretrained_ckpt:
+            logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
+            lightning_module = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
+        else:
+            lightning_module = hydra.utils.instantiate(cfg.algorithm.model, datamodule=datamodule)
         
-        if "dimensionality_reduction" in cfg.callbacks:
-            dr_callbacks = cfg.callbacks.dimensionality_reduction
-            for name, cb_cfg in dr_callbacks.items():
-                dr_callback = hydra.utils.instantiate(cb_cfg)
-                if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-                    # pass dataset and embeddings to the callback,
-                    # dataset specific label, plotting logic is handled by the callback
-                    output = dr_callback.on_dr_end(
-                        dataset=datamodule.test_dataset,
-                        dr_outputs=dr_outputs,
-                        )
-                    callback_outputs.append((name, output))
-                else:
-                    logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
-                        
-    if lightning_module is not None:
-        logger.info("Instantiating the Neural Network model...")
         trainer = instantiate_trainer(cfg)
-        logger.info("Running training...")
-        train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
         
+        if not cfg.eval_only:
+            logger.info("Running training...")
+            train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
+        
+        logger.info("Running model evaluation.")
         model_metrics, model_error = evaluate(
             lightning_module,
             cfg=cfg,
@@ -140,17 +141,34 @@ def main(cfg: DictConfig):
             datamodule=datamodule,
             embeddings=dr_embedding,
         )
-        model_error = next(iter(model_metrics.values())) if model_metrics else None
+        if model_metrics:
+            model_error = next(iter(model_metrics.values()))
         logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
-
-    aggregated_metrics = {}
+    else:
+        lightning_module = None  
+        
+    # ----------------------------- #
+    #         Callbacks           #
+    # ----------------------------- #
+    
+    callback_outputs = []
+    
+    if "dimensionality_reduction" in cfg.callbacks and dr_outputs:
+        dr_callbacks = cfg.callbacks.dimensionality_reduction
+        for name, cb_cfg in dr_callbacks.items():
+            dr_callback = hydra.utils.instantiate(cb_cfg)
+            if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
+                output = dr_callback.on_dr_end(dataset=datamodule.test_dataset, dr_outputs=dr_outputs)
+                callback_outputs.append((name, output))
+            else:
+                logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
 
     aggregated_metrics = aggregate_metrics(
-        dr_metrics=dr_metrics,
+        dr_metrics=dr_outputs.get("scores"),
         model_metrics=model_metrics if model_metrics else None,
         model_error=model_error,
         callback_outputs=callback_outputs
-        )
+    )
     
     logger.info(f"Aggregated metrics: {aggregated_metrics}")
     
@@ -159,12 +177,12 @@ def main(cfg: DictConfig):
         wandb.finish()
     else:
         logger.info("wandb.run not active; skipping wandb.log")
-
     
     assert aggregated_metrics is not None
     logger.info("Experiment complete.")
-
+    
     return aggregated_metrics
+
 
 def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
     dr_module = None
@@ -178,17 +196,20 @@ def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[Dimensi
         dr_module = hydra.utils.instantiate(dr_cfg)
 
     if "model" in cfg.algorithm and cfg.algorithm.model is not None:
-        model_cfg = cfg.algorithm.model 
-        if "_target_" not in model_cfg:
-            raise ValueError("Missing _target_ in model config")
-
-        logger.info(f"Instantiating Model: {model_cfg._target_}")
-        lightning_module = hydra.utils.instantiate(model_cfg, datamodule=datamodule)
-
+        model_cfg = cfg.algorithm.model
+        # Dynamically instantiate or use the already-instantiated module.
+        lightning_module = instantiate_model(model_cfg, datamodule)
         if not isinstance(lightning_module, LightningModule):
             raise TypeError(f"Model must be a LightningModule, got {type(lightning_module)}")
-
+    
     return dr_module, lightning_module
+
+def instantiate_model(cfg_model, datamodule):
+    if isinstance(cfg_model, (dict)) or OmegaConf.is_config(cfg_model):
+        model = hydra.utils.instantiate(cfg_model, datamodule=datamodule)
+    else:
+        model = cfg_model
+    return model
 
 if __name__ == "__main__":
     main()

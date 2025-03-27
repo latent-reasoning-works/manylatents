@@ -194,3 +194,54 @@ def aggregate_metrics(
                 aggregated_metrics[name] = output
 
     return aggregated_metrics
+
+
+def load_precomputed_embeddings(cfg) -> dict:
+    """
+    Loads precomputed embeddings from a file specified in the config.
+    
+    This function supports:
+      - .npy files: loaded using numpy.load
+      - .csv files: loaded using numpy.loadtxt (assumes comma-separated floats)
+      - .pt or .pth files: loaded using torch.load. If the loaded object is a
+        tensor, it is converted to a numpy array. If it's a dictionary, it
+        looks for an 'embeddings' key.
+    
+    Returns:
+        dict: A dictionary with keys "embeddings", "label", "scores", and "metadata".
+              "label", "scores", and "metadata" are set to None by default.
+    """
+    precomputed_path = cfg.data.precomputed_path
+    if not precomputed_path:
+        raise ValueError("No precomputed path specified in the configuration.")
+
+    ext = os.path.splitext(precomputed_path)[-1].lower()
+    embeddings = None
+
+    if ext == ".npy":
+        embeddings = np.load(precomputed_path)
+    elif ext == ".csv":
+        embeddings = np.loadtxt(precomputed_path, delimiter=",")
+    elif ext in [".pt", ".pth"]:
+        loaded = torch.load(precomputed_path, map_location="cpu")
+        if isinstance(loaded, torch.Tensor):
+            embeddings = loaded.numpy()
+        elif isinstance(loaded, dict):
+            # If the checkpoint is a dict, assume embeddings are stored under the key "embeddings"
+            if "embeddings" in loaded:
+                emb = loaded["embeddings"]
+                embeddings = emb.numpy() if hasattr(emb, "numpy") else np.array(emb)
+            else:
+                raise ValueError("Pretrained checkpoint dictionary does not contain 'embeddings' key.")
+        else:
+            raise ValueError(f"Unsupported type loaded from {precomputed_path}: {type(loaded)}")
+    else:
+        raise ValueError(f"Unsupported precomputed embedding file extension: {ext}")
+
+    # You can expand this to load labels or metadata if they are stored in a structured file.
+    return {
+        "embeddings": embeddings,
+        "label": None,
+        "scores": None,
+        "metadata": None
+    }

@@ -45,3 +45,9 @@ class Config:
 
     name: str = "default"
     """Experiment name."""
+    
+    eval_only: bool = False
+    """If True, skip training and only run evaluation (or plotting) using precomputed embeddings or a pretrained network."""
+    
+    pretrained_ckpt: Optional[str] = None
+    """If specified, load a pretrained checkpoint to compute embeddings instead of training a new model."""
