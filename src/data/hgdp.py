@@ -20,7 +20,10 @@ class HGDPDataModule(LightningDataModule):
         mmap_mode: str = None,
         precomputed_path: str = None,
         delimiter: str = ",",
-        filter_related: bool = True,
+        filter_qc: bool = False,
+        filter_related: bool = False,
+        test_all: bool = False,
+        remove_recent_migration: bool = False,
         mode: str = None,
 
     ):
@@ -35,7 +38,10 @@ class HGDPDataModule(LightningDataModule):
             mmap_mode (Optional[str]): Memory-mapping mode.
             precomputed_path (Optional[str]): Path to precomputed embeddings.
             delimiter (Optional[str]): Delimiter for CSV files.
-            filter_related (bool): Whether to filter related samples.
+            filter_qc (Optional[bool]): Whether to filter samples based on quality control.
+            filter_related (Optional[bool]): Whether to filter related samples.
+            test_all (Optional[bool]): Whether to use all samples for testing.
+            remove_recent_migration (Optional[bool]): remove recently migrated samples.
             mode (str): 'split' or 'full' mode. Former splits data into train/test according to indices, 
             latter uses all data for both fit and transform operations.
 
@@ -50,6 +56,9 @@ class HGDPDataModule(LightningDataModule):
         self.delimiter = delimiter
         self.precomputed_path = precomputed_path
         self.filter_related = filter_related
+        self.filter_qc = filter_qc
+        self.test_all = test_all
+        self.remove_recent_migration = remove_recent_migration
         self.mode = mode
 
     def prepare_data(self) -> None:
@@ -68,6 +77,9 @@ class HGDPDataModule(LightningDataModule):
                 precomputed_path=self.precomputed_path,
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
+                filter_qc=self.filter_qc,
+                test_all=self.test_all,
+                remove_recent_migration=self.remove_recent_migration,
                 data_split='full',
             )
 
@@ -81,6 +93,9 @@ class HGDPDataModule(LightningDataModule):
                 precomputed_path=self.precomputed_path,
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
+                filter_qc=self.filter_qc,
+                test_all=self.test_all,
+                remove_recent_migration=self.remove_recent_migration,
                 data_split='train',
             )
 
@@ -91,6 +106,9 @@ class HGDPDataModule(LightningDataModule):
                 precomputed_path=self.precomputed_path,
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
+                filter_qc=self.filter_qc,
+                test_all=self.test_all,
+                remove_recent_migration=self.remove_recent_migration,
                 data_split='test',
             )
 

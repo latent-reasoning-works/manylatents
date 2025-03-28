@@ -25,11 +25,14 @@ class PlinkDataset(Dataset):
                  files: Dict[str, str], 
                  cache_dir: str,  
                  mmap_mode: Optional[str] = None,
+                 precomputed_path: Optional[str] = None,
                  delimiter: Optional[str] = ",",
                  filter_qc: Optional[bool] = False,
                  filter_related: Optional[bool] = False,
                  test_all: Optional[bool] = False,
-                 data_split: str = None) -> None:
+                 remove_recent_migration: Optional[bool] = False,
+                 data_split: str = None,
+                 ) -> None:
         """
         Initializes the PLINK dataset.
 
@@ -37,10 +40,12 @@ class PlinkDataset(Dataset):
             files (dict): Dictionary containing paths for PLINK and metadata files.
             cache_dir (str): Directory for caching preprocessed data.
             mmap_mode (Optional[str]): Memory-mapping mode for large datasets.
+            precomputed_path (Optional[str]): path to precomputed embeddings.
             delimiter (Optional[str]): Delimiter for reading metadata files.
             filter_qc (Optional[bool]): Whether to filter samples based on quality control.
             filter_related (Optional[bool]): Whether to filter related samples.
             test_all (Optional[bool]): Whether to use all samples for testing.
+            remove_recent_migration (Optional[bool]): remove recently migrated samples.
             data_split (str): Data split to use ('train', 'test', or 'full').
         """
         super().__init__()
@@ -56,8 +61,19 @@ class PlinkDataset(Dataset):
         self.delimiter = delimiter
 
         self.metadata = self.load_metadata(self.metadata_path)
+        
+        # get properties
+        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
+        self._latitude = self.extract_latitude()
+        self._longitude = self.extract_longitude()
+        self._population_label = self.extract_population_label()
+        self._qc_filter_indices = self.extract_qc_filter_indices()
+        self._related_indices = self.extract_related_indices()
 
-        self.fit_idx, self.trans_idx = self.extract_indices()
+        self.fit_idx, self.trans_idx = self.extract_indices(filter_qc,
+                                                            filter_related,
+                                                            test_all,
+                                                            remove_recent_migration)
 
         self.split_indices = {
             'train': np.where(self.fit_idx)[0],
@@ -66,6 +82,61 @@ class PlinkDataset(Dataset):
         }
 
         self.original_data = self.load_or_convert_data()
+        
+        # Load precomputed embeddings using the mixin, if provided.
+        self.precomputed_path = precomputed_path
+        self.precomputed_embeddings = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
+        
+        # Note: Do NOT override self.original_data here,
+        # so that raw data remains available for evaluations.
+        if self.data_split != "full":
+            idx = self.split_indices[self.data_split]
+            self.metadata = self.metadata.iloc[idx].copy()
+            self.original_data = self.original_data[idx]
+            if self.precomputed_embeddings is not None:
+                self.precomputed_embeddings = self.precomputed_embeddings[idx]
+            # Update split_indices to an identity mapping.
+            self.split_indices = {self.data_split: np.arange(len(self.metadata))}
+
+    def extract_indices(self, 
+                        filter_qc: bool,
+                        filter_related: bool,
+                        test_all: bool,
+                        remove_recent_migration: bool
+                       ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Extracts fit/transform indices based on metadata filters.
+        Args:
+            filter_qc (Optional[bool]): Whether to filter samples based on quality control.
+            filter_related (Optional[bool]): Whether to filter related samples.
+            test_all (Optional[bool]): Whether to use all samples for testing.
+            remove_recent_migration (Optional[bool]): remove recently migrated samples.
+        """
+        if filter_qc:
+            filtered_indices = self.qc_filter_indices
+        else:
+            filtered_indices = np.ones(len(self.metadata), dtype=bool)
+
+        if filter_related:
+            related_indices = self.related_indices
+        else:
+            related_indices = np.ones(len(self.metadata), dtype=bool)
+        
+        if remove_recent_migration:
+            recent_migrant_filter = self.geographic_preservation_indices
+        else:
+            recent_migrant_filter = np.ones(len(self.metadata), dtype=bool)
+
+        if test_all:
+            # for test set, include both related and unrelated
+            fit_idx = related_indices & filtered_indices & recent_migrant_filter
+            trans_idx = filtered_indices & recent_migrant_filter
+        else:
+            # otherwise train on unrelated and test on the related individuals
+            fit_idx = related_indices & filtered_indices & recent_migrant_filter
+            trans_idx = (~related_indices) & filtered_indices & recent_migrant_filter
+
+        return fit_idx, trans_idx
 
     def load_or_convert_data(self) -> np.ndarray:
         """
@@ -81,33 +152,6 @@ class PlinkDataset(Dataset):
         logger.info(f"Loading processed PLINK data from {npy_cache_file}")
         return np.load(npy_cache_file, mmap_mode=self.mmap_mode)
 
-    def __len__(self) -> int:
-        return len(self.split_indices[self.data_split])
-
-    def __getitem__(self, index: int) -> Any:
-        real_idx = self.split_indices[self.data_split][index]
-        sample = self.original_data[real_idx]
-        metadata_row = self.metadata.iloc[real_idx].to_dict()
-        metadata_row = {k.strip(): v for k, v in metadata_row.items()}
-        return sample, metadata_row  
-    
-    @abstractmethod
-    def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Sets indices to fit and transform on using metadata.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Boolean arrays for fit and transform indices.
-        """
-        pass
-
-    @property
-    def get_original_data(self) -> np.ndarray:
-        """
-        Returns the original, unbatched data.
-        """
-        return self.original_data
-    
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
         Loads metadata.
@@ -121,6 +165,51 @@ class PlinkDataset(Dataset):
         logger.info(f"Loading metadata from: {metadata_path}")
         return pd.read_csv(metadata_path, delimiter=self.delimiter)
 
+    def __len__(self) -> int:
+        return len(self.split_indices[self.data_split])
+
+    def __getitem__(self, index: int) -> Any:
+        real_idx = self.split_indices[self.data_split][index]
+        sample = self.original_data[real_idx]
+        metadata_row = self.metadata.iloc[real_idx].to_dict()
+        metadata_row = {k.strip(): v for k, v in metadata_row.items()}
+        return sample, metadata_row  
+
+    @abstractmethod
+    def extract_latitude(self) -> pd.Series:
+        """
+        Extracts latitudes
+        """
+        pass
+
+    @abstractmethod
+    def extract_longitude(self) -> pd.Series:
+        """
+        Extracts longitudes
+        """
+        pass
+
+    @abstractmethod
+    def extract_population_label(self) -> pd.Series:
+        """
+        Extracts population labels
+        """
+        pass
+
+    @abstractmethod
+    def extract_qc_filter_indices(self) -> np.ndarray:
+        """
+        Extracts points that passed QC
+        """
+        pass
+
+    @abstractmethod
+    def extract_related_indices(self) -> np.ndarray:
+        """
+        Extracts maximal unrelated subset
+        """
+        pass
+
     @abstractmethod
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
@@ -133,3 +222,34 @@ class PlinkDataset(Dataset):
             np.ndarray: Array of labels.
         """
         pass
+
+    @property
+    def get_original_data(self) -> np.ndarray:
+        """
+        Returns the original, unbatched data.
+        """
+        return self.original_data
+
+    @property
+    def latitude(self) -> pd.Series:
+        return self._latitude
+
+    @property
+    def longitude(self) -> pd.Series:
+        return self._longitude
+
+    @property
+    def population_label(self) -> pd.Series:
+        return self._population_label
+    
+    @property
+    def qc_filter_indices(self) -> np.array:
+        return self._qc_filter_indices
+
+    @property
+    def related_indices(self) -> np.array:
+        return self._related_indices
+    
+    @property
+    def geographic_preservation_indices(self) -> pd.Series:
+        return self._geographic_preservation_indices
