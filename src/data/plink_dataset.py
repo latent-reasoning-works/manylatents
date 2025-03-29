@@ -95,6 +95,15 @@ class PlinkDataset(Dataset):
             self.original_data = self.original_data[idx]
             if self.precomputed_embeddings is not None:
                 self.precomputed_embeddings = self.precomputed_embeddings[idx]
+            
+            # update exposed attributes
+            self._latitude = self._latitude.iloc[idx].copy()
+            self._longitude = self._longitude.iloc[idx].copy()
+            self._population_label = self._population_label.iloc[idx].copy()
+            self._qc_filter_indices = self._qc_filter_indices[idx]
+            self._related_indices = self._related_indices[idx]
+            self._geographic_preservation_indices = self._geographic_preservation_indices[idx]
+                
             # Update split_indices to an identity mapping.
             self.split_indices = {self.data_split: np.arange(len(self.metadata))}
 
