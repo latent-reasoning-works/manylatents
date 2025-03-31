@@ -83,7 +83,7 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
 
         # Make sure these have longitude/latitude information
         has_long_lat = ~self.metadata['latitude'].isna() & ~self.metadata['longitude'].isna()
-        return (gbr_idx & ~high_density_idx & has_long_lat)
+        return (gbr_idx & ~high_density_idx & has_long_lat).values
 
     def extract_latitude(self) -> pd.Series:
         """

@@ -255,7 +255,10 @@ def convert_plink_to_npy(plink_prefix: str,
             if len(chunk_buffer) == chunk_size or i == num_markers - 1:
                 chunk_array = np.array(chunk_buffer, dtype=np.int8).T  # Convert to NumPy and transpose
                 end_col = start_col + chunk_array.shape[1]
-                genotypes_array[:, start_col:end_col] = chunk_array  # Assign block to main array
+
+                # HWE normalization
+                normalized_chunk_array = preprocess_data_matrix(chunk_array, fit_idx, trans_idx)
+                genotypes_array[:, start_col:end_col] = normalized_chunk_array  # Assign block to main array
 
                 # Reset buffer and update progress
                 chunk_buffer = []
@@ -263,9 +266,9 @@ def convert_plink_to_npy(plink_prefix: str,
                 pbar.update(chunk_size)
 
     # HWE normalization
-    normalized_matrix = preprocess_data_matrix(genotypes_array, fit_idx, trans_idx)
+    #normalized_matrix = preprocess_data_matrix(genotypes_array, fit_idx, trans_idx)
 
-    np.save(fname, normalized_matrix)
+    np.save(fname, genotypes_array)
     
 ### Plink Dataset end
 def cache_result(cache_path: str, compute_func, *args, **kwargs):
