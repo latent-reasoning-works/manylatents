@@ -173,3 +173,25 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
         
         return self.metadata[label_col].values
+    
+    def extract_indices(self, 
+                        filter_qc: bool,
+                        filter_related: bool,
+                        test_all: bool,
+                        remove_recent_migration: bool
+                       ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Extracts fit/transform indices based on metadata filters.
+        Args:
+            filter_qc (Optional[bool]): Whether to filter samples based on quality control.
+            filter_related (Optional[bool]): Whether to filter related samples.
+            test_all (Optional[bool]): Whether to use all samples for testing.
+            remove_recent_migration (Optional[bool]): remove recently migrated samples.
+        """
+        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration)
+
+        # First entry is dummy row. So we ignore this!
+        fit_idx[0] = False
+        trans_idx[0] = False
+
+        return fit_idx, trans_idx
