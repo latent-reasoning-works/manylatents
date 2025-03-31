@@ -159,7 +159,7 @@ def main(cfg: DictConfig):
     # ----------------------------- #
     
     callback_outputs = []
-    
+
     if "dimensionality_reduction" in cfg.callbacks and dr_outputs:
         dr_callbacks = cfg.callbacks.dimensionality_reduction
         for name, cb_cfg in dr_callbacks.items():
@@ -176,18 +176,18 @@ def main(cfg: DictConfig):
         model_error=model_error,
         callback_outputs=callback_outputs
     )
-    
+
     logger.info(f"Aggregated metrics: {aggregated_metrics}")
-    
+
     if hasattr(wandb, "run") and wandb.run is not None:
         wandb.log(aggregated_metrics)
         wandb.finish()
     else:
         logger.info("wandb.run not active; skipping wandb.log")
-    
+
     assert aggregated_metrics is not None
     logger.info("Experiment complete.")
-    
+
     return aggregated_metrics
 
 
