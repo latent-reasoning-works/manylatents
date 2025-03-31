@@ -34,12 +34,15 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
     def __init__(self, 
                  files: Dict[str, str], 
                  cache_dir: str, 
-                 filter_related: bool = True,
                  data_split: str = "full",
                  mmap_mode: Optional[str] = None, 
                  precomputed_path: Optional[str] = None,
                  metadata: Optional[pd.DataFrame] = None,
-                 delimiter: Optional[str] = ","):
+                 delimiter: Optional[str] = ",",
+                 filter_qc: Optional[bool] = False,
+                 filter_related: Optional[bool] = False,
+                 test_all: Optional[bool] = False,
+                 remove_recent_migration: Optional[bool] = False):
         """
         Initializes the HGDP dataset.
         """
@@ -51,28 +54,12 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          cache_dir=cache_dir, 
                          mmap_mode=mmap_mode,
                          delimiter=delimiter,
-                         data_split=data_split)
-        
-        # Load precomputed embeddings using the mixin, if provided.
-        self.precomputed_path = precomputed_path
-        self.precomputed_embeddings = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
-        
-        # Note: Do NOT override self.original_data here,
-        # so that raw data remains available for evaluations.
-        if self.data_split != "full":
-            idx = self.split_indices[self.data_split]
-            self.metadata = self.metadata.iloc[idx].copy()
-            self.original_data = self.original_data[idx]
-            if self.precomputed_embeddings is not None:
-                self.precomputed_embeddings = self.precomputed_embeddings[idx]
-            # Update split_indices to an identity mapping.
-            self.split_indices = {self.data_split: np.arange(len(self.metadata))}
-
-        # get properties
-        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
-        self._latitude = self.metadata["latitude"]
-        self._longitude = self.metadata["longitude"]
-        self._population_label = self.metadata["Population"]
+                         data_split=data_split,
+                         precomputed_path=precomputed_path,
+                         filter_qc=filter_qc,
+                         filter_related=filter_related,
+                         test_all=test_all,
+                         remove_recent_migration=remove_recent_migration)
 
     def __getitem__(self, index: int) -> Any:
         real_idx = self.split_indices[self.data_split][index]
@@ -91,24 +78,6 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             "metadata": metadata_row
         }
 
-    def extract_indices(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Extracts fit/transform indices based on metadata filters.
-        """
-        filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
-        _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
-        filtered_indices = ~self.metadata.index.isin(_filtered_indices)
-        
-        if self.filter_related:
-            related_indices = ~self.metadata['filter_king_related'].values
-        else:
-            related_indices = np.ones(len(self.metadata), dtype=bool)
-
-        fit_idx = related_indices & filtered_indices
-        trans_idx = (~related_indices) & filtered_indices
-
-        return fit_idx, trans_idx
-
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """
         Extracts indices of samples that we expect to preserve geography.
@@ -120,6 +89,38 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
         rest_idx = self.metadata['Population'].isin(['ACB', 'ASW', 'CEU'])
 
         return ~(american_idx | rest_idx)
+
+    def extract_latitude(self) -> pd.Series:
+        """
+        Extracts latitudes
+        """
+        return self.metadata["latitude"]
+    
+    def extract_longitude(self) -> pd.Series:
+        """
+        Extracts longitudes
+        """
+        return self.metadata["longitude"]
+    
+    def extract_population_label(self) -> pd.Series:
+        """
+        Extracts population labels
+        """
+        return self.metadata["Population"]
+    
+    def extract_qc_filter_indices(self) -> np.ndarray:
+        """
+        Extracts points that passed QC
+        """
+        filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+        _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
+        return ~self.metadata.index.isin(_filtered_indices)
+
+    def extract_related_indices(self) -> np.ndarray:
+        """
+        Extracts maximal unrelated subset
+        """
+        return ~self.metadata['filter_king_related'].values
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
@@ -172,19 +173,3 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
         
         return self.metadata[label_col].values
-   
-    @property
-    def latitude(self) -> pd.Series:
-        return self._latitude
-
-    @property
-    def longitude(self) -> pd.Series:
-        return self._longitude
-
-    @property
-    def population_label(self) -> pd.Series:
-        return self._population_label
-    
-    @property
-    def geographic_preservation_indices(self) -> pd.Series:
-        return self._geographic_preservation_indices
