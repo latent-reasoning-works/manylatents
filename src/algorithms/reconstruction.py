@@ -16,7 +16,7 @@ logger = getLogger(__name__)
 class Reconstruction(LightningModule):
     """
     An algorithm for reconstruction tasks that wraps a neural network
-    (e.g. one of the AAnet variants) which is specified by a Hydra config.    
+    (e.g. one of the AAnet variants) specified by a Hydra config.
     """
 
     def __init__(
@@ -40,22 +40,18 @@ class Reconstruction(LightningModule):
         self.init_seed = init_seed
 
         self.save_hyperparameters(ignore=["datamodule"])
-        
         self.network: torch.nn.Module | None = None
 
     def configure_model(self):
         """
         Instantiate the network from the Hydra config and initialize weights.
-        This method checks if the network configuration is still a configuration
-        or if it has already been instantiated.
+        Checks whether the network configuration is still a config or already instantiated.
         """
         with torch.random.fork_rng():
             torch.manual_seed(self.init_seed)
-            # Check if network_config is a dict-like config
             if isinstance(self.network_config, (dict, DictConfig)) or OmegaConf.is_config(self.network_config):
                 self.network = hydra_zen.instantiate(self.network_config)
             else:
-                # It's already been instantiated, so just use it directly.
                 self.network = self.network_config
 
             # If the network has lazy layers, perform a forward pass with a dummy input.
@@ -65,53 +61,46 @@ class Reconstruction(LightningModule):
                     if dummy_shape is None and hasattr(self, "dummy_input_shape"):
                         dummy_shape = self.dummy_input_shape
                     if dummy_shape is not None:
-                        example_input_array = torch.zeros((self.datamodule.batch_size, *dummy_shape))
-                        _ = self.network(example_input_array)
+                        example_input = torch.zeros((self.datamodule.batch_size, *dummy_shape))
+                        _ = self.network(example_input)
                     else:
-                        # If no dummy shape is available, log that lazy init is skipped.
-                        self.logger.info("No dummy input shape provided; skipping lazy weight initialization.")
-    
+                        logger.info("No dummy input shape provided; skipping lazy weight initialization.")
+
     def forward(self, x: Tensor) -> Tensor:
         """
-        Forward pass simply delegates to the underlying network.
+        Delegate forward pass to the underlying network.
         """
         assert self.network is not None, "Network not configured. Call configure_model() first."
         return self.network(x)
 
-    def training_step(self, batch: tuple[Tensor, ...], batch_idx: int) -> Tensor:
+    def shared_step(self, batch: tuple[Tensor, ...], batch_idx: int, phase: str) -> dict:
         """
-        Run a training step: forward the input through the network and compute its loss.
+        Common step logic for training, validation, and testing.
         """
         x = batch[0]
         outputs = self.network(x)
         loss = self.network.loss_function(outputs)
-        self.log("train_loss", loss, prog_bar=True)
-        return loss
+        self.log(f"{phase}_loss", loss, prog_bar=True)
+        return {"loss": loss, "outputs": outputs}
 
-    def validation_step(self, batch: tuple[Tensor, ...], batch_idx: int) -> Tensor:
-        """
-        Run a validation step: forward the input and compute its loss.
-        """
-        x = batch[0]
-        outputs = self.network(x)
-        loss = self.network.loss_function(outputs)
-        self.log("val_loss", loss, prog_bar=True)
-        return loss
+    def training_step(self, batch: tuple[Tensor, ...], batch_idx: int) -> dict:
+        return self.shared_step(batch, batch_idx, phase="train")
+
+    def validation_step(self, batch: tuple[Tensor, ...], batch_idx: int) -> dict:
+        return self.shared_step(batch, batch_idx, phase="val")
+
+    def test_step(self, batch: tuple[Tensor, ...], batch_idx: int) -> dict:
+        return self.shared_step(batch, batch_idx, phase="test")
 
     def configure_optimizers(self):
         """
         Instantiate the optimizer using the provided Hydra config.
-        If the optimizer configuration is already a partial (because `_partial_: true`
-        was used in the YAML), then it is used directly; otherwise, it is instantiated.
         """
         if isinstance(self.optimizer_config, functools.partial):
             optimizer_partial = self.optimizer_config
         else:
             optimizer_partial = hydra_zen.instantiate(self.optimizer_config)
-        
-        # Now call the partial with the model's parameters.
-        optimizer = optimizer_partial(self.parameters())
-        return optimizer
+        return optimizer_partial(self.parameters())
 
     def configure_callbacks(self) -> Union[Sequence[Callback], Callback]:
         """

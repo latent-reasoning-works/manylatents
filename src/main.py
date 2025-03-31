@@ -92,7 +92,14 @@ def main(cfg: DictConfig):
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
         )
-        
+       
+        if dr_module is None:
+            raise ValueError(
+                "Dimensionality reduction module is not instantiated."
+                "Please ensure that 'dimensionality_reduction' is properly configured in your algorithm config,"
+                "or set 'eval_only: true' to load precomputed embeddings."
+            )
+            
         dr_module.fit(train_tensor)
         dr_embedding = dr_module.transform(test_tensor)
         logger.info(f"Embedding completed with shape: {dr_embedding.shape}")

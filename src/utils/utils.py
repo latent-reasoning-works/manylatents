@@ -195,6 +195,12 @@ def aggregate_metrics(
 
     return aggregated_metrics
 
+def is_numeric(value: str) -> bool:
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
 
 def load_precomputed_embeddings(cfg) -> dict:
     """
@@ -202,10 +208,11 @@ def load_precomputed_embeddings(cfg) -> dict:
     
     This function supports:
       - .npy files: loaded using numpy.load
-      - .csv files: loaded using numpy.loadtxt (assumes comma-separated floats)
-      - .pt or .pth files: loaded using torch.load. If the loaded object is a
-        tensor, it is converted to a numpy array. If it's a dictionary, it
-        looks for an 'embeddings' key.
+      - .csv files: loaded by checking if there's a header. If a header is detected
+        (i.e. non-numeric values in the first row), the file is loaded with np.genfromtxt
+        and the header row is skipped. Otherwise, np.loadtxt is used.
+      - .pt or .pth files: loaded using torch.load. If the loaded object is a tensor, it is converted to a numpy array.
+        If it's a dictionary, it looks for an 'embeddings' key.
     
     Returns:
         dict: A dictionary with keys "embeddings", "label", "scores", and "metadata".
@@ -221,7 +228,16 @@ def load_precomputed_embeddings(cfg) -> dict:
     if ext == ".npy":
         embeddings = np.load(precomputed_path)
     elif ext == ".csv":
-        embeddings = np.loadtxt(precomputed_path, delimiter=",")
+        delimiter = ","
+        # Read the first line to check for headers
+        with open(precomputed_path, "r") as f:
+            first_line = f.readline().strip()
+        first_line_fields = first_line.split(delimiter)
+        # If any field in the first line is non-numeric, assume a header exists.
+        if any(not is_numeric(field) for field in first_line_fields):
+            embeddings = np.genfromtxt(precomputed_path, delimiter=delimiter, skip_header=1)
+        else:
+            embeddings = np.loadtxt(precomputed_path, delimiter=delimiter)
     elif ext in [".pt", ".pth"]:
         loaded = torch.load(precomputed_path, map_location="cpu")
         if isinstance(loaded, torch.Tensor):

@@ -6,7 +6,6 @@ import hydra
 import numpy as np
 import torch
 from lightning import LightningDataModule, LightningModule, Trainer
-from lightning.fabric.utilities.exceptions import MisconfigurationException
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
@@ -134,7 +133,6 @@ def evaluate_dr(
         
     return dr_metrics
 
-
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(
     algorithm: LightningModule,
@@ -144,41 +142,33 @@ def evaluate_lightningmodule(
     datamodule: Union[LightningDataModule, DataLoader],
     embeddings: Optional[any] = None,
     **kwargs,
-) -> dict:
+) -> Tuple[dict, Optional[float]]:
     """
     Evaluate the LightningModule on the test set and compute additional custom metrics.
     
-    If the model does not implement a `test_step()`, this function will skip evaluation and return an empty dictionary.
-    
     Returns:
-        A dictionary mapping each metric name to its computed value.
+        A tuple: (combined_metrics, error_value).
+        If evaluation is skipped (no test_step or empty results), returns ({}, None).
     """
-    # Optionally, you can check before calling trainer.test
     if not hasattr(algorithm, "test_step"):
         logger.info("Model does not define a test_step() method; skipping evaluation.")
-        return {}
+        return {}, None
 
-    try:
-        results = trainer.test(model=algorithm, datamodule=datamodule)
-    except MisconfigurationException as e:
-        logger.info(f"Skipping evaluation due to misconfiguration: {e}")
-        return {}
-    
+    results = trainer.test(model=algorithm, datamodule=datamodule)
     if not results:
-        return {}
-    base_metrics = results[0]
+        return {}, None
 
+    base_metrics = results[0]
     custom_metrics = {}
     model_metrics_cfg = cfg.metrics.get("model", {})
+
     for metric_key, metric_params in model_metrics_cfg.items():
         if metric_params.get("enabled", True):
-            try:
-                metric_fn = hydra.utils.instantiate(metric_params)
-                # Each metric_fn should return a tuple (name, value)
-                name, value = metric_fn(algorithm, test_results=base_metrics)
-                custom_metrics[name] = value
-            except Exception as e:
-                logger.error(f"Error computing metric '{metric_key}': {e}")
-    
+            metric_fn = hydra.utils.instantiate(metric_params)
+            # Let any errors during metric computation propagate.
+            name, value = metric_fn(algorithm, test_results=base_metrics)
+            custom_metrics[name] = value
+
     combined_metrics = {**base_metrics, **custom_metrics}
-    return combined_metrics
+    error_value = next(iter(combined_metrics.values())) if combined_metrics else None
+    return combined_metrics, error_value

@@ -1,4 +1,4 @@
-_target_: src.networks.aanet.Vanilla
+_target_: src.algorithms.networks.aanet.Vanilla
 input_shape: 100
 n_archetypes: 4
 layer_widths: [128, 128]
