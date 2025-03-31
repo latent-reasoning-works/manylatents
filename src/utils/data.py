@@ -198,7 +198,32 @@ def generate_hash(file_path: str, fit_idx: np.ndarray, trans_idx: np.ndarray) ->
     # Generate and return the hash
     return hashlib.md5(hash_input).hexdigest()
 
-def convert_plink_to_npy(plink_prefix: str, fname: str, fit_idx: np.array, trans_idx: np.array) -> None:
+# def convert_plink_to_npy(plink_prefix: str, fname: str, fit_idx: np.array, trans_idx: np.array) -> None:
+#     """
+#     Converts PLINK binary files to a NumPy array after preprocessing.
+
+#     Args:
+#         plink_prefix (str): Prefix for the PLINK binary files.
+#         fname (str): Filename for the output NumPy array.
+#         fit_idx (np.array): Boolean array indicating samples to fit on.
+#         trans_idx (np.array): Boolean array indicating samples to transform on.
+#     """
+#     pedfile = PyPlink(plink_prefix)
+#     genotypes_array = np.zeros([pedfile.get_nb_samples(), pedfile.get_nb_markers()], dtype=np.int8)
+
+#     for i, (marker_id, genotypes) in tqdm.tqdm(enumerate(pedfile), total=pedfile.get_nb_markers()):
+#         genotypes_array[:, i] = genotypes
+
+#     # HWE normalization
+#     normalized_matrix = preprocess_data_matrix(genotypes_array, fit_idx, trans_idx)
+
+#     np.save(fname, normalized_matrix)
+
+def convert_plink_to_npy(plink_prefix: str, 
+                         fname: str, 
+                         fit_idx: np.array, 
+                         trans_idx: np.array, 
+                         chunk_size: int = 1000) -> None:
     """
     Converts PLINK binary files to a NumPy array after preprocessing.
 
@@ -207,12 +232,35 @@ def convert_plink_to_npy(plink_prefix: str, fname: str, fit_idx: np.array, trans
         fname (str): Filename for the output NumPy array.
         fit_idx (np.array): Boolean array indicating samples to fit on.
         trans_idx (np.array): Boolean array indicating samples to transform on.
+        chunk_size (int): Loads data in chunks. Adjust based on memory limits
     """
-    pedfile = PyPlink(plink_prefix)
-    genotypes_array = np.zeros([pedfile.get_nb_samples(), pedfile.get_nb_markers()], dtype=np.int8)
 
-    for i, (marker_id, genotypes) in tqdm.tqdm(enumerate(pedfile), total=pedfile.get_nb_markers()):
-        genotypes_array[:, i] = genotypes
+    pedfile = PyPlink(plink_prefix)
+    num_samples = pedfile.get_nb_samples()
+    num_markers = pedfile.get_nb_markers()
+    chunk_size = 1000
+
+    # Initialize a standard NumPy array
+    genotypes_array = np.zeros((num_samples, num_markers), dtype=np.int8)
+
+    chunk_buffer = []
+    start_col = 0  # Tracks where each chunk starts
+
+    # Efficiently process chunks
+    with tqdm.tqdm(total=num_markers) as pbar:
+        for i, (marker_id, genotypes) in enumerate(pedfile):
+            chunk_buffer.append(genotypes)
+
+            # Process and write the chunk once it's full
+            if len(chunk_buffer) == chunk_size or i == num_markers - 1:
+                chunk_array = np.array(chunk_buffer, dtype=np.int8).T  # Convert to NumPy and transpose
+                end_col = start_col + chunk_array.shape[1]
+                genotypes_array[:, start_col:end_col] = chunk_array  # Assign block to main array
+
+                # Reset buffer and update progress
+                chunk_buffer = []
+                start_col = end_col
+                pbar.update(chunk_size)
 
     # HWE normalization
     normalized_matrix = preprocess_data_matrix(genotypes_array, fit_idx, trans_idx)
