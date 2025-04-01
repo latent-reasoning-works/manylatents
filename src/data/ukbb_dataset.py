@@ -54,10 +54,10 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
         sample_precomputed = None
         if self.precomputed_embeddings is not None:
             sample_precomputed = self.precomputed_embeddings[real_idx]
-        
+
         metadata_row = self.metadata.iloc[real_idx].to_dict()
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
-        
+
         # Return a dict containing both raw and precomputed data.
         return {
             "raw": sample_raw,
@@ -90,19 +90,19 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
         Extracts latitudes
         """
         return self.metadata["latitude"]
-    
+
     def extract_longitude(self) -> pd.Series:
         """
         Extracts longitudes
         """
         return self.metadata["longitude"]
-    
+
     def extract_population_label(self) -> pd.Series:
         """
         Extracts population labels
         """
         return self.metadata["self_described_ancestry"]
-    
+
     def extract_qc_filter_indices(self) -> np.ndarray:
         """
         Extracts points that passed QC
@@ -167,5 +167,5 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
         """
         if label_col not in self.metadata.columns:
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
-        
+
         return self.metadata[label_col].values
