@@ -3,7 +3,7 @@ import pandas as pd
 from pyplink import PyPlink
 import argparse
 
-def main(metadata_path, admix_file_root):
+def main(plink_prefix, metadata_path, admix_file_root):
     """
     Clean up and process admixture output files by adding metadata.
 
@@ -35,8 +35,7 @@ def main(metadata_path, admix_file_root):
             admixture_ratios = pd.read_csv(fname, header=None, sep=' ')
 
             # Get label order directly from plink file
-            data_path = os.path.join(admix_file_root, 'tmp', prefix)
-            pedfile = PyPlink(data_path)
+            pedfile = PyPlink(plink_prefix)
             sample_id = pedfile.get_fam()[['fid', 'iid']].rename(columns={'iid': 'sample_id', 'fid': 'sample_fid'})
 
             # Merge with population metadata
@@ -46,7 +45,8 @@ def main(metadata_path, admix_file_root):
                 left=final_df, 
                 right=pop_df, 
                 left_on='sample_id', 
-                right_on='project_meta.sample_id'
+                right_on='project_meta.sample_id',
+                how='left'
             )
             final_df = final_df.drop(columns=['sample_fid', 'project_meta.sample_id'])
 
@@ -56,8 +56,9 @@ def main(metadata_path, admix_file_root):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Clean up and process admixture output files.")
+    parser.add_argument("--plink_prefix", type=str, required=True, help="Path and prefix of plink file")
     parser.add_argument("--metadata_path", type=str, required=True, help="Path to metadata.")
     parser.add_argument("--admix_file_root", type=str, required=True, help="Path to directory for admixture analysis.")
 
     args = parser.parse_args()
-    main(args.metadata_path, args.admix_file_root)
+    main(args.plink_prefix, args.metadata_path, args.admix_file_root)
