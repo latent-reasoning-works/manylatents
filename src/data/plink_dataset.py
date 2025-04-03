@@ -22,8 +22,9 @@ class PlinkDataset(Dataset):
     _valid_splits = {"train", "test", "full"}
 
     def __init__(self, 
-                 files: Dict[str, str], 
                  cache_dir: str,  
+                 files: Dict[str, str] = None, 
+                 metadata: Optional[pd.DataFrame] = None,
                  mmap_mode: Optional[str] = None,
                  precomputed_path: Optional[str] = None,
                  delimiter: Optional[str] = ",",
@@ -52,16 +53,30 @@ class PlinkDataset(Dataset):
         
         if data_split not in self._valid_splits:
             raise ValueError(f"Invalid data_split '{data_split}'. Use one of {self._valid_splits}.")
+        
         self.data_split = data_split
         self.filenames = files
         self.cache_dir = cache_dir 
-        self.plink_path = files["plink"]
-        self.metadata_path = files["metadata"]
         self.mmap_mode = mmap_mode
         self.delimiter = delimiter
 
-        self.metadata = self.load_metadata(self.metadata_path)
-        
+        if files is not None and "plink" in files:
+            self.plink_path = files["plink"]
+            self.metadata_path = files["metadata"]
+            if self.metadata_path is None:
+                raise ValueError("Metadata path must be provided in the files dict.")
+            self.metadata = self.load_metadata(self.metadata_path)
+            self.original_data = self.load_or_convert_data()
+        elif files is not None and "metadata" in files:
+            # Only metadata is provided; no raw data available.
+            self.metadata = self.load_metadata(files["metadata"])
+            self.original_data = None
+        elif metadata is not None:
+            self.metadata = metadata
+            self.original_data = None
+        else:
+            raise ValueError("Must provide either a files dict or metadata directly.")
+ 
         # get properties
         self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
         self._latitude = self.extract_latitude()
@@ -81,12 +96,22 @@ class PlinkDataset(Dataset):
             'full': np.arange(len(self.metadata))
         }
 
-        self.original_data = self.load_or_convert_data()
-        
+        if self.original_data is not None:
+            self.original_data = self.load_or_convert_data()
+            
         # Load precomputed embeddings using the mixin, if provided.
         self.precomputed_path = precomputed_path
         self.precomputed_embeddings = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
         
+        ## assigning for getitem
+        if self.original_data is not None:
+            self.data = self.original_data
+        elif self.precomputed_embeddings is not None:
+            self.data = self.precomputed_embeddings
+            logger.warning("No raw data (original_data) was provided. Some metrics may require original_data for accurate evaluation.")
+        else:
+            raise ValueError("No valid data source found: both raw data and precomputed embeddings are missing.")
+
         # Note: Do NOT override self.original_data here,
         # so that raw data remains available for evaluations.
         if self.data_split != "full":
@@ -179,10 +204,10 @@ class PlinkDataset(Dataset):
 
     def __getitem__(self, index: int) -> Any:
         real_idx = self.split_indices[self.data_split][index]
-        sample = self.original_data[real_idx]
+        sample = self.data[real_idx]
         metadata_row = self.metadata.iloc[real_idx].to_dict()
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
-        return sample, metadata_row  
+        return {"data": sample, "metadata": metadata_row}
 
     @abstractmethod
     def extract_latitude(self) -> pd.Series:

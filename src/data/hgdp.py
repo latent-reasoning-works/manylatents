@@ -1,4 +1,6 @@
+from typing import Optional
 
+import pandas as pd
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader
@@ -13,22 +15,22 @@ class HGDPDataModule(LightningDataModule):
 
     def __init__(
         self,
-        files: dict,
         batch_size: int,
         num_workers: int,
         cache_dir: str,
+        files: dict = None,
         mmap_mode: str = None,
         precomputed_path: str = None,
+        metadata: Optional[pd.DataFrame] = None, 
         delimiter: str = ",",
         filter_qc: bool = False,
         filter_related: bool = False,
         test_all: bool = False,
         remove_recent_migration: bool = False,
         mode: str = None,
-
     ):
         """
-        Initializes the HGDPModule with configuration parameters.
+        Initializes the HGDPDataModule with configuration parameters.
         
         Args:
             files (dict): Paths for PLINK and metadata files.
@@ -41,17 +43,19 @@ class HGDPDataModule(LightningDataModule):
             filter_qc (Optional[bool]): Whether to filter samples based on quality control.
             filter_related (Optional[bool]): Whether to filter related samples.
             test_all (Optional[bool]): Whether to use all samples for testing.
-            remove_recent_migration (Optional[bool]): remove recently migrated samples.
-            mode (str): 'split' or 'full' mode. Former splits data into train/test according to indices, 
-            latter uses all data for both fit and transform operations.
-
-
+            remove_recent_migration (Optional[bool]): Remove recently migrated samples.
+            mode (str): 'split' or 'full' mode. 'split' splits data into train/test, 
+                        while 'full' uses the same data for both.
         """
         super().__init__()
-        self.files = files
+        
+        if metadata is not None:
+            self.metadata = metadata
+            
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cache_dir = cache_dir
+        self.files = files
         self.mmap_mode = mmap_mode
         self.delimiter = delimiter
         self.precomputed_path = precomputed_path
@@ -82,9 +86,8 @@ class HGDPDataModule(LightningDataModule):
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='full',
             )
-
             self.test_dataset = self.train_dataset
-            
+
         elif self.mode == 'split':
             self.train_dataset = HGDPDataset(
                 files=self.files,
@@ -98,7 +101,6 @@ class HGDPDataModule(LightningDataModule):
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='train',
             )
-
             self.test_dataset = HGDPDataset(
                 files=self.files,
                 cache_dir=self.cache_dir,
@@ -111,40 +113,38 @@ class HGDPDataModule(LightningDataModule):
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='test',
             )
-
         else:
             raise ValueError(f"Invalid mode '{self.mode}'. Use 'full' or 'split'.")
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_dataset, 
-                          batch_size=self.batch_size, 
-                          num_workers=self.num_workers,
-                          collate_fn=self._collate_fn)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self._collate_fn
+        )
 
     def val_dataloader(self) -> DataLoader:
-        # calls train directly, manage splitting logic later if required
-        return DataLoader(self.train_dataset, 
-                          batch_size=self.batch_size, 
-                          num_workers=self.num_workers,
-                          collate_fn=self._collate_fn)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self._collate_fn
+        )
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(self.test_dataset, 
-                          batch_size=self.batch_size, 
-                          num_workers=self.num_workers,
-                          collate_fn=self._collate_fn)
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=self._collate_fn
+        )
 
     @staticmethod
     def _collate_fn(batch):
-        raw_samples = [torch.tensor(sample["raw"], dtype=torch.float32) for sample in batch]
-        precomputed_samples = None
-        if batch[0]["precomputed"] is not None:
-            precomputed_samples = [torch.tensor(sample["precomputed"], dtype=torch.float32) for sample in batch]
-            precomputed_samples = torch.stack(precomputed_samples)
+        data_samples = [torch.tensor(sample["data"], dtype=torch.float32) for sample in batch]
+        data_samples = torch.stack(data_samples)
         metadata = [sample["metadata"] for sample in batch]
-        return torch.stack(raw_samples), precomputed_samples, metadata
-    
-    @property
-    def dims(self):
-        sample = self.train_dataset[0]
-        return sample["raw"].shape
+        return {"data": data_samples, "metadata": metadata}
+
+

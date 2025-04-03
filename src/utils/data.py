@@ -279,18 +279,13 @@ def subsample_data_and_dataset(
     
     return subsampled_ds, subsampled_embeddings
 
-def determine_data_source(loader) -> Tuple[int, str]:
-    """
-    Inspects one batch from the loader to determine which field is available.
-    Assumes each batch is a tuple (raw, precomputed, metadata).
-
-    Returns:
-        field_index (int): 0 if raw data is to be used, 1 if precomputed embeddings are available.
-        data_source (str): A descriptive string.
-    """
+def determine_data_source(loader) -> Tuple[str, str]:
     first_batch = next(iter(loader))
-    # first_batch is a tuple: (raw, precomputed, metadata)
-    if first_batch[1] is not None:
-        return 1, "precomputed embeddings"
+    if "precomputed" in first_batch and first_batch["precomputed"] is not None:
+        return "precomputed", "using precomputed embeddings"
+    elif "raw" in first_batch and first_batch["raw"] is not None:
+        return "raw", "using raw data"
+    elif "data" in first_batch and first_batch["data"] is not None:
+        return "data", "using unified data"
     else:
-        return 0, "raw data"
+        raise ValueError("No valid data source found in the first batch.")

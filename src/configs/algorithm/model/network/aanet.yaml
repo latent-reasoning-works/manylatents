@@ -1,5 +1,5 @@
 _target_: src.algorithms.networks.aanet.Vanilla
-input_shape: 100
+input_shape: null # must be currently specified from experiment 
 n_archetypes: 4
 layer_widths: [128, 128]
 activation_out: "tanh"

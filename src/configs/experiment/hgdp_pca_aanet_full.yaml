@@ -8,3 +8,8 @@ defaults:
   - override /metrics: hgdp_dr
 
 seed: 42
+
+algorithm:
+  model:
+    network:
+      input_shape: 2

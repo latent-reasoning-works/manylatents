@@ -3,13 +3,11 @@ import logging
 from typing import Any, Optional, Tuple, Union
 
 import hydra
-import numpy as np
 import torch
 from lightning import LightningDataModule, LightningModule, Trainer
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.utils.data import DummyDataModule, subsample_data_and_dataset
 from src.utils.utils import check_or_make_dirs
 
@@ -51,23 +49,6 @@ def instantiate_trainer(cfg: DictConfig) -> Trainer:
     trainer_config.pop("logger", None)
 
     return hydra.utils.instantiate(trainer_config, callbacks=callbacks, logger=loggers)
-
-def train_model(
-    cfg: DictConfig,
-    trainer: Trainer,
-    datamodule: Union[LightningDataModule, DataLoader],
-    model: torch.nn.Module,
-    embeddings: Optional[np.ndarray] = None,  # Allow None
-):
-    """
-    Train the model using PyTorch Lightning Trainer.
-    """
-    if model is None:
-        raise ValueError("No model was instantiated. Check your config under 'algorithm.network'.")
-
-    logger.info(f"Training model with embeddings: {embeddings is not None}") 
-    trainer.fit(model, datamodule=datamodule)
-
     
 @functools.singledispatch
 def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
@@ -79,59 +60,60 @@ def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
         f"There is no registered handler for evaluating algorithm {algorithm} of type "
         f"{type(algorithm)}! (kwargs: {kwargs})"
     )
-    
-@evaluate.register(DimensionalityReductionModule)
-def evaluate_dr(
-    algorithm: DimensionalityReductionModule,
+
+@evaluate.register(dict)
+def evaluate_embeddings(
+    embedding_container: dict,
     *,
     cfg: DictConfig,
     datamodule,
-    embeddings: Optional[np.ndarray] = None,
     **kwargs,
 ) -> dict:
+    if embedding_container is None or embedding_container.get("embeddings") is None:
+        logger.warning("No embeddings available for evaluation.")
+        return {}
     
     if datamodule.mode == "split":
         ds = datamodule.test_dataset
     else:
-        ds = datamodule.train_dataset
+        ds = datamodule.train_dataset ## defaults to full datset on full runs
 
-    # Subset the original data using the split indices for consistency.
-    original_data = ds.original_data[ds.split_indices[ds.data_split]]
-        
-    if original_data is None:
-        raise ValueError("No original data available for evaluation.")
-    
-    logger.info(f"Original data shape: {original_data.shape}")
-    logger.info(f"Computing DR metrics for {original_data.shape[0]} samples.")
-    
-    dr_metrics = {}
-    
-    # Retrieve the top-level metrics configuration.
+    # Use original_data as the reference if available;
+    # if not, fallback to precomputed_embeddings.
+    if ds.original_data is not None:
+        reference = ds.original_data[ds.split_indices[ds.data_split]]
+    elif ds.precomputed_embeddings is not None:
+        logger.warning("No raw data provided; using precomputed embeddings as reference for evaluation.")
+        reference = ds.precomputed_embeddings[ds.split_indices[ds.data_split]]
+    else:
+        raise ValueError("No valid reference data available for evaluation.")
+
+    logger.info(f"Reference data shape: {reference.shape}")
+    logger.info(f"Computing embedding metrics for {reference.shape[0]} samples.")
+
+    metrics = {}
     all_metrics_cfg = cfg.metrics
-    ds_subsample_fraction = all_metrics_cfg.get("subsample_fraction", None)
-    # Dataset-level metrics should be defined as a dict keyed by metric name.
     ds_metrics_cfg = all_metrics_cfg.get("dataset", {})
-    
+    ds_subsample_fraction = all_metrics_cfg.get("subsample_fraction", None)
+
     if ds_subsample_fraction is not None:
-        ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embeddings, ds_subsample_fraction)
+        ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embedding_container.get("embeddings"), ds_subsample_fraction)
         logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
     else:
-        ds_subsampled, embeddings_subsampled = ds, embeddings
+        ds_subsampled, embeddings_subsampled = ds, embedding_container.get("embeddings")
 
-    # Compute dataset-level metrics using the provided names.
     for metric_name, metric_config in ds_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
         result = metric_fn(ds_subsampled, embeddings_subsampled)
-        dr_metrics[metric_name] = result
+        metrics[metric_name] = result
 
-    # Compute module-level metrics similarly.
     module_metrics_cfg = all_metrics_cfg.get("module", {})
     for metric_name, metric_config in module_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
-        result = metric_fn(ds, embeddings)
-        dr_metrics[metric_name] = result
-        
-    return dr_metrics
+        result = metric_fn(ds, embedding_container.get("embeddings"))
+        metrics[metric_name] = result
+
+    return metrics
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(
@@ -140,7 +122,6 @@ def evaluate_lightningmodule(
     cfg: DictConfig,
     trainer: Trainer,
     datamodule: Union[LightningDataModule, DataLoader],
-    embeddings: Optional[any] = None,
     **kwargs,
 ) -> Tuple[dict, Optional[float]]:
     """

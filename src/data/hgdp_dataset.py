@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -60,23 +60,14 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          filter_related=filter_related,
                          test_all=test_all,
                          remove_recent_migration=remove_recent_migration)
-
+        
     def __getitem__(self, index: int) -> Any:
         real_idx = self.split_indices[self.data_split][index]
-        sample_raw = self.original_data[real_idx]
-        sample_precomputed = None
-        if self.precomputed_embeddings is not None:
-            sample_precomputed = self.precomputed_embeddings[real_idx]
-        
+        sample = self.data[real_idx]
         metadata_row = self.metadata.iloc[real_idx].to_dict()
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
-        
-        # Return a dict containing both raw and precomputed data.
-        return {
-            "raw": sample_raw,
-            "precomputed": sample_precomputed,
-            "metadata": metadata_row
-        }
+        return {"data": sample, "metadata": metadata_row}
+
 
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """

@@ -9,4 +9,5 @@ defaults:
   - trainer: null # instantiate only if network is being passed
   - experiment: null
 
-seed: 42
+seed: 2
+debug: false

@@ -14,7 +14,6 @@ from src.experiment import (
     evaluate,
     instantiate_datamodule,
     instantiate_trainer,
-    train_model,
 )
 from src.utils.data import determine_data_source
 from src.utils.utils import (
@@ -31,13 +30,15 @@ register_configs()
 def main(cfg: DictConfig):
     """
     Main entry point:
-      - Instantiates datamodule, algorithm, and trainer (if needed)
-      - Runs Dimensionality Reduction (DR) if specified and obtains embeddings
-      - Runs training and evaluation only if a neural network is provided
+      - Instantiates datamodule, algorithm, and trainer as needed.
+      - Computes embeddings either via DR or via a neural network’s encoder.
+      - Runs training and evaluation.      
       
-    Note: For network-only configurations, embeddings remain None at instantiation 
-    and should be extracted later from the trained model.
+    This version builds a unified embedding container (a dict with at least "embeddings")
+    that is passed to a unified evaluate() routine (registered for dict types) to compute
+    dataset-level and module-level metrics.
     """
+    
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
     
@@ -54,7 +55,7 @@ def main(cfg: DictConfig):
             wandb.run.config.update({k: v for k, v in os.environ.items() if k.startswith("SLURM")})
             ## log slurm variables; check if useful, usable across cluster envs
 
-    # Data instantiatoin
+    # Data instantiation
     datamodule = instantiate_datamodule(cfg)
     train_loader = datamodule.train_dataloader()
     test_loader = datamodule.test_dataloader()
@@ -66,68 +67,53 @@ def main(cfg: DictConfig):
         dr_module, lightning_module = None, None
         
     logger.info("Starting the experiment pipeline...")
-
-    dr_outputs = {}
-    dr_metrics = None
+    
+    # Containers for embedding and model evaluation metrics
+    embedding_metrics = {}
+    embedding_metrics["dr_metrics"] = None
+    embedding_metrics["latent_metrics"] = None
     model_metrics, model_error = None, None
+    
 
-    # ----------------------------- #
-    #  Dimensionality Reduction   #
-    # ----------------------------- #
+    # --- DR Embedding Computation ---
+    embedding_container = None
     if cfg.eval_only:
         logger.info("Evaluation-only mode (DR): Loading precomputed DR outputs.")
-        dr_outputs = load_precomputed_embeddings(cfg)
-        dr_embedding = dr_outputs.get("embeddings")
-        if hasattr(datamodule.test_dataset, "get_labels"):
-            dr_outputs["label"] = datamodule.test_dataset.get_labels()
-    else:
-        if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
-            ## Unroll train and test dataloaders to fit DR module
-            train_batches = [batch[field_index].cpu() for batch in train_loader]
-            train_tensor = torch.cat(train_batches, dim=0)
-            test_batches  = [batch[field_index].cpu() for batch in test_loader]
-            test_tensor = torch.cat(test_batches, dim=0)
-            logger.info(
+        embedding_container = load_precomputed_embeddings(cfg)
+    elif "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
+        # Unroll train and test dataloaders to obtain tensors.
+        ## To be replaced with a more efficient method.
+        train_batches = [batch[field_index].cpu() for batch in train_loader]
+        train_tensor = torch.cat(train_batches, dim=0)
+        test_batches  = [batch[field_index].cpu() for batch in test_loader]
+        test_tensor = torch.cat(test_batches, dim=0)
+        logger.info(
             f"Running Dimensionality Reduction (DR) on {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
         )
-       
-        if dr_module is None:
-            raise ValueError(
-                "Dimensionality reduction module is not instantiated."
-                "Please ensure that 'dimensionality_reduction' is properly configured in your algorithm config,"
-                "or set 'eval_only: true' to load precomputed embeddings."
-            )
-            
+
         dr_module.fit(train_tensor)
-        dr_embedding = dr_module.transform(test_tensor)
-        logger.info(f"Embedding completed with shape: {dr_embedding.shape}")
-        if hasattr(datamodule.test_dataset, "get_labels"):
-            dr_labels = datamodule.test_dataset.get_labels()
-        else:
-            dr_labels = None
-            
-        dr_metrics = evaluate(
-            dr_module,
+        embeddings = dr_module.transform(test_tensor)
+        logger.info(f"DR embedding completed with shape: {embeddings.shape}")
+        dr_labels = datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None
+
+        embedding_container = {
+            "embeddings": embeddings,
+            "label": dr_labels,
+            "metadata": {"source": "DR", "data_shape": test_tensor.shape},
+        }
+
+    if embedding_container is not None: ## fails if no embeddings are computed/loaded
+        logger.info("Evaluating embeddings (from DR output)...")
+        embedding_metrics["dr_metrics"] = evaluate(
+            embedding_container,
             cfg=cfg,
             datamodule=datamodule,
-            embeddings=dr_embedding,
         )
-
-        logger.info(f"DR Metrics: {dr_metrics}")
-        dr_outputs = {
-            "embeddings": dr_embedding,
-            "label": dr_labels,
-            "scores": dr_metrics,
-            "metadata": None, ## change
-        }                
-
-    # ----------------------------- #
-    #         Lightning Model     #
-    # ----------------------------- #
+    # --- Neural Network (Lightning) setup and evaluation ---
+    model_metrics, model_error = None, None
     if "model" in cfg.algorithm and cfg.algorithm.model is not None:
-        # In eval-only mode, if a pretrained checkpoint is provided, load it.
         if cfg.eval_only and cfg.pretrained_ckpt:
             logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
             lightning_module = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
@@ -138,7 +124,7 @@ def main(cfg: DictConfig):
         
         if not cfg.eval_only:
             logger.info("Running training...")
-            train_model(cfg, trainer, datamodule, lightning_module, dr_embedding)
+            trainer.fit(lightning_module, datamodule=datamodule)
         
         logger.info("Running model evaluation.")
         model_metrics, model_error = evaluate(
@@ -146,35 +132,52 @@ def main(cfg: DictConfig):
             cfg=cfg,
             trainer=trainer,
             datamodule=datamodule,
-            embeddings=dr_embedding,
         )
-        if model_metrics:
-            model_error = next(iter(model_metrics.values()))
         logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
-    else:
-        lightning_module = None  
         
-    # ----------------------------- #
-    #         Callbacks           #
-    # ----------------------------- #
-    
+    # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---    
+    if lightning_module is not None and hasattr(lightning_module, "encode"):
+        logger.info("Extracting latent embeddings using the network's encoder...")
+        test_batches = [batch["data"].cpu() for batch in test_loader]
+        test_tensor = torch.cat(test_batches, dim=0)
+        latent_embeddings = lightning_module.encode(test_tensor)
+        if isinstance(latent_embeddings, torch.Tensor):
+            latent_embeddings = latent_embeddings.detach().cpu().numpy()
+        logger.info(f"Latent embeddings shape: {latent_embeddings.shape}")
+        latent_container = {
+            "embeddings": latent_embeddings,
+            "metadata": {"source": "latent", "data_shape": test_tensor.shape},
+        }
+        
+        logger.info("Evaluating embeddings (from encoder output)...")
+        embedding_metrics["latent_metrics"] = evaluate(
+            latent_container,
+            cfg=cfg,
+            datamodule=datamodule,
+        )
+
+    # --- Callbacks ---
     callback_outputs = []
-    
-    if "dimensionality_reduction" in cfg.callbacks and dr_outputs:
+    if "dimensionality_reduction" in cfg.callbacks and embedding_container is not None:
         dr_callbacks = cfg.callbacks.dimensionality_reduction
         for name, cb_cfg in dr_callbacks.items():
             dr_callback = hydra.utils.instantiate(cb_cfg)
             if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-                output = dr_callback.on_dr_end(dataset=datamodule.test_dataset, dr_outputs=dr_outputs)
+                output = dr_callback.on_dr_end(dataset=datamodule.test_dataset, dr_outputs=embedding_container)
                 callback_outputs.append((name, output))
             else:
                 logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
-
+    
+    # --- Aggregate embedding and model metrics ---
+    ## Model_error isn't being aggregated, check if lightning
+    ## logging callbakc automatically does this, if so, 
+    ## aggregated metrics is only for callback outputs/embeddings.
     aggregated_metrics = aggregate_metrics(
-        dr_metrics=dr_outputs.get("scores"),
-        model_metrics=model_metrics if model_metrics else None,
+        dr_metrics=embedding_metrics["dr_metrics"],
+        latent_metrics=embedding_metrics["latent_metrics"],
+        model_metrics=model_metrics,
         model_error=model_error,
-        callback_outputs=callback_outputs
+        callback_outputs=callback_outputs,
     )
     
     logger.info(f"Aggregated metrics: {aggregated_metrics}")
@@ -187,9 +190,7 @@ def main(cfg: DictConfig):
     
     assert aggregated_metrics is not None
     logger.info("Experiment complete.")
-    
     return aggregated_metrics
-
 
 def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
     dr_module = None

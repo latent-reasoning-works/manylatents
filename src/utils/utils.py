@@ -157,6 +157,7 @@ def setup_logging(debug: bool = False):
 
 def aggregate_metrics(
     dr_metrics: dict = None,
+    latent_metrics: dict = None,
     model_metrics: dict = None,
     model_error: float = None,
     callback_outputs: list = None
@@ -170,15 +171,17 @@ def aggregate_metrics(
     """
     aggregated_metrics = {}
 
-    # Merge DR metrics.
     if dr_metrics:
         aggregated_metrics.update(dr_metrics)
 
-    # Merge network (model) metrics.
+    if latent_metrics:
+        aggregated_metrics.update(latent_metrics)
+        
     if model_metrics:
         aggregated_metrics.update(model_metrics)
+        
+    ## model_error: is the lightning callback handling this? Verify
 
-    ## why is this here? may have to move to a different function/main
     # Process any callback outputs.
     if callback_outputs:
         for name, output in callback_outputs:
@@ -258,6 +261,6 @@ def load_precomputed_embeddings(cfg) -> dict:
     return {
         "embeddings": embeddings,
         "label": None,
+        "metadata": None,
         "scores": None,
-        "metadata": None
     }
