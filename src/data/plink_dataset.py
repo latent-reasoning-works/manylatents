@@ -59,6 +59,8 @@ class PlinkDataset(Dataset):
         self.cache_dir = cache_dir 
         self.mmap_mode = mmap_mode
         self.delimiter = delimiter
+        self.admixture_path = files['admixture']
+        self.admixture_ks = files['admixture_K'].split(',') if len(files['admixture_K']) > 0 else None
 
         if files is not None and "plink" in files:
             self.plink_path = files["plink"]
@@ -77,6 +79,8 @@ class PlinkDataset(Dataset):
         else:
             raise ValueError("Must provide either a files dict or metadata directly.")
  
+        self.admixture_ratios = self.load_admixture_ratios(self.admixture_path, self.admixture_ks)
+
         # get properties
         self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
         self._latitude = self.extract_latitude()
@@ -128,7 +132,10 @@ class PlinkDataset(Dataset):
             self._qc_filter_indices = self._qc_filter_indices[idx]
             self._related_indices = self._related_indices[idx]
             self._geographic_preservation_indices = self._geographic_preservation_indices[idx]
-                
+
+            for K in self.admixture_ratios.keys():
+                self.admixture_ratios[K] = self.admixture_ratios[K].iloc[idx].copy()
+
             # Update split_indices to an identity mapping.
             self.split_indices = {self.data_split: np.arange(len(self.metadata))}
 
@@ -198,6 +205,17 @@ class PlinkDataset(Dataset):
         """
         logger.info(f"Loading metadata from: {metadata_path}")
         return pd.read_csv(metadata_path, delimiter=self.delimiter)
+    
+    def load_admixture_ratios(self, admixture_path, admixture_Ks) -> dict:
+        """
+        Loads admixture ratios
+        """
+        admixture_ratio_dict = {}
+        if admixture_Ks is not None:
+            list_of_files = [admixture_path.replace('{K}', K) for K in admixture_Ks]
+            for file, K in zip(list_of_files, admixture_Ks):
+                admixture_ratio_dict[K] = pd.read_csv(file, sep='\t', header=None)
+        return admixture_ratio_dict
 
     def __len__(self) -> int:
         return len(self.split_indices[self.data_split])

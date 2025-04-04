@@ -2,10 +2,7 @@ defaults:
 - _self_
 - dataset:
   - geographic_preservation
+  - admixture_preservation
 - module:
   - trustworthiness
-  - fractal_dimension
-  - lid
-  - persistent_homology
-  - tangent_space 
-subsample_fraction: 0.05
+subsample_fraction: null
