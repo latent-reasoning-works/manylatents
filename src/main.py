@@ -67,19 +67,12 @@ def main(cfg: DictConfig):
         dr_module, lightning_module = None, None
         
     logger.info("Starting the experiment pipeline...")
-    
-    # Containers for embedding and model evaluation metrics
-    embedding_metrics = {}
-    embedding_metrics["dr_metrics"] = None
-    embedding_metrics["latent_metrics"] = None
-    model_metrics, model_error = None, None
-    
-
+        
     # --- DR Embedding Computation ---
-    embedding_container = None
+    embeddings = None
     if cfg.eval_only:
         logger.info("Evaluation-only mode (DR): Loading precomputed DR outputs.")
-        embedding_container = load_precomputed_embeddings(cfg)
+        embeddings = load_precomputed_embeddings(cfg)
     elif "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         # Unroll train and test dataloaders to obtain tensors.
         ## To be replaced with a more efficient method.
@@ -94,23 +87,24 @@ def main(cfg: DictConfig):
         )
 
         dr_module.fit(train_tensor)
-        embeddings = dr_module.transform(test_tensor)
-        logger.info(f"DR embedding completed with shape: {embeddings.shape}")
+        _embeddings = dr_module.transform(test_tensor)
+        logger.info(f"DR embedding completed with shape: {_embeddings.shape}")
         dr_labels = datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None
-
-        embedding_container = {
-            "embeddings": embeddings,
+        ## conforms to EmbeddingOutputs interface
+        embeddings = {
+            "embeddings": _embeddings,
             "label": dr_labels,
             "metadata": {"source": "DR", "data_shape": test_tensor.shape},
         }
 
-    if embedding_container is not None: ## fails if no embeddings are computed/loaded
+    if embeddings is not None:
         logger.info("Evaluating embeddings (from DR output)...")
-        embedding_metrics["dr_metrics"] = evaluate(
-            embedding_container,
+        embeddings["scores"] = evaluate(
+            embeddings,
             cfg=cfg,
             datamodule=datamodule,
         )
+        
     # --- Neural Network (Lightning) setup and evaluation ---
     model_metrics, model_error = None, None
     if "model" in cfg.algorithm and cfg.algorithm.model is not None:
@@ -135,46 +129,45 @@ def main(cfg: DictConfig):
         )
         logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
         
-    # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---    
+    # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---
+    latent_embeddings = None    
     if lightning_module is not None and hasattr(lightning_module, "encode"):
         logger.info("Extracting latent embeddings using the network's encoder...")
         test_batches = [batch["data"].cpu() for batch in test_loader]
         test_tensor = torch.cat(test_batches, dim=0)
-        latent_embeddings = lightning_module.encode(test_tensor)
-        if isinstance(latent_embeddings, torch.Tensor):
-            latent_embeddings = latent_embeddings.detach().cpu().numpy()
-        logger.info(f"Latent embeddings shape: {latent_embeddings.shape}")
-        latent_container = {
-            "embeddings": latent_embeddings,
+        _latent_embeddings = lightning_module.encode(test_tensor)
+        if isinstance(_latent_embeddings, torch.Tensor):
+            _latent_embeddings = _latent_embeddings.detach().cpu().numpy()
+        logger.info(f"Latent embeddings shape: {_latent_embeddings.shape}")
+        latent_embeddings = {
+            "embeddings": _latent_embeddings,
             "metadata": {"source": "latent", "data_shape": test_tensor.shape},
         }
         
         logger.info("Evaluating embeddings (from encoder output)...")
-        embedding_metrics["latent_metrics"] = evaluate(
-            latent_container,
+        latent_embeddings["scores"] = evaluate(
+            latent_embeddings,
             cfg=cfg,
             datamodule=datamodule,
         )
 
     # --- Callbacks ---
     callback_outputs = []
-    if "dimensionality_reduction" in cfg.callbacks and embedding_container is not None:
+    if "dimensionality_reduction" in cfg.callbacks and embeddings is not None:
         dr_callbacks = cfg.callbacks.dimensionality_reduction
         for name, cb_cfg in dr_callbacks.items():
             dr_callback = hydra.utils.instantiate(cb_cfg)
             if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-                output = dr_callback.on_dr_end(dataset=datamodule.test_dataset, dr_outputs=embedding_container)
+                output = dr_callback.on_dr_end(dataset=datamodule.test_dataset, 
+                                               embeddings=embeddings)
                 callback_outputs.append((name, output))
             else:
                 logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
     
     # --- Aggregate embedding and model metrics ---
-    ## Model_error isn't being aggregated, check if lightning
-    ## logging callbakc automatically does this, if so, 
-    ## aggregated metrics is only for callback outputs/embeddings.
     aggregated_metrics = aggregate_metrics(
-        dr_metrics=embedding_metrics["dr_metrics"],
-        latent_metrics=embedding_metrics["latent_metrics"],
+        dr_scores=embeddings.get("scores") if embeddings is not None else None,
+        latent_scores=latent_embeddings.get("scores") if latent_embeddings is not None else None,
         model_metrics=model_metrics,
         model_error=model_error,
         callback_outputs=callback_outputs,

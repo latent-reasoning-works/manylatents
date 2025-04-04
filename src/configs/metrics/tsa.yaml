@@ -1,4 +1,4 @@
 defaults:
 - _self_
-- module:
+- embedding:
   - tangent_space 

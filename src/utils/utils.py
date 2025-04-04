@@ -156,32 +156,26 @@ def setup_logging(debug: bool = False):
     logger.addHandler(console_handler)
 
 def aggregate_metrics(
-    dr_metrics: dict = None,
-    latent_metrics: dict = None,
+    dr_scores: dict = None,
+    latent_scores: dict = None,
     model_metrics: dict = None,
-    model_error: float = None,
+    model_error: dict = None,
     callback_outputs: list = None
 ) -> dict:
-    """
-    Aggregates metrics from DR evaluation, network evaluation, and callbacks,
-    and logs them to wandb if a run is active.
-    
-    Returns:
-        A dictionary containing all aggregated metrics.
-    """
     aggregated_metrics = {}
 
-    if dr_metrics:
-        aggregated_metrics.update(dr_metrics)
+    if dr_scores:
+        aggregated_metrics.update(dr_scores)
 
-    if latent_metrics:
-        aggregated_metrics.update(latent_metrics)
-        
+    if latent_scores:
+        aggregated_metrics.update(latent_scores)
+
     if model_metrics:
         aggregated_metrics.update(model_metrics)
-        
-    ## model_error: is the lightning callback handling this? Verify
-
+    
+    if model_error:
+        aggregated_metrics.update(model_error)
+    
     # Process any callback outputs.
     if callback_outputs:
         for name, output in callback_outputs:

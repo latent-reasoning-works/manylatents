@@ -1,6 +1,6 @@
 defaults:
 - dataset: null
-- module:
+- embedding:
   - trustworthiness
   - fractal_dimension
   - lid

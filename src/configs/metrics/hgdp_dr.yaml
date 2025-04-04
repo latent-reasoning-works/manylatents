@@ -3,6 +3,6 @@ defaults:
 - dataset:
   - geographic_preservation
   - admixture_preservation
-- module:
+- embedding:
   - trustworthiness
 subsample_fraction: null

@@ -4,5 +4,5 @@ plot_embeddings:
   experiment_name: "${name}.png"
   figsize: [8, 6]
   legend: false
-  color_by_score: None #tangent_space
+  color_by_score: null
 

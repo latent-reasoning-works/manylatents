@@ -6,15 +6,16 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import scprep
+from matplotlib.colors import ListedColormap
 
 import wandb
-from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
+from src.callbacks.dimensionality_reduction.base import EmbeddingCallback
 from src.data.hgdp_dataset import HGDPDataset
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 
 logger = logging.getLogger(__name__)
 
-class PlotEmbeddings(DimensionalityReductionCallback):
+class PlotEmbeddings(EmbeddingCallback):
     def __init__(
         self,
         save_dir: str = "outputs",
@@ -60,7 +61,10 @@ class PlotEmbeddings(DimensionalityReductionCallback):
             f"PlotEmbeddings initialized with directory: {self.save_dir} and experiment name: {self.experiment_name}"
         )
 
-    def _get_colormap(self, dataset: any) -> str:
+    def _get_colormap(self, dataset: any) -> any:
+        if self.color_by_score == "tangent_space":
+            # Define discrete colors for the two categories (adjust colors as needed)
+            return ListedColormap(["#1f77b4", "#ff7f0e"])
         if self.color_by_score is not None:
             return "viridis"
         return cmap_pop_HGDP if isinstance(dataset, HGDPDataset) else "viridis"
@@ -103,17 +107,18 @@ class PlotEmbeddings(DimensionalityReductionCallback):
             color_array = np.asarray(color_array)
             return color_array[1:]
         return None
-
+    
     def _plot_embeddings(self, dataset: any, embeddings_to_plot: np.ndarray, color_array: np.ndarray) -> str:
         cmap = self._get_colormap(dataset)
         fig_size = (self.figsize[0], self.figsize[1])
-
+        
         norm = None
-        if self.color_by_score is not None and color_array is not None and self.apply_norm:
+        # For continuous scores, you may want to normalize. For tangent_space (categorical), skip normalization.
+        if self.color_by_score is not None and self.color_by_score != "tangent_space" and color_array is not None and self.apply_norm:
             score_min = float(color_array.min())
             score_max = float(color_array.max())
             norm = mcolors.Normalize(vmin=score_min, vmax=score_max)
-
+        
         ax = scprep.plot.scatter2d(
             embeddings_to_plot,
             s=8,
@@ -130,37 +135,47 @@ class PlotEmbeddings(DimensionalityReductionCallback):
             label_prefix=None,
             title='',
             fontsize=36,
-            alpha=self.alpha  # pass the alpha value here
+            alpha=self.alpha
         )
-
+        
         if norm is not None and ax.collections:
             mappable = ax.collections[0]
             mappable.set_norm(norm)
             mappable.set_array(np.asarray(color_array))
-
+        
         plt.xlabel(self.x_label, fontsize=12)
         plt.ylabel(self.y_label, fontsize=12)
         plt.title(self.title, fontsize=16)
-
-        if self.color_by_score is not None and ax.collections:
+        
+        # For tangent_space, create a categorical legend
+        if self.color_by_score == "tangent_space":
+            from matplotlib.patches import Patch
+            # Adjust the colors to match those returned by _get_colormap (ListedColormap)
+            legend_elements = [
+                Patch(facecolor="#1f77b4", label="Tangent Space: 1"),
+                Patch(facecolor="#ff7f0e", label="Tangent Space: 2")
+            ]
+            plt.legend(handles=legend_elements, loc='upper right')
+        elif self.color_by_score is not None and ax.collections:
+            # For continuous scores, create a colorbar
             mappable = ax.collections[0]
             cbar = plt.colorbar(mappable)
             cbar.set_label(f"{self.color_by_score} Score")
-
+        
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
         self.save_path = os.path.join(self.save_dir, filename)
-
+        
         plt.savefig(self.save_path, bbox_inches="tight")
         plt.close()
         logger.info(f"Saved 2D embeddings plot to {self.save_path}")
-
+        
         if wandb.run is not None:
             wandb.log({"embedding_plot": wandb.Image(self.save_path)})
-
+        
         return self.save_path
 
-    def on_dr_end(self, dataset: any, dr_outputs: dict) -> str:
-        embeddings_to_plot = self._get_embeddings(dr_outputs)
-        color_array = self._get_color_array(dataset, dr_outputs)
+    def on_dr_end(self, dataset: any, embeddings: dict) -> str:
+        embeddings_to_plot = self._get_embeddings(embeddings)
+        color_array = self._get_color_array(dataset, embeddings)
         return self._plot_embeddings(dataset, embeddings_to_plot, color_array)

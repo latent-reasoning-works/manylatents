@@ -4,7 +4,7 @@
 
 from typing import List
 
-from src.callbacks.base import BaseCallback
+from src.callbacks.cb_base import BaseCallback
 
 
 class CompositeCallback(BaseCallback):

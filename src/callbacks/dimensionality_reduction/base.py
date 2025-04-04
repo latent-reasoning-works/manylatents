@@ -10,28 +10,27 @@ from src.callbacks.base import BaseCallback
 
 logger = logging.getLogger(__name__)
 
-class DimensionalityReductionOutputs(TypedDict, total=False):
+class EmbeddingOutputs(TypedDict, total=False):
     """
-    Defines the minimal output contract for DR models.
-    All DimensionalityReduction modules should return at least an 'embeddings' tensor,
-    along with optional 'loss' and 'label' entries.
+    Defines the minimal output contract for embedding methods.
+    All embedding modules (DR or NN encoders) should return at least an 'embeddings' array,
+    along with optional 'label', 'scores', and 'metadata' entries.
     """
-    
     embeddings: np.ndarray
-    """Reduced embeddings from the model, e.g. PHATE, UMAP, PCA."""
+    """Reduced embeddings from the model, e.g. UMAP, PCA, or an encoder output."""
     
     label: NotRequired[Tensor]
     """Optional labels for the embeddings, if available."""
     
     scores: NotRequired[np.ndarray]
-    """Optional scores for the embeddings, if available."""
+    """Optional scores for the embeddings, if available (e.g. tangent_space values)."""
     
     metadata: NotRequired[Any]
     """Optional metadata to be saved with the embeddings."""
     
-class DimensionalityReductionCallback(BaseCallback, ABC):
+class EmbeddingCallback(BaseCallback, ABC):
     @abstractmethod
-    def on_dr_end(self, dataset: Any, dr_outputs: DimensionalityReductionOutputs) -> Any:
+    def on_dr_end(self, dataset: Any, embeddings: EmbeddingOutputs) -> Any:
         """
         Called when the Dimensionality Reduction process is complete.
         

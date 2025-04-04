@@ -59,9 +59,11 @@ class PlinkDataset(Dataset):
         self.cache_dir = cache_dir 
         self.mmap_mode = mmap_mode
         self.delimiter = delimiter
-        self.admixture_path = files['admixture']
-        self.admixture_ks = files['admixture_K'].split(',') if len(files['admixture_K']) > 0 else None
+        self.admixture_path = files.get('admixture', None)
+        admixture_K_str = files.get('admixture_K', '')
+        self.admixture_ks = admixture_K_str.split(',') if len(admixture_K_str) > 0 else None
 
+        # Then, for the rest of the data loading, follow your current pattern.
         if files is not None and "plink" in files:
             self.plink_path = files["plink"]
             self.metadata_path = files["metadata"]
