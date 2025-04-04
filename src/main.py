@@ -90,8 +90,7 @@ def main(cfg: DictConfig):
         _embeddings = dr_module.transform(test_tensor)
         logger.info(f"DR embedding completed with shape: {_embeddings.shape}")
         dr_labels = datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None
-        ## conforms to EmbeddingOutputs interface
-        embeddings = {
+        embeddings = {## conforms to EmbeddingOutputs interface
             "embeddings": _embeddings,
             "label": dr_labels,
             "metadata": {"source": "DR", "data_shape": test_tensor.shape},
@@ -139,8 +138,9 @@ def main(cfg: DictConfig):
         if isinstance(_latent_embeddings, torch.Tensor):
             _latent_embeddings = _latent_embeddings.detach().cpu().numpy()
         logger.info(f"Latent embeddings shape: {_latent_embeddings.shape}")
-        latent_embeddings = {
+        latent_embeddings = {## conforms to EmbeddingOutputs interface
             "embeddings": _latent_embeddings,
+            "label": datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None,
             "metadata": {"source": "latent", "data_shape": test_tensor.shape},
         }
         

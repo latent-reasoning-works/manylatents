@@ -283,6 +283,13 @@ class PlinkDataset(Dataset):
         Returns the original, unbatched data.
         """
         return self.original_data
+    
+    @property ## TEST FUNCTION, SHOULD BE REMOVED/HOMOGENIZED W.R.T METRICS E.G. PEARSON_CORRELATION
+    def get_data(self) -> np.ndarray:
+        """
+        Returns the passed data, whether embeddings or raw data, as assigned
+        """
+        return self.data
 
     @property
     def latitude(self) -> pd.Series:

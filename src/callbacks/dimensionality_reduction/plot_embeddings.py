@@ -152,8 +152,8 @@ class PlotEmbeddings(EmbeddingCallback):
             from matplotlib.patches import Patch
             # Adjust the colors to match those returned by _get_colormap (ListedColormap)
             legend_elements = [
-                Patch(facecolor="#1f77b4", label="Tangent Space: 1"),
-                Patch(facecolor="#ff7f0e", label="Tangent Space: 2")
+                Patch(facecolor="#1f77b4", label="Dim ~ 1"),
+                Patch(facecolor="#ff7f0e", label="Dim ~ 2")
             ]
             plt.legend(handles=legend_elements, loc='upper right')
         elif self.color_by_score is not None and ax.collections:

@@ -1,4 +1,0 @@
-defaults:
-- _self_
-- embedding:
-  - tangent_space 

@@ -63,13 +63,13 @@ def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
 
 @evaluate.register(dict)
 def evaluate_embeddings(
-    embedding_container: dict,
+    EmbeddingOutputs: dict,
     *,
     cfg: DictConfig,
     datamodule,
     **kwargs,
 ) -> dict:
-    if embedding_container is None or embedding_container.get("embeddings") is None:
+    if EmbeddingOutputs is None or EmbeddingOutputs.get("embeddings") is None:
         logger.warning("No embeddings available for evaluation.")
         return {}
     
@@ -97,20 +97,20 @@ def evaluate_embeddings(
     ds_subsample_fraction = all_metrics_cfg.get("subsample_fraction", None)
 
     if ds_subsample_fraction is not None:
-        ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, embedding_container.get("embeddings"), ds_subsample_fraction)
+        ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, EmbeddingOutputs.get("embeddings"), ds_subsample_fraction)
         logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
     else:
-        ds_subsampled, embeddings_subsampled = ds, embedding_container.get("embeddings")
+        ds_subsampled, embeddings_subsampled = ds, EmbeddingOutputs.get("embeddings")
 
     for metric_name, metric_config in ds_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
         result = metric_fn(ds_subsampled, embeddings_subsampled)
         metrics[metric_name] = result
 
-    module_metrics_cfg = all_metrics_cfg.get("module", {})
+    module_metrics_cfg = all_metrics_cfg.get("embedding", {})
     for metric_name, metric_config in module_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
-        result = metric_fn(ds, embedding_container.get("embeddings"))
+        result = metric_fn(ds, EmbeddingOutputs.get("embeddings"))
         metrics[metric_name] = result
 
     return metrics

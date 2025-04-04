@@ -13,8 +13,8 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      algorithm.dimensionality_reduction.n_neighbors: 3, 5, 10, 20, 50, 80, 100, 200, 500, 750, 1000, 1250, 1500, 2000, 3000, 4149 
-      metrics.embedding.tangent_space.n_neighbors: 5, 10, 15, 20, 30, 50
+      algorithm.dimensionality_reduction.n_neighbors: 3, 5 
+      metrics.embedding.tangent_space.n_neighbors: 5, 10 
 
 callbacks:
   dimensionality_reduction:
