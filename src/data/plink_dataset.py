@@ -63,14 +63,13 @@ class PlinkDataset(Dataset):
         admixture_K_str = files.get('admixture_K', '')
         self.admixture_ks = admixture_K_str.split(',') if len(admixture_K_str) > 0 else None
 
-        # Then, for the rest of the data loading, follow your current pattern.
+        # Step 1: Load metadata
         if files is not None and "plink" in files:
             self.plink_path = files["plink"]
             self.metadata_path = files["metadata"]
             if self.metadata_path is None:
                 raise ValueError("Metadata path must be provided in the files dict.")
             self.metadata = self.load_metadata(self.metadata_path)
-            self.original_data = self.load_or_convert_data()
         elif files is not None and "metadata" in files:
             # Only metadata is provided; no raw data available.
             self.metadata = self.load_metadata(files["metadata"])
@@ -80,10 +79,9 @@ class PlinkDataset(Dataset):
             self.original_data = None
         else:
             raise ValueError("Must provide either a files dict or metadata directly.")
- 
-        self.admixture_ratios = self.load_admixture_ratios(self.admixture_path, self.admixture_ks)
 
-        # get properties
+        # Step 2: Extract metadata-derived properties
+        self.admixture_ratios = self.load_admixture_ratios(self.admixture_path, self.admixture_ks)
         self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
         self._latitude = self.extract_latitude()
         self._longitude = self.extract_longitude()
@@ -91,6 +89,7 @@ class PlinkDataset(Dataset):
         self._qc_filter_indices = self.extract_qc_filter_indices()
         self._related_indices = self.extract_related_indices()
 
+        # Step 3: Extract indices
         self.fit_idx, self.trans_idx = self.extract_indices(filter_qc,
                                                             filter_related,
                                                             test_all,
@@ -102,9 +101,10 @@ class PlinkDataset(Dataset):
             'full': np.arange(len(self.metadata))
         }
 
-        if self.original_data is not None:
+        # Step 4: Load or convert raw data
+        if getattr(self, "plink_path", None) is not None:
             self.original_data = self.load_or_convert_data()
-            
+
         # Load precomputed embeddings using the mixin, if provided.
         self.precomputed_path = precomputed_path
         self.precomputed_embeddings = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
