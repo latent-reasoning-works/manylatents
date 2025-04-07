@@ -1,5 +1,5 @@
 # @package _global_
-name: hgdp_pca_full_n_components=${algorithm.dimensionality_reduction.n_components}
+name: hgdp_pca_n_components=${algorithm.dimensionality_reduction.n_components}
 
 defaults:
   - override /algorithm/dimensionality_reduction: pca
@@ -11,4 +11,7 @@ seed: 42
 
 algorithm:
   dimensionality_reduction:
-    n_components: 2
+    n_components: 50
+
+data:
+  filter_related: true # no fitting on related samples

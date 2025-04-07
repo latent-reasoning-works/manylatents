@@ -1,9 +1,9 @@
 # @package _global_
-name: hgdp_pca_full_n_components=${algorithm.dimensionality_reduction.n_components}
+name: hgdp_pca_umap
 
 defaults:
-  - override /algorithm/dimensionality_reduction: pca
-  - override /data: hgdp
+  - override /algorithm/dimensionality_reduction: umap
+  - override /data: hgdp_pca_precomputed
   - override /callbacks/dimensionality_reduction: default
   - override /metrics: hgdp_dr
   
