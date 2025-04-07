@@ -216,7 +216,8 @@ class PlinkDataset(Dataset):
         if admixture_Ks is not None:
             list_of_files = [admixture_path.replace('{K}', K) for K in admixture_Ks]
             for file, K in zip(list_of_files, admixture_Ks):
-                admixture_ratio_dict[K] = pd.read_csv(file, sep='\t', header=None)
+                # only keep admixture info + sample IDs. Drop other columns
+                admixture_ratio_dict[K] = pd.read_csv(file, sep='\t', header=None).iloc[:, :-2]
         return admixture_ratio_dict
 
     def __len__(self) -> int:
