@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def PearsonCorrelation(dataset, embeddings: np.ndarray,
                        return_per_sample: bool = False, 
-                       num_dists: int = 50000) -> float:
+                       num_dists: int = 100) -> float:
     """
     Compute the Pearson correlation between pairwise distances in the 
     original high-dimensional data and the low-dimensional embeddings.

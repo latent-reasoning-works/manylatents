@@ -37,7 +37,7 @@ class PlotEmbeddings(EmbeddingCallback):
             figsize (tuple): Figure size (width, height).
             label_col (str): Column name in metadata to use for labels (fallback).
             legend (bool): Whether to include a legend.
-            color_by_score (str): Optional key in dr_outputs to use for continuous score-based coloring.
+            color_by_score (str): Optional key in embeddings to use for continuous score-based coloring.
             x_label (str): Label for the x-axis.
             y_label (str): Label for the y-axis.
             title (str): Title for the plot.
@@ -69,8 +69,8 @@ class PlotEmbeddings(EmbeddingCallback):
             return "viridis"
         return cmap_pop_HGDP if isinstance(dataset, HGDPDataset) else "viridis"
 
-    def _get_embeddings(self, dr_outputs: dict) -> np.ndarray:
-        embeddings = dr_outputs["embeddings"]
+    def _get_embeddings(self, embeddings: dict) -> np.ndarray:
+        embeddings = embeddings["embeddings"]
         if hasattr(embeddings, "numpy"):
             emb_np = embeddings.numpy()
         else:
@@ -78,27 +78,27 @@ class PlotEmbeddings(EmbeddingCallback):
         embeddings_to_plot = emb_np[:, :2] if emb_np.shape[1] > 2 else emb_np
         return embeddings_to_plot[1:]
 
-    def _get_color_array(self, dataset: any, dr_outputs: dict) -> np.ndarray:
+    def _get_color_array(self, dataset: any, embeddings: dict) -> np.ndarray:
         color_array = None
         if self.color_by_score is not None:
-            scores = dr_outputs.get("scores")
+            scores = embeddings.get("scores")
             if scores is not None and isinstance(scores, dict):
                 color_array = scores.get(self.color_by_score)
             else:
-                color_array = dr_outputs.get(self.color_by_score)
+                color_array = embeddings.get(self.color_by_score)
             if color_array is None:
                 logger.warning(
-                    f"Coloring key '{self.color_by_score}' not found in dr_outputs; falling back to label-based coloring."
+                    f"Coloring key '{self.color_by_score}' not found in embeddings; falling back to label-based coloring."
                 )
-                if "label" in dr_outputs and dr_outputs["label"] is not None:
-                    color_array = dr_outputs["label"]
+                if "label" in embeddings and embeddings["label"] is not None:
+                    color_array = embeddings["label"]
                 else:
                     color_array = dataset.get_labels(self.label_col)
             else:
                 logger.info(f"Using '{self.color_by_score}' for coloring.")
         else:
-            if "label" in dr_outputs and dr_outputs["label"] is not None:
-                color_array = dr_outputs["label"]
+            if "label" in embeddings and embeddings["label"] is not None:
+                color_array = embeddings["label"]
             else:
                 color_array = dataset.get_labels(self.label_col)
         if color_array is not None:
