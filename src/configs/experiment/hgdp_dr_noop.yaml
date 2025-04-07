@@ -1,0 +1,13 @@
+# @package _global_
+name: hgdp_dr_noop
+
+defaults:
+  - override /algorithm/dimensionality_reduction: dr_noop
+  - override /data: hgdp_split
+  - override /callbacks/dimensionality_reduction: default
+  - override /metrics: tsa_pearson
+
+seed: 42
+
+data:
+  filter_related: true # consistency with hgdp_pca

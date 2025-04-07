@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def TangentSpaceApproximation(dataset, 
                               embeddings: np.ndarray, 
-                              n_neighbors: int = 10, 
+                              n_neighbors: int = 15,
                               variance_threshold: float = 0.95, 
                               return_per_sample: bool = False) -> Union[float, np.ndarray]:
     """

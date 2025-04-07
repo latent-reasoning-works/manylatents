@@ -1,6 +1,6 @@
 tangent_space:
   _target_: src.metrics.tangent_space.TangentSpaceApproximation
   _partial_: True
-  n_neighbors: 10
+  n_neighbors: 15
   variance_threshold: 0.95
   return_per_sample: True

@@ -8,5 +8,5 @@ mode: full
 files:
   metadata: "./data/HGDP+1KGP/gnomad_derived_metadata_with_filtered_sampleids.csv"
   
-precomputed_path: "./data/embeddings/hgdp_pca_full.csv"
+precomputed_path: "./data/embeddings/hgdp_pca.csv"
 delimiter: ","
