@@ -139,7 +139,7 @@ class PlinkDataset(Dataset):
                 self.admixture_ratios[K] = self.admixture_ratios[K].iloc[idx].copy()
 
             # Update split_indices to an identity mapping.
-            self.split_indices = {self.data_split: np.arange(len(self.metadata))}
+            #self.split_indices = {self.data_split: np.arange(len(self.metadata))}
 
     def extract_indices(self, 
                         filter_qc: bool,
@@ -226,7 +226,7 @@ class PlinkDataset(Dataset):
     def __getitem__(self, index: int) -> Any:
         real_idx = self.split_indices[self.data_split][index]
         sample = self.data[real_idx]
-        metadata_row = self.metadata.iloc[real_idx].to_dict()
+        metadata_row = self.metadata.iloc[index].to_dict()
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
         return {"data": sample, "metadata": metadata_row}
 
