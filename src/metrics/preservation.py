@@ -183,17 +183,26 @@ def compute_continental_admixture_metric_dists(
         admixture_ratios = admixture_ratios[subset_to_test_on]
         population_label = population_label[subset_to_test_on]
 
-    df = pd.concat([
-        population_label,
-        pd.DataFrame(ancestry_coords, index=population_label.index).rename(columns={0: "emb1", 1: "emb2"}),
-        pd.DataFrame(admixture_ratios, index=population_label.index)
-    ], axis=1)
+    df1 = pd.DataFrame(ancestry_coords, 
+                       index=population_label.index)
+    df1 = df1.rename(columns={i: f'emb{i}' for i in range(ancestry_coords.shape[1])})
+    df2 = admixture_ratios.set_index(0).dropna()
+    df2 = df2.rename(columns={i: f'ar{i}' for i in range(admixture_ratios.shape[1])}) # drop NA rows
+
+    df = pd.merge(df1, df2, left_index=True, right_index=True, how='inner')
+    df = pd.merge(df, population_label, left_index=True, right_index=True, how='inner')
+
+    # df = pd.concat([
+    #     population_label,
+    #     pd.DataFrame(ancestry_coords, index=population_label.index).rename(columns={0: "emb1", 1: "emb2"}),
+    #     pd.DataFrame(admixture_ratios, index=population_label.index)
+    # ], axis=1)
 
     if use_medians:
         df = df.groupby("Population").median().reset_index()
 
-    ancestry_coords2 = df[["emb1", "emb2"]].values
-    admixture_ratios2 = df.iloc[:, 2:].values  # everything after emb1/emb2
+    ancestry_coords2 = df[df.columns[df.columns.map(str).str.startswith('emb')]].values
+    admixture_ratios2 = df[df.columns[df.columns.map(str).str.startswith('ar')]].values
 
     ancestry_dists = pdist(ancestry_coords2)
 
@@ -319,7 +328,7 @@ def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:
     """
     return compute_continental_admixture_metric_dists(
         ancestry_coords=embeddings,
-        admixture_ratios=dataset.admixture_ratios,
+        admixture_ratios=dataset.admixture_ratios['2'],
         population_label=dataset.population_label
     )
 
