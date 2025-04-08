@@ -81,10 +81,10 @@ def evaluate_embeddings(
     # Use original_data as the reference if available;
     # if not, fallback to precomputed_embeddings.
     if ds.original_data is not None:
-        reference = ds.original_data #[ds.split_indices[ds.data_split]]
+        reference = ds.original_data[ds.split_indices[ds.data_split]]
     elif ds.precomputed_embeddings is not None:
         logger.warning("No raw data provided; using precomputed embeddings as reference for evaluation.")
-        reference = ds.precomputed_embeddings #[ds.split_indices[ds.data_split]]
+        reference = ds.precomputed_embeddings[ds.split_indices[ds.data_split]]
     else:
         raise ValueError("No valid reference data available for evaluation.")
 
