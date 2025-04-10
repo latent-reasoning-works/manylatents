@@ -5,9 +5,12 @@ defaults:
   - override /algorithm/dimensionality_reduction: noop
   - override /data: hgdp_split
   - override /callbacks/dimensionality_reduction: default
-  - override /metrics: tsa_pearson
 
 seed: 42
 
 data:
   filter_related: true # consistency with hgdp_pca, turn off if running from other sources
+
+metrics:
+  embedding:
+    tangent_space
