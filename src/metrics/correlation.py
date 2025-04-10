@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 def PearsonCorrelation(dataset, embeddings: np.ndarray,
                        return_per_sample: bool = False, 
-                       num_dists: int = 100) -> float:
+                       num_dists: int = 100,
+                       random_state: int = 42) -> float:
     """
     Compute the Pearson correlation between pairwise distances in the 
     original high-dimensional data and the low-dimensional embeddings.
@@ -27,14 +28,15 @@ def PearsonCorrelation(dataset, embeddings: np.ndarray,
     Returns:
         A float if return_per_sample is False, or a numpy array of shape (n_samples,) if True.
     """
-    original_data = dataset.data
-    if original_data is None:
-        raise ValueError("Dataset does not have 'data' attribute.")
+    if dataset.data.shape[0] != embeddings.shape[0]:
+        raise ValueError(
+            f"Mismatch: dataset has {dataset.data.shape[0]} samples but embeddings has {embeddings.shape[0]}"
+        )
 
     if not return_per_sample:
         # Compute the global Pearson correlation using a random subset of distances.
         logger.info(f"Starting global Pearson correlation computation with {num_dists} distances.")
-        orig_dists = pdist(original_data)
+        orig_dists = pdist(dataset.data)
         emb_dists = pdist(embeddings)
         
         n = len(emb_dists)
@@ -46,10 +48,11 @@ def PearsonCorrelation(dataset, embeddings: np.ndarray,
         corr, _ = pearsonr(orig_sample, emb_sample)
         logger.info("Finished global Pearson correlation computation.")
         return corr
+    
     else:
         # Compute per-individual Pearson correlations.
         logger.info("Starting per-individual Pearson correlation computation.")
-        orig_dists = squareform(pdist(original_data))
+        orig_dists = squareform(pdist(dataset.data))
         emb_dists = squareform(pdist(embeddings))
         
         n = orig_dists.shape[0]

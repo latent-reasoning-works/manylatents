@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -61,14 +61,6 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          test_all=test_all,
                          remove_recent_migration=remove_recent_migration)
         
-    # def __getitem__(self, index: int) -> Any:
-    #     real_idx = self.split_indices[self.data_split][index]
-    #     sample = self.data[real_idx]
-    #     metadata_row = self.metadata.iloc[real_idx].to_dict()
-    #     metadata_row = {k.strip(): v for k, v in metadata_row.items()}
-    #     return {"data": sample, "metadata": metadata_row}
-
-
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """
         Extracts indices of samples that we expect to preserve geography.

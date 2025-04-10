@@ -73,21 +73,20 @@ class PlinkDataset(Dataset):
         elif files is not None and "metadata" in files:
             # Only metadata is provided; no raw data available.
             self.metadata = self.load_metadata(files["metadata"])
-            self.original_data = None
         elif metadata is not None:
             self.metadata = metadata
-            self.original_data = None
         else:
             raise ValueError("Must provide either a files dict or metadata directly.")
 
         # Step 2: Extract metadata-derived properties
-        self.admixture_ratios = self.load_admixture_ratios(self.admixture_path, self.admixture_ks)
-        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
         self._latitude = self.extract_latitude()
         self._longitude = self.extract_longitude()
         self._population_label = self.extract_population_label()
         self._qc_filter_indices = self.extract_qc_filter_indices()
         self._related_indices = self.extract_related_indices()
+        self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
+        self.admixture_ratios = self.load_admixture_ratios(self.admixture_path, self.admixture_ks)
+
 
         # Step 3: Extract indices
         self.fit_idx, self.trans_idx = self.extract_indices(filter_qc,
@@ -101,45 +100,55 @@ class PlinkDataset(Dataset):
             'full': np.arange(len(self.metadata))
         }
 
-        # Step 4: Load or convert raw data
+        # Step 4: Load raw or precomputed data
         if getattr(self, "plink_path", None) is not None:
-            self.original_data = self.load_or_convert_data()
-
-        # Load precomputed embeddings using the mixin, if provided.
-        self.precomputed_path = precomputed_path
-        self.precomputed_embeddings = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
-        
-        ## assigning for getitem
-        if self.original_data is not None:
-            self.data = self.original_data
-        elif self.precomputed_embeddings is not None:
-            self.data = self.precomputed_embeddings
-            logger.warning("No raw data (original_data) was provided. Some metrics may require original_data for accurate evaluation.")
+            _data = self.load_or_convert_data()
         else:
-            raise ValueError("No valid data source found: both raw data and precomputed embeddings are missing.")
+            _data = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
+        if _data is None:
+            raise ValueError("No data source found: either raw Plink or precomputed embeddings are missing.")  
+        
+        # Step 5: Slice data to the requested split
+        self.data = self._apply_split(_data, split=self.data_split)
 
-        # Note: Do NOT override self.original_data here,
-        # so that raw data remains available for evaluations.
-        if self.data_split != "full":
-            idx = self.split_indices[self.data_split]
-            self.metadata = self.metadata.iloc[idx].copy()
-            self.original_data = self.original_data[idx]
-            if self.precomputed_embeddings is not None:
-                self.precomputed_embeddings = self.precomputed_embeddings[idx]
-            
-            # update exposed attributes
-            self._latitude = self._latitude.iloc[idx].copy()
-            self._longitude = self._longitude.iloc[idx].copy()
-            self._population_label = self._population_label.iloc[idx].copy()
-            self._qc_filter_indices = self._qc_filter_indices[idx]
-            self._related_indices = self._related_indices[idx]
-            self._geographic_preservation_indices = self._geographic_preservation_indices[idx]
+        assert self.data.shape[0] == len(self._latitude) == len(self.metadata), (
+            f"Split mismatch: data has {self.data.shape[0]} rows, "
+            f"latitude {len(self._latitude)}, metadata {len(self.metadata)}"
+        )
 
-            for K in self.admixture_ratios.keys():
-                self.admixture_ratios[K] = self.admixture_ratios[K].iloc[idx].copy()
+    def _apply_split(self, raw: np.ndarray, split: str) -> np.ndarray:
+        """
+        Subset raw (samples×features) and all per-sample attrs to the given split.
+        Returns the sliced raw; updates self.metadata and all self._* arrays in place.
+        """
+        if split == "full":
+            return raw
 
-            # Update split_indices to an identity mapping.
-            #self.split_indices = {self.data_split: np.arange(len(self.metadata))}
+        idx = self.split_indices[split]  # e.g. length 4094 for 'test'
+        # 1) slice the raw matrix
+        sliced = raw[idx, ...]
+
+        # 2) slice every per-sample attribute in __dict__
+        for name, val in list(self.__dict__.items()):
+            # only our private per-sample arrays start with "_" 
+            if not name.startswith("_"):
+                continue
+            # numpy array
+            if isinstance(val, np.ndarray) and val.ndim == 1 and len(val) == raw.shape[0]:
+                setattr(self, name, val[idx])
+            # pandas Series/DataFrame
+            elif isinstance(val, (pd.Series, pd.DataFrame)) and len(val) == raw.shape[0]:
+                setattr(self, name, val.iloc[idx].reset_index(drop=True))
+
+        # 3) slice admixture_ratios dict
+        for K, df in self.admixture_ratios.items():
+            if isinstance(df, (pd.Series, pd.DataFrame)) and len(df) == raw.shape[0]:
+                self.admixture_ratios[K] = df.iloc[idx].reset_index(drop=True)
+
+        # 4) slice metadata itself
+        self.metadata = self.metadata.iloc[idx].reset_index(drop=True)
+
+        return sliced
 
     def extract_indices(self, 
                         filter_qc: bool,
@@ -223,10 +232,9 @@ class PlinkDataset(Dataset):
     def __len__(self) -> int:
         return len(self.split_indices[self.data_split])
 
-    def __getitem__(self, index: int) -> Any:
-        real_idx = self.split_indices[self.data_split][index]
-        sample = self.data[real_idx]
-        metadata_row = self.metadata.iloc[index].to_dict()
+    def __getitem__(self, idx: int) -> Any:
+        sample = self.data[idx]
+        metadata_row = self.metadata.iloc[idx].to_dict()
         metadata_row = {k.strip(): v for k, v in metadata_row.items()}
         return {"data": sample, "metadata": metadata_row}
 
@@ -277,21 +285,7 @@ class PlinkDataset(Dataset):
             np.ndarray: Array of labels.
         """
         pass
-
-    @property
-    def get_original_data(self) -> np.ndarray:
-        """
-        Returns the original, unbatched data.
-        """
-        return self.original_data
     
-    @property ## TEST FUNCTION, SHOULD BE REMOVED/HOMOGENIZED W.R.T METRICS E.G. PEARSON_CORRELATION
-    def get_data(self) -> np.ndarray:
-        """
-        Returns the passed data, whether embeddings or raw data, as assigned
-        """
-        return self.data
-
     @property
     def latitude(self) -> pd.Series:
         return self._latitude
