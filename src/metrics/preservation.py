@@ -305,6 +305,20 @@ def compute_quality_metrics(
 
     return metrics_dict
 
+def AdmixturePreservationK(dataset, embeddings: np.ndarray) -> np.array:
+    """
+    A vector-value wrapper returning admixture preservation scores for all Ks.
+    """
+    
+    return_vector = np.zeros(len(dataset.admixture_ratios))
+    for i, key in enumerate(dataset.admixture_ratios.keys()):
+        return_vector[i] = compute_continental_admixture_metric_dists(
+            ancestry_coords=embeddings,
+            admixture_ratios=dataset.admixture_ratios[key],
+            population_label=dataset.population_label
+        )
+    return return_vector
+    
 
 ##############################################################################
 # 5) Single-Value Wrappers (conform to Metric(Protocol))
@@ -328,7 +342,7 @@ def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:
     """
     return compute_continental_admixture_metric_dists(
         ancestry_coords=embeddings,
-        admixture_ratios=dataset.admixture_ratios['2'],
+        admixture_ratios=dataset.admixture_ratios,
         population_label=dataset.population_label
     )
 
