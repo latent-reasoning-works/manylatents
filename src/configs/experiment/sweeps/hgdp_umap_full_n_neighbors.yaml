@@ -4,7 +4,7 @@ name: hgdp_umap_full_n_neighbors=${algorithm.dimensionality_reduction.n_neighbor
 defaults:
   - override /algorithm/dimensionality_reduction: umap
   - override /data: hgdp_pca_precomputed
-  - override /callbacks/dimensionality_reduction: default
+  - override /callbacks/embedding: default
   - override /metrics: hgdp_dr
 
 seed: 42

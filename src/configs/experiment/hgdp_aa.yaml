@@ -1,0 +1,10 @@
+# @package _global_
+name: hgdp_aa
+
+defaults:
+  - override /algorithm/dimensionality_reduction: aa
+  - override /data: hgdp_split
+  - override /callbacks/embedding: default
+  - override /metrics: tsa_pearson
+
+seed: 42

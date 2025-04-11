@@ -1,4 +1,4 @@
 defaults:
 - network: null
-- dimensionality_reduction: null
+- embedding: null
 - _self_

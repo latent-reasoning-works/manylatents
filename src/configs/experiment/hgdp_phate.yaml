@@ -4,7 +4,7 @@ name: hgdp_phate_full
 defaults:
   - override /algorithm/dimensionality_reduction: phate
   - override /data: hgdp
-  - override /callbacks/dimensionality_reduction: default
+  - override /callbacks/embedding: default
   - override /metrics: hgdp_dr
   
 seed: 42

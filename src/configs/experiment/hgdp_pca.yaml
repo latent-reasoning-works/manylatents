@@ -4,7 +4,7 @@ name: hgdp_pca_n_components=${algorithm.dimensionality_reduction.n_components}
 defaults:
   - override /algorithm/dimensionality_reduction: pca
   - override /data: hgdp_split
-  - override /callbacks/dimensionality_reduction: default
+  - override /callbacks/embedding: default
   - override /metrics: hgdp_dr
 
 seed: 42

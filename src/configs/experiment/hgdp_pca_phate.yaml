@@ -4,7 +4,7 @@ name: hgdp_pca_phate
 defaults:
   - override /algorithm/dimensionality_reduction: phate
   - override /data: hgdp_pca_precomputed
-  - override /callbacks/dimensionality_reduction: default
+  - override /callbacks/embedding: default
   - override /metrics: hgdp_dr
   
 seed: 42

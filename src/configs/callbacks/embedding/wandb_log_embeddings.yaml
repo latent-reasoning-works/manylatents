@@ -1,0 +1,6 @@
+_target_: src.callbacks.embedding.wandb_log_embeddings.WandbLogEmbeddings
+log_embeddings: true
+log_metrics: true
+include_labels: true
+log_archetype_similarity: true
+max_dims_to_log: 50

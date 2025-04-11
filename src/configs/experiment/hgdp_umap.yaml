@@ -4,7 +4,7 @@ name: hgdp_umap
 defaults:
   - override /algorithm/dimensionality_reduction: umap
   - override /data: hgdp_split
-  - override /callbacks/dimensionality_reduction: default
+  - override /callbacks/embedding: default
   - override /metrics: hgdp_dr
   
 seed: 42
