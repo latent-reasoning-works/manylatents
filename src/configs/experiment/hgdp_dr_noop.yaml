@@ -5,7 +5,7 @@ defaults:
   - override /algorithm/dimensionality_reduction: noop
   - override /data: hgdp_split
   - override /callbacks/dimensionality_reduction: default
-  - override /metrics: tsa_pearson
+  - override /metrics: tangent_space
 
 seed: 42
 

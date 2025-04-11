@@ -101,15 +101,39 @@ class PlinkDataset(Dataset):
         }
 
         # Step 4: Load raw or precomputed data
-        if getattr(self, "plink_path", None) is not None:
-            _data = self.load_or_convert_data()
-        else:
+        _data = None
+        if precomputed_path is not None:
             _data = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
+        else:
+            _data = self.load_or_convert_data()
         if _data is None:
             raise ValueError("No data source found: either raw Plink or precomputed embeddings are missing.")  
         
-        # Step 5: Slice data to the requested split
-        self.data = self._apply_split(_data, split=self.data_split)
+        full_n = len(self.split_indices["full"])
+        split_idx = self.split_indices[self.data_split]
+        # Step 5: Slice data
+        if _data.shape[0] == full_n: # We have the full matrix → use our helper to slice
+            self.data = self._apply_split(_data, split=self.data_split)
+        else: # Precomputed is already sliced to split size (e.g. 4094)
+            if _data.shape[0] != len(split_idx):
+                raise ValueError(
+                    f"Precomputed embeddings have {_data.shape[0]} rows but split '{self.data_split}' has {len(split_idx)} samples"
+                )
+            # Manually slice metadata & all per-sample arrays in place
+            self.metadata = self.metadata.iloc[split_idx].reset_index(drop=True)
+            for name in [
+                "_latitude", "_longitude", "_population_label",
+                "_qc_filter_indices", "_related_indices", "_geographic_preservation_indices"
+            ]:
+                val = getattr(self, name)
+                if isinstance(val, pd.Series):
+                    setattr(self, name, val.iloc[split_idx].reset_index(drop=True))
+                else:
+                    setattr(self, name, val[split_idx])
+            # Slice admixture_ratios
+            for K, df in self.admixture_ratios.items():
+                self.admixture_ratios[K] = df.iloc[split_idx].reset_index(drop=True)
+            self.data = _data
 
         assert self.data.shape[0] == len(self._latitude) == len(self.metadata), (
             f"Split mismatch: data has {self.data.shape[0]} rows, "

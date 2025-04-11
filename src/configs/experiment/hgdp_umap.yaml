@@ -1,9 +1,9 @@
 # @package _global_
-name: hgdp_umap_full
+name: hgdp_umap
 
 defaults:
   - override /algorithm/dimensionality_reduction: umap
-  - override /datamodule: hgdp
+  - override /data: hgdp_split
   - override /callbacks/dimensionality_reduction: default
   - override /metrics: hgdp_dr
   
@@ -11,4 +11,4 @@ seed: 42
 
 algorithm:
   dimensionality_reduction:
-    n_components: 2
+    n_components: 50

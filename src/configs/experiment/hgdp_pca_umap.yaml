@@ -1,5 +1,5 @@
 # @package _global_
-name: hgdp_pca_umap
+name: hgdp_pca_umap_n_components=${algorithm.dimensionality_reduction.n_components}
 
 defaults:
   - override /algorithm/dimensionality_reduction: umap
@@ -11,4 +11,4 @@ seed: 42
 
 algorithm:
   dimensionality_reduction:
-    n_components: 2
+    n_components: 50
