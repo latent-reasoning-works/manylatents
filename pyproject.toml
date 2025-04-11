@@ -84,6 +84,7 @@ dependencies = [
     "opentsne>=1.0.2",
     "umap-learn>=0.5.7",
     "ripser>=0.6.12",
+    "archetypes>=0.6.2",
 ]
 
 [tool.uv]

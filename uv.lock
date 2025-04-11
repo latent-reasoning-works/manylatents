@@ -84,6 +84,24 @@ wheels = [
 ]
 
 [[package]]
+name = "archetypes"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "opt-einsum" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "torch" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c3/1e/77e9430dfa10a241b01f0a9ab14341896b3a907035537f22932f46b3c0dc/archetypes-0.6.2.tar.gz", hash = "sha256:0c37ec01143804885b0902f7dc5e94652026315dae7f6558da37580463b4cc6c", size = 184146 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/3e/409a8c743d09188992a443cf50b1782fa882217a70ef4d00e6e76e3ed449/archetypes-0.6.2-py3-none-any.whl", hash = "sha256:42a09f7c9225925fdee5065b7f008f29e8e244e3f2f0ddc64c7838291fdc3a44", size = 24365 },
+]
+
+[[package]]
 name = "argcomplete"
 version = "3.5.3"
 source = { registry = "https://pypi.org/simple" }
@@ -958,6 +976,7 @@ name = "manifold-genetics"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "archetypes" },
     { name = "asttokens" },
     { name = "comm" },
     { name = "contourpy" },
@@ -1035,6 +1054,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "archetypes", specifier = ">=0.6.2" },
     { name = "asttokens", specifier = "==2.4.1" },
     { name = "comm", specifier = "==0.2.2" },
     { name = "contourpy", specifier = "==1.2.0" },
@@ -1452,6 +1472,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/14/a5/72aad8de41cc577c6b34977a4cbdb97e5bf2c1141d3430191da16cd7b1dc/openTSNE-1.0.2-cp39-cp39-macosx_10_12_universal2.whl", hash = "sha256:78d1122ce9233ba3e9de07825127b34b3f330665047f3e04c3914ee0e2b3fad2", size = 1016506 },
     { url = "https://files.pythonhosted.org/packages/02/f5/ddcead14d625cc09c1779304d22aac41d3d06552a8f8bb6680d8d67e28da/openTSNE-1.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e349d876a26f417326b0aa4e031f2ca5af167608538eaae2b5d2fbaabd353df", size = 3023094 },
     { url = "https://files.pythonhosted.org/packages/29/28/da77c553872d16fc54a133c478173782ae3b5289d4b47314019d35a0703f/openTSNE-1.0.2-cp39-cp39-win_amd64.whl", hash = "sha256:8c927dc2b47560d06abab48a8cca0ddf388a9200a2d27fc197c786b15f644e7c", size = 472805 },
+]
+
+[[package]]
+name = "opt-einsum"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/b9/2ac072041e899a52f20cf9510850ff58295003aa75525e58343591b0cbfb/opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac", size = 63004 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd", size = 71932 },
 ]
 
 [[package]]

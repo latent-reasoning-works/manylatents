@@ -3,10 +3,10 @@ defaults:
 
 _target_: src.data.hgdp.HGDPDataModule
 mmap_mode: null
-mode: full
+mode: split
 
 files:
   metadata: "./data/HGDP+1KGP/gnomad_derived_metadata_with_filtered_sampleids.csv"
   
-precomputed_path: "./data/embeddings/hgdp_pca_full.csv"
+precomputed_path: "./data/embeddings/hgdp_pca.csv"
 delimiter: ","

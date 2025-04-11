@@ -153,12 +153,12 @@ def main(cfg: DictConfig):
 
     # --- Callbacks ---
     callback_outputs = []
-    if "dimensionality_reduction" in cfg.callbacks and embeddings is not None:
-        dr_callbacks = cfg.callbacks.dimensionality_reduction
-        for name, cb_cfg in dr_callbacks.items():
-            dr_callback = hydra.utils.instantiate(cb_cfg)
-            if hasattr(dr_callback, "on_dr_end") and callable(dr_callback.on_dr_end):
-                output = dr_callback.on_dr_end(dataset=datamodule.test_dataset, 
+    if "embedding" in cfg.callbacks and embeddings is not None:
+        embedding_callbacks = cfg.callbacks.embedding
+        for name, cb_cfg in embedding_callbacks.items():
+            embedding_callback = hydra.utils.instantiate(cb_cfg)
+            if hasattr(embedding_callback, "on_dr_end") and callable(embedding_callback.on_dr_end):
+                output = embedding_callback.on_dr_end(dataset=datamodule.test_dataset, 
                                                embeddings=embeddings)
                 callback_outputs.append((name, output))
             else:

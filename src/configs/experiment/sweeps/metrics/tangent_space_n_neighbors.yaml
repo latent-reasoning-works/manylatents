@@ -4,7 +4,7 @@ name: hgdp_umap_full_n_neighbors=${algorithm.dimensionality_reduction.n_neighbor
 defaults:
   - override /algorithm/dimensionality_reduction: umap
   - override /data: hgdp_pca_precomputed
-  - override /callbacks/dimensionality_reduction: plot_embeddings
+  - override /callbacks/embeddings: plot_embeddings
   - override /metrics: tsa_pearson
 
 seed: 42
@@ -17,8 +17,6 @@ hydra:
       metrics.embedding.tangent_space.n_neighbors: 5, 10, 15, 20, 30, 50
 
 callbacks:
-  dimensionality_reduction:
+  embedding:
     plot_embeddings:
       color_by_score: tangent_space
-
-

@@ -78,19 +78,9 @@ def evaluate_embeddings(
     else:
         ds = datamodule.train_dataset ## defaults to full datset on full runs
 
-    # Use original_data as the reference if available;
-    # if not, fallback to precomputed_embeddings.
-    if ds.original_data is not None:
-        reference = ds.original_data[ds.split_indices[ds.data_split]]
-    elif ds.precomputed_embeddings is not None:
-        logger.warning("No raw data provided; using precomputed embeddings as reference for evaluation.")
-        reference = ds.precomputed_embeddings[ds.split_indices[ds.data_split]]
-    else:
-        raise ValueError("No valid reference data available for evaluation.")
-
-    logger.info(f"Reference data shape: {reference.shape}")
-    logger.info(f"Computing embedding metrics for {reference.shape[0]} samples.")
-
+    logger.info(f"Reference data shape: {ds.data.shape}")
+    logger.info(f"Computing embedding metrics for {ds.data.shape[0]} samples.")
+    
     metrics = {}
     all_metrics_cfg = cfg.metrics
     ds_metrics_cfg = all_metrics_cfg.get("dataset", {})

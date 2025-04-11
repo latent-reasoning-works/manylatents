@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from src.callbacks.dimensionality_reduction.base import EmbeddingCallback
+from src.callbacks.embedding.base import EmbeddingCallback
 from src.utils.utils import save_embeddings
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ class SaveEmbeddings(EmbeddingCallback):
 
         # If saving as CSV and include_metrics is True, combine embeddings and scores.
         if self.save_format.lower() == "csv":
+            logger.info("Saving embeddings as CSV.")
             df = pd.DataFrame(_embeddings, columns=[f"dim_{i+1}" for i in range(_embeddings.shape[1])])
             if self.include_metrics and "scores" in embeddings:
                 scores = embeddings["scores"]
