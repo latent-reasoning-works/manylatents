@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import torch
 
 import wandb
-from src.callbacks.dimensionality_reduction.base import DimensionalityReductionCallback
+from src.callbacks.embedding.base import EmbeddingCallback
 
 logger = logging.getLogger(__name__)
 
-class WandbLogEmbeddings(DimensionalityReductionCallback):
+class WandbLogEmbeddings(EmbeddingCallback):
     def __init__(
         self,
         log_embeddings: bool = True,

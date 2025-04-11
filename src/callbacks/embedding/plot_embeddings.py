@@ -9,7 +9,7 @@ import scprep
 from matplotlib.colors import ListedColormap
 
 import wandb
-from src.callbacks.dimensionality_reduction.base import EmbeddingCallback
+from src.callbacks.embedding.base import EmbeddingCallback
 from src.data.hgdp_dataset import HGDPDataset
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 
