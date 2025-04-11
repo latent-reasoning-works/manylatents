@@ -189,14 +189,11 @@ def compute_continental_admixture_metric_dists(
     df2 = admixture_ratios.set_index(0).dropna()
     df2 = df2.rename(columns={i: f'ar{i}' for i in range(admixture_ratios.shape[1])}) # drop NA rows
 
-    df = pd.merge(df1, df2, left_index=True, right_index=True, how='inner')
-    df = pd.merge(df, population_label, left_index=True, right_index=True, how='inner')
-
-    # df = pd.concat([
-    #     population_label,
-    #     pd.DataFrame(ancestry_coords, index=population_label.index).rename(columns={0: "emb1", 1: "emb2"}),
-    #     pd.DataFrame(admixture_ratios, index=population_label.index)
-    # ], axis=1)
+    #df = pd.merge(df1, df2, left_index=True, right_index=True, how='inner')
+    #df = pd.merge(df, population_label, left_index=True, right_index=True, how='inner')
+    
+    df = pd.concat([df1, df2.reset_index()], axis=1).drop(columns=0)
+    df = pd.concat([df, population_label], axis=1)
 
     if use_medians:
         df = df.groupby("Population").median().reset_index()
@@ -305,6 +302,20 @@ def compute_quality_metrics(
 
     return metrics_dict
 
+def AdmixturePreservationK(dataset, embeddings: np.ndarray) -> np.array:
+    """
+    A vector-value wrapper returning admixture preservation scores for all Ks.
+    """
+    
+    return_vector = np.zeros(len(dataset.admixture_ratios))
+    for i, key in enumerate(dataset.admixture_ratios.keys()):
+        return_vector[i] = compute_continental_admixture_metric_dists(
+            ancestry_coords=embeddings,
+            admixture_ratios=dataset.admixture_ratios[key],
+            population_label=dataset.population_label
+        )
+    return return_vector
+    
 
 ##############################################################################
 # 5) Single-Value Wrappers (conform to Metric(Protocol))
@@ -328,7 +339,7 @@ def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:
     """
     return compute_continental_admixture_metric_dists(
         ancestry_coords=embeddings,
-        admixture_ratios=dataset.admixture_ratios['2'],
+        admixture_ratios=dataset.admixture_ratios,
         population_label=dataset.population_label
     )
 

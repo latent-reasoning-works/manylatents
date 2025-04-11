@@ -60,7 +60,7 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          filter_related=filter_related,
                          test_all=test_all,
                          remove_recent_migration=remove_recent_migration)
-        
+
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """
         Extracts indices of samples that we expect to preserve geography.
@@ -147,6 +147,16 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                 metadata[col] = False
 
         return metadata
+
+    def load_admixture_ratios(self, admixture_path, admixture_Ks) -> dict:
+        """
+        Loads admixture ratios
+        """
+        admixture_ratio_dict = super().load_admixture_ratios(admixture_path, admixture_Ks)
+        if admixture_Ks is not None:
+            for key in admixture_ratio_dict:
+                admixture_ratio_dict[key] = hgdp_add_dummy_row(admixture_ratio_dict[key])
+        return admixture_ratio_dict
 
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """

@@ -3,7 +3,7 @@ import pandas as pd
 from pyplink import PyPlink
 import argparse
 
-def main(plink_prefix, metadata_path, admix_file_root):
+def main(indices_file, metadata_path, admix_file_root):
     """
     Clean up and process admixture output files by adding metadata.
 
@@ -34,21 +34,29 @@ def main(plink_prefix, metadata_path, admix_file_root):
             # Load admixture ratios
             admixture_ratios = pd.read_csv(fname, header=None, sep=' ')
 
-            # Get label order directly from plink file
-            pedfile = PyPlink(plink_prefix)
-            sample_id = pedfile.get_fam()[['fid', 'iid']].rename(columns={'iid': 'sample_id', 'fid': 'sample_fid'})
+            # Get label order from indices_file
+            sample_id = pd.read_csv(indices_file, header=None, sep=' ')
+
+            sample_id = sample_id.rename(columns={0: 'sample_id'})
+            sample_id = sample_id.drop(columns=[1])
 
             # Merge with population metadata
             pop_df = metadata[['Population', 'Genetic_region_merged']].reset_index()
             final_df = pd.concat([sample_id, admixture_ratios], axis=1)
+            
             final_df = pd.merge(
-                left=final_df, 
-                right=pop_df, 
-                left_on='sample_id', 
-                right_on='project_meta.sample_id',
+                left=pop_df, 
+                right=final_df, 
+                left_on='project_meta.sample_id', 
+                right_on='sample_id',
                 how='left'
             )
-            final_df = final_df.drop(columns=['sample_fid', 'project_meta.sample_id'])
+
+            final_df = final_df.drop(columns=['sample_id'])
+            final_df = final_df.rename(columns={'project_meta.sample_id': 'sample_id'})
+            all_but_last_2_cols = [col for col in final_df.columns if col not in ['Population', 
+                                                                                  'Genetic_region_merged']]
+            final_df = final_df[all_but_last_2_cols + ['Population', 'Genetic_region_merged']]
 
             # Save final dataframe
             output_file = os.path.join(admix_file_root, f'{prefix}.{k}_metadata.tsv')
@@ -56,9 +64,9 @@ def main(plink_prefix, metadata_path, admix_file_root):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Clean up and process admixture output files.")
-    parser.add_argument("--plink_prefix", type=str, required=True, help="Path and prefix of plink file")
+    parser.add_argument("--indices_file", type=str, required=True, help="File containing indices passed to admixture software")
     parser.add_argument("--metadata_path", type=str, required=True, help="Path to metadata.")
     parser.add_argument("--admix_file_root", type=str, required=True, help="Path to directory for admixture analysis.")
 
     args = parser.parse_args()
-    main(args.plink_prefix, args.metadata_path, args.admix_file_root)
+    main(args.indices_file, args.metadata_path, args.admix_file_root)

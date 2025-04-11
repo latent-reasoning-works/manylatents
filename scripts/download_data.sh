@@ -2,7 +2,7 @@
 # Downloads HGDP-1KGP zip file from Dropbox
 
 # Dropbox direct download link
-URL_HGDP_1KGP="https://www.dropbox.com/scl/fi/r9jbv7eg6xhqzl5jvopn0/HGDP-1KGP.tar.gz?rlkey=77iq45q0sxgwpb8zs0x8ixas6&st=lao3eyfx&dl=1"
+URL_HGDP_1KGP="https://www.dropbox.com/scl/fi/gmq9fzo8yr2qpvaxhe3et/HGDP-1KGP.tar.gz?rlkey=h3nqkbhnmtnl2vczpwqrz0bul&st=e5r325gq&dl=1"
 
 # Local path for the zip file
 FILE_HGDP_1KGP="data/HGDP+1KGP.tar.gz"
