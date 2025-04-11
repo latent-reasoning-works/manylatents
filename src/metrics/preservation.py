@@ -189,14 +189,11 @@ def compute_continental_admixture_metric_dists(
     df2 = admixture_ratios.set_index(0).dropna()
     df2 = df2.rename(columns={i: f'ar{i}' for i in range(admixture_ratios.shape[1])}) # drop NA rows
 
-    df = pd.merge(df1, df2, left_index=True, right_index=True, how='inner')
-    df = pd.merge(df, population_label, left_index=True, right_index=True, how='inner')
-
-    # df = pd.concat([
-    #     population_label,
-    #     pd.DataFrame(ancestry_coords, index=population_label.index).rename(columns={0: "emb1", 1: "emb2"}),
-    #     pd.DataFrame(admixture_ratios, index=population_label.index)
-    # ], axis=1)
+    #df = pd.merge(df1, df2, left_index=True, right_index=True, how='inner')
+    #df = pd.merge(df, population_label, left_index=True, right_index=True, how='inner')
+    
+    df = pd.concat([df1, df2.reset_index()], axis=1).drop(columns=0)
+    df = pd.concat([df, population_label], axis=1)
 
     if use_medians:
         df = df.groupby("Population").median().reset_index()
