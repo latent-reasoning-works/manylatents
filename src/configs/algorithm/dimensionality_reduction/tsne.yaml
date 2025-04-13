@@ -2,7 +2,8 @@ _target_: src.algorithms.tsne.TSNEModule
 n_components: 2
 random_state: ${seed}
 perplexity: 30
-n_iter: 1000
+n_iter_early: 250
+n_iter_late: 750
 learning_rate: 'auto'
 metric: "euclidean"
 fit_fraction: 1.0

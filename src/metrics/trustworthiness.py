@@ -16,7 +16,7 @@ def Trustworthiness(dataset, embeddings: np.ndarray, n_neighbors: int = 5, metri
       - A float representing the trustworthiness score.
     """
     return sk_trustworthiness(
-        X=dataset.original_data, 
+        X=dataset.data, 
         X_embedded=embeddings, 
         n_neighbors=n_neighbors, 
         metric=metric

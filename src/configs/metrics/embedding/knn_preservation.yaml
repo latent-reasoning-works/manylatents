@@ -1,0 +1,5 @@
+knn_preservation:
+  _target_: src.metrics.knn_preservation.KNNPreservation
+  _partial_: True
+  n_neighbors: 10
+  metric: euclidean
