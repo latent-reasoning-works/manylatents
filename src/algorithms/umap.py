@@ -1,6 +1,7 @@
 
 from typing import Optional
 
+import numpy as np
 import torch
 from torch import Tensor
 from umap import UMAP
@@ -50,3 +51,20 @@ class UMAPModule(DimensionalityReductionModule):
         x_np = x.detach().cpu().numpy()
         embedding = self.model.fit_transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+
+    @property
+    def affinity_matrix(self):
+        """Returns affinity matrix (not sure if this is exactly what is used in UMAP"""
+        if not self._is_fitted:
+            raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
+        row_norms = self.model.graph_.sum(1)
+        return np.asarray(self.model.graph_.todense()/row_norms)
+
+    @property
+    def kernel_matrix(self):
+        """Returns kernel matrix (not sure if this is exactly what is used in UMAP"""
+        if not self._is_fitted:
+            raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
+        K_no_diag = np.asarray(self.model.graph_.todense())
+        K = np.eye(len(K_no_diag)) + K_no_diag
+        return K

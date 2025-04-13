@@ -1,6 +1,7 @@
 
 from typing import Optional, Union
 
+import numpy as np
 import torch
 from phate import PHATE
 from torch import Tensor
@@ -52,3 +53,15 @@ class PHATEModule(DimensionalityReductionModule):
         x_np = x.detach().cpu().numpy()
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+
+    @property
+    def affinity_matrix(self):
+        """Returns diffusion operator, without diagonal"""
+        diff_op = self.model.diff_op 
+        A = diff_op - np.diag(diff_op)*np.eye(len(diff_op))
+        return A
+
+    @property
+    def kernel_matrix(self):
+        """Returns kernel matrix used to build diffusion operator"""
+        return self.model.graph.K.todense()
