@@ -18,7 +18,7 @@ algorithm_store(pca_config, name="pca")
 phate_config = builds(
     PHATEModule,
     n_components="${cfg.algorithm.n_components:50}",
-    knn="${cfg.algorithm.knn:30}",
+    knn="${cfg.algorithm.knn:5}",
     gamma="${cfg.algorithm.gamma:0.5}",
     populate_full_signature=True
 )
@@ -30,7 +30,8 @@ tsne_config = builds(
     random_state="${cfg.algorithm.random_state:42}",
     perplexity="${cfg.algorithm.perplexity:30.0}",
     learning_rate="${cfg.algorithm.learning_rate:200.0}",
-    n_iter="${cfg.algorithm.n_iter:1000}",
+    n_iter_early="${cfg.algorithm.n_iter_early:250}",
+    n_iter_late="${cfg.algorithm.n_iter_late:750}",
     metric="${cfg.algorithm.metric:euclidean}",
     populate_full_signature=True
 )

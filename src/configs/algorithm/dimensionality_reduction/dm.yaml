@@ -1,0 +1,3 @@
+_target_: src.algorithms.dm.PCAModule
+n_components: 2
+random_state: ${seed}

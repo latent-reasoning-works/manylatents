@@ -24,3 +24,13 @@ class DimensionalityReductionModule(ABC):
         """Fit and then transform data."""
         self.fit(x)
         return self.transform(x)
+
+    @property
+    def affinity_matrix(self):
+        """Fitted Affinity matrix. For topological metrics"""
+        pass
+
+    @property
+    def kernel_matrix(self):
+        """Fitted Kernel matrix. For topological metrics"""
+        pass
