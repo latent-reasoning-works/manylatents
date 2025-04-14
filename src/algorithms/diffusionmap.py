@@ -1,9 +1,8 @@
-
 import torch
 from torch import Tensor
 from typing import Optional, Union
-from .utils.diffusion_map import DiffusionMap
 
+from .dr_utils.diffusion_map import DiffusionMap
 from .dimensionality_reduction import DimensionalityReductionModule
 
 class DiffusionMapModule(DimensionalityReductionModule):
@@ -14,25 +13,23 @@ class DiffusionMapModule(DimensionalityReductionModule):
         knn: Optional[int] = 5,
         t: Union[int, str] = 15, # Can be an integer or 'auto'
         decay: Optional[int] = 40,
-        gamma: Optional[float] = 1, 
         n_pca: Optional[int] = None,
         n_landmark: Optional[int] = 2000,
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
     ):
-        super().__init__(n_components, random_state, knn, t, decay, gamma, n_pca, n_landmark, n_jobs, verbose)
+        super().__init__(n_components, random_state)
         self.fit_fraction = fit_fraction
-        self.model = DiffusionMap(n_components=self.n_components, 
-                           random_state=self.random_state,
-                           knn=self.knn,
-                           t=self.t,
-                           decay=self.decay,
-                           gamma=self.gamma,
-                           n_pca=self.n_pca,
-                           n_landmark=self.n_landmark,
-                           n_jobs=self.n_jobs,
-                           verbose=self.verbose)
+        self.model = DiffusionMap(n_components=n_components, 
+                                  random_state=random_state,
+                                  knn=knn,
+                                  t=t,
+                                  decay=decay,
+                                  n_pca=n_pca,
+                                  n_landmark=n_landmark,
+                                  n_jobs=n_jobs,
+                                  verbose=verbose)
 
     def fit(self, x: Tensor) -> None:
         """Fits DiffusionMap on a subset of data."""
@@ -50,3 +47,15 @@ class DiffusionMapModule(DimensionalityReductionModule):
         x_np = x.detach().cpu().numpy()
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+
+    @property
+    def affinity_matrix(self):
+        """Returns diffusion operator, without diagonal"""
+        diff_op = self.model.diff_op 
+        A = diff_op - np.diag(diff_op)*np.eye(len(diff_op))
+        return A
+
+    @property
+    def kernel_matrix(self):
+        """Returns kernel matrix used to build diffusion operator"""
+        return self.model.graph.K.todense()
