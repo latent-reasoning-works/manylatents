@@ -20,7 +20,7 @@ class PrecomputedMixin:
                 elif abs_path.endswith(".csv"):
                     # Use genfromtxt to skip the header and select numeric columns.
                     # Adjust `usecols` as needed; here we assume columns 0 and 1 are numeric.
-                    return np.genfromtxt(abs_path, delimiter=",", skip_header=1, usecols=(0, 1))
+                    return np.genfromtxt(abs_path, delimiter=",", skip_header=1)
                 else:
                     raise ValueError(f"Unsupported file format: {abs_path}")
         logger.info("No precomputed embeddings found or path does not exist.")
