@@ -148,7 +148,7 @@ class PlinkDataset(Dataset):
         if split == "full":
             return raw
 
-        idx = self.split_indices[split]  # e.g. length 4094 for 'test'
+        idx = self.split_indices[split]
         # 1) slice the raw matrix
         sliced = raw[idx, ...]
 

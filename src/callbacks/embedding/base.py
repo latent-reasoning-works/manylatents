@@ -29,6 +29,16 @@ class EmbeddingOutputs(TypedDict, total=False):
     """Optional metadata to be saved with the embeddings."""
     
 class EmbeddingCallback(BaseCallback, ABC):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.callback_outputs = {}
+
+    def register_output(self, key: str, output: Any) -> None:
+        """Store a callback output for later use."""
+        self.callback_outputs[key] = output
+        logger.info(f"Output registered under key: {key}")
+
     @abstractmethod
     def on_dr_end(self, dataset: Any, embeddings: EmbeddingOutputs) -> Any:
         """

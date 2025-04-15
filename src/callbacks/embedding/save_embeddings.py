@@ -16,12 +16,11 @@ class SaveEmbeddings(EmbeddingCallback):
                  save_format: str = "npy", 
                  experiment_name: str = "experiment",
                  include_metrics: bool=False) -> None:
-        
+        super().__init__()
         self.save_dir = save_dir
         self.save_format = save_format
         self.experiment_name = experiment_name
         self.include_metrics = include_metrics
-        
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
@@ -67,5 +66,6 @@ class SaveEmbeddings(EmbeddingCallback):
         if "label" not in embeddings and hasattr(dataset, "get_labels"):
             embeddings["label"] = dataset.get_labels()
         self.save_embeddings(embeddings)
-        return self.save_path
+        self.register_output("saved_embeddings", self.save_path)
+        return self.callback_outputs
 

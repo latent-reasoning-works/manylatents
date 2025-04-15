@@ -3,4 +3,4 @@ save_embeddings:
   save_dir: ${hydra:runtime.output_dir}
   save_format: "csv"
   experiment_name: ${name}
-  include_metrics: False
+  include_metrics: True

@@ -11,4 +11,4 @@ seed: 42
 
 algorithm:
   dimensionality_reduction:
-    n_components: 50
+    n_components: 2

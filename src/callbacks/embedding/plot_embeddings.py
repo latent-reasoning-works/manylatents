@@ -30,6 +30,7 @@ class PlotEmbeddings(EmbeddingCallback):
         apply_norm: bool = False,    ## EXPERIMENTAL, NOT INCONSISTENT IN TSA CASE
         alpha: float = 0.8          
     ):
+        super().__init__()
         """
         Args:
             save_dir (str): Directory where the plot will be saved.
@@ -178,4 +179,6 @@ class PlotEmbeddings(EmbeddingCallback):
     def on_dr_end(self, dataset: any, embeddings: dict) -> str:
         embeddings_to_plot = self._get_embeddings(embeddings)
         color_array = self._get_color_array(dataset, embeddings)
-        return self._plot_embeddings(dataset, embeddings_to_plot, color_array)
+        self.save_path = self._plot_embeddings(dataset, embeddings_to_plot, color_array)
+        self.register_output("embedding_plot", self.save_path)
+        return self.callback_outputs
