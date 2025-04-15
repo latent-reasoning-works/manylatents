@@ -92,9 +92,10 @@ def evaluate_embeddings(
     else:
         ds_subsampled, embeddings_subsampled = ds, EmbeddingOutputs.get("embeddings")
 
+    module = kwargs.get("module", None)
     for metric_name, metric_config in ds_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
-        result = metric_fn(ds_subsampled, embeddings_subsampled)
+        result = metric_fn(ds_subsampled, embeddings_subsampled, module=module)
         metrics[metric_name] = result
 
     module_metrics_cfg = all_metrics_cfg.get("embedding", {})

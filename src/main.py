@@ -102,6 +102,7 @@ def main(cfg: DictConfig):
             embeddings,
             cfg=cfg,
             datamodule=datamodule,
+            module=dr_module
         )
         
     # --- Neural Network (Lightning) setup and evaluation ---
