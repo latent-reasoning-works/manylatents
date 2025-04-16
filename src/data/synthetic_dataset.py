@@ -123,19 +123,114 @@ class SwissRoll(SyntheticDataset):
             self.graph = graphtools.Graph(self.X, use_pygsp=True)
         return self.graph
     
+class SaddleSurfaceDataset(SyntheticDataset):
+    def __init__(
+        self,
+        n_distributions=100,
+        n_points_per_distribution=50,
+        noise=0.05,
+        manifold_noise=0.2,
+        a=1.0,
+        b=1.0,
+        random_state=42,
+        rotate_to_dim=3,
+    ):
+        super().__init__()
+        np.random.seed(random_state)
+        self.n_distributions = n_distributions
+        self.n_points_per_distribution = n_points_per_distribution
+        self.noise = noise
+        self.manifold_noise = manifold_noise
+        self.a = a
+        self.b = b
+        self.random_state = random_state
 
+        self.u_centers = np.random.uniform(-2, 2, n_distributions)
+        self.v_centers = np.random.uniform(-2, 2, n_distributions)
+
+        self.u_samples = []
+        self.v_samples = []
+        self.point_sets = []
+
+        gt_points = self._generate_gaussian_blobs()
+        self.X = gt_points
+        if rotate_to_dim > 3:
+            self.X = self.rotate_to_dim(rotate_to_dim)
+        self.X = self._apply_noise(self.X)
+        self.gt_points = gt_points
+
+        self.labels = np.repeat(
+            np.eye(self.n_distributions), self.n_points_per_distribution, axis=0
+        )
+        self.labels = np.argmax(self.labels,-1)
+
+    def _generate_gaussian_blobs(self):
+        """Generate Gaussian blobs in the parameter space of the saddle surface."""
+        for i in range(self.n_distributions):
+            u_blob = np.random.normal(
+                self.u_centers[i], self.manifold_noise, self.n_points_per_distribution
+            )
+            v_blob = np.random.normal(
+                self.v_centers[i], self.manifold_noise, self.n_points_per_distribution
+            )
+            self.u_samples.append(u_blob)
+            self.v_samples.append(v_blob)
+            self.point_sets.append(self._saddle_to_cartesian(u_blob, v_blob))
+        X = np.concatenate(self.point_sets)
+        return X
+
+    def _apply_noise(self, X):
+        """Add noise to the points in the Cartesian space to simulate noisy data."""
+        X = X + np.random.normal(0, self.noise, X.shape)
+        return X
+
+    def _saddle_to_cartesian(self, u, v):
+        """Convert saddle coordinates to Cartesian coordinates."""
+        x = u
+        y = v
+        z = self.a * u**2 - self.b * v**2
+        return np.stack((x, y, z), axis=-1)
+
+    def get_geodesic(self):
+        """Compute pairwise geodesic distances for a specific distribution using a surface-based distance."""
+        points = self.gt_points
+        num_points = points.shape[0]
+        distances = np.zeros((num_points, num_points))
+
+        for i in range(num_points):
+            for j in range(i + 1, num_points):
+                distances[i, j] = self._surface_geodesic_distance(points[i], points[j])
+                distances[j, i] = distances[i, j]
+
+        return distances
+
+    def _surface_geodesic_distance(self, p1, p2):
+        """Approximate the geodesic distance between two points on the saddle surface."""
+        u1, v1 = p1[0], p1[1]
+        u2, v2 = p2[0], p2[1]
+        distance = np.sqrt((u2 - u1) ** 2 + (v2 - v1) ** 2)
+
+        return distance
+    
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    data_name = "saddle_surface" # "swiss_roll"
 
-    dataset = SwissRoll(n_distributions=100, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
+    if data_name == "swiss_roll":
+        dataset = SwissRoll(n_distributions=100, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
+
+    elif data_name == "saddle_surface":
+        dataset = SaddleSurfaceDataset(n_distributions=100, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
+    
     data = dataset.X
     labels = dataset.labels
     gt_distance = dataset.get_geodesic()
     print("Data shape:", dataset.X.shape)
     print("Labels shape:", dataset.labels.shape)
-    # 3d plot of the data
+
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(data[:,1], data[:,2], data[:,3], c=labels, cmap='tab20')
-    plt.savefig("swiss_roll.png", bbox_inches='tight')
+    ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
+    plt.savefig(f"{data_name}.png", bbox_inches='tight') 
+
     
