@@ -92,7 +92,7 @@ def compute_geographic_metric(
     longitude,
     use_medians=False,
     only_far=False,
-    subset_to_test_on=None
+    subset_to_test_on=None,
 ):
     """
     Compare ground-truth haversine distances (lat/lon) vs. embedding distances (ancestry_coords).
@@ -302,20 +302,6 @@ def compute_quality_metrics(
 
     return metrics_dict
 
-def AdmixturePreservationK(dataset, embeddings: np.ndarray) -> np.array:
-    """
-    A vector-value wrapper returning admixture preservation scores for all Ks.
-    """
-    
-    return_vector = np.zeros(len(dataset.admixture_ratios))
-    for i, key in enumerate(dataset.admixture_ratios.keys()):
-        return_vector[i] = compute_continental_admixture_metric_dists(
-            ancestry_coords=embeddings,
-            admixture_ratios=dataset.admixture_ratios[key],
-            population_label=dataset.population_label
-        )
-    return return_vector
-    
 
 ##############################################################################
 # 5) Single-Value Wrappers (conform to Metric(Protocol))
@@ -325,6 +311,8 @@ def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
     """
     Minimal wrapper that passes extra keyword arguments to compute_geographic_metric.
     """
+    #module = kwargs.pop('module', None)  # Pop but ignore or handle separately
+
     return compute_geographic_metric(
         ancestry_coords=embeddings,
         latitude=dataset.latitude,
@@ -342,6 +330,20 @@ def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:
         admixture_ratios=dataset.admixture_ratios,
         population_label=dataset.population_label
     )
+
+def AdmixturePreservationK(dataset, embeddings: np.ndarray) -> np.array:
+    """
+    A vector-value wrapper returning admixture preservation scores for all Ks.
+    """
+    
+    return_vector = np.zeros(len(dataset.admixture_ratios))
+    for i, key in enumerate(dataset.admixture_ratios.keys()):
+        return_vector[i] = compute_continental_admixture_metric_dists(
+            ancestry_coords=embeddings,
+            admixture_ratios=dataset.admixture_ratios[key],
+            population_label=dataset.population_label
+        )
+    return return_vector
 
 def AdmixtureLaplacian(dataset, embeddings: np.ndarray) -> float:
     """
