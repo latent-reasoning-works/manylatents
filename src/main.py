@@ -81,7 +81,7 @@ def main(cfg: DictConfig):
         test_batches  = [batch[field_index].cpu() for batch in test_loader]
         test_tensor = torch.cat(test_batches, dim=0)
         logger.info(
-            f"Running Dimensionality Reduction (DR) on {data_source}:\n"
+            f"Running Dimensionality Reduction (DR) {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
         )

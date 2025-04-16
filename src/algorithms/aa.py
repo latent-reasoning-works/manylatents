@@ -13,7 +13,8 @@ class ArchetypalAnalysisModule(DimensionalityReductionModule):
         max_iter: int = 100,
         random_state: int = 42
     ):
-        super().__init__(n_components=n_components, init_seed=random_state)
+        super().__init__(n_components=n_components, 
+                         init_seed=random_state)
         self.method = method
         self.max_iter = max_iter
         self.model = None

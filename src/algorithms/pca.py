@@ -7,7 +7,8 @@ from .dimensionality_reduction import DimensionalityReductionModule
 
 
 class PCAModule(DimensionalityReductionModule):
-    def __init__(self, n_components: int = 2, 
+    def __init__(self, 
+                 n_components: int = 2, 
                  random_state: int = 42, 
                  fit_fraction: float = 1.0):
         super().__init__(n_components=n_components, 
