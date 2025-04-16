@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.linalg import svd
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 
-def AffinitySpectrum(embeddings: np.ndarray, kernel_matrix: np.ndarray, top_k: int = 25) -> np.ndarray:
+def affinity_spectrum(embeddings: np.ndarray, kernel_matrix: np.ndarray, top_k: int = 25) -> np.ndarray:
     """
     Compute the top `k` singular values of the normalized affinity matrix
     derived from a kernel matrix, using the symmetrized diffusion operator.
@@ -33,3 +34,10 @@ def AffinitySpectrum(embeddings: np.ndarray, kernel_matrix: np.ndarray, top_k: i
     U, svals, VT = svd(S)
 
     return svals[:top_k]
+
+##############################################################################
+# Single-Value Wrappers (conform to Metric(Protocol))
+##############################################################################
+
+def AffinitySpectrum(dataset, embeddings: np.ndarray, module: DimensionalityReductionModule, top_k: int = 25) -> np.ndarray:
+    return affinity_spectrum(embeddings=embeddings, top_k=top_k, kernel_matrix=module.kernel_matrix)
