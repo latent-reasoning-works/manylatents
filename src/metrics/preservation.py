@@ -40,7 +40,7 @@ def preservation_metric(gt_dists, ac_dists, num_dists=50000, only_far=False):
 # 2) Geographic Metric
 ##############################################################################
 
-def _compute_geographic_metric(
+def compute_geographic_metric(
     ancestry_coords,
     latitude,
     longitude,
@@ -86,7 +86,7 @@ def _compute_geographic_metric(
     return preservation_metric(gt_dists, ac_dists, only_far=only_far)
 
 ## logging version for debugging
-def compute_geographic_metric(
+def _compute_geographic_metric(
     ancestry_coords,
     latitude,
     longitude,
