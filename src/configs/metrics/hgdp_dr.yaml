@@ -5,4 +5,7 @@ defaults:
   - admixture_preservationk
 - embedding:
   - trustworthiness
+  - knn_preservation
+- module:
+  - connected_components
 subsample_fraction: null
