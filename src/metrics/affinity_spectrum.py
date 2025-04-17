@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from scipy.linalg import svd
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
@@ -40,4 +41,12 @@ def affinity_spectrum(embeddings: np.ndarray, kernel_matrix: np.ndarray, top_k: 
 ##############################################################################
 
 def AffinitySpectrum(dataset, embeddings: np.ndarray, module: DimensionalityReductionModule, top_k: int = 25) -> np.ndarray:
-    return affinity_spectrum(embeddings=embeddings, top_k=top_k, kernel_matrix=module.kernel_matrix)
+    kernel_matrix = getattr(module, "kernel_matrix", None)
+    if kernel_matrix is None:
+        warnings.warn(
+            "AffinitySpectrum metric skipped: module has no 'kernel_matrix' attribute.",
+            RuntimeWarning
+        )
+        return np.array([np.nan])
+    
+    return affinity_spectrum(embeddings=embeddings, top_k=top_k, kernel_matrix=kernel_matrix)
