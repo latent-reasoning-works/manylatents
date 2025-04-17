@@ -94,3 +94,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+## handle for local folders
+_*

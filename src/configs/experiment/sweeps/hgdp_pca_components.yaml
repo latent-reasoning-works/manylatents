@@ -1,5 +1,5 @@
 # @package _global_
-name: pca_n_components=${algorithm.dimensionality_reduction.n_components}
+name: hgdp_pca_n_components=${algorithm.dimensionality_reduction.n_components}
 
 defaults:
   - override /algorithm/dimensionality_reduction: pca

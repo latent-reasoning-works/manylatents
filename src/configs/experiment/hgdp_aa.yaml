@@ -1,10 +1,10 @@
 # @package _global_
-name: hgdp_aa
+name: hgdp_aa_n_archetypes=${algorithm.dimensionality_reduction.n_components}
 
 defaults:
   - override /algorithm/dimensionality_reduction: aa
   - override /data: hgdp_split
   - override /callbacks/embedding: default
-  - override /metrics: tsa_pearson
+  - override /metrics: tangent_space
 
 seed: 42
