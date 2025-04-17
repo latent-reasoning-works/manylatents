@@ -5,7 +5,7 @@ defaults:
   - override /algorithm/dimensionality_reduction: tsne
   - override /data: hgdp_pca_precomputed
   - override /callbacks/embeddings: default
-  - override /metrics: hgdp_dr
+  - override /metrics: hgdp_hyperparameter_exp
 
 seed: 42
 

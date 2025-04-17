@@ -1,0 +1,18 @@
+defaults:
+- _self_
+- dataset:
+  - geographic_preservation
+  - geographic_preservation_medians
+  - geographic_preservation_far
+  - geographic_preservation_medians_far
+  - admixture_preservationk
+  - admixture_preservationk_medians
+  - admixture_preservationk_far
+  - admixture_preservationk_medians_far
+- embedding:
+  - trustworthiness
+  - knn_preservation
+- module:
+  - connected_components
+  - affinity_spectrum
+subsample_fraction: null

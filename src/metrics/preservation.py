@@ -321,17 +321,18 @@ def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
         **kwargs
     )
 
-def AdmixturePreservation(dataset, embeddings: np.ndarray) -> float:
+def AdmixturePreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
     """
     Another single-value wrapper returning Spearman correlation.
     """
     return compute_continental_admixture_metric_dists(
         ancestry_coords=embeddings,
         admixture_ratios=dataset.admixture_ratios,
-        population_label=dataset.population_label
+        population_label=dataset.population_label,
+        **kwargs
     )
 
-def AdmixturePreservationK(dataset, embeddings: np.ndarray) -> np.array:
+def AdmixturePreservationK(dataset, embeddings: np.ndarray, **kwargs) -> np.array:
     """
     A vector-value wrapper returning admixture preservation scores for all Ks.
     """
@@ -341,7 +342,8 @@ def AdmixturePreservationK(dataset, embeddings: np.ndarray) -> np.array:
         return_vector[i] = compute_continental_admixture_metric_dists(
             ancestry_coords=embeddings,
             admixture_ratios=dataset.admixture_ratios[key],
-            population_label=dataset.population_label
+            population_label=dataset.population_label,
+            **kwargs
         )
     return return_vector
 
