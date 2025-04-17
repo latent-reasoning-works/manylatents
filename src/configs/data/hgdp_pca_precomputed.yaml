@@ -8,7 +8,7 @@ mode: split
 files:
   metadata: "./data/HGDP+1KGP/gnomad_derived_metadata_with_filtered_sampleids.csv"
   
-precomputed_path: "./data/embeddings/hgdp_pca.csv"
+precomputed_path: "./data/embeddings/hgdp_pca_n_components=50.csv"
 filter_qc: True
 filter_related: False
 test_all: True
