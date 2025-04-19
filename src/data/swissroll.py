@@ -1,7 +1,7 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-from synthetic_dataset import SwissRoll
+from .synthetic_dataset import SwissRoll
 
 class SwissRollDataModule(LightningDataModule):
     """
