@@ -1,0 +1,15 @@
+# @package _global_
+name: swissroll_pca_n_components=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: pca
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /metrics: tangent_space
+
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2
+    
