@@ -90,7 +90,7 @@ class SwissRoll(SyntheticDataset):
         X += noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
         self.data = X.T  # shape (5000, 3)
         self.ts = np.squeeze(ts)  # (5000,)
-        self.labels = np.repeat(
+        self.metadata = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
         )
         self.t = self.mean_t[0]  # shape (100, )
@@ -99,10 +99,10 @@ class SwissRoll(SyntheticDataset):
         self.means = np.concatenate((mean_x, self.mean_y, mean_z)).T  # shape (100, 3)
         if rotate_to_dim > 3:
             self.data = self.rotate_to_dim(rotate_to_dim)
-        self.labels = np.repeat(
+        self.metadata = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
         )
-        self.labels = np.argmax(self.labels,-1)
+        self.metadata = np.argmax(self.metadata,-1)
 
     def _unroll_t(self, t):
         t = t.flatten()  # (100,)
@@ -161,10 +161,10 @@ class SaddleSurfaceDataset(SyntheticDataset):
         self.data = self._apply_noise(self.data)
         self.gt_points = gt_points
 
-        self.labels = np.repeat(
+        self.metadata = np.repeat(
             np.eye(self.n_distributions), self.n_points_per_distribution, axis=0
         )
-        self.labels = np.argmax(self.labels,-1)
+        self.metadata = np.argmax(self.metadata,-1)
 
     def _generate_gaussian_blobs(self):
         """Generate Gaussian blobs in the parameter space of the saddle surface."""
@@ -225,7 +225,7 @@ if __name__ == "__main__":
         dataset = SaddleSurfaceDataset(n_distributions=100, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
     
     data = dataset.X
-    labels = dataset.labels
+    labels = dataset.metadata
     gt_distance = dataset.get_geodesic()
     print("Data shape:", dataset.X.shape)
     print("Labels shape:", dataset.labels.shape)
