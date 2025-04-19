@@ -1,7 +1,7 @@
 _target_: src.data.swissroll.SwissRollDataModule
 batch_size: 32
 num_workers: 1
-val_split: 0.2
+test_split: 0.2
 n_distributions: 100
 n_points_per_distribution: 50
 noise: 0.05
@@ -9,3 +9,4 @@ manifold_noise: 0.05
 width: 10.0
 random_state: 42
 rotate_to_dim: 5
+mode: full

@@ -13,32 +13,33 @@ class SyntheticDataset(Dataset):
 
     def __init__(self):
         super().__init__()
-        self.X = None
-        self.labels = None
+        self.data = None
+        self.metadata = None
         self.graph = None
 
     def __len__(self):
-        return self.X.shape[0]
+        return self.data.shape[0]
 
     def __getitem__(self, idx):
-        x = self.X[idx]
-        y = self.labels[idx] if self.labels is not None else -1
-        return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
+        x = self.data[idx]
+        y = self.metadata[idx] if self.metadata is not None else -1
+        return {"data": torch.tensor(x, dtype=torch.float32), "metadata": torch.tensor(y, dtype=torch.long)}
+        # return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
 
     def get_labels(self):
-        return self.labels
+        return self.metadata
 
     def get_data(self):
-        return self.X
+        return self.data
 
     def standardize_data(self):
         """
         Standardize data putting it in a unit box around the origin. (min_max normalization)
         This is necessary for quadtree type algorithms
         """
-        X = self.X
-        minx = np.min(self.X, axis=0)
-        maxx = np.max(self.X, axis=0)
+        X = self.data
+        minx = np.min(self.data, axis=0)
+        maxx = np.max(self.data, axis=0)
         self.std_X = (X - minx) / (maxx - minx)
         return self.std_X
 
@@ -46,12 +47,13 @@ class SyntheticDataset(Dataset):
         """
         Rotate dataset to a different dimensionality.
         """
-        self.rot_mat = special_ortho_group.rvs(dim)[: self.X.shape[1]]
-        self.high_X = np.dot(self.X, self.rot_mat)
+        self.rot_mat = special_ortho_group.rvs(dim)[: self.data.shape[1]]
+        self.high_X = np.dot(self.data, self.rot_mat)
         return self.high_X
 
     def get_geodesic(self):
         pass
+
 
 class SwissRoll(SyntheticDataset):
     def __init__(
@@ -86,7 +88,7 @@ class SwissRoll(SyntheticDataset):
         zs = ts * np.sin(ts)
         X = np.stack((xs, ys, zs))  # shape (3, 5000)
         X += noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
-        self.X = X.T  # shape (5000, 3)
+        self.data = X.T  # shape (5000, 3)
         self.ts = np.squeeze(ts)  # (5000,)
         self.labels = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
@@ -96,7 +98,7 @@ class SwissRoll(SyntheticDataset):
         mean_z = self.mean_t * np.sin(self.mean_t)  # shape (1, 100)
         self.means = np.concatenate((mean_x, self.mean_y, mean_z)).T  # shape (100, 3)
         if rotate_to_dim > 3:
-            self.X = self.rotate_to_dim(rotate_to_dim)
+            self.data = self.rotate_to_dim(rotate_to_dim)
         self.labels = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
         )
@@ -120,7 +122,7 @@ class SwissRoll(SyntheticDataset):
     def get_graph(self):
         """Create a graphtools graph if does not exist."""
         if self.graph is None:
-            self.graph = graphtools.Graph(self.X, use_pygsp=True)
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
         return self.graph
     
 class SaddleSurfaceDataset(SyntheticDataset):
@@ -153,10 +155,10 @@ class SaddleSurfaceDataset(SyntheticDataset):
         self.point_sets = []
 
         gt_points = self._generate_gaussian_blobs()
-        self.X = gt_points
+        self.data = gt_points
         if rotate_to_dim > 3:
-            self.X = self.rotate_to_dim(rotate_to_dim)
-        self.X = self._apply_noise(self.X)
+            self.data = self.rotate_to_dim(rotate_to_dim)
+        self.data = self._apply_noise(self.data)
         self.gt_points = gt_points
 
         self.labels = np.repeat(
