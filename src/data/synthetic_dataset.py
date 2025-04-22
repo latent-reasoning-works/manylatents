@@ -125,7 +125,7 @@ class SwissRoll(SyntheticDataset):
             self.graph = graphtools.Graph(self.data, use_pygsp=True)
         return self.graph
     
-class SaddleSurfaceDataset(SyntheticDataset):
+class SaddleSurface(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         dataset = SwissRoll(n_distributions=100, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
 
     elif data_name == "saddle_surface":
-        dataset = SaddleSurfaceDataset(n_distributions=100, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
+        dataset = SaddleSurface(n_distributions=100, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
     
     data = dataset.X
     labels = dataset.metadata
