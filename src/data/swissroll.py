@@ -146,9 +146,9 @@ if __name__ == "__main__":
     val_batch = next(iter(val_loader))
 
     print("Train batch:")
-    print("  x shape:", train_batch[0].shape)
-    print("  y shape:", train_batch[1].shape)
+    print("  x shape:", train_batch['data'].shape)
+    print("  y shape:", train_batch['metadata'].shape)
 
     print("Validation batch:")
-    print("  x shape:", val_batch[0].shape)
-    print("  y shape:", val_batch[1].shape)
+    print("  x shape:", val_batch['data'].shape)
+    print("  y shape:", val_batch['metadata'].shape)
