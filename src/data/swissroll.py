@@ -15,28 +15,55 @@ class SwissRollDataModule(LightningDataModule):
         num_workers: int = 0,
         n_distributions: int = 100,
         n_points_per_distribution: int = 50,
-        noise: float = 0.05,
-        manifold_noise: float = 0.05,
+        noise: float = 0.1,
+        manifold_noise: float = 0.1,
         width: float = 10.0,
         random_state: int = 42,
         rotate_to_dim: int = 3,
         # parameters to match hgdp.py
-        mode: str = 'split',
+        mode: str = 'full',
     ):
         """
-        Initializes the SwissRollDataModule with configuration parameters.
+        Initialize the SwissRollDataModule with configuration parameters for data loading
+        and synthetic data generation.
 
-        Args:
-            batch_size (int): Number of samples per batch.
-            val_split (float): Fraction of the dataset used for validation.
-            num_workers (int): Number of subprocesses to use for data loading.
-            n_distributions (int): Number of distributions in the synthetic Swiss Roll.
-            n_points_per_distribution (int): Number of samples per distribution.
-            noise (float): Amount of additive noise to the final data.
-            manifold_noise (float): Noise along the Swiss roll manifold.
-            width (float): Width of the Swiss roll (controls spread in Y-axis).
-            random_state (int): Random seed for reproducibility.
-            rotate_to_dim (int): Output dimension to which the 3D Swiss roll is rotated.
+        Parameters
+        ----------
+        batch_size : int, default=128
+            Number of samples per batch used in training and validation data loaders.
+
+        test_split : float, default=0.2
+            Fraction of the dataset to allocate to the test set.
+
+        num_workers : int, default=0
+            Number of subprocesses to use for data loading in PyTorch's DataLoader.
+
+        n_distributions : int, default=100
+            Number of independent Gaussian distributions along the Swiss roll manifold.
+
+        n_points_per_distribution : int, default=50
+            Number of samples drawn from each Gaussian distribution.
+
+        noise : float, default=0.1
+            Global Gaussian noise added to all data points for variability.
+
+        manifold_noise : float, default=0.1
+            Local noise controlling the spread of points within each Gaussian distribution.
+
+        width : float, default=10.0
+            Width of the Swiss roll, determining the spread of the manifold in the vertical axis.
+
+        random_state : int, default=42
+            Seed for the random number generator to ensure reproducibility.
+
+        rotate_to_dim : int, default=3
+            Target dimension for rotation. Rotation is only applied if this value is greater than 3.
+            The default of 3 keeps the Swiss roll in 3D space.
+
+        mode : str, default='full'
+            Mode for dataset train/test seperation. 
+            If 'full', the entire dataset is used as both training and test set (unsplit).
+            If 'split', the dataset is randomly split into training and test subsets based on `test_split`.
         """
         super().__init__()
         
@@ -76,8 +103,8 @@ class SwissRollDataModule(LightningDataModule):
                 rotate_to_dim=self.rotate_to_dim,
             )
             self.test_dataset = self.train_dataset
-        elif self.mode == 'split':
 
+        elif self.mode == 'split':
             self.dataset = SwissRoll(
                 n_distributions=self.n_distributions,
                 n_points_per_distribution=self.n_points_per_distribution,
@@ -121,6 +148,8 @@ class SwissRollDataModule(LightningDataModule):
         )
     
 if __name__ == "__main__":
+
+    from synthetic_dataset import SwissRoll
 
     # Initialize DataModule
     sr = SwissRollDataModule(

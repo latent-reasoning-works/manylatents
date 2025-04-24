@@ -24,7 +24,6 @@ class SyntheticDataset(Dataset):
         x = self.data[idx]
         y = self.metadata[idx] if self.metadata is not None else -1
         return {"data": torch.tensor(x, dtype=torch.float32), "metadata": torch.tensor(y, dtype=torch.long)}
-        # return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
 
     def get_labels(self):
         return self.metadata
@@ -45,7 +44,7 @@ class SyntheticDataset(Dataset):
 
     def rotate_to_dim(self, dim):
         """
-        Rotate dataset to a different dimensionality.
+        Rotate dataset to a different higher dimensionality.
         """
         self.rot_mat = special_ortho_group.rvs(dim)[: self.data.shape[1]]
         self.high_X = np.dot(self.data, self.rot_mat)
@@ -60,12 +59,45 @@ class SwissRoll(SyntheticDataset):
         self,
         n_distributions=100,
         n_points_per_distribution=50,
-        noise=0.0,
-        manifold_noise=1.0,
-        width=1,
+        noise=0.1,
+        manifold_noise=0.1,
+        width=10.0,
         random_state=42,
         rotate_to_dim=3,
     ):
+        """
+        Initialize a synthetic Swiss Roll dataset with parameters to control 
+        the structure and noise characteristics. The distributions are generated
+        by sampling points along a Swiss roll manifold, with Gaussian noise added to
+        the points.
+
+        Parameters:
+        ----------
+        n_distributions : int, default=100
+            Number of independent Gaussian distributions to generate along the manifold.
+
+        n_points_per_distribution : int, default=50
+            Number of samples drawn from each Gaussian distribution.
+
+        noise : float, default=0.1
+            Standard deviation of isotropic Gaussian noise added to each data point 
+            (i.e., global noise affecting all points).
+
+        manifold_noise : float, default=0.1
+            Controls the standard deviation within each local distribution on the 
+            manifold (i.e., spread of each blob along the Swiss roll).
+
+        width : float, default=10.0
+            Width factor of the Swiss roll, affecting how "thick" the roll appears.
+
+        random_state : int, default=42
+            Seed for random number generator to ensure reproducibility of the synthetic data.
+
+        rotate_to_dim : int, default=3
+            The higher dimensionality of the space to which the manifold is rotated.
+            Rotation is only applied when this value is greater than 3.
+            For visualization purposes, the default of 3 means no rotation is applied.
+        """
         super().__init__()
         rng = np.random.default_rng(random_state)
 
@@ -130,13 +162,44 @@ class SaddleSurface(SyntheticDataset):
         self,
         n_distributions=100,
         n_points_per_distribution=50,
-        noise=0.05,
-        manifold_noise=0.2,
+        noise=0.1,
+        manifold_noise=0.1,
         a=1.0,
         b=1.0,
         random_state=42,
         rotate_to_dim=3,
     ):
+        """
+        Initialize a synthetic Saddle Surface dataset with tunable parameters for geometry and noise.
+
+        Parameters
+        ----------
+        n_distributions : int, default=100
+            Number of independent Gaussian distributions sampled across the saddle surface manifold.
+
+        n_points_per_distribution : int, default=50
+            Number of data points drawn from each Gaussian distribution.
+
+        noise : float, default=0.1
+            Global isotropic Gaussian noise added to all data points.
+
+        manifold_noise : float, default=0.1
+            Local noise controlling spread within each distribution on the manifold surface.
+
+        a : float, default=1.0
+            Coefficient scaling the x-direction of the saddle surface (z = a * x^2 - b * y^2).
+
+        b : float, default=1.0
+            Coefficient scaling the y-direction curvature of the saddle surface (z = a * x^2 - b * y^2).
+
+        random_state : int, default=42
+            Seed for the random number generator to ensure reproducibility.
+
+        rotate_to_dim : int, default=3
+            The higher dimensionality of the space to which the manifold is rotated.
+            Rotation is only applied when this value is greater than 3.
+            For visualization purposes, the default of 3 means no rotation is applied.
+        """
         super().__init__()
         np.random.seed(random_state)
         self.n_distributions = n_distributions
@@ -215,6 +278,7 @@ class SaddleSurface(SyntheticDataset):
         return distance
     
 if __name__ == "__main__":
+
     import matplotlib.pyplot as plt
     data_name = "saddle_surface" # "swiss_roll"
 
