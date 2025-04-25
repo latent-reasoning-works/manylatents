@@ -1,0 +1,15 @@
+# @package _global_
+name: saddlesurface_pca_n_components=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: pca
+  - override /data: saddlesurface
+  - override /callbacks/embedding: default
+  - override /metrics: sythetic_data_metrics
+
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2
+    
