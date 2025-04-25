@@ -1,0 +1,4 @@
+admixture_preservation_medians:
+  _target_: src.metrics.preservation.AdmixturePreservationK
+  _partial_: True
+  use_medians: True

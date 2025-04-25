@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import networkx as nx
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
@@ -24,4 +25,12 @@ def connected_components(embeddings: np.ndarray, kernel_matrix: np.ndarray) -> l
 ##############################################################################
 
 def ConnectedComponents(dataset, embeddings: np.ndarray, module: DimensionalityReductionModule) -> np.ndarray:
-    return connected_components(embeddings=embeddings, kernel_matrix=module.kernel_matrix)
+    kernel_matrix = getattr(module, "kernel_matrix", None)
+    if kernel_matrix is None:
+        warnings.warn(
+            "ConnectedComponents metric skipped: module has no 'kernel_matrix' attribute.",
+            RuntimeWarning
+        )
+        return np.array([np.nan])
+
+    return connected_components(embeddings=embeddings, kernel_matrix=kernel_matrix)
