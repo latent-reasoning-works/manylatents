@@ -128,8 +128,6 @@ def main():
         default=[
             "algorithm.dimensionality_reduction",
             "metrics.embedding.trustworthiness",
-            "metrics.dataset.geographic_preservation",
-            "metrics.dataset.admixture_preservation",
         ],
         help="Config sections to extract (default: the four main ones)"
     )
