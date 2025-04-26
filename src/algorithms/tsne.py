@@ -106,7 +106,7 @@ class TSNEModule(DimensionalityReductionModule):
         if not self._is_fitted:
             raise RuntimeError("Model not fitted.")
         P = self.affinities.P.todense()
-        np.fill_diagonal(P, 0)  # Remove self-loops if needed
+        np.fill_diagonal(P, 0)  # Remove self-loops
         return P
 
     @property
@@ -114,11 +114,17 @@ class TSNEModule(DimensionalityReductionModule):
         """Returns kernel matrix used to build P matrix (including diagonal)"""
         if not self._is_fitted:
             raise RuntimeError("Model not fitted.")
+
         # NOTE: affinity matrix has more non-zero entries than kernel matrix.
         # Not sure why.
-        K_no_diag = build_dense_distance_matrix(self.affinities._PerplexityBasedNN__distances,
-                                                self.affinities._PerplexityBasedNN__neighbors)
-        # add back diagonal
+        # NOTE: values here are >> 1
+        #K_no_diag = build_dense_distance_matrix(self.affinities._PerplexityBasedNN__distances,
+        #                                        self.affinities._PerplexityBasedNN__neighbors)
+        # symmetrize
+        #K_no_diag = (K_no_diag + K_no_diag.T) / 2
+        K_no_diag = np.asarray(self.affinities.P.todense())
+
+        # add diagonal (just setting to 1)
         K = np.eye(len(K_no_diag)) + K_no_diag
 
         return K
