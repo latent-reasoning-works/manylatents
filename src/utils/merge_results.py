@@ -1,4 +1,5 @@
 import argparse
+import yaml
 import re
 import pandas as pd
 from typing import List
@@ -77,6 +78,23 @@ def load_all_runs_from_sweeps(
                 continue
             with open(log_file, "r") as f:
                 log_text = f.read()
+
+            if metric_keys is None:
+                metric_keys = []
+                with open(config_file, "r") as stream:
+                    try:
+                        out = yaml.safe_load(stream)
+                    except yaml.YAMLError as exc:
+                        print(exc)
+                if 'dataset' in out['metrics'].keys():
+                    metric_keys.extend(list(out['metrics']['dataset'].keys()))
+                if 'embedding' in out['metrics'].keys():
+                    metric_keys.extend(list(out['metrics']['embedding'].keys()))
+                if 'module' in out['metrics'].keys():
+                    metric_keys.extend(list(out['metrics']['module'].keys()))
+                print('Did not pass metric_keys. Infered from metric config file')
+                print(metric_keys)
+
             metrics = extract_selected_metrics_from_text(log_text, metric_keys)
             if not metrics:
                 continue
@@ -101,7 +119,6 @@ def main():
         "--metric_keys", 
         type=str, 
         nargs='+',
-        required=True,
         help="Metric keys to extract from logs (space separated)"
     )
     parser.add_argument(
