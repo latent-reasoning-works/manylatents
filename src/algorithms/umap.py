@@ -66,5 +66,5 @@ class UMAPModule(DimensionalityReductionModule):
         if not self._is_fitted:
             raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
         K_no_diag = np.asarray(self.model.graph_.todense())
-        K = np.eye(len(K_no_diag)) + K_no_diag
-        return K
+        #K = np.eye(len(K_no_diag)) + K_no_diag
+        return K_no_diag
