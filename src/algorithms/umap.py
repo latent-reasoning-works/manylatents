@@ -15,6 +15,7 @@ class UMAPModule(DimensionalityReductionModule):
         n_components: int = 2,
         random_state: Optional[int] = 42,
         n_neighbors: int = 15,
+        min_dist: float = 0.5,
         metric: str = 'euclidean',
         n_epochs: Optional[int] = 200,
         learning_rate: float = 1.0,
@@ -25,6 +26,7 @@ class UMAPModule(DimensionalityReductionModule):
         self.model = UMAP(n_components=n_components, 
                            random_state=random_state,
                            n_neighbors=n_neighbors,
+                           min_dist=min_dist,
                            metric=metric,
                            n_epochs=n_epochs,
                            learning_rate=learning_rate)
