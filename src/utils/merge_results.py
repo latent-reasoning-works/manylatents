@@ -7,7 +7,8 @@ from omegaconf import OmegaConf
 from pathlib import Path
 
 def extract_metric_value(metric_str: str):
-    array_match = re.match(r'array\(\[(.*?)\]\)', metric_str, re.DOTALL)
+    #array_match = re.match(r'array\(\[(.*?)\]\)', metric_str, re.DOTALL)
+    array_match = re.match(r'array\(\[(.*?)\][^\)]*\)', metric_str, re.DOTALL)
     if array_match:
         return [float(x.strip()) for x in array_match.group(1).split(',')]
     else:
@@ -19,7 +20,8 @@ def extract_metric_value(metric_str: str):
 def extract_selected_metrics_from_text(log_text: str, metric_names: List[str]):
     result = {}
     for metric in metric_names:
-        pattern = rf"'{metric}':\s*(array\(\[.*?\]\)|[0-9.eE+-]+)"
+        #pattern = rf"'{metric}':\s*(array\(\[.*?\]\)|[0-9.eE+-]+)"
+        pattern = rf"'{metric}':\s*(array\(\[.*?\][^\)]*\)|array\([^\)]*\)|[0-9.eE+-]+)"
         match = re.search(pattern, log_text, re.DOTALL)
         if match:
             value = extract_metric_value(match.group(1))
@@ -96,6 +98,7 @@ def load_all_runs_from_sweeps(
                 print(metric_keys)
 
             metrics = extract_selected_metrics_from_text(log_text, metric_keys)
+
             if not metrics:
                 continue
             df_row = pd.DataFrame([metrics])
