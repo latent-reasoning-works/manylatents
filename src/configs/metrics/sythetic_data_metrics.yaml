@@ -1,5 +1,7 @@
 defaults:
 - _self_
+- dataset:
+  - geodesic_preservation
+  - geodesic_preservation_far
 - embedding:
-  - tangent_space
   - knn_preservation

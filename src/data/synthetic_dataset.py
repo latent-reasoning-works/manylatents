@@ -53,6 +53,11 @@ class SyntheticDataset(Dataset):
     def get_geodesic(self):
         pass
 
+    @property
+    def geodesic_dists(self):
+        D = self.get_geodesic()
+        return D[np.triu_indices(D.shape[0], k=1)]
+
 
 class SwissRoll(SyntheticDataset):
     def __init__(

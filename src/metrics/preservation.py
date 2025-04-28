@@ -355,3 +355,17 @@ def AdmixtureLaplacian(dataset, embeddings: np.ndarray) -> float:
         ancestry_coords=embeddings,
         admixture_ratios=dataset.admixture_ratios
     )
+
+def GeodesicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
+    """
+    Computes preservation of embedding distance versus ground truth distance (on synthetic data)
+    Do not pass use_medians as a kwarg
+    """
+
+    assert hasattr(dataset, 'geodesic_dists')
+    if "use_medians" in kwargs:
+        raise ValueError("'use_medians' argument is not allowed.")
+
+    return preservation_metric(dataset.geodesic_dists, 
+                               pdist(embeddings), 
+                               **kwargs)
