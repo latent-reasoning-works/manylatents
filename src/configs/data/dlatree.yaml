@@ -7,7 +7,7 @@ n_branch: 20
 branch_lengths: 100
 rand_multiplier: 2.0
 gap_multiplier: 0.0
-random_state: 0
+random_state: ${seed}
 sigma: 0.5
 disconnect_branches: null
 sampling_density_factors: null
