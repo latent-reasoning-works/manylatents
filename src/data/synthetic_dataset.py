@@ -357,7 +357,7 @@ class DLAtree(SyntheticDataset):
         self.metadata = metadata
         self.n_dim = n_dim
         
-    def get_geodesic(self):
+    def get_gt_dists(self):
         """
         Compute geodesic distances as shortest paths over the tree graph
         """
@@ -510,7 +510,7 @@ class DLAtree(SyntheticDataset):
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "dla_tree" # "swiss_roll" or "saddle_surface" or "dla_tree"
+    data_name = "saddle_surface" # "swiss_roll" or "saddle_surface" or "dla_tree"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=100, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
