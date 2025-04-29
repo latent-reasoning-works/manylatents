@@ -5,8 +5,8 @@ knn: 5
 t: 'auto'
 gamma: 1.0
 decay: 40
-n_pca: 100 ## default in source library
-n_landmark: 2000
+n_pca: null #100 #default in source library
+n_landmark: null
 n_jobs: -1
 verbose: False
 fit_fraction: 1.0

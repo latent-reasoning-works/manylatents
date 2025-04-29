@@ -7,6 +7,6 @@ n_points_per_distribution: 50
 noise: 0.1
 manifold_noise: 0.1
 width: 10.0
-random_state: 42
+random_state: ${seed}
 rotate_to_dim: 5
 mode: full

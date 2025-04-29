@@ -1,0 +1,4 @@
+gt_preservation_far:
+  _target_: src.metrics.preservation.GroundTruthPreservation
+  _partial_: True
+  only_far: True

@@ -1,0 +1,7 @@
+defaults:
+- _self_
+- dataset:
+  - gt_preservation
+  - gt_preservation_far
+- embedding:
+  - knn_preservation
