@@ -64,4 +64,6 @@ class PHATEModule(DimensionalityReductionModule):
     @property
     def kernel_matrix(self):
         """Returns kernel matrix used to build diffusion operator"""
-        return self.model.graph.K.todense()
+        K =  np.asarray(self.model.graph.K.todense())
+        K = K - np.diag(K)*np.eye(len(K))
+        return K

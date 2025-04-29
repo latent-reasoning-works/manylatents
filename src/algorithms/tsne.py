@@ -5,6 +5,7 @@ from typing import Optional, Union
 import numpy as np
 from openTSNE import affinity, initialization
 from openTSNE.tsne import TSNEEmbedding
+from openTSNE.affinity import PerplexityBasedNN
 
 from .dimensionality_reduction import DimensionalityReductionModule
 
@@ -57,7 +58,16 @@ class TSNEModule(DimensionalityReductionModule):
         x_fit = x_np[:n_fit]
 
         # Step 1: Compute affinities (P matrix)
-        self.affinities = affinity.PerplexityBasedNN(
+        
+        # monkey patch to allow for large perplexity
+        # Overwriting:
+        # https://github.com/pavlin-policar/openTSNE/blob/52ae1d67cbe2b99995e6c8dc0fcc3992344998bc/openTSNE/affinity.py#L340
+        def do_nothing_check_perplexity(perplexity, k_neighbors):
+            # Always just return the perplexity passed in, no checks or clamping
+            return perplexity
+        PerplexityBasedNN.check_perplexity = staticmethod(do_nothing_check_perplexity)
+
+        self.affinities = PerplexityBasedNN(
             x_fit,
             perplexity=self.perplexity,
             metric=self.metric,
@@ -105,20 +115,26 @@ class TSNEModule(DimensionalityReductionModule):
         """Returns P matrix"""
         if not self._is_fitted:
             raise RuntimeError("Model not fitted.")
-        P = self.affinities.P.todense()
-        np.fill_diagonal(P, 0)  # Remove self-loops if needed
+        P = np.asarray(self.affinities.P.todense())
         return P
 
     @property
     def kernel_matrix(self):
-        """Returns kernel matrix used to build P matrix (including diagonal)"""
+        """Returns kernel matrix used to build P matrix (not including diagonal)"""
         if not self._is_fitted:
             raise RuntimeError("Model not fitted.")
+
         # NOTE: affinity matrix has more non-zero entries than kernel matrix.
         # Not sure why.
-        K_no_diag = build_dense_distance_matrix(self.affinities._PerplexityBasedNN__distances,
-                                                self.affinities._PerplexityBasedNN__neighbors)
-        # add back diagonal
-        K = np.eye(len(K_no_diag)) + K_no_diag
+        # NOTE: values here are >> 1
+        #K_no_diag = build_dense_distance_matrix(self.affinities._PerplexityBasedNN__distances,
+        #                                        self.affinities._PerplexityBasedNN__neighbors)
+        # symmetrize
+        #K_no_diag = (K_no_diag + K_no_diag.T) / 2
+        K_no_diag = np.asarray(self.affinities.P.todense())
+
+        # add diagonal (just setting to 1)
+        #K = np.eye(len(K_no_diag)) + K_no_diag
+        K = K_no_diag
 
         return K

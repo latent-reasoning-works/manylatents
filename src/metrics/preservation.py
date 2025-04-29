@@ -230,9 +230,23 @@ def compute_continental_admixture_metric_laplacian(
     laplacian = compute_knn_laplacian(ancestry_coords, k=5, normalized=True)
     return compute_average_smoothness(laplacian, admixture_ratios)
 
+##############################################################################
+# 4) Ground Truth based metrics
+##############################################################################
+
+def compute_ground_truth_preservation(ancestry_coords,
+                                      gt_dists,
+                                      **kwargs):
+    
+    gt_dists = gt_dists[np.triu_indices(gt_dists.shape[0], k=1)]
+    ac_dists = pdist(ancestry_coords)
+    return preservation_metric(gt_dists, 
+                               ac_dists, 
+                               **kwargs)
+
 
 ##############################################################################
-# 4) Example Aggregators
+# 5) Example Aggregators
 ##############################################################################
 
 def compute_k_admixture_metric_dists(
@@ -304,7 +318,7 @@ def compute_quality_metrics(
 
 
 ##############################################################################
-# 5) Single-Value Wrappers (conform to Metric(Protocol))
+# 6) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
 def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
@@ -355,3 +369,18 @@ def AdmixtureLaplacian(dataset, embeddings: np.ndarray) -> float:
         ancestry_coords=embeddings,
         admixture_ratios=dataset.admixture_ratios
     )
+
+def GroundTruthPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
+    """
+    Computes preservation of embedding distance versus ground truth distance (on synthetic data)
+    Do not pass use_medians as a kwarg
+    """
+
+    assert hasattr(dataset, 'get_gt_dists'
+    gt_dists = dataset.get_gt_dists()
+    if "use_medians" in kwargs:
+        raise ValueError("'use_medians' argument is not allowed.")
+
+    return compute_ground_truth_preservation(embeddings,
+                                             gt_dists,
+                                             **kwargs)
