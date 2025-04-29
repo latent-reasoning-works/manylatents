@@ -76,7 +76,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
         self.test_split = test_split
         self.num_workers = num_workers
 
-        # SwissRoll-specific
+        # Saddle Surface specific
         self.n_distributions = n_distributions
         self.n_points_per_distribution = n_points_per_distribution
         self.noise = noise

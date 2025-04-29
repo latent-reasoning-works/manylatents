@@ -4,6 +4,9 @@ import graphtools
 import numpy as np
 from sklearn.metrics import pairwise_distances
 from scipy.stats import special_ortho_group
+import scipy.sparse as sp
+from scipy.sparse.csgraph import shortest_path
+from typing import Union, List, Optional, Dict
 
 
 class SyntheticDataset(Dataset):
@@ -282,26 +285,260 @@ class SaddleSurface(SyntheticDataset):
 
         return distance
     
+    def get_graph(self):
+        """Create a graphtools graph if does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
+
+class DLAtree(SyntheticDataset):
+    def __init__(
+        self,
+        n_dim: int = 3,
+        n_branch: int = 20,
+        branch_lengths: Union[List[int], int, None] = None,  # List of branch lengths, one per branch
+        rand_multiplier: float = 2,
+        gap_multiplier: float = 0,
+        random_state: int = 42,
+        sigma: float = 4,
+        disconnect_branches: Optional[List[int]] = [5,15],  # Branch indices to disconnect
+        sampling_density_factors: Optional[Dict[int, float]] = None,  # Reduce density of certain branches
+    ):
+
+        """
+        Generate a Diffusion-Limited Aggregation (DLA) tree with optional branch disconnections.
+
+        Parameters
+        ----------
+        n_dim : int, default=3
+            Number of dimensions for each point in the tree.
+
+        n_branch : int, default=20
+            Number of branches in the tree.
+
+        branch_lengths : int or list of int or None, default=100
+            Length of each branch. If an int is provided, all branches will have the same length.
+
+        rand_multiplier : float, default=2.0
+            Scaling factor for random movement along the tree.
+
+        gap_multiplier : float, default=0.0
+            Scaling factor for the gap added when disconnecting branches.
+
+        random_state : int, default=37
+            Seed for the random number generator to ensure reproducibility.
+
+        sigma : float, default=4.0
+            Standard deviation of Gaussian noise added to all data points.
+
+        disconnect_branches : list of int or None, optional
+            Indices of branches to disconnect from the main structure.
+
+        sampling_density_factors : dict of int to float or None, optional
+            Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
+        """
+        super().__init__()
+        # Generate the DLA data
+        data, data_gt, metadata = self._make_sim_data(
+            n_dim=n_dim,
+            n_branch=n_branch,
+            branch_lengths=branch_lengths,
+            rand_multiplier=rand_multiplier,
+            gap_multiplier=gap_multiplier,
+            random_state=random_state,
+            sigma=sigma,
+            disconnect_branches=disconnect_branches or [],
+            sampling_density_factors=sampling_density_factors,
+        )
+
+        self.data = data  # noisy data
+        self.data_gt = data_gt  # ground truth tree
+        self.metadata = metadata
+        self.n_dim = n_dim
+        
+    def get_gt_dists(self):
+        """
+        Compute geodesic distances as shortest paths over the tree graph
+        """
+        if self.graph is None:
+            self.get_graph()
+        geodesic_dist = shortest_path(csgraph=self.graph.tocsr(), directed=False)
+        return geodesic_dist
+
+    def get_graph(self):
+        """
+        Build a sparse adjacency graph connecting neighboring points along the tree structure
+        """
+        if self.graph is None:
+            n_points = self.data_gt.shape[0]
+            adj_matrix = sp.lil_matrix((n_points, n_points))
+
+            for i in range(n_points - 1):
+                distance = np.linalg.norm(self.data_gt[i] - self.data_gt[i + 1])
+                adj_matrix[i, i + 1] = distance
+                adj_matrix[i + 1, i] = distance
+
+            self.graph = adj_matrix
+        return self.graph
+    
+    ### same method of get_geodesic and get_graph as DeMAP but might not work well on DLA tree
+    # def get_geodesic(self):
+    #     # Compute geodesic distances as shortest paths over the graphtools graph
+    #     if self.graph is None:
+    #         self.get_graph()
+    #     adj_matrix = self.graph.graph  # extract adjacency matrix from Graph object
+    #     geodesic_dist = shortest_path(csgraph=adj_matrix.tocsr(), directed=False)
+    #     return geodesic_dist
+
+    # def get_graph(self):
+    #     # Build and return a graphtools.Graph object (DeMAP style) on noisy data
+    #     if self.graph is None:
+    #         import graphtools
+    #         self.graph = graphtools.Graph(self.data_gt, knn=10, decay=None)
+    #     return self.graph
+
+    def _make_sim_data(
+        self,
+        n_dim: int,
+        n_branch: int,
+        branch_lengths: int,
+        rand_multiplier: float,
+        gap_multiplier: float,
+        random_state: int,
+        sigma: float,
+        disconnect_branches: list,
+        sampling_density_factors: dict,
+    ):
+        return self._gen_dla_with_disconnectivity(
+            n_dim=n_dim,
+            n_branch=n_branch,
+            branch_lengths=branch_lengths,
+            rand_multiplier=rand_multiplier,
+            gap_multiplier=gap_multiplier,
+            random_state=random_state,
+            sigma=sigma,
+            disconnect_branches=disconnect_branches,
+            sampling_density_factors=sampling_density_factors,
+        )
+
+    def _gen_dla_with_disconnectivity(
+        self,
+        n_dim: int,
+        n_branch: int,
+        branch_lengths,
+        rand_multiplier: float,
+        gap_multiplier: float,
+        random_state: int,
+        sigma: float,
+        disconnect_branches: list,
+        sampling_density_factors: dict,
+    ):
+        """
+        Generates a Diffusion-Limited Aggregation (DLA) tree with optional branch disconnections.
+        """
+        np.random.seed(random_state)
+
+        # Default branch lengths if none are provided
+        if branch_lengths is None:
+            branch_lengths = [100] * n_branch
+        elif isinstance(branch_lengths, int):
+            branch_lengths = [branch_lengths] * n_branch
+        elif len(branch_lengths) != n_branch:
+            raise ValueError("The length of 'branch_lengths' must match 'n_branch'.")
+
+        # Initialize the first branch
+        M_gt = np.cumsum(-1 + rand_multiplier * np.random.rand(branch_lengths[0], n_dim), axis=0)
+        M = M_gt.copy()  # Start with ground truth dataset
+        branch_start_indices = [0]  # Keep track of where each branch starts
+
+        for i in range(1, n_branch):
+            ind = np.random.randint(branch_start_indices[i - 1], branch_start_indices[i - 1] + branch_lengths[i - 1])
+
+            # Create the ground truth branch first
+            new_branch_gt = np.cumsum(
+                -1 + rand_multiplier * np.random.rand(branch_lengths[i], n_dim), axis=0
+            )
+            new_branch_gt += M_gt[ind]
+
+            # Create the potentially disconnected branch
+            new_branch = new_branch_gt.copy()
+            if i in disconnect_branches:
+                jump = np.random.normal(gap_multiplier, 0.1, n_dim)  # Jump offset
+                new_branch += jump  # Apply the jump to all points in the branch
+
+                # Check if the jump places the branch too close to another branch
+                distances = np.linalg.norm(M - new_branch[0], axis=1)
+                if np.min(distances) < rand_multiplier:
+                    raise ValueError(f"Jump for branch {i} is too close to another branch. Adjust gap_multiplier.")
+
+            M_gt = np.concatenate([M_gt, new_branch_gt])
+            M = np.concatenate([M, new_branch])
+            branch_start_indices.append(M.shape[0] - branch_lengths[i])
+
+        # Reduce sampling density for certain branches
+        if sampling_density_factors:
+            mask = np.ones(M.shape[0], dtype=bool)
+            for branch_idx, factor in sampling_density_factors.items():
+                start_idx = branch_start_indices[branch_idx]
+                end_idx = start_idx + branch_lengths[branch_idx]
+                branch_points = np.arange(start_idx, end_idx)
+                keep_points = np.random.choice(branch_points, int(len(branch_points) * factor), replace=False)
+                mask[branch_points] = False  # Remove points
+                mask[keep_points] = True  # Retain selected points
+            M = M[mask]
+            M_gt = M_gt[mask]  # Apply the same mask to the ground truth
+        else:
+            mask = None
+
+        # Add noise
+        noise = np.random.normal(0, sigma, M.shape)
+        M = M + noise
+        M_gt = M_gt + noise
+
+        C = np.array(
+            [i for branch_idx, branch_len in enumerate(branch_lengths)
+             for i in [branch_idx] * branch_len]
+        )
+        if mask is not None:
+            C = C[mask]
+
+        return M, M_gt, C
+
+
+
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "saddle_surface" # "swiss_roll"
+    data_name = "saddle_surface" # "swiss_roll" or "saddle_surface" or "dla_tree"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=100, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
 
     elif data_name == "saddle_surface":
         dataset = SaddleSurface(n_distributions=100, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
+    elif data_name == "dla_tree":
+        dataset = DLAtree(n_dim=100, n_branch=20, branch_lengths=100, rand_multiplier=2.0, gap_multiplier=0.0, random_state=37, sigma=4.0, disconnect_branches=[], sampling_density_factors=None)
     
-    data = dataset.X
+    data = dataset.data
     labels = dataset.metadata
     gt_distance = dataset.get_gt_dists()
-    print("Data shape:", dataset.X.shape)
-    print("Labels shape:", dataset.labels.shape)
+    g = dataset.get_graph()
+    print("Data shape:", dataset.data.shape)
+    print("Labels shape:", dataset.metadata.shape)
+    
+    if data_name == "swiss_roll" or data_name == "saddle_surface":
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(data[:,2], data[:,0], data[:,1], c=labels, cmap='tab20')
+    elif data_name == "dla_tree":
+        # visualize by phate
+        import phate
+        phate_operator = phate.PHATE()
+        phate_data = phate_operator.fit_transform(data)
+        plt.figure(figsize=(8, 6))
+        plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
     plt.savefig(f"{data_name}.png", bbox_inches='tight') 
 
     
