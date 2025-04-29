@@ -50,13 +50,13 @@ class SyntheticDataset(Dataset):
         self.high_X = np.dot(self.data, self.rot_mat)
         return self.high_X
 
-    def get_geodesic(self):
+    def get_gt_dists(self):
         pass
 
-    @property
-    def geodesic_dists(self):
-        D = self.get_geodesic()
-        return D[np.triu_indices(D.shape[0], k=1)]
+    #@property
+    #def geodesic_dists(self):
+    #    D = self.get_geodesic()
+    #    return D[np.triu_indices(D.shape[0], k=1)]
 
 
 class SwissRoll(SyntheticDataset):
@@ -147,7 +147,7 @@ class SwissRoll(SyntheticDataset):
             1, -1
         )  # (1, 100)
 
-    def get_geodesic(self):
+    def get_gt_dists(self):
         u_t = self._unroll_t(self.ts)  # (1, 5000)
         # u_t = self.ts
         true_coords = np.concatenate(
@@ -261,7 +261,7 @@ class SaddleSurface(SyntheticDataset):
         z = self.a * u**2 - self.b * v**2
         return np.stack((x, y, z), axis=-1)
 
-    def get_geodesic(self):
+    def get_gt_dists(self):
         """Compute pairwise geodesic distances for a specific distribution using a surface-based distance."""
         points = self.gt_points
         num_points = points.shape[0]
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     
     data = dataset.X
     labels = dataset.metadata
-    gt_distance = dataset.get_geodesic()
+    gt_distance = dataset.get_gt_dists()
     print("Data shape:", dataset.X.shape)
     print("Labels shape:", dataset.labels.shape)
 
