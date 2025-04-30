@@ -376,7 +376,7 @@ def GroundTruthPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
     Do not pass use_medians as a kwarg
     """
 
-    assert hasattr(dataset, 'get_gt_dists'
+    assert hasattr(dataset, 'get_gt_dists')
     gt_dists = dataset.get_gt_dists()
     if "use_medians" in kwargs:
         raise ValueError("'use_medians' argument is not allowed.")
