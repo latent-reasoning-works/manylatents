@@ -1,6 +1,7 @@
-# 🧬 Manifold Genetics
+# Many Latents
+"One geometry, learned through many latents"
 
-A framework for applying dimensionality reduction techniques (PCA, PHATE, t-SNE, etc.) on genomic datasets, built with **PyTorch Lightning**, **Hydra**, and **uv** for reproducibility and scalability.  
+A framework for applying dimensionality reduction techniques (PCA, PHATE, t-SNE, etc.) on diverse datasets, built with **PyTorch Lightning**, **Hydra**, and **uv** for reproducibility and scalability.  
 TODO: Fill description with the neural net coupling functionality + other relevant stuff...
 
 ---
