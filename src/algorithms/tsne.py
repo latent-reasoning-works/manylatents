@@ -1,11 +1,11 @@
-import torch
-from torch import Tensor
 from typing import Optional, Union
 
 import numpy as np
-from openTSNE import affinity, initialization
-from openTSNE.tsne import TSNEEmbedding
+import torch
+from openTSNE import initialization
 from openTSNE.affinity import PerplexityBasedNN
+from openTSNE.tsne import TSNEEmbedding
+from torch import Tensor
 
 from .dimensionality_reduction import DimensionalityReductionModule
 
@@ -40,6 +40,7 @@ class TSNEModule(DimensionalityReductionModule):
         n_iter_late: Optional[int] = 750,
         learning_rate: Union[float, str] = 'auto',
         metric: str = "euclidean",
+        initialization: str = "random",
         fit_fraction: float = 1.0,
     ):
         super().__init__(n_components, random_state)
@@ -48,6 +49,7 @@ class TSNEModule(DimensionalityReductionModule):
         self.n_iter_late = n_iter_late
         self.learning_rate = learning_rate
         self.metric = metric
+        self.initialization = initialization
         self.fit_fraction = fit_fraction
         self.random_state = random_state
 
@@ -77,7 +79,14 @@ class TSNEModule(DimensionalityReductionModule):
         )
 
         # Step 2: Initialize embedding
-        init = initialization.pca(x_fit, random_state=self.random_state)
+        init = _get_tsne_initialization(
+            init_arg=self.initialization,
+            x_fit=x_fit,
+            n_fit=n_fit,
+            n_components=self.n_components,
+            random_state=self.random_state,
+            affinities=self.affinities,
+        )
 
         # Step 3: Create Embedding object
         self.embedding_train = TSNEEmbedding(
@@ -138,3 +147,74 @@ class TSNEModule(DimensionalityReductionModule):
         K = K_no_diag
 
         return K
+    
+def _get_tsne_initialization(
+    init_arg: Union[str, np.ndarray],
+    x_fit: np.ndarray,
+    n_fit: int,
+    n_components: int,
+    random_state: Optional[int],
+    affinities=None,
+) -> np.ndarray:
+    """
+    Return a (n_fit x n_components) array for openTSNE initialization.
+    init_arg can be:
+      - "pca", "random", "spectral", "rescale", "jitter"
+      - any custom ndarray of shape (n_fit, n_components)
+    """
+    # custom array takes absolute precedence
+    if isinstance(init_arg, np.ndarray):
+        return init_arg
+
+    method = init_arg.lower()
+    if method == "pca":
+        return initialization.pca(
+            X=x_fit,
+            n_components=n_components,
+            random_state=random_state,
+            add_jitter=True,
+        )
+
+    if method == "random":
+        return initialization.random(
+            n_samples=n_fit,
+            n_components=n_components,
+            random_state=random_state,
+        )
+
+    if method == "spectral":
+        # affinities.P is the sparse adjacency / transition matrix
+        return initialization.spectral(
+            A=affinities.P,
+            n_components=n_components,
+            random_state=random_state,
+            add_jitter=True,
+        )
+
+    if method == "rescale":
+        base = initialization.pca(
+            X=x_fit,
+            n_components=n_components,
+            random_state=random_state,
+            add_jitter=False,
+        )
+        return initialization.rescale(x=base, target_std=0.0001)
+
+    if method == "jitter":
+        base = initialization.pca(
+            X=x_fit,
+            n_components=n_components,
+            random_state=random_state,
+            add_jitter=False,
+        )
+        return initialization.jitter(
+            x=base,
+            scale=0.01,
+            random_state=random_state,
+        )
+
+    raise ValueError(
+        f"Unsupported TSNE initialization `{init_arg}`; "
+        "choose one of "
+        "['pca','random','spectral','rescale','jitter'] or pass an ndarray"
+    )

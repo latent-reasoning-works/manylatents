@@ -6,4 +6,5 @@ n_iter_early: 250
 n_iter_late: 750
 learning_rate: 'auto'
 metric: "euclidean"
+initialization: "random"
 fit_fraction: 1.0
