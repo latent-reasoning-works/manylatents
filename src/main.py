@@ -38,7 +38,6 @@ def main(cfg: DictConfig):
     that is passed to a unified evaluate() routine (registered for dict types) to compute
     dataset-level and module-level metrics.
     """
-    
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
     

@@ -1,7 +1,7 @@
 [project]
-name = "manifold-genetics"
+name = "ManyLatents"
 version = "0.1.0"
-description = "placeholder" ## change to something more descriptive
+description = "a hydra enabled dimensionality reduction framework for the analysis of high dimensional data"
 authors = [
     { name = "César Miguel Valdez Córdova", email = "cesar.valdez@mila.quebec" },
     { name = "Shuang Ni", email = "shuang.ni@mila.quebec"},
@@ -85,6 +85,8 @@ dependencies = [
     "umap-learn>=0.5.7",
     "ripser>=0.6.12",
     "archetypes>=0.6.2",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.12",
 ]
 
 [tool.uv]

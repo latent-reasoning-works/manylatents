@@ -1,4 +1,4 @@
-name: 🧬 Dimensionality Reduction Tests
+name: Build and Integration Tests
 
 on:
   push:
@@ -11,40 +11,40 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  dr-tests:
-    name: Run DR Tests on CPU
+  build-and-run:
+    name: Build and Run Main
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      # ✅ Checkout repository
+      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ✅ Install uv package manager
+      # Install uv package manager
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ✅ Install dependencies
+      # Install dependencies
       - name: Install dependencies
         run: |
           uv sync
 
-      # ✅ Run Dimensionality Reduction Tests
-      - name: Run DR Tests
+      # Run main.py with a basic configuration
+      ## todo: add configuration with noops on metrics,dataset,algorithm
+      - name: Run main.py
         run: |
-          uv run pytest src/algorithms/dimensionality_reduction_test.py
-          uv run pytest src/tests/algorithms/dr_compliance_test.py
+          source .venv/bin/activate
+          python -m src.main \
+            algorithm=dimensionality_reduction/noop \
+            metrics=test_metric \
+            data=test_data \
+            debug=true
 
-      # ✅ Upload Coverage Report (Optional)
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:

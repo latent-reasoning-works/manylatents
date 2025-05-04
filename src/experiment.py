@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     check_or_make_dirs(cfg.cache_dir)
     logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
-
+    ##todo: change to use a test data config call instead, remove dummy utils call
     if cfg.data.get("debug", False):
         logger.info("DEBUG MODE: Using a dummy datamodule with limited data.")
         dummy_data = torch.randn(100, 10)

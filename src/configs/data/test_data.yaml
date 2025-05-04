@@ -1,0 +1,2 @@
+_target_: src.data.test_data.TestDataModule
+batch_size: 32
