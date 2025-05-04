@@ -86,6 +86,8 @@ def evaluate_embeddings(
     ds_metrics_cfg = all_metrics_cfg.get("dataset", {})
     ds_subsample_fraction = all_metrics_cfg.get("subsample_fraction", None)
 
+    # naming and variable setting a bit fuzzy, make it be in line 
+    # with module, embedding level metrics
     if ds_subsample_fraction is not None:
         ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, EmbeddingOutputs.get("embeddings"), ds_subsample_fraction)
         logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
@@ -97,7 +99,7 @@ def evaluate_embeddings(
     # dataset metrics
     for metric_name, metric_config in ds_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
-        result = metric_fn(ds_subsampled, embeddings_subsampled)
+        result = metric_fn(embeddings=embeddings_subsampled, dataset=ds_subsampled)
         metrics[metric_name] = result
 
     # embedding metrics
@@ -105,7 +107,7 @@ def evaluate_embeddings(
     for metric_name, metric_config in embedding_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
         # no subsetting here
-        result = metric_fn(ds, EmbeddingOutputs.get("embeddings"))
+        result = metric_fn(embeddings=EmbeddingOutputs.get("embeddings"))
         metrics[metric_name] = result
 
     # module metrics
@@ -113,7 +115,7 @@ def evaluate_embeddings(
     for metric_name, metric_config in module_metrics_cfg.items():
         metric_fn = hydra.utils.instantiate(metric_config)
         # no subsetting here
-        result = metric_fn(ds, EmbeddingOutputs.get("embeddings"), module=module)
+        result = metric_fn(embeddings=EmbeddingOutputs.get("embeddings"), module=module)
         metrics[metric_name] = result
 
     return metrics
