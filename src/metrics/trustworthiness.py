@@ -2,7 +2,10 @@ import numpy as np
 from sklearn.manifold import trustworthiness as sk_trustworthiness
 
 
-def Trustworthiness(embeddings: np.ndarray, dataset, n_neighbors: int = 5, metric: str = 'euclidean') -> float:
+def Trustworthiness(embeddings: np.ndarray, 
+                    dataset: object, 
+                    n_neighbors: int = 25, 
+                    metric: str = 'euclidean') -> float:
     """
     Compute the trustworthiness of an embedding.
 

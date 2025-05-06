@@ -9,7 +9,7 @@ from src.algorithms.dimensionality_reduction import DimensionalityReductionModul
 def Continuity(
     embeddings: np.ndarray,
     dataset: object,
-    n_neighbors: int = 5,
+    n_neighbors: int = 25,
     metric: str = 'euclidean',
     module: Optional[DimensionalityReductionModule] = None,
 ) -> float:

@@ -8,7 +8,7 @@ from sklearn.neighbors import NearestNeighbors
 logger = logging.getLogger(__name__)
 
 def TangentSpaceApproximation(embeddings: np.ndarray, 
-                              n_neighbors: int = 15,
+                              n_neighbors: int = 25,
                               variance_threshold: float = 0.95, 
                               return_per_sample: bool = False) -> Union[float, np.ndarray]:
     """

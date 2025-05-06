@@ -7,7 +7,7 @@ from sklearn.neighbors import NearestNeighbors
 logger = logging.getLogger(__name__)
 
 def ParticipationRatio(embeddings: np.ndarray,
-                       n_neighbors: int = 15,
+                       n_neighbors: int = 25,
                        return_per_sample: bool = False) -> Union[float, np.ndarray]:
     """
     Compute the local Participation Ratio (PR) for each sample’s neighborhood.
