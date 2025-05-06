@@ -11,7 +11,7 @@ hydra:
     cpus_per_task: 1
     mem_gb: null
     mem_per_cpu: 128GB
-    timeout_min: 2000
+    timeout_min: 200
     array_parallelism: 30 # max num of tasks to run in parallel (via job array)
     setup:
       - "source .venv/bin/activate"
