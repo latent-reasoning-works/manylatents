@@ -16,3 +16,7 @@ hydra:
     array_parallelism: 20 # max num of tasks to run in parallel (via job array)
     setup:
       - "source .venv/bin/activate"
+
+    additional_parameters:
+      account: def-hussinju
+
