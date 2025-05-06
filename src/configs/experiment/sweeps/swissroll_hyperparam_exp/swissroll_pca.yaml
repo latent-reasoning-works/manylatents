@@ -2,6 +2,7 @@
 name: swissroll_pca_full_n_components=${algorithm.dimensionality_reduction.n_components}
 
 defaults:
+  - /launcher: mila_cluster
   - override /algorithm/dimensionality_reduction: pca
   - override /data: swissroll
   - override /callbacks/embedding: default
