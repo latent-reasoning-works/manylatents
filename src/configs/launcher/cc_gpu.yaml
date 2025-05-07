@@ -18,5 +18,5 @@ hydra:
       - "source .venv/bin/activate"
 
     additional_parameters:
-      account: def-hussinju
+      account: add-your-account
 
