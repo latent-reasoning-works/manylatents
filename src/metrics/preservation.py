@@ -323,8 +323,8 @@ def compute_quality_metrics(
 # 6) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def GeographicPreservation(dataset, 
-                           embeddings: np.ndarray,
+def GeographicPreservation(embeddings: np.ndarray,
+                           dataset, 
                            module: Optional[DimensionalityReductionModule] = None,
                            **kwargs) -> float:
     """
@@ -340,8 +340,8 @@ def GeographicPreservation(dataset,
         **kwargs
     )
 
-def AdmixturePreservation(dataset, 
-                          embeddings: np.ndarray, 
+def AdmixturePreservation(embeddings: np.ndarray,
+                          dataset, 
                           module: Optional[DimensionalityReductionModule] = None,
                           **kwargs) -> float:
     """
@@ -354,8 +354,8 @@ def AdmixturePreservation(dataset,
         **kwargs
     )
 
-def AdmixturePreservationK(dataset, 
-                           embeddings: np.ndarray, 
+def AdmixturePreservationK(embeddings: np.ndarray,
+                           dataset, 
                            module: Optional[DimensionalityReductionModule] = None,
                            **kwargs) -> np.array:
     """
@@ -372,8 +372,8 @@ def AdmixturePreservationK(dataset,
         )
     return return_vector
 
-def AdmixtureLaplacian(dataset, 
-                       embeddings: np.ndarray,
+def AdmixtureLaplacian(embeddings: np.ndarray,
+                       dataset, 
                        module: Optional[DimensionalityReductionModule] = None) -> float:
     """
     Laplacian-based metric -> single float for callback usage.
@@ -383,8 +383,8 @@ def AdmixtureLaplacian(dataset,
         admixture_ratios=dataset.admixture_ratios
     )
 
-def GroundTruthPreservation(dataset, 
-                            embeddings: np.ndarray, 
+def GroundTruthPreservation(embeddings: np.ndarray, 
+                            dataset, 
                             module: Optional[DimensionalityReductionModule] = None,
                             **kwargs) -> float:
     """

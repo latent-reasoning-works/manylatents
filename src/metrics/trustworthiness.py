@@ -6,9 +6,9 @@ from src.algorithms.dimensionality_reduction import DimensionalityReductionModul
 
 def Trustworthiness(embeddings: np.ndarray, 
                     dataset: object, 
+                    module: Optional[DimensionalityReductionModule] = None,
                     n_neighbors: int = 25, 
-                    metric: str = 'euclidean',
-                    module: Optional[DimensionalityReductionModule] = None,) -> float:
+                    metric: str = 'euclidean') -> float:
     """
     Compute the trustworthiness of an embedding.
 
