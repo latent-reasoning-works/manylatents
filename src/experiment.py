@@ -72,7 +72,9 @@ def evaluate_embeddings(
     if EmbeddingOutputs is None or EmbeddingOutputs.get("embeddings") is None:
         logger.warning("No embeddings available for evaluation.")
         return {}
-    
+
+    embeddings = EmbeddingOutputs.get("embeddings")
+ 
     if datamodule.mode == "split":
         ds = datamodule.test_dataset
     else:
@@ -81,44 +83,34 @@ def evaluate_embeddings(
     logger.info(f"Reference data shape: {ds.data.shape}")
     logger.info(f"Computing embedding metrics for {ds.data.shape[0]} samples.")
     
-    metrics = {}
-    all_metrics_cfg = cfg.metrics
-    ds_metrics_cfg = all_metrics_cfg.get("dataset", {})
-    ds_subsample_fraction = all_metrics_cfg.get("subsample_fraction", None)
-
-    # naming and variable setting a bit fuzzy, make it be in line 
-    # with module, embedding level metrics
-    if ds_subsample_fraction is not None:
-        ds_subsampled, embeddings_subsampled = subsample_data_and_dataset(ds, EmbeddingOutputs.get("embeddings"), ds_subsample_fraction)
-        logger.info(f"Subsampled dataset to {embeddings_subsampled.shape[0]} samples for dataset-level metrics.")
+    #subsample in case dataset is too large
+    subsample_fraction = cfg.metrics.get("subsample_fraction", None)
+    if subsample_fraction is not None:
+        ds_sub, emb_sub = subsample_data_and_dataset(ds, embeddings, subsample_fraction)
+        logger.info(f"Subsampled dataset to {emb_sub.shape[0]} samples.")
     else:
-        ds_subsampled, embeddings_subsampled = ds, EmbeddingOutputs.get("embeddings")
+        ds_sub, emb_sub = ds, embeddings
 
     module = kwargs.get("module", None)
     
-    # dataset metrics
-    for metric_name, metric_config in ds_metrics_cfg.items():
-        metric_fn = hydra.utils.instantiate(metric_config)
-        result = metric_fn(embeddings=embeddings_subsampled, dataset=ds_subsampled)
-        metrics[metric_name] = result
-
-    # embedding metrics
-    embedding_metrics_cfg = all_metrics_cfg.get("embedding", {})
-    for metric_name, metric_config in embedding_metrics_cfg.items():
-        metric_fn = hydra.utils.instantiate(metric_config)
-        # no subsetting here
-        result = metric_fn(embeddings=EmbeddingOutputs.get("embeddings"))
-        metrics[metric_name] = result
-
-    # module metrics
-    module_metrics_cfg = all_metrics_cfg.get("module", {})
-    for metric_name, metric_config in module_metrics_cfg.items():
-        metric_fn = hydra.utils.instantiate(metric_config)
-        # no subsetting here
-        result = metric_fn(embeddings=EmbeddingOutputs.get("embeddings"), module=module)
-        metrics[metric_name] = result
-
+    metric_cfgs = {## removes metric level headers, config structure not flat
+        name: subcfg
+        for group in cfg.metrics.values()
+        if isinstance(group, DictConfig)
+        for name, subcfg in group.items()
+        if isinstance(subcfg, DictConfig) and "_target_" in subcfg
+    }    
+    
+    metrics = {}
+    for metric_name, metric_cfg in metric_cfgs.items():
+        metric_fn = hydra.utils.instantiate(metric_cfg)
+        metrics[metric_name] = metric_fn(
+            embeddings=emb_sub,
+            dataset=ds_sub,
+            module=module,
+        )
     return metrics
+
 
 @evaluate.register(LightningModule)
 def evaluate_lightningmodule(
