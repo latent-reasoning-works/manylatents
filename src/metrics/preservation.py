@@ -1,10 +1,12 @@
 import logging
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import spearmanr
 
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.utils.metrics import (
     compute_average_smoothness,
     compute_geodesic_distances,
@@ -321,7 +323,10 @@ def compute_quality_metrics(
 # 6) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
+def GeographicPreservation(dataset, 
+                           embeddings: np.ndarray,
+                           module: Optional[DimensionalityReductionModule] = None,
+                           **kwargs) -> float:
     """
     Minimal wrapper that passes extra keyword arguments to compute_geographic_metric.
     """
@@ -335,7 +340,10 @@ def GeographicPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
         **kwargs
     )
 
-def AdmixturePreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
+def AdmixturePreservation(dataset, 
+                          embeddings: np.ndarray, 
+                          module: Optional[DimensionalityReductionModule] = None,
+                          **kwargs) -> float:
     """
     Another single-value wrapper returning Spearman correlation.
     """
@@ -346,7 +354,10 @@ def AdmixturePreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
         **kwargs
     )
 
-def AdmixturePreservationK(dataset, embeddings: np.ndarray, **kwargs) -> np.array:
+def AdmixturePreservationK(dataset, 
+                           embeddings: np.ndarray, 
+                           module: Optional[DimensionalityReductionModule] = None,
+                           **kwargs) -> np.array:
     """
     A vector-value wrapper returning admixture preservation scores for all Ks.
     """
@@ -361,7 +372,9 @@ def AdmixturePreservationK(dataset, embeddings: np.ndarray, **kwargs) -> np.arra
         )
     return return_vector
 
-def AdmixtureLaplacian(dataset, embeddings: np.ndarray) -> float:
+def AdmixtureLaplacian(dataset, 
+                       embeddings: np.ndarray,
+                       module: Optional[DimensionalityReductionModule] = None) -> float:
     """
     Laplacian-based metric -> single float for callback usage.
     """
@@ -370,7 +383,10 @@ def AdmixtureLaplacian(dataset, embeddings: np.ndarray) -> float:
         admixture_ratios=dataset.admixture_ratios
     )
 
-def GroundTruthPreservation(dataset, embeddings: np.ndarray, **kwargs) -> float:
+def GroundTruthPreservation(dataset, 
+                            embeddings: np.ndarray, 
+                            module: Optional[DimensionalityReductionModule] = None,
+                            **kwargs) -> float:
     """
     Computes preservation of embedding distance versus ground truth distance (on synthetic data)
     Do not pass use_medians as a kwarg

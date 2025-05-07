@@ -1,11 +1,15 @@
+from typing import Optional
+
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 
 def KNNPreservation(
     dataset,
     embeddings: np.ndarray,
     n_neighbors: int = 10,
-    metric: str = 'euclidean'
+    metric: str = 'euclidean',
+    module: Optional[DimensionalityReductionModule] = None
 ) -> float:
     """
     Compute the average k-NN preservation between high-dimensional data and its low-dimensional embedding.
