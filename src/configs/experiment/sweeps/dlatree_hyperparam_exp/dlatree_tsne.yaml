@@ -1,0 +1,16 @@
+# @package _global_
+name: tsne_perplexity=${algorithm.dimensionality_reduction.perplexity}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: tsne
+  - override /data: dlatree
+  - override /callbacks/embedding: default
+  - override /metrics: synthetic_data_metrics
+
+seed: 42
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.perplexity: 2,3,7,10,17,33,67,167,250,333,500,667,1000,1333,1500,2000,3000,4000,6000

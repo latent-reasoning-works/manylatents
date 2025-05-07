@@ -1,9 +1,12 @@
+from typing import Optional
+
 import numpy as np
 from sklearn.manifold import trustworthiness as sk_trustworthiness
-
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 
 def Trustworthiness(embeddings: np.ndarray, 
                     dataset: object, 
+                    module: Optional[DimensionalityReductionModule] = None,
                     n_neighbors: int = 25, 
                     metric: str = 'euclidean') -> float:
     """
