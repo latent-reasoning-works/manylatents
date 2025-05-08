@@ -1,0 +1,7 @@
+_target_: src.algorithms.reconstruction.Reconstruction
+datamodule: ${data}
+network:
+  _target_: src.algorithms.networks.autoencoder.Autoencoder
+  input_dim: null # must be currently specified from experiment
+  hidden_dims: 128
+  bottleneck_dim: 50

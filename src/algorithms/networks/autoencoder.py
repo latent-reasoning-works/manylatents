@@ -6,7 +6,10 @@ class Autoencoder(nn.Module):
     A simple autoencoder for reconstruction tasks.
     """
 
-    def __init__(self, input_dim: int, hidden_dims: list[int], bottleneck_dim: int, activation: str = "relu"):
+    def __init__(self, input_dim: int, 
+                 hidden_dims: list[int], 
+                 bottleneck_dim: int, 
+                 activation: str = "relu"):
         """
         Parameters:
             input_dim (int): Size of the input layer.
