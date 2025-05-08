@@ -1,8 +1,67 @@
+import copy
+from itertools import product
+from typing import Dict
+
 import numpy as np
+from omegaconf import DictConfig, ListConfig
 from scipy.sparse.csgraph import connected_components, shortest_path
 from sklearn.neighbors import kneighbors_graph
 
 
+def flatten_and_unroll_metrics(
+    all_metrics: DictConfig
+) -> Dict[str, DictConfig]:
+    """
+    Walks through every subgroup under cfg.metrics (dataset, embedding, module),
+    finds each DictConfig with a _target_, and for any keys whose value is
+    a list/ListConfig, builds one sub-config per element (Cartesian‐product
+    if multiple list-valued keys are present).
+
+    Returns:
+      name→single‐value DictConfig, where name is
+        "{group}.{metric}" or
+        "{group}.{metric}__{param1}_{v1}_{param2}_{v2}…"
+    """
+    flat: Dict[str, DictConfig] = {}
+
+    for group_name, group_cfg in all_metrics.items():
+        if not isinstance(group_cfg, DictConfig):
+            continue
+
+        for metric_name, metric_cfg in group_cfg.items():
+            if not (isinstance(metric_cfg, DictConfig) and "_target_" in metric_cfg):
+                continue
+
+            # 1) collect all keys that are list-valued
+            sweep_keys = []
+            sweep_vals = []
+            for k, v in metric_cfg.items():
+                if isinstance(v, (list, tuple, ListConfig)):
+                    sweep_keys.append(k)
+                    sweep_vals.append(list(v))
+
+            # 2) if no sweep, just copy as-is
+            if not sweep_keys:
+                flat[f"{group_name}.{metric_name}"] = metric_cfg
+                continue
+
+            # 3) cartesian‐product over all sweep values
+            for combo in product(*sweep_vals):
+                cfg_copy = copy.deepcopy(metric_cfg)
+                suffix_parts = []
+                for k, val in zip(sweep_keys, combo):
+                    # coerce to native types
+                    if isinstance(val, ListConfig): val = list(val)
+                    if isinstance(val, float) and float(val).is_integer():
+                        val = int(val)
+                    setattr(cfg_copy, k, val)
+                    suffix_parts.append(f"{k}_{val}")
+
+                flat_name = f"{group_name}.{metric_name}__{'_'.join(suffix_parts)}"
+                flat[flat_name] = cfg_copy
+
+    return flat
+###### METRIC-SPECIFIC HELPERS
 def haversine_vectorized(coords):
     """
     Compute pairwise haversine distances in a vectorized manner.
