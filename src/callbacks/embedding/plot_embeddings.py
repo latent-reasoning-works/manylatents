@@ -167,18 +167,18 @@ class PlotEmbeddings(EmbeddingCallback):
         filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
         self.save_path = os.path.join(self.save_dir, filename)
         
+        os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
         plt.savefig(self.save_path, bbox_inches="tight")
         plt.close()
-        logger.info(f"Saved 2D embeddings plot to {self.save_path}")
         
+        logger.info(f"Saved 2D embeddings plot to {self.save_path}")
         if wandb.run is not None:
             wandb.log({"embedding_plot": wandb.Image(self.save_path)})
-        
         return self.save_path
 
     def on_dr_end(self, dataset: any, embeddings: dict) -> str:
-        embeddings_to_plot = self._get_embeddings(embeddings)
-        color_array = self._get_color_array(dataset, embeddings)
-        self.save_path = self._plot_embeddings(dataset, embeddings_to_plot, color_array)
-        self.register_output("embedding_plot", self.save_path)
+        emb2d = self._get_embeddings(embeddings)
+        colors = self._get_color_array(dataset, embeddings)
+        path = self._plot_embeddings(dataset, emb2d, colors)
+        self.register_output("embedding_plot_path", path)
         return self.callback_outputs
