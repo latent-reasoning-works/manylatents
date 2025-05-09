@@ -1,12 +1,16 @@
 import logging
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
+from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+
 logger = logging.getLogger(__name__)
 
 def ParticipationRatio(embeddings: np.ndarray,
+                       dataset: Optional[object] = None,
+                       module: Optional[DimensionalityReductionModule] = None,
                        n_neighbors: int = 25,
                        return_per_sample: bool = False) -> Union[float, np.ndarray]:
     """

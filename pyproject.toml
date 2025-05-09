@@ -88,6 +88,7 @@ dependencies = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.6.12",
     "hydra-submitit-launcher>=1.2.0",
+    "scanpy>=1.10.3",
 ]
 
 [tool.uv]

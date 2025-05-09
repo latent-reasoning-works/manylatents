@@ -6,12 +6,11 @@ from sklearn.metrics import pairwise_distances
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 
 
-def Continuity(
-    embeddings: np.ndarray,
-    dataset: object,
-    n_neighbors: int = 25,
-    metric: str = 'euclidean',
-    module: Optional[DimensionalityReductionModule] = None,
+def Continuity(embeddings: np.ndarray, 
+               dataset: Optional[object] = None, 
+               module: Optional[DimensionalityReductionModule] = None,
+               n_neighbors: int = 25,
+               metric: str = 'euclidean',
 ) -> float:
     """
     Compute the continuity metric of embeddings, comparing neighborhood preservation 
