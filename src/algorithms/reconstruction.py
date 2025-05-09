@@ -15,7 +15,11 @@ class Reconstruction(LightningModule):
     specified by a Hydra config. This version assumes that the network configuration includes an
     'input_shape' provided via the config.
     """
-    def __init__(self, datamodule, network: DictConfig, optimizer: DictConfig, init_seed: int = 42):
+    def __init__(self, datamodule, 
+                 network: DictConfig, 
+                 loss: DictConfig,
+                 optimizer: DictConfig, 
+                 init_seed: int = 42):
         """
         Parameters:
             datamodule: Object used to load train/val/test data.
@@ -51,6 +55,11 @@ class Reconstruction(LightningModule):
             self.network = hydra_zen.instantiate(self.network_config)
         else:
             self.network = self.network_config
+            
+        if isinstance(self.loss_config, (dict, DictConfig)):
+            self.loss_fn = hydra_zen.instantiate(self.loss_config)
+        else:
+            self.loss_fn = self.loss_config
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -77,7 +86,13 @@ class Reconstruction(LightningModule):
         """
         x = batch["data"]
         outputs = self.network(x)
-        loss = self.network.loss_function(outputs)
+        
+        extras = {}
+        if hasattr(self.network, "encoder"):
+            extras["latent"] = self.network.encoder(x)
+            
+        loss = self.loss_fn(outputs=outputs, targets=x, **extras)
+        
         self.log(f"{phase}_loss", loss, prog_bar=True)
         return {"loss": loss, "outputs": outputs}
 
