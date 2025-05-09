@@ -22,16 +22,15 @@ class Autoencoder(nn.Module):
             activation (str): Activation function ("relu", "tanh", or "sigmoid").
         """
         super().__init__()
-        
+        ## allow single, int hidden dim
+        if isinstance(hidden_dims, int):
+            hidden_dims = [hidden_dims]
+             
         self.input_dim = input_dim
         self.hidden_dims = list(hidden_dims)
         self.latent_dim = latent_dim
         self.activation = activation
         
-        ## allow single, int hidden dim
-        if isinstance(hidden_dims, int):
-            hidden_dims = [hidden_dims]
-
         # Activation function mapping
         activation_fn = {
             "relu": nn.ReLU(),
@@ -41,7 +40,8 @@ class Autoencoder(nn.Module):
 
         # Encoder: progressively reducing dimensions
         encoder_layers = []
-        prev_dim = input_dim
+        prev_dim = self.input_dim
+        
         for h_dim in hidden_dims:
             encoder_layers.append(nn.Linear(prev_dim, h_dim))
             encoder_layers.append(activation_fn)
@@ -52,7 +52,7 @@ class Autoencoder(nn.Module):
 
         # Decoder: progressively increasing dimensions
         decoder_layers = []
-        prev_dim = latent_dim
+        prev_dim = self.latent_dim
         for h_dim in reversed(hidden_dims):
             decoder_layers.append(nn.Linear(prev_dim, h_dim))
             decoder_layers.append(activation_fn)

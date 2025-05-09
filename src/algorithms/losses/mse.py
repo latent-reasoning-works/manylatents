@@ -1,6 +1,12 @@
+# src/algorithms/losses/mse.py
 import torch.nn as nn
+from torch import Tensor
 
 
 class MSELoss(nn.Module):
-    def forward(self, outputs, targets, **kwargs):
-        return nn.functional.mse_loss(outputs, targets)
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss()
+
+    def forward(self, outputs: Tensor, targets: Tensor, **kwargs) -> Tensor:
+         return self.mse(outputs, targets)
