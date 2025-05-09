@@ -30,7 +30,7 @@ fi
 # Downloads scRNAseq zip file from Dropbox
 
 # Dropbox direct download link
-URL_scRNAseq="need_another_link"
+URL_scRNAseq="https://www.dropbox.com/scl/fi/f512xl4b128q4t55jdsfc/scRNAseq.tar.gz?rlkey=d2rzidzm8asmvegkq7blo7che&st=xo8cxkt7&dl=1"
 
 # Local path for the zip file
 FILE_scRNAseq="data/scRNAseq.tar.gz"
