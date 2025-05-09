@@ -13,6 +13,6 @@ defaults:
 algorithm:
   model:
     network:
-      input_dim: 4094 # hgdp n_rows x PCA dims
+      input_dim: 54 # hgdp n_rows x PCA dims
 
 seed: 42

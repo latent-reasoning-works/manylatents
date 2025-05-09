@@ -41,10 +41,22 @@ class Reconstruction(LightningModule):
         """
         Set up the network using the provided network config.
         """
+        # 1) Infer feature-dim if not provided, and write it back into the config
+        if self.network_config.input_dim is None:
+            first_batch = next(iter(self.datamodule.train_dataloader()))["data"]
+            feat_dim = first_batch.shape[1]
+            # Patch the DictConfig so that instantiate() sees a real int
+            self.network_config.input_dim = feat_dim
+        else:
+            feat_dim = self.network_config.input_dim
+
+        # 2) Now instantiate with a concrete input_dim
         self.configure_model()
+
         logger.info(
-            f"Reconstruction network configured with input shape: {self.network_config.input_dim}"
+            f"Reconstruction network configured with input_dim={feat_dim}"
         )
+        
 
     def configure_model(self):
         """
@@ -52,15 +64,26 @@ class Reconstruction(LightningModule):
         Assumes that 'input_dim' is already set in the config.
         """
         torch.manual_seed(self.init_seed)
-        if isinstance(self.network_config, (dict, DictConfig)):
-            self.network = hydra_zen.instantiate(self.network_config)
-        else:
-            self.network = self.network_config
-            
-        if isinstance(self.loss_config, (dict, DictConfig)):
-            self.loss_fn = hydra_zen.instantiate(self.loss_config)
-        else:
-            self.loss_fn = self.loss_config
+
+        cfg_map = {
+            "network": self.network_config,
+            "loss_fn": self.loss_config,
+            # add more as needed 
+        }
+
+        for attr, cfg in cfg_map.items():
+            if isinstance(cfg, (dict, DictConfig)):
+                inst = hydra_zen.instantiate(cfg)
+            else:
+                inst = cfg  # already an object
+            setattr(self, attr, inst)
+
+        # stash the optimizer config for the actual optimizer_step
+        # leave the torch.optim instantiation for configure_optimizers
+        self._optimizer_partial = self.optimizer_config
+
+        logger.info(f"Instantiated network={self.network.__class__.__name__}, "
+                    f"loss_fn={self.loss_fn.__class__.__name__}")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
