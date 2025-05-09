@@ -25,3 +25,31 @@ if [ ! -d "$DIR_HGDP_1KGP" ]; then
 else
     echo "Directory $DIR_HGDP_1KGP already exists, skipping extraction."
 fi
+
+
+# Downloads scRNAseq zip file from Dropbox
+
+# Dropbox direct download link
+URL_scRNAseq="need_another_link"
+
+# Local path for the zip file
+FILE_scRNAseq="data/scRNAseq.tar.gz"
+
+# Local extraction directory
+DIR_scRNAseq="data/scRNAseq"
+
+# Download the file if it doesn't already exist
+if [ ! -f "$FILE_scRNAseq" ]; then
+    echo "Downloading scRNAseq..."
+    wget -O "$FILE_scRNAseq" "$URL_scRNAseq"
+else
+    echo "File $FILE_scRNAseq already exists, skipping download."
+fi
+
+# Extract only if the directory doesn't exist
+if [ ! -d "$DIR_scRNAseq" ]; then
+    echo "Extracting scRNAseq.tar.gz..."
+    tar -xzvf "$FILE_scRNAseq" -C data/
+else
+    echo "Directory $DIR_scRNAseq already exists, skipping extraction."
+fi
