@@ -9,6 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.utils.data import DummyDataModule, subsample_data_and_dataset
+from src.utils.metrics import flatten_and_unroll_metrics
 from src.utils.utils import check_or_make_dirs
 
 logger = logging.getLogger(__name__)
@@ -93,23 +94,17 @@ def evaluate_embeddings(
 
     module = kwargs.get("module", None)
     
-    metric_cfgs = {## removes metric level headers, config structure not flat
-        name: subcfg
-        for group in cfg.metrics.values()
-        if isinstance(group, DictConfig)
-        for name, subcfg in group.items()
-        if isinstance(subcfg, DictConfig) and "_target_" in subcfg
-    }    
+    metric_cfgs = flatten_and_unroll_metrics(cfg.metrics)
     
-    metrics = {}
+    results: dict[str, float] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
-        metrics[metric_name] = metric_fn(
+        results[metric_name] = metric_fn(
             embeddings=emb_sub,
             dataset=ds_sub,
             module=module,
         )
-    return metrics
+    return results
 
 
 @evaluate.register(LightningModule)
