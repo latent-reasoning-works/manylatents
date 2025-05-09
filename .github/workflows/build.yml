@@ -13,30 +13,43 @@ permissions:
 
 jobs:
   build-and-run:
-    name: Build and Run Main
+    name: Build, Test & Run Main
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      # Checkout repository
+      # 1) Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Install uv package manager
-      - name: Install the latest version of uv
+      # 2) (Optional) Set up Python 3.9
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # 3) Install uv
+      - name: Install UV package manager
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: 'latest'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Install dependencies
+      # 4) Create & activate venv, install deps
       - name: Install dependencies
         run: |
+          python -m venv .venv
+          source .venv/bin/activate
           uv sync
 
-      # Run main.py with a basic configuration
-      ## todo: add configuration with noops on metrics,dataset,algorithm
-      - name: Run main.py
+      # 5) Run your pytest suite (and collect coverage)
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          pytest --maxfail=1 --disable-warnings -q --cov=src --cov-report=xml
+
+      # 6) Run main.py with a basic config
+      - name: Run main.py smoke
         run: |
           source .venv/bin/activate
           python -m src.main \
@@ -45,8 +58,9 @@ jobs:
             data=test_data \
             debug=true
 
+      # 7) Upload coverage report
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report-dr-tests
-          path: ./coverage.xml
+          name: coverage-report
+          path: coverage.xml
