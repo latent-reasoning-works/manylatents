@@ -1,7 +1,7 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-from singlecell_dataset import EmbryoidBody
+from .singlecell_dataset import EmbryoidBody
 
 class EmbryoidBodyDataModule(LightningDataModule):
     """
