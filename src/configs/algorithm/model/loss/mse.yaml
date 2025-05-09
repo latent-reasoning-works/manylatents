@@ -1,1 +1,1 @@
-_target_: algorithms.losses.MSELoss
+_target_: src.algorithms.losses.MSELoss

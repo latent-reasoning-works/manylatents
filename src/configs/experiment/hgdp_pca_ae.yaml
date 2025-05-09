@@ -2,10 +2,16 @@
 name: hgdp_pca_ae
 
 defaults:
-  - override /algorithm/dimensionality_reduction: noop
+  #- override /algorithm/dimensionality_reduction: noop
   - override /algorithm/model: ae_reconstruction
   - override /data: hgdp_pca_precomputed
   - override /callbacks/embedding: default
+  - override /trainer: default
   #- override /metrics: hgdp_dr
+
+algorithm:
+  model:
+    network:
+      input_dim: 4094 # hgdp n_rows x PCA dims
 
 seed: 42
