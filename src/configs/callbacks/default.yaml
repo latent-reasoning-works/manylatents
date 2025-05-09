@@ -1,4 +1,4 @@
 defaults:
-- network: null
+- trainer: null
 - embedding: null
 - _self_
