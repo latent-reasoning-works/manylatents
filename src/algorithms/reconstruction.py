@@ -13,7 +13,7 @@ class Reconstruction(LightningModule):
     """
     An algorithm for reconstruction tasks that wraps a neural network (e.g. AAnet variants or Autoencoder)
     specified by a Hydra config. This version assumes that the network configuration includes an
-    'input_shape' provided via the config.
+    'input_dim' provided via the config.
     """
     def __init__(self, datamodule, 
                  network: DictConfig, 
@@ -23,7 +23,7 @@ class Reconstruction(LightningModule):
         """
         Parameters:
             datamodule: Object used to load train/val/test data.
-            network: The config of the network (e.g. AAnet or Autoencoder) to instantiate. Must include 'input_shape'.
+            network: The config of the network (e.g. AAnet or Autoencoder) to instantiate. Must include 'input_dim'.
             optimizer: The config for the optimizer.
             init_seed: Seed for deterministic weight initialization.
         """
@@ -32,6 +32,7 @@ class Reconstruction(LightningModule):
         self.network_config = network
         self.optimizer_config = optimizer
         self.init_seed = init_seed
+        self.loss_config = loss
 
         self.save_hyperparameters(ignore=["datamodule"])
         self.network: nn.Module | None = None
@@ -42,13 +43,13 @@ class Reconstruction(LightningModule):
         """
         self.configure_model()
         logger.info(
-            f"Reconstruction network configured with input shape: {self.network_config.input_shape}"
+            f"Reconstruction network configured with input shape: {self.network_config.input_dim}"
         )
 
     def configure_model(self):
         """
         Instantiate the network from the Hydra config.
-        Assumes that 'input_shape' is already set in the config.
+        Assumes that 'input_dim' is already set in the config.
         """
         torch.manual_seed(self.init_seed)
         if isinstance(self.network_config, (dict, DictConfig)):
@@ -73,12 +74,7 @@ class Reconstruction(LightningModule):
         Returns the latent representation produced by the network's encoder.
         """
         assert self.network is not None, "Network not configured. Call configure_model() first."
-        if hasattr(self.network, "encoder") and callable(self.network.encoder):
-            return self.network.encoder(x)
-        elif hasattr(self.network, "encode") and callable(self.network.encode):
-            return self.network.encode(x)
-        else:
-            raise NotImplementedError("The underlying network does not support encoding.")
+        return self.network.encode(x)
 
     def shared_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int, phase: str) -> dict:
         """

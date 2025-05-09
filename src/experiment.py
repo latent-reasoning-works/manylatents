@@ -39,7 +39,7 @@ def instantiate_trainer(cfg: DictConfig) -> Trainer:
     Dynamically instantiate the PyTorch Lightning Trainer from the config.
     Handles callbacks and loggers if specified.
     """
-    trainer_cb_cfg = cfg.algorithm.callbacks.trainer
+    trainer_cb_cfg = cfg.callbacks.trainer
 
     callbacks = [
         hydra.utils.instantiate(cb_conf)
