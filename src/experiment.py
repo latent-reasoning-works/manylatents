@@ -39,17 +39,23 @@ def instantiate_trainer(cfg: DictConfig) -> Trainer:
     Dynamically instantiate the PyTorch Lightning Trainer from the config.
     Handles callbacks and loggers if specified.
     """
-    trainer_config = OmegaConf.to_container(cfg.trainer, resolve=True)
+    trainer_cb_cfg = cfg.algorithm.callbacks.trainer
 
-    # Load callbacks & logger from separate configs
-    callbacks = hydra.utils.instantiate(cfg.callbacks) if "callbacks" in cfg else []
-    loggers = hydra.utils.instantiate(cfg.logger) if "logger" in cfg and cfg.logger is not None else None
+    callbacks = [
+        hydra.utils.instantiate(cb_conf)
+        for cb_conf in trainer_cb_cfg.values()
+    ]
 
-    # Remove from trainer config to avoid duplicate passing
-    trainer_config.pop("callbacks", None)
-    trainer_config.pop("logger", None)
+    loggers = []
+    if "logger" in cfg and cfg.logger is not None:
+        for lg_conf in cfg.logger.values():
+            loggers.append(hydra.utils.instantiate(lg_conf))
 
-    return hydra.utils.instantiate(trainer_config, callbacks=callbacks, logger=loggers)
+    trainer_cfg = OmegaConf.to_container(cfg.trainer, resolve=True)
+    trainer_cfg.pop("callbacks", None)
+    trainer_cfg.pop("logger", None)
+
+    return hydra.utils.instantiate(trainer_cfg, callbacks=callbacks, logger=loggers)
     
 @functools.singledispatch
 def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
