@@ -10,3 +10,5 @@ width: 10.0
 random_state: ${seed}
 rotate_to_dim: 5
 mode: full
+precomputed_path: null
+mmap_mode: null
