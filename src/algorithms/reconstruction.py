@@ -121,8 +121,11 @@ class Reconstruction(LightningModule):
     def validation_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
         return self.shared_step(batch, batch_idx, phase="val")
 
-    def test_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
-        return self.shared_step(batch, batch_idx, phase="test")
+    def test_step(self, batch, batch_idx):
+        out = self.shared_step(batch, batch_idx, phase="test")
+        # out["loss"] is your test loss
+        self.log("test_loss", out["loss"], prog_bar=True, on_epoch=True)
+        return out
 
     def configure_optimizers(self):
         """

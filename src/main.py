@@ -1,20 +1,18 @@
 import logging
-import os
 from typing import Optional, Tuple
 
 import hydra
 import torch
 from lightning import LightningModule
+from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
 
-import wandb
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.configs import register_configs
 from src.experiment import (
     evaluate,
-    instantiate_callbacks,
     instantiate_datamodule,
-    instantiate_trainer,
+    instantiate_embedding_callbacks,
 )
 from src.utils.data import determine_data_source
 from src.utils.utils import (
@@ -41,18 +39,6 @@ def main(cfg: DictConfig):
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
     
-    if cfg.debug:
-        wandb.init(mode="disabled")
-    else:
-        wandb.init(
-            ## add project name?
-            name=cfg.name,
-            config=OmegaConf.to_container(cfg, resolve=True),
-        )
-        if wandb.run:
-            wandb.run.config.update({k: v for k, v in os.environ.items() if k.startswith("SLURM")})
-            ## log slurm variables; check if useful, usable across cluster envs
-
     # --- Data instantiation ---
     datamodule = instantiate_datamodule(cfg)
     train_loader = datamodule.train_dataloader()
@@ -65,13 +51,19 @@ def main(cfg: DictConfig):
     else:
         dr_module, lightning_module = None, None
 
-    # --- Callbacks ---
-    lightning_cbs, embedding_cbs = instantiate_callbacks(cfg.callbacks.trainer, 
-                                                         cfg.callbacks.embedding
-                                                         )
+    # --- Embedding Callbacks ---
+    embedding_cbs = instantiate_embedding_callbacks(cfg.callbacks.embedding)
 
-    # ---- Trainer ----
-    trainer = instantiate_trainer(cfg, lightning_callbacks=lightning_cbs)
+    # --- Trainer ---
+    trainer = hydra.utils.instantiate(cfg.trainer)
+    
+    # --- Loggers ---
+    wb_logger = next( ## fetches wandblogger from trainer if instantiated
+        (lg for lg in trainer.loggers if isinstance(lg, WandbLogger)),
+        None
+    )
+    for cb in embedding_cbs: ## registers new one if not
+        cb.run = wb_logger.experiment if wb_logger else None
 
     logger.info("Starting the experiment pipeline...")
         
