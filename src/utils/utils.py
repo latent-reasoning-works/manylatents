@@ -3,7 +3,7 @@ import logging
 import os
 import pickle
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import h5py
 import numpy as np
@@ -11,6 +11,8 @@ import pandas as pd
 import rich
 import rich.logging
 import torch
+from lightning.pytorch import Trainer
+from omegaconf import DictConfig, OmegaConf
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,28 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
     except Exception as e:
         logging.warning(f"Could not detect delimiter for file '{file_path}': {e}")
         return None
+
+def instantiate_trainer(
+    cfg: DictConfig,
+    lightning_callbacks: Optional[List] = None,
+    loggers:            Optional[List] = None,
+) -> Trainer:
+    """
+    Dynamically instantiate the PL Trainer from cfg.trainer,
+    injecting `callbacks` and `logger` lists as overrides.
+    """
+    # Turn the trainer sub‐config into a plain dict:
+    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
+    # Remove the entries we want to override:
+    trainer_kwargs.pop("callbacks", None)
+    trainer_kwargs.pop("logger",    None)
+
+    if lightning_callbacks:
+        trainer_kwargs["callbacks"] = lightning_callbacks
+    if loggers:
+        trainer_kwargs["logger"] = loggers
+
+    return Trainer(**trainer_kwargs)
 
 def save_embeddings(embeddings, path, format='npy', metadata=None):
     """

@@ -2,17 +2,19 @@ import logging
 from typing import Optional, Tuple
 
 import hydra
+import lightning
 import torch
 from lightning import LightningModule
-from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig, OmegaConf
 
+import wandb
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
 from src.configs import register_configs
 from src.experiment import (
     evaluate,
+    instantiate_callbacks,
     instantiate_datamodule,
-    instantiate_embedding_callbacks,
+    instantiate_trainer,
 )
 from src.utils.data import determine_data_source
 from src.utils.utils import (
@@ -38,6 +40,17 @@ def main(cfg: DictConfig):
     """
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
+
+    if cfg.debug:
+        wandb.init(mode="disabled")
+    else:
+        wandb.init(
+            project="ManyLatents",
+            name=cfg.name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+        )
+
+    lightning.seed_everything(cfg.seed, workers=True)
     
     # --- Data instantiation ---
     datamodule = instantiate_datamodule(cfg)
@@ -51,20 +64,32 @@ def main(cfg: DictConfig):
     else:
         dr_module, lightning_module = None, None
 
-    # --- Embedding Callbacks ---
-    embedding_cbs = instantiate_embedding_callbacks(cfg.callbacks.embedding)
+    # --- Callbacks ---
+    trainer_cb_cfg   = cfg.trainer.get("callbacks", {})
+    embedding_cb_cfg = cfg.get("callbacks", {}).get("embedding", {})
+
+    lightning_cbs, embedding_cbs = instantiate_callbacks(
+        trainer_cb_cfg,
+        embedding_cb_cfg
+    )
+    
+    if not embedding_cbs:
+        logger.info("No embedding callbacks configured; skip embedding‐level hooks.")
+
+    # --- Loggers ---
+    loggers = []
+    if not cfg.debug and cfg.get("logger"):
+        for lg_conf in cfg.logger.values():
+            loggers.append(hydra.utils.instantiate(lg_conf))
 
     # --- Trainer ---
-    trainer = hydra.utils.instantiate(cfg.trainer)
-    
-    # --- Loggers ---
-    wb_logger = next( ## fetches wandblogger from trainer if instantiated
-        (lg for lg in trainer.loggers if isinstance(lg, WandbLogger)),
-        None
+    trainer = instantiate_trainer(
+        cfg,
+        lightning_callbacks=lightning_cbs,
+        loggers=loggers,
     )
-    for cb in embedding_cbs: ## registers new one if not
-        cb.run = wb_logger.experiment if wb_logger else None
 
+    
     logger.info("Starting the experiment pipeline...")
         
     # --- DR Embedding Computation ---
@@ -159,6 +184,10 @@ def main(cfg: DictConfig):
             cb.on_dr_end(dataset=datamodule.test_dataset, embeddings=outputs)
 
     logger.info("Experiment complete.")
+    
+    if wandb.run:
+        wandb.finish()
+        
     return
 
 def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:

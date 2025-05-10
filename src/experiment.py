@@ -3,8 +3,13 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
-from lightning import LightningDataModule, LightningModule, Trainer
-from omegaconf import DictConfig
+from lightning import (
+    Callback,
+    LightningDataModule,
+    LightningModule,
+    Trainer,
+)
+from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from src.callbacks.embedding.base import EmbeddingCallback
@@ -22,21 +27,55 @@ def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     dm.setup()
     return dm
 
-def instantiate_embedding_callbacks(
-    embedding_cb_cfg: Dict[str, Any],
-) -> List[EmbeddingCallback]:
-    """
-    Given cfg.callbacks.embedding (a dict of name→config),
-    instantiate each one and return only the EmbeddingCallback instances.
-    """
-    cbs: List[EmbeddingCallback] = []
+def instantiate_callbacks(
+    trainer_cb_cfg: Dict[str, Any] = None,
+    embedding_cb_cfg: Dict[str, Any] = None
+) -> Tuple[List[Callback], List[EmbeddingCallback]]:
+    trainer_cb_cfg   = trainer_cb_cfg   or {}
+    embedding_cb_cfg = embedding_cb_cfg or {}
+
+    lightning_cbs, embedding_cbs = [], []
+
+    for name, one_cfg in trainer_cb_cfg.items():
+        cb = hydra.utils.instantiate(one_cfg)
+        if isinstance(cb, Callback):
+            lightning_cbs.append(cb)
+        else:
+            logger.warning(f"Ignoring non‐Lightning callback '{name}'")
+
     for name, one_cfg in embedding_cb_cfg.items():
         cb = hydra.utils.instantiate(one_cfg)
         if isinstance(cb, EmbeddingCallback):
-            cbs.append(cb)
+            embedding_cbs.append(cb)
         else:
-            logger.warning(f"Ignoring non-EmbeddingCallback {name}")
-    return cbs
+            logger.warning(f"Ignoring non‐Embedding callback '{name}'")
+
+    return lightning_cbs, embedding_cbs
+
+def instantiate_trainer(
+    cfg: DictConfig,
+    lightning_callbacks: Optional[List] = None,
+    loggers:            Optional[List] = None,
+) -> Trainer:
+    """
+    Hydra-instantiate cfg.trainer by manually
+    pulling out _target_, callbacks & logger fields.
+    """
+    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
+
+    # remove hydra meta‐fields we don't want to forward
+    ## hacky, needs to be fixed to conform with Trainer invocation
+    trainer_kwargs.pop("_target_", None)
+    trainer_kwargs.pop("callbacks", None)
+    trainer_kwargs.pop("logger",    None)
+
+    if lightning_callbacks:
+        trainer_kwargs["callbacks"] = lightning_callbacks
+    if loggers:
+        trainer_kwargs["logger"] = loggers
+
+    return Trainer(**trainer_kwargs)
+
 
     
 @functools.singledispatch
