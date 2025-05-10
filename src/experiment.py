@@ -1,13 +1,14 @@
 import functools
 import logging
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
 import torch
-from lightning import LightningDataModule, LightningModule, Trainer
-from omegaconf import DictConfig, OmegaConf
+from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
+from src.callbacks.embedding.base import EmbeddingCallback
 from src.utils.data import DummyDataModule, subsample_data_and_dataset
 from src.utils.metrics import flatten_and_unroll_metrics
 from src.utils.utils import check_or_make_dirs
@@ -34,28 +35,43 @@ def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     dm.setup()
     return dm
 
-def instantiate_trainer(cfg: DictConfig) -> Trainer:
+def instantiate_trainer(
+    cfg: DictConfig,
+    lightning_callbacks: Optional[list] = None,
+    loggers:            Optional[list] = None,
+) -> Trainer:
     """
-    Dynamically instantiate the PyTorch Lightning Trainer from the config.
-    Handles callbacks and loggers if specified.
+    Hydra-instantiate cfg.trainer (consumes _target_),
+    injecting callback & logger lists as overrides.
     """
-    trainer_cb_cfg = cfg.callbacks.trainer
+    overrides = {}
+    if lightning_callbacks:
+        overrides["callbacks"] = lightning_callbacks
+    if loggers:
+        overrides["logger"] = loggers
 
-    callbacks = [
-        hydra.utils.instantiate(cb_conf)
-        for cb_conf in trainer_cb_cfg.values()
-    ]
+    # this will call the _target_ in cfg.trainer and produce a Trainer
+    return hydra.utils.instantiate(cfg.trainer, **overrides)
 
-    loggers = []
-    if "logger" in cfg and cfg.logger is not None:
-        for lg_conf in cfg.logger.values():
-            loggers.append(hydra.utils.instantiate(lg_conf))
+def instantiate_callbacks(
+    trainer_cb_cfg: Dict[str, Any],
+    embedding_cb_cfg: Dict[str, Any]
+) -> Tuple[List[Callback], List[EmbeddingCallback]]:
+    lightning_cbs, embedding_cbs = [], []
+    for name, one_cfg in trainer_cb_cfg.items():
+        cb = hydra.utils.instantiate(one_cfg)
+        if isinstance(cb, Callback):
+            lightning_cbs.append(cb)
+        else:
+            logger.warning(f"Ignoring trainer callback {name}")
+    for name, one_cfg in embedding_cb_cfg.items():
+        cb = hydra.utils.instantiate(one_cfg)
+        if isinstance(cb, EmbeddingCallback):
+            embedding_cbs.append(cb)
+        else:
+            logger.warning(f"Ignoring embedding callback {name}")
+    return lightning_cbs, embedding_cbs
 
-    trainer_cfg = OmegaConf.to_container(cfg.trainer, resolve=True)
-    trainer_cfg.pop("callbacks", None)
-    trainer_cfg.pop("logger", None)
-
-    return hydra.utils.instantiate(trainer_cfg, callbacks=callbacks, logger=loggers)
     
 @functools.singledispatch
 def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:

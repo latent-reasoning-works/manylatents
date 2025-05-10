@@ -12,12 +12,12 @@ from src.algorithms.dimensionality_reduction import DimensionalityReductionModul
 from src.configs import register_configs
 from src.experiment import (
     evaluate,
+    instantiate_callbacks,
     instantiate_datamodule,
     instantiate_trainer,
 )
 from src.utils.data import determine_data_source
 from src.utils.utils import (
-    aggregate_metrics,
     load_precomputed_embeddings,
     setup_logging,
 )
@@ -49,22 +49,30 @@ def main(cfg: DictConfig):
             name=cfg.name,
             config=OmegaConf.to_container(cfg, resolve=True),
         )
-        
         if wandb.run:
             wandb.run.config.update({k: v for k, v in os.environ.items() if k.startswith("SLURM")})
             ## log slurm variables; check if useful, usable across cluster envs
 
-    # Data instantiation
+    # --- Data instantiation ---
     datamodule = instantiate_datamodule(cfg)
     train_loader = datamodule.train_dataloader()
     test_loader = datamodule.test_dataloader()
     field_index, data_source = determine_data_source(train_loader)
-
+    
+    # --- Algorithm modules ---
     if not cfg.eval_only:
         dr_module, lightning_module = instantiate_algorithm(cfg, datamodule)
     else:
         dr_module, lightning_module = None, None
-        
+
+    # --- Callbacks ---
+    lightning_cbs, embedding_cbs = instantiate_callbacks(cfg.callbacks.trainer, 
+                                                         cfg.callbacks.embedding
+                                                         )
+
+    # ---- Trainer ----
+    trainer = instantiate_trainer(cfg, lightning_callbacks=lightning_cbs)
+
     logger.info("Starting the experiment pipeline...")
         
     # --- DR Embedding Computation ---
@@ -74,47 +82,43 @@ def main(cfg: DictConfig):
         embeddings = load_precomputed_embeddings(cfg)
     elif "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
         # Unroll train and test dataloaders to obtain tensors.
-        ## To be replaced with a more efficient method.
-        train_batches = [batch[field_index].cpu() for batch in train_loader]
-        train_tensor = torch.cat(train_batches, dim=0)
-        test_batches  = [batch[field_index].cpu() for batch in test_loader]
-        test_tensor = torch.cat(test_batches, dim=0)
+        ### To be replaced with a more efficient method.
+        train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
+        test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
         logger.info(
             f"Running Dimensionality Reduction (DR) {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
         )
-
+        ## fit, transform ops
         dr_module.fit(train_tensor)
         _embeddings = dr_module.transform(test_tensor)
         logger.info(f"DR embedding completed with shape: {_embeddings.shape}")
-        dr_labels = datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None
+        
         embeddings = {## conforms to EmbeddingOutputs interface
             "embeddings": _embeddings,
-            "label": dr_labels,
+            "label": getattr(datamodule.test_dataset, "get_labels", lambda: None)(),
             "metadata": {"source": "DR", "data_shape": test_tensor.shape},
         }
-
-    if embeddings is not None:
         logger.info("Evaluating embeddings (from DR output)...")
         embeddings["scores"] = evaluate(
             embeddings,
             cfg=cfg,
             datamodule=datamodule,
             module=dr_module
-        )
+        ) 
         
     # --- Neural Network (Lightning) setup and evaluation ---
     model_metrics, model_error = None, None
-    if "model" in cfg.algorithm and cfg.algorithm.model is not None:
-        if cfg.eval_only and cfg.pretrained_ckpt:
+    if cfg.algorithm.get("model"):
+        if cfg.eval_only and cfg.pretrained_ckpt: ## load from checkpoint if supplied
             logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
             lightning_module = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-        else:
-            lightning_module = hydra.utils.instantiate(cfg.algorithm.model, datamodule=datamodule)
-        
-        trainer = instantiate_trainer(cfg)
-        
+        else: ## else instantiate a new model from its config
+            lightning_module = hydra.utils.instantiate(
+                cfg.algorithm.model, datamodule=datamodule
+                )
+                
         if not cfg.eval_only:
             logger.info("Running training...")
             trainer.fit(lightning_module, datamodule=datamodule)
@@ -129,17 +133,16 @@ def main(cfg: DictConfig):
         logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
         
     # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---
-    latent_embeddings = None    
-    if lightning_module is not None and hasattr(lightning_module, "encode"):
+    latents = None    
+    if lightning_module and hasattr(lightning_module, "encode"):
         logger.info("Extracting latent embeddings using the network's encoder...")
-        test_batches = [batch["data"].cpu() for batch in test_loader]
-        test_tensor = torch.cat(test_batches, dim=0)
-        _latent_embeddings = lightning_module.encode(test_tensor)
-        if isinstance(_latent_embeddings, torch.Tensor):
-            _latent_embeddings = _latent_embeddings.detach().cpu().numpy()
-        logger.info(f"Latent embeddings shape: {_latent_embeddings.shape}")
+        test_tensor = torch.cat([b["data"].cpu() for b in test_loader], dim=0)
+        latents = lightning_module.encode(test_tensor)
+        latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+            
+        logger.info(f"Latent embeddings shape: {latents.shape}")
         latent_embeddings = {## conforms to EmbeddingOutputs interface
-            "embeddings": _latent_embeddings,
+            "embeddings": latents,
             "label": datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None,
             "metadata": {"source": "latent", "data_shape": test_tensor.shape},
         }
@@ -150,40 +153,21 @@ def main(cfg: DictConfig):
             cfg=cfg,
             datamodule=datamodule,
         )
+    # --- merge embeddings scores from DR and NN, if available ---
+    dr_scores     = embeddings.get("scores", {})         if embeddings else {}
+    latent_scores = latent_embeddings.get("scores", {})  if latent_embeddings else {}
+    embedding_metrics = {**dr_scores, **latent_scores}
 
-    # --- Callbacks ---
-    callback_outputs = []
-    if "embedding" in cfg.callbacks and embeddings is not None:
-        embedding_callbacks = cfg.callbacks.embedding
-        for name, cb_cfg in embedding_callbacks.items():
-            embedding_callback = hydra.utils.instantiate(cb_cfg)
-            if hasattr(embedding_callback, "on_dr_end") and callable(embedding_callback.on_dr_end):
-                output = embedding_callback.on_dr_end(dataset=datamodule.test_dataset, 
-                                               embeddings=embeddings)
-                callback_outputs.append((name, output))
-            else:
-                logger.warning("Callback has no on_dr_end() method. Skipping metrics.")
-    
-    # --- Aggregate embedding and model metrics ---
-    aggregated_metrics = aggregate_metrics(
-        dr_scores=embeddings.get("scores") if embeddings is not None else None,
-        latent_scores=latent_embeddings.get("scores") if latent_embeddings is not None else None,
-        model_metrics=model_metrics,
-        model_error=model_error,
-        callback_outputs=callback_outputs,
-    )
-    
-    logger.info(f"Aggregated metrics: {aggregated_metrics}")
-    
-    if hasattr(wandb, "run") and wandb.run is not None:
-        wandb.log(aggregated_metrics)
-        wandb.finish()
-    else:
-        logger.info("wandb.run not active; skipping wandb.log")
-    
-    assert aggregated_metrics is not None
+    for tag, embed_dict in (("dr", embeddings), ("latent", latent_embeddings)):
+        if not embed_dict:
+            continue
+        outputs = dict(embed_dict)
+        outputs["metrics"] = embedding_metrics
+        for cb in embedding_cbs:
+            cb.on_dr_end(dataset=datamodule.test_dataset, embeddings=outputs)
+
     logger.info("Experiment complete.")
-    return aggregated_metrics
+    return
 
 def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
     dr_module = None
