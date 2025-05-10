@@ -23,6 +23,8 @@ class DLATreeDataModule(LightningDataModule):
         n_dim: int = 3,
         disconnect_branches: Optional[List[int]] = [5,15],
         sampling_density_factors: Optional[Dict[int, float]] = None,
+        precomputed_path: str = None,
+        mmap_mode: str = None,
         mode: str = 'full',
     ):
         """
@@ -66,6 +68,13 @@ class DLATreeDataModule(LightningDataModule):
 
         sampling_density_factors : dict of int to float or None, optional
             Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
+        
+        precomputed_path : str, optional
+            Path to precomputed dataset. If provided, the dataset will be loaded from this path.
+            If None, a new dataset will be generated.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
 
         mode : str, default='full'
             Mode for dataset train/test seperation. 
@@ -91,6 +100,8 @@ class DLATreeDataModule(LightningDataModule):
         self.sampling_density_factors = sampling_density_factors
 
         self.mode = mode
+        self.precomputed_path = precomputed_path
+        self.mmap_mode = mmap_mode
 
         self.dataset = None
         self.train_dataset = None
@@ -112,6 +123,8 @@ class DLATreeDataModule(LightningDataModule):
                 sigma=self.sigma,
                 disconnect_branches=self.disconnect_branches,
                 sampling_density_factors=self.sampling_density_factors,
+                precomputed_path=self.precomputed_path,
+                mmap_mode=self.mmap_mode,
             )
             self.test_dataset = self.train_dataset
 
@@ -126,6 +139,8 @@ class DLATreeDataModule(LightningDataModule):
                 sigma=self.sigma,
                 disconnect_branches=self.disconnect_branches,
                 sampling_density_factors=self.sampling_density_factors,
+                precomputed_path=self.precomputed_path,
+                mmap_mode=self.mmap_mode,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
@@ -176,7 +191,9 @@ if __name__ == "__main__":
         sigma=0.5,
         disconnect_branches=[3],
         random_state=0,
-        mode='split'
+        mode='split', 
+        precomputed_path=None,
+        mmap_mode=None,
     )
 
     # Setup datasets

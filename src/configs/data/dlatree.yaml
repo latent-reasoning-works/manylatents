@@ -12,3 +12,5 @@ sigma: 0.5
 disconnect_branches: [2,4,6,8]
 sampling_density_factors: null
 mode: full
+precomputed_path: null
+mmap_mode: null
