@@ -3,7 +3,7 @@ import logging
 import os
 import pickle
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import h5py
 import numpy as np
@@ -11,8 +11,8 @@ import pandas as pd
 import rich
 import rich.logging
 import torch
-
-import wandb
+from lightning.pytorch import Trainer
+from omegaconf import DictConfig, OmegaConf
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,28 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
         logging.warning(f"Could not detect delimiter for file '{file_path}': {e}")
         return None
 
+def instantiate_trainer(
+    cfg: DictConfig,
+    lightning_callbacks: Optional[List] = None,
+    loggers:            Optional[List] = None,
+) -> Trainer:
+    """
+    Dynamically instantiate the PL Trainer from cfg.trainer,
+    injecting `callbacks` and `logger` lists as overrides.
+    """
+    # Turn the trainer sub‐config into a plain dict:
+    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
+    # Remove the entries we want to override:
+    trainer_kwargs.pop("callbacks", None)
+    trainer_kwargs.pop("logger",    None)
+
+    if lightning_callbacks:
+        trainer_kwargs["callbacks"] = lightning_callbacks
+    if loggers:
+        trainer_kwargs["logger"] = loggers
+
+    return Trainer(**trainer_kwargs)
+
 def save_embeddings(embeddings, path, format='npy', metadata=None):
     """
     Saves embeddings in the specified format.
@@ -154,43 +176,6 @@ def setup_logging(debug: bool = False):
     console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
 
     logger.addHandler(console_handler)
-
-def aggregate_metrics(
-    dr_scores: dict = None,
-    latent_scores: dict = None,
-    model_metrics: dict = None,
-    model_error: dict = None,
-    callback_outputs: list = None
-) -> dict:
-    aggregated_metrics = {}
-
-    if dr_scores:
-        aggregated_metrics.update(dr_scores)
-
-    if latent_scores:
-        aggregated_metrics.update(latent_scores)
-
-    if model_metrics:
-        aggregated_metrics.update(model_metrics)
-    
-    if model_error:
-        aggregated_metrics.update(model_error)
-    
-    # Process any callback outputs.
-    if callback_outputs:
-        for name, output in callback_outputs:
-            # If the callback returns a dictionary of metrics, prefix keys with the callback name.
-            if isinstance(output, dict):
-                prefixed = {f"{name}_{k}": v for k, v in output.items()}
-                aggregated_metrics.update(prefixed)
-            # If output is an image path, log it as a wandb.Image.
-            elif isinstance(output, str) and output.endswith(".png"):
-                aggregated_metrics[f"{name}_plot"] = wandb.Image(output)
-            # Otherwise, log the string directly.
-            elif isinstance(output, str):
-                aggregated_metrics[name] = output
-
-    return aggregated_metrics
 
 def is_numeric(value: str) -> bool:
     try:

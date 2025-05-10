@@ -105,7 +105,7 @@ class Vanilla(Base):
     """
     def __init__(
         self,
-        input_shape: int,
+        input_dim: int,
         n_archetypes: int = 4,
         noise: float = 0,
         layer_widths: list = [128, 128],
@@ -117,7 +117,7 @@ class Vanilla(Base):
         **kwargs
     ):
         super().__init__()
-        self.input_shape = input_shape
+        self.input_dim = input_dim
         self.n_archetypes = n_archetypes
         self.noise = noise
         self.layer_widths = layer_widths
@@ -129,7 +129,7 @@ class Vanilla(Base):
         
         # Build encoder layers.
         encoder_layers = []
-        in_dim = input_shape
+        in_dim = input_dim
         for i, width in enumerate(layer_widths):
             if i == 0:
                 encoder_layers.append(nn.Linear(in_features=in_dim, out_features=width))
@@ -149,7 +149,7 @@ class Vanilla(Base):
             else:
                 decoder_layers.append(nn.Linear(in_features=dec_widths[i - 1], out_features=width))
         # Final decoder layer.
-        decoder_layers.append(nn.Linear(in_features=dec_widths[-1], out_features=input_shape))
+        decoder_layers.append(nn.Linear(in_features=dec_widths[-1], out_features=input_dim))
         self.decoder_layers = nn.ModuleList(decoder_layers)
         
         # Precompute the archetypal simplex.
@@ -203,7 +203,7 @@ class VAE(Base):
     """
     def __init__(
         self,
-        input_shape: int,
+        input_dim: int,
         n_archetypes: int = 4,
         layer_widths: List[int] = [128, 128],
         activation_out: str = "tanh",
@@ -215,7 +215,7 @@ class VAE(Base):
         **kwargs
     ) -> None:
         super(VAE, self).__init__()
-        self.input_shape = input_shape
+        self.input_dim = input_dim
         self.n_archetypes = n_archetypes
         self.layer_widths = layer_widths
         self.activation_out = activation_out.lower()
@@ -227,7 +227,7 @@ class VAE(Base):
         
         # Build encoder.
         layers = []
-        in_dim = input_shape
+        in_dim = input_dim
         for width in layer_widths:
             layers.append(nn.Sequential(nn.Linear(in_dim, width), nn.ReLU()))
             in_dim = width
@@ -251,7 +251,7 @@ class VAE(Base):
             act_out = None
         else:
             raise ValueError('activation_out not recognized')
-        self.final_layer = nn.Sequential(nn.Linear(dec_widths[-1], input_shape), act_out)
+        self.final_layer = nn.Sequential(nn.Linear(dec_widths[-1], input_dim), act_out)
         
         # Precompute the archetypal simplex.
         self.archetypal_simplex = self.get_n_simplex(self.n_archetypes, scale=self.simplex_scale)

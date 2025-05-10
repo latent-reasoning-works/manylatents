@@ -1,14 +1,19 @@
 import functools
 import logging
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
-import torch
-from lightning import LightningDataModule, LightningModule, Trainer
+from lightning import (
+    Callback,
+    LightningDataModule,
+    LightningModule,
+    Trainer,
+)
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
-from src.utils.data import DummyDataModule, subsample_data_and_dataset
+from src.callbacks.embedding.base import EmbeddingCallback
+from src.utils.data import subsample_data_and_dataset
 from src.utils.metrics import flatten_and_unroll_metrics
 from src.utils.utils import check_or_make_dirs
 
@@ -17,39 +22,61 @@ logger = logging.getLogger(__name__)
 def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     check_or_make_dirs(cfg.cache_dir)
     logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
-    ##todo: change to use a test data config call instead, remove dummy utils call
-    if cfg.data.get("debug", False):
-        logger.info("DEBUG MODE: Using a dummy datamodule with limited data.")
-        dummy_data = torch.randn(100, 10)
-        dummy_labels = torch.zeros(100)
-        dataset = torch.utils.data.TensorDataset(dummy_data, dummy_labels)
-        return DummyDataModule(
-            dataset=dataset, 
-            batch_size=cfg.data.batch_size, 
-            num_workers=cfg.data.num_workers
-        )
-
     datamodule_cfg = {k: v for k, v in cfg.data.items() if k != "debug"}
     dm = hydra.utils.instantiate(datamodule_cfg)
     dm.setup()
     return dm
 
-def instantiate_trainer(cfg: DictConfig) -> Trainer:
+def instantiate_callbacks(
+    trainer_cb_cfg: Dict[str, Any] = None,
+    embedding_cb_cfg: Dict[str, Any] = None
+) -> Tuple[List[Callback], List[EmbeddingCallback]]:
+    trainer_cb_cfg   = trainer_cb_cfg   or {}
+    embedding_cb_cfg = embedding_cb_cfg or {}
+
+    lightning_cbs, embedding_cbs = [], []
+
+    for name, one_cfg in trainer_cb_cfg.items():
+        cb = hydra.utils.instantiate(one_cfg)
+        if isinstance(cb, Callback):
+            lightning_cbs.append(cb)
+        else:
+            logger.warning(f"Ignoring non‐Lightning callback '{name}'")
+
+    for name, one_cfg in embedding_cb_cfg.items():
+        cb = hydra.utils.instantiate(one_cfg)
+        if isinstance(cb, EmbeddingCallback):
+            embedding_cbs.append(cb)
+        else:
+            logger.warning(f"Ignoring non‐Embedding callback '{name}'")
+
+    return lightning_cbs, embedding_cbs
+
+def instantiate_trainer(
+    cfg: DictConfig,
+    lightning_callbacks: Optional[List] = None,
+    loggers:            Optional[List] = None,
+) -> Trainer:
     """
-    Dynamically instantiate the PyTorch Lightning Trainer from the config.
-    Handles callbacks and loggers if specified.
+    Hydra-instantiate cfg.trainer by manually
+    pulling out _target_, callbacks & logger fields.
     """
-    trainer_config = OmegaConf.to_container(cfg.trainer, resolve=True)
+    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
 
-    # Load callbacks & logger from separate configs
-    callbacks = hydra.utils.instantiate(cfg.callbacks) if "callbacks" in cfg else []
-    loggers = hydra.utils.instantiate(cfg.logger) if "logger" in cfg and cfg.logger is not None else None
+    # remove hydra meta‐fields we don't want to forward
+    ## hacky, needs to be fixed to conform with Trainer invocation
+    trainer_kwargs.pop("_target_", None)
+    trainer_kwargs.pop("callbacks", None)
+    trainer_kwargs.pop("logger",    None)
 
-    # Remove from trainer config to avoid duplicate passing
-    trainer_config.pop("callbacks", None)
-    trainer_config.pop("logger", None)
+    if lightning_callbacks:
+        trainer_kwargs["callbacks"] = lightning_callbacks
+    if loggers:
+        trainer_kwargs["logger"] = loggers
 
-    return hydra.utils.instantiate(trainer_config, callbacks=callbacks, logger=loggers)
+    return Trainer(**trainer_kwargs)
+
+
     
 @functools.singledispatch
 def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:

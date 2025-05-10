@@ -3,7 +3,7 @@ datamodule: ${data}
 network:
   _target_: src.algorithms.networks.aanet.Vanilla
   ## would a partial call work?
-  input_shape: null # must be currently specified from experiment 
+  input_dim: null # must be currently specified from experiment 
   n_archetypes: 4
   layer_widths: [128, 128]
   activation_out: "tanh"
