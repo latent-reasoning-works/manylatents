@@ -1,5 +1,3 @@
-# src/callbacks/embedding/wandb_log_scores.py
-
 import logging
 import re
 
