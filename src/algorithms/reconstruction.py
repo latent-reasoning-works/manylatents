@@ -13,13 +13,17 @@ class Reconstruction(LightningModule):
     """
     An algorithm for reconstruction tasks that wraps a neural network (e.g. AAnet variants or Autoencoder)
     specified by a Hydra config. This version assumes that the network configuration includes an
-    'input_shape' provided via the config.
+    'input_dim' provided via the config.
     """
-    def __init__(self, datamodule, network: DictConfig, optimizer: DictConfig, init_seed: int = 42):
+    def __init__(self, datamodule, 
+                 network: DictConfig, 
+                 loss: DictConfig,
+                 optimizer: DictConfig, 
+                 init_seed: int = 42):
         """
         Parameters:
             datamodule: Object used to load train/val/test data.
-            network: The config of the network (e.g. AAnet or Autoencoder) to instantiate. Must include 'input_shape'.
+            network: The config of the network (e.g. AAnet or Autoencoder) to instantiate. Must include 'input_dim'.
             optimizer: The config for the optimizer.
             init_seed: Seed for deterministic weight initialization.
         """
@@ -28,6 +32,7 @@ class Reconstruction(LightningModule):
         self.network_config = network
         self.optimizer_config = optimizer
         self.init_seed = init_seed
+        self.loss_config = loss
 
         self.save_hyperparameters(ignore=["datamodule"])
         self.network: nn.Module | None = None
@@ -36,21 +41,49 @@ class Reconstruction(LightningModule):
         """
         Set up the network using the provided network config.
         """
+        # 1) Infer feature-dim if not provided, and write it back into the config
+        if self.network_config.input_dim is None:
+            first_batch = next(iter(self.datamodule.train_dataloader()))["data"]
+            feat_dim = first_batch.shape[1]
+            # Patch the DictConfig so that instantiate() sees a real int
+            self.network_config.input_dim = feat_dim
+        else:
+            feat_dim = self.network_config.input_dim
+
+        # 2) Now instantiate with a concrete input_dim
         self.configure_model()
+
         logger.info(
-            f"Reconstruction network configured with input shape: {self.network_config.input_shape}"
+            f"Reconstruction network configured with input_dim={feat_dim}"
         )
+        
 
     def configure_model(self):
         """
         Instantiate the network from the Hydra config.
-        Assumes that 'input_shape' is already set in the config.
+        Assumes that 'input_dim' is already set in the config.
         """
         torch.manual_seed(self.init_seed)
-        if isinstance(self.network_config, (dict, DictConfig)):
-            self.network = hydra_zen.instantiate(self.network_config)
-        else:
-            self.network = self.network_config
+
+        cfg_map = {
+            "network": self.network_config,
+            "loss_fn": self.loss_config,
+            # add more as needed 
+        }
+
+        for attr, cfg in cfg_map.items():
+            if isinstance(cfg, (dict, DictConfig)):
+                inst = hydra_zen.instantiate(cfg)
+            else:
+                inst = cfg  # already an object
+            setattr(self, attr, inst)
+
+        # stash the optimizer config for the actual optimizer_step
+        # leave the torch.optim instantiation for configure_optimizers
+        self._optimizer_partial = self.optimizer_config
+
+        logger.info(f"Instantiated network={self.network.__class__.__name__}, "
+                    f"loss_fn={self.loss_fn.__class__.__name__}")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -64,12 +97,7 @@ class Reconstruction(LightningModule):
         Returns the latent representation produced by the network's encoder.
         """
         assert self.network is not None, "Network not configured. Call configure_model() first."
-        if hasattr(self.network, "encoder") and callable(self.network.encoder):
-            return self.network.encoder(x)
-        elif hasattr(self.network, "encode") and callable(self.network.encode):
-            return self.network.encode(x)
-        else:
-            raise NotImplementedError("The underlying network does not support encoding.")
+        return self.network.encode(x)
 
     def shared_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int, phase: str) -> dict:
         """
@@ -77,7 +105,13 @@ class Reconstruction(LightningModule):
         """
         x = batch["data"]
         outputs = self.network(x)
-        loss = self.network.loss_function(outputs)
+        
+        extras = {}
+        if hasattr(self.network, "encoder"):
+            extras["latent"] = self.network.encoder(x)
+            
+        loss = self.loss_fn(outputs=outputs, targets=x, **extras)
+        
         self.log(f"{phase}_loss", loss, prog_bar=True)
         return {"loss": loss, "outputs": outputs}
 
@@ -87,8 +121,11 @@ class Reconstruction(LightningModule):
     def validation_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
         return self.shared_step(batch, batch_idx, phase="val")
 
-    def test_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
-        return self.shared_step(batch, batch_idx, phase="test")
+    def test_step(self, batch, batch_idx):
+        out = self.shared_step(batch, batch_idx, phase="test")
+        # out["loss"] is your test loss
+        self.log("test_loss", out["loss"], prog_bar=True, on_epoch=True)
+        return out
 
     def configure_optimizers(self):
         """

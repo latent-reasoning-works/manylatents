@@ -1,0 +1,18 @@
+# @package _global_
+name: eb_pca_umap_n_components=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: umap
+  - override /data: embryoidbody
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+
+seed: 42
+
+data:
+  precomputed_path: "./data/embeddings/eb_pca.csv"
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2
+    

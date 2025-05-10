@@ -1,5 +1,3 @@
-# src/callbacks/embedding/wandb_log_scores.py
-
 import logging
 import re
 
@@ -13,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 class WandbLogScores(EmbeddingCallback):
     """
-    1) 0-D scalars → one wandb.log() each
-    2) per-sample table for any arrays
-    3) k-curve tables for any metrics swept over n_neighbors
+    1) 0-D scalars → one wandb.log() with keys like "DR/…"
+    2) per-sample table → key "DR/per_sample_metrics"
+    3) k-curve tables → keys like "DR/continuity__k_curve_table"
     """
     def __init__(
         self,
@@ -43,15 +41,18 @@ class WandbLogScores(EmbeddingCallback):
             logger.warning("No scores found.")
             return {}
 
+        # figure out whether this is DR or latent
+        tag = embeddings.get("metadata", {}).get("source", "embedding")
+
         # --- 1) summary scalars (0-D only) ---
         scalar_summary = {
-            name: float(vals)
+            f"{tag}/{name}": float(vals)
             for name, vals in scores.items()
             if np.ndim(vals) == 0
         }
         if self.log_summary and scalar_summary:
             wandb.log(scalar_summary, commit=False)
-            logger.info(f"Logged scalars: {list(scalar_summary)}")
+            logger.info(f"Logged scalars for {tag}: {list(scalar_summary)}")
 
         # --- 2) per-sample table (1-D arrays) ---
         array_keys = [k for k,v in scores.items() if np.ndim(v) > 0]
@@ -69,30 +70,31 @@ class WandbLogScores(EmbeddingCallback):
 
             df = pd.DataFrame(data)
             table = wandb.Table(dataframe=df)
-            wandb.log({"per_sample_metrics": table}, commit=False)
-            logger.info("Logged per-sample table.")
+            wandb.log({f"{tag}/per_sample_metrics": table}, commit=False)
+            logger.info(f"Logged table {tag}/per_sample_metrics")
 
         # --- 3) k-curve tables ---
         if self.log_k_curve_table and scalar_summary:
             # group all swept scalars by their base name
-            groups = {}
-            for name, val in scalar_summary.items():
-                m = self._knn_re.match(name)
+            groups: dict[str,list[tuple[int,float]]] = {}
+            for full_name, val in scalar_summary.items():
+                # strip off the tag/ prefix
+                _, inner = full_name.split("/", 1)
+                m = self._knn_re.match(inner)
                 if m:
                     base = m.group("base")
                     k    = int(m.group("k"))
                     groups.setdefault(base, []).append((k, val))
 
             for base, kv in groups.items():
-                # only if at least two points
                 if len(kv) < 2:
                     continue
                 kv.sort(key=lambda x: x[0])
                 ks, vs = zip(*kv)
                 df = pd.DataFrame({"n_neighbors": ks, base: vs})
                 table = wandb.Table(dataframe=df)
-                wandb.log({f"{base}__k_curve_table": table}, commit=False)
-                logger.info(f"Logged {base}__k_curve_table: ks={ks}, vals={vs}")
+                wandb.log({f"{tag}/{base}__k_curve_table": table}, commit=False)
+                logger.info(f"Logged {tag}/{base}__k_curve_table: ks={ks}, vals={vs}")
 
         # final flush
         wandb.log({})

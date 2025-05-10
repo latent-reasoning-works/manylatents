@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import Dataset
 import graphtools
@@ -7,6 +8,7 @@ from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
 from typing import Union, List, Optional, Dict
+from .precomputed_mixin import PrecomputedMixin
 
 
 class SyntheticDataset(Dataset):
@@ -56,13 +58,8 @@ class SyntheticDataset(Dataset):
     def get_gt_dists(self):
         pass
 
-    #@property
-    #def geodesic_dists(self):
-    #    D = self.get_geodesic()
-    #    return D[np.triu_indices(D.shape[0], k=1)]
 
-
-class SwissRoll(SyntheticDataset):
+class SwissRoll(SyntheticDataset, PrecomputedMixin):
     def __init__(
         self,
         n_distributions=100,
@@ -72,6 +69,8 @@ class SwissRoll(SyntheticDataset):
         width=10.0,
         random_state=42,
         rotate_to_dim=3,
+        precomputed_path=None,
+        mmap_mode=None,
     ):
         """
         Initialize a synthetic Swiss Roll dataset with parameters to control 
@@ -105,11 +104,19 @@ class SwissRoll(SyntheticDataset):
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
             For visualization purposes, the default of 3 means no rotation is applied.
+
+        precomputed_path : str, optional
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
+            If None, a new dataset will be generated.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
+        np.random.seed(random_state)
         rng = np.random.default_rng(random_state)
 
-        self.mean_t = 3 * np.pi / 2 * (1 + 2 * np.random.rand(1, n_distributions))
+        self.mean_t = 3 * np.pi / 2 * (1 + 2 * rng.random((1, n_distributions)))
         # ground truth coordinate euclidean in (y,t) is geo on 3d
 
         # mean_y has shape (1, n_distributions) when width=1
@@ -127,18 +134,21 @@ class SwissRoll(SyntheticDataset):
         xs = ts * np.cos(ts)
         zs = ts * np.sin(ts)
         X = np.stack((xs, ys, zs))  # shape (3, 5000)
-        X += noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
-        self.data = X.T  # shape (5000, 3)
+        noise_term = noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
+        X = X + noise_term
+        # load precomputed embeddings or generated data
+        if precomputed_path is not None and os.path.exists(precomputed_path):
+            self.data = self.load_precomputed(precomputed_path, mmap_mode)
+        else:   
+            self.data = X.T  # shape (5000, 3)
+            if rotate_to_dim > 3:
+                self.data = self.rotate_to_dim(rotate_to_dim)
+
         self.ts = np.squeeze(ts)  # (5000,)
         self.metadata = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
         )
-        self.t = self.mean_t[0]  # shape (100, )
-        mean_x = self.mean_t * np.cos(self.mean_t)  # shape (1, 100)
-        mean_z = self.mean_t * np.sin(self.mean_t)  # shape (1, 100)
-        self.means = np.concatenate((mean_x, self.mean_y, mean_z)).T  # shape (100, 3)
-        if rotate_to_dim > 3:
-            self.data = self.rotate_to_dim(rotate_to_dim)
+        
         self.metadata = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
         )
@@ -152,7 +162,6 @@ class SwissRoll(SyntheticDataset):
 
     def get_gt_dists(self):
         u_t = self._unroll_t(self.ts)  # (1, 5000)
-        # u_t = self.ts
         true_coords = np.concatenate(
             (u_t, self.ys[None, ...])
         ).T  # (5000, 2) This is a 2D space
@@ -165,6 +174,7 @@ class SwissRoll(SyntheticDataset):
             self.graph = graphtools.Graph(self.data, use_pygsp=True)
         return self.graph
     
+
 class SaddleSurface(SyntheticDataset):
     def __init__(
         self,
@@ -292,7 +302,7 @@ class SaddleSurface(SyntheticDataset):
         return self.graph
 
 
-class DLAtree(SyntheticDataset):
+class DLAtree(SyntheticDataset, PrecomputedMixin):
     def __init__(
         self,
         n_dim: int = 3,
@@ -304,6 +314,8 @@ class DLAtree(SyntheticDataset):
         sigma: float = 4,
         disconnect_branches: Optional[List[int]] = [5,15],  # Branch indices to disconnect
         sampling_density_factors: Optional[Dict[int, float]] = None,  # Reduce density of certain branches
+        precomputed_path: Optional[str] = None,
+        mmap_mode: Optional[str] = None,
     ):
 
         """
@@ -337,6 +349,13 @@ class DLAtree(SyntheticDataset):
 
         sampling_density_factors : dict of int to float or None, optional
             Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
+        
+        precomputed_path : str, optional
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
+            If None, a new dataset will be generated.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
         # Generate the DLA data
@@ -351,8 +370,11 @@ class DLAtree(SyntheticDataset):
             disconnect_branches=disconnect_branches or [],
             sampling_density_factors=sampling_density_factors,
         )
-
-        self.data = data  # noisy data
+        # Load precomputed embeddings or generated data
+        if precomputed_path is not None and os.path.exists(precomputed_path):
+            self.data = self.load_precomputed(precomputed_path, mmap_mode)
+        else:
+            self.data = data  # noisy data
         self.data_gt = data_gt  # ground truth tree
         self.metadata = metadata
         self.n_dim = n_dim
@@ -510,15 +532,15 @@ class DLAtree(SyntheticDataset):
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "saddle_surface" # "swiss_roll" or "saddle_surface" or "dla_tree"
+    data_name = "dla_tree" # "swiss_roll" or "saddle_surface" or "dla_tree"
 
     if data_name == "swiss_roll":
-        dataset = SwissRoll(n_distributions=100, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
+        dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
 
     elif data_name == "saddle_surface":
-        dataset = SaddleSurface(n_distributions=100, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
+        dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
     elif data_name == "dla_tree":
-        dataset = DLAtree(n_dim=100, n_branch=20, branch_lengths=100, rand_multiplier=2.0, gap_multiplier=0.0, random_state=37, sigma=4.0, disconnect_branches=[], sampling_density_factors=None)
+        dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
     
     data = dataset.data
     labels = dataset.metadata
