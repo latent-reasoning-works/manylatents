@@ -58,11 +58,6 @@ class SyntheticDataset(Dataset):
     def get_gt_dists(self):
         pass
 
-    #@property
-    #def geodesic_dists(self):
-    #    D = self.get_geodesic()
-    #    return D[np.triu_indices(D.shape[0], k=1)]
-
 
 class SwissRoll(SyntheticDataset, PrecomputedMixin):
     def __init__(
@@ -109,6 +104,13 @@ class SwissRoll(SyntheticDataset, PrecomputedMixin):
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
             For visualization purposes, the default of 3 means no rotation is applied.
+
+        precomputed_path : str, optional
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
+            If None, a new dataset will be generated.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
         np.random.seed(random_state)
@@ -146,10 +148,6 @@ class SwissRoll(SyntheticDataset, PrecomputedMixin):
         self.metadata = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
         )
-        # self.t = self.mean_t[0]  # shape (100, )
-        # mean_x = self.mean_t * np.cos(self.mean_t)  # shape (1, 100)
-        # mean_z = self.mean_t * np.sin(self.mean_t)  # shape (1, 100)
-        # self.means = np.concatenate((mean_x, self.mean_y, mean_z)).T  # shape (100, 3)
         
         self.metadata = np.repeat(
             np.eye(n_distributions), n_points_per_distribution, axis=0
@@ -351,6 +349,13 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
 
         sampling_density_factors : dict of int to float or None, optional
             Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
+        
+        precomputed_path : str, optional
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
+            If None, a new dataset will be generated.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
         # Generate the DLA data
@@ -365,8 +370,11 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
             disconnect_branches=disconnect_branches or [],
             sampling_density_factors=sampling_density_factors,
         )
-
-        self.data = data  # noisy data
+        # Load precomputed embeddings or generated data
+        if precomputed_path is not None and os.path.exists(precomputed_path):
+            self.data = self.load_precomputed(precomputed_path, mmap_mode)
+        else:
+            self.data = data  # noisy data
         self.data_gt = data_gt  # ground truth tree
         self.metadata = metadata
         self.n_dim = n_dim
@@ -541,17 +549,17 @@ if __name__ == "__main__":
     print("Data shape:", dataset.data.shape)
     print("Labels shape:", dataset.metadata.shape)
     
-    if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "dla_tree":
+    if data_name == "swiss_roll" or data_name == "saddle_surface":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(data[:,2], data[:,0], data[:,1], c=labels, cmap='tab20')
-    # elif data_name == "dla_tree":
-    #     # visualize by phate
-    #     import phate
-    #     phate_operator = phate.PHATE()
-    #     phate_data = phate_operator.fit_transform(data)
-    #     plt.figure(figsize=(8, 6))
-    #     plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
+    elif data_name == "dla_tree":
+        # visualize by phate
+        import phate
+        phate_operator = phate.PHATE()
+        phate_data = phate_operator.fit_transform(data)
+        plt.figure(figsize=(8, 6))
+        plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
 
     plt.savefig(f"{data_name}.png", bbox_inches='tight') 
 

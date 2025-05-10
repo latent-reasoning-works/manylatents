@@ -61,6 +61,13 @@ class SwissRollDataModule(LightningDataModule):
             Target dimension for rotation. Rotation is only applied if this value is greater than 3.
             The default of 3 keeps the Swiss roll in 3D space.
 
+        precomputed_path : str, optional
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
+            If None, a new dataset will be generated.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
+
         mode : str, default='full'
             Mode for dataset train/test seperation. 
             If 'full', the entire dataset is used as both training and test set (unsplit).

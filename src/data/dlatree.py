@@ -70,7 +70,7 @@ class DLATreeDataModule(LightningDataModule):
             Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
         
         precomputed_path : str, optional
-            Path to precomputed dataset. If provided, the dataset will be loaded from this path.
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
             If None, a new dataset will be generated.
         
         mmap_mode : str, optional
