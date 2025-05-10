@@ -5,7 +5,7 @@ defaults:
   - override /algorithm/dimensionality_reduction: pca
   - override /data: dlatree
   - override /callbacks/embedding: default
-  - override /metrics: synthetic_data_metrics
+  - override /metrics: synthetic_data_metrics_suite #synthetic_data_metrics
 
 seed: 42
 

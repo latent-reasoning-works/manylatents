@@ -9,11 +9,11 @@ hydra:
     #tasks_per_node: 1
     cpus_per_task: 1
     mem_gb: null
-    mem_per_cpu: 128GB
-    timeout_min: 200
-    array_parallelism: 20 # max num of tasks to run in parallel (via job array)
+    mem_per_cpu: 32GB
+    timeout_min: 60
+    array_parallelism: 2 # max num of tasks to run in parallel (via job array)
     setup:
       - "source .venv/bin/activate"
 
     additional_parameters:
-      account: add-your-account
+      account: ctb-hussinju

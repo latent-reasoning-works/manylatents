@@ -1,0 +1,17 @@
+# @package _global_
+name: saddlesurface_pca_full_n_components=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - /launcher: cc_cpu
+  - override /algorithm/dimensionality_reduction: pca
+  - override /data: dlatree_default
+  - override /callbacks/embedding: default
+  - override /metrics: synthetic_data_metrics_suite
+
+seed: 42
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.n_components: 2,50

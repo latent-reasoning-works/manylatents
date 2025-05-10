@@ -151,6 +151,7 @@ def main(cfg: DictConfig):
         
     # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---
     latents = None    
+    latent_embeddings = None
     if lightning_module and hasattr(lightning_module, "encode"):
         logger.info("Extracting latent embeddings using the network's encoder...")
         test_tensor = torch.cat([b["data"].cpu() for b in test_loader], dim=0)
