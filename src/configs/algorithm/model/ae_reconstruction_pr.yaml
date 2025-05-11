@@ -14,3 +14,4 @@ optimizer:
   lr: 0.001
 loss:
   _target_: src.algorithms.losses.geometric.PRLoss
+  lambda_pr: 0.01

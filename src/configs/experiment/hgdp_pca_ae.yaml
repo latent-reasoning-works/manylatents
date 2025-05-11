@@ -1,8 +1,7 @@
 # @package _global_
-name: hgdp_pca_ae
+name: hgdp_pca_ae_AllGeomLoss_50D
 
 defaults:
-  #- override /algorithm/dimensionality_reduction: noop
   - override /algorithm/model: ae_reconstruction_allgeom
   - override /data: hgdp_pca_precomputed
   - override /callbacks/embedding: default

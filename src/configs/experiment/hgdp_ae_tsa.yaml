@@ -1,17 +1,16 @@
 # @package _global_
-name: hgdp_ae_d_{algorithm.model.network.latent_dim}_{algorithm.model.loss}
+name: hgdp_ae_TSALoss_50D
 
 defaults:
   - override /algorithm/model: ae_reconstruction_tsa
   - override /data: hgdp_split
   - override /callbacks/embedding: default
-  - override /callbacks/trainer: default
   - override /trainer: default
   - override /metrics: fidelity_metrics
 
 algorithm:
   model:
     network:
-      input_dim: 197675 # HGDP ncols
+      input_dim: 172152 # HGDP ncols
 
 seed: 42

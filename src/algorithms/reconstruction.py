@@ -109,7 +109,12 @@ class Reconstruction(LightningModule):
         }
 
         loss = self.loss_fn(outputs=outputs, targets=x, **extras)
-        self.log(f"{phase}_loss", loss, prog_bar=True)
+        self.log(f"{phase}_loss", 
+                 loss, 
+                 prog_bar=True,
+                 on_step=False,
+                 on_epoch=True,
+        )
         return {"loss": loss, "outputs": outputs}
 
     def training_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
