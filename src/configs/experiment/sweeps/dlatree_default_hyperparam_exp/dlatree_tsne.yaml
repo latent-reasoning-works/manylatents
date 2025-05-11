@@ -15,4 +15,3 @@ hydra:
   sweeper:
     params:
       algorithm.dimensionality_reduction.perplexity: 2,3,7,10,17,33,67,167,250,333,500,667,1000,1333,1500,2000,3000,4000
-

@@ -1,5 +1,5 @@
 # @package _global_
-name: saddlesurface_pca_full_n_components=${algorithm.dimensionality_reduction.n_components}
+name: dlatree_default_pca_full_n_components=${algorithm.dimensionality_reduction.n_components}
 
 defaults:
   - /launcher: cc_cpu
