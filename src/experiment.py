@@ -24,7 +24,6 @@ def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
     logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
     datamodule_cfg = {k: v for k, v in cfg.data.items() if k != "debug"}
     dm = hydra.utils.instantiate(datamodule_cfg)
-    dm.setup()
     return dm
 
 def instantiate_callbacks(

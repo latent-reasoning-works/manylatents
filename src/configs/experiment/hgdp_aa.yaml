@@ -5,6 +5,6 @@ defaults:
   - override /algorithm/dimensionality_reduction: aa
   - override /data: hgdp_split
   - override /callbacks/embedding: default
-  - override /metrics: tangent_space
+  - override /metrics: fidelity_metrics
 
 seed: 42

@@ -1,3 +1,3 @@
 import hydra_zen
 
-algorithm_store = hydra_zen.store(group="optimizer")
+optimizer_store = hydra_zen.store(group="model/optimizer")

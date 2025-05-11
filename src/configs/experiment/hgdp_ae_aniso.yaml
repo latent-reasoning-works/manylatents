@@ -1,8 +1,8 @@
 # @package _global_
-name: hgdp_ae_MSELoss_50D
+name: hgdp_ae_AnisotropyLoss_50D
 
 defaults:
-  - override /algorithm/model: ae_reconstruction
+  - override /algorithm/model: ae_reconstruction_aniso
   - override /data: hgdp_split
   - override /callbacks/embedding: default
   - override /trainer: default
@@ -11,6 +11,6 @@ defaults:
 algorithm:
   model:
     network:
-      input_dim: 172152 # HGDP ncols     
+      input_dim: 172152 # HGDP ncols
 
 seed: 42

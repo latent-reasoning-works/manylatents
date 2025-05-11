@@ -54,6 +54,7 @@ def main(cfg: DictConfig):
     
     # --- Data instantiation ---
     datamodule = instantiate_datamodule(cfg)
+    datamodule.setup()
     train_loader = datamodule.train_dataloader()
     test_loader = datamodule.test_dataloader()
     field_index, data_source = determine_data_source(train_loader)
@@ -78,8 +79,8 @@ def main(cfg: DictConfig):
 
     # --- Loggers ---
     loggers = []
-    if not cfg.debug and cfg.get("logger"):
-        for lg_conf in cfg.logger.values():
+    if not cfg.debug:
+        for lg_conf in cfg.trainer.get("logger", {}).values():
             loggers.append(hydra.utils.instantiate(lg_conf))
 
     # --- Trainer ---
@@ -88,7 +89,6 @@ def main(cfg: DictConfig):
         lightning_callbacks=lightning_cbs,
         loggers=loggers,
     )
-
     
     logger.info("Starting the experiment pipeline...")
         
