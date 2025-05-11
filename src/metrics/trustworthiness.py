@@ -1,9 +1,11 @@
 from typing import Optional
 
 import numpy as np
+import torch
 from sklearn.manifold import trustworthiness as sk_trustworthiness
 
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+
 
 def Trustworthiness(embeddings: np.ndarray, 
                     dataset: object, 
@@ -22,6 +24,9 @@ def Trustworthiness(embeddings: np.ndarray,
     Returns:
       - A float representing the trustworthiness score.
     """
+    if torch.is_tensor(embeddings):
+        embeddings = embeddings.cpu().numpy()
+        
     return sk_trustworthiness(
         X=dataset.data, 
         X_embedded=embeddings, 

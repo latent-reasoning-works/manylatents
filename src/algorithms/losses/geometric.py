@@ -1,69 +1,109 @@
-import hydra
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
-from omegaconf import DictConfig
-from torch import nn
 
 
-class AEDimLoss(nn.Module):
-    def __init__(
-        self,
-        lambda_tsa: float,
-        lambda_pr: float,
-        tsa_cfg:   DictConfig,
-        pr_cfg:    DictConfig,
-    ):
+class PRLoss(nn.Module):
+    """
+    Loss wrapper for Participation Ratio:
+    Computes MSE + lambda_pr * PR(z)
+    PR = (sum eig)^2 / sum(eig^2), eig from batch covariance of latent z.
+    """
+    def __init__(self, lambda_pr: float = 0.01, eps: float = 1e-8):
+        super().__init__()
+        self.lambda_pr = lambda_pr
+        self.eps = eps
+
+    def forward(self, outputs: torch.Tensor, targets: torch.Tensor, latent: torch.Tensor = None, **_):
+        recon = F.mse_loss(outputs, targets)
+        # Participation Ratio
+        B, d = latent.shape
+        zc = latent - latent.mean(0, keepdim=True)
+        cov = (zc.T @ zc) / (B - 1 + self.eps)
+        eig = torch.linalg.eigvalsh(cov).clamp(min=self.eps)
+        pr_val = (eig.sum() ** 2) / (eig.pow(2).sum())
+        return recon + self.lambda_pr * pr_val
+
+class AnisotropyLoss(nn.Module):
+    """
+    Loss wrapper for Anisotropy:
+    Computes MSE + lambda_aniso * (1 - anisotropy(z))
+    anisotropy = 1 - max(eig)/sum(eig)
+    """
+    def __init__(self, lambda_aniso: float = 0.01, eps: float = 1e-8):
+        super().__init__()
+        self.lambda_aniso = lambda_aniso
+        self.eps = eps
+
+    def forward(self, outputs: torch.Tensor, targets: torch.Tensor, latent: torch.Tensor = None, **_):
+        recon = F.mse_loss(outputs, targets)
+        B, d = latent.shape
+        zc = latent - latent.mean(0, keepdim=True)
+        cov = (zc.T @ zc) / (B - 1 + self.eps)
+        eig = torch.linalg.eigvalsh(cov).clamp(min=self.eps)
+        aniso_val = eig.max() / eig.sum()
+        return recon + self.lambda_aniso * (1.0 - aniso_val)
+
+class TSALoss(nn.Module):
+    """
+    Loss wrapper for Tangent-Space Approximation:
+    Computes MSE + lambda_tsa * TSA(raw, z)
+    TSA = average Frobenius norm squared between raw- and latent-space tangent projectors
+    """
+    def __init__(self, lambda_tsa: float = 0.1, k: int = 25, p: int = 1, eps: float = 1e-8):
         super().__init__()
         self.lambda_tsa = lambda_tsa
-        self.lambda_pr  = lambda_pr
-        self.tsa = hydra.utils.instantiate(tsa_cfg)
-        self.pr  = hydra.utils.instantiate(pr_cfg)
+        self.k = k
+        self.p = p
+        self.eps = eps
 
-    def forward(self, outputs, targets, latent=None, **_):
-        # recon
+    def forward(self,
+                outputs: torch.Tensor,
+                targets: torch.Tensor,
+                latent: torch.Tensor = None,
+                raw: torch.Tensor = None,
+                **_):
         recon = F.mse_loss(outputs, targets)
-        # metric terms
-        tsa_loss = self.tsa(embeddings=latent, dataset=None, module=None)
-        pr_loss  = self.pr(embeddings=latent, dataset=None, module=None)
-        return recon + self.lambda_tsa * tsa_loss + self.lambda_pr * pr_loss
+        B, D = raw.shape
+        _, d = latent.shape
+        # pairwise distances in raw space
+        dists = torch.cdist(raw, raw)
+        idx = dists.topk(self.k + 1, largest=False).indices
+        losses = []
+        for i in range(B):
+            nbrs = idx[i, 1:]
+            Z = latent[nbrs]
+            X = raw[nbrs]
+            Zc = Z - Z.mean(0, keepdim=True)
+            Xc = X - X.mean(0, keepdim=True)
+            Cz = (Zc.T @ Zc) / (self.k - 1 + self.eps)
+            Cx = (Xc.T @ Xc) / (self.k - 1 + self.eps)
+            _, Uz = torch.linalg.eigh(Cz)
+            Ui = Uz[:, -self.p:]
+            _, Ux = torch.linalg.eigh(Cx)
+            Vi = Ux[:, -self.p:]
+            Pz = Ui @ Ui.T
+            Px = Vi @ Vi.T
+            losses.append(torch.norm(Pz - Px) ** 2)
+        tsa_val = torch.stack(losses).mean()
+        return recon + self.lambda_tsa * tsa_val
 
-
-class AENeighborhoodLoss(nn.Module):
-    def __init__(
-        self,
-        lambda_trust: float,
-        lambda_cont:  float,
-        trust_cfg:    DictConfig,
-        cont_cfg:     DictConfig,
-    ):
+class AllGeomLoss(nn.Module):
+    """
+    Composite loss: sum of PR, Anisotropy, and TSA sub-losses
+    """
+    def __init__(self,
+                 loss_pr:    nn.Module,
+                 loss_aniso: nn.Module,
+                 loss_tsa:   nn.Module):
         super().__init__()
-        self.lambda_trust = lambda_trust
-        self.lambda_cont  = lambda_cont
-        self.trust = hydra.utils.instantiate(trust_cfg)
-        self.cont  = hydra.utils.instantiate(cont_cfg)
+        self.pr_loss    = loss_pr
+        self.aniso_loss = loss_aniso
+        self.tsa_loss   = loss_tsa
 
-    def forward(self, outputs, targets, latent=None, dataset=None, **_):
-        recon = F.mse_loss(outputs, targets)
-        t = 1.0 - self.trust(embeddings=latent, dataset=dataset, module=None)
-        c = 1.0 - self.cont(embeddings=latent, dataset=dataset, module=None)
-        return recon + self.lambda_trust * t + self.lambda_cont * c
-
-
-class AEShapeLoss(nn.Module):
-    def __init__(
-        self,
-        lambda_pr:    float,
-        lambda_aniso: float,
-        pr_cfg:       DictConfig,
-        aniso_cfg:    DictConfig,
-    ):
-        super().__init__()
-        self.lambda_pr    = lambda_pr
-        self.lambda_aniso = lambda_aniso
-        self.pr          = hydra.utils.instantiate(pr_cfg)
-        self.aniso       = hydra.utils.instantiate(aniso_cfg)
-
-    def forward(self, outputs, targets, latent=None, dataset=None, **_):
-        recon = F.mse_loss(outputs, targets)
-        pr_l  = self.pr(embeddings=latent, dataset=dataset, module=None)
-        a_l   = 1.0 - self.aniso(embeddings=latent, dataset=dataset, module=None)
-        return recon + self.lambda_pr * pr_l + self.lambda_aniso * a_l
+    def forward(self, outputs, targets, latent=None, raw=None, **_):
+        recon  = F.mse_loss(outputs, targets)
+        pr     = self.pr_loss(outputs, targets, latent=latent)
+        aniso  = self.aniso_loss(outputs, targets, latent=latent)
+        tsa    = self.tsa_loss(outputs, targets, latent=latent, raw=raw)
+        return recon + pr + aniso + tsa

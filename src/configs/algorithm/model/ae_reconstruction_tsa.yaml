@@ -13,4 +13,4 @@ optimizer:
   _partial_: true
   lr: 0.001
 loss:
-  _target_: src.algorithms.losses.mse.MSELoss
+  _target_: src.algorithms.losses.geometric.TSALoss

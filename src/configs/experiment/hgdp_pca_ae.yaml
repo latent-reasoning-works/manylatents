@@ -3,7 +3,7 @@ name: hgdp_pca_ae
 
 defaults:
   #- override /algorithm/dimensionality_reduction: noop
-  - override /algorithm/model: ae_reconstruction
+  - override /algorithm/model: ae_reconstruction_allgeom
   - override /data: hgdp_pca_precomputed
   - override /callbacks/embedding: default
   - override /callbacks/trainer: default

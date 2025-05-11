@@ -2,7 +2,7 @@
 name: hgdp_ae_d_{algorithm.model.network.latent_dim}_{algorithm.model.loss}
 
 defaults:
-  - override /algorithm/model: ae_reconstruction
+  - override /algorithm/model: ae_reconstruction_allgeom
   - override /data: hgdp_split
   - override /callbacks/embedding: default
   - override /callbacks/trainer: default
@@ -12,6 +12,6 @@ defaults:
 algorithm:
   model:
     network:
-      input_dim: 197675 # HGDP ncols     
+      input_dim: 197675 # HGDP ncols
 
 seed: 42

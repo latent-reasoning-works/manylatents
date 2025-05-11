@@ -54,6 +54,7 @@ def main(cfg: DictConfig):
     
     # --- Data instantiation ---
     datamodule = instantiate_datamodule(cfg)
+    datamodule.setup()
     train_loader = datamodule.train_dataloader()
     test_loader = datamodule.test_dataloader()
     field_index, data_source = determine_data_source(train_loader)
@@ -89,7 +90,6 @@ def main(cfg: DictConfig):
         loggers=loggers,
     )
 
-    
     logger.info("Starting the experiment pipeline...")
         
     # --- DR Embedding Computation ---
