@@ -2,3 +2,4 @@ continuity:
   _target_: src.metrics.continuity.Continuity
   _partial_: True
   n_neighbors: [15,25,50,100,250]
+  return_per_sample: True

@@ -36,26 +36,35 @@ class WandbLogScores(EmbeddingCallback):
         if run is None:
             return {}
 
-        scores = embeddings.get("scores", {})
-        if not scores:
+        raw_scores = embeddings.get("scores", {})
+        if not raw_scores:
             logger.warning("No scores found.")
             return {}
 
-        # figure out whether this is DR or latent
+        # 0) first, unpack any (scalar, per_sample_array) tuples into two entries
+        scores: dict[str, np.ndarray | float] = {}
+        for name, vals in raw_scores.items():
+            if isinstance(vals, tuple) and len(vals) == 2:
+                scalar, arr = vals
+                scores[name] = float(scalar)
+                scores[f"{name}__per_sample"] = np.asarray(arr)
+            else:
+                scores[name] = vals
+
         tag = embeddings.get("metadata", {}).get("source", "embedding")
 
-        # --- 1) summary scalars (0-D only) ---
+        # 1) summary scalars (0-D only)
         scalar_summary = {
-            f"{tag}/{name}": float(vals)
-            for name, vals in scores.items()
-            if np.ndim(vals) == 0
+            f"{tag}/{name}": float(v)
+            for name, v in scores.items()
+            if np.ndim(v) == 0
         }
         if self.log_summary and scalar_summary:
             wandb.log(scalar_summary, commit=False)
             logger.info(f"Logged scalars for {tag}: {list(scalar_summary)}")
 
-        # --- 2) per-sample table (1-D arrays) ---
-        array_keys = [k for k,v in scores.items() if np.ndim(v) > 0]
+        # 2) per-sample table (1-D arrays)
+        array_keys = [k for k, v in scores.items() if np.ndim(v) == 1]
         if self.log_table and array_keys:
             N = len(scores[array_keys[0]])
             data = {"sample_index": np.arange(N)}
@@ -66,19 +75,17 @@ class WandbLogScores(EmbeddingCallback):
                     else list(lbl)
                 )
             for name in array_keys:
-                data[name] = np.asarray(scores[name]).tolist()
+                data[name] = scores[name].tolist()
 
             df = pd.DataFrame(data)
             table = wandb.Table(dataframe=df)
             wandb.log({f"{tag}/per_sample_metrics": table}, commit=False)
             logger.info(f"Logged table {tag}/per_sample_metrics")
 
-        # --- 3) k-curve tables ---
+        # 3) k-curve tables (group swept scalars by base name)
         if self.log_k_curve_table and scalar_summary:
-            # group all swept scalars by their base name
-            groups: dict[str,list[tuple[int,float]]] = {}
+            groups: dict[str, list[tuple[int, float]]] = {}
             for full_name, val in scalar_summary.items():
-                # strip off the tag/ prefix
                 _, inner = full_name.split("/", 1)
                 m = self._knn_re.match(inner)
                 if m:
