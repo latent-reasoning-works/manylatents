@@ -93,7 +93,7 @@ def main(cfg: DictConfig):
     logger.info("Starting the experiment pipeline...")
         
     # --- DR Embedding Computation ---
-    embeddings = None
+    embeddings: dict = {}
     if cfg.eval_only:
         logger.info("Evaluation-only mode (DR): Loading precomputed DR outputs.")
         embeddings = load_precomputed_embeddings(cfg)
@@ -150,7 +150,7 @@ def main(cfg: DictConfig):
         logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
         
     # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---
-    latents = None    
+    latent_embeddings: dict = {}
     if lightning_module and hasattr(lightning_module, "encode"):
         logger.info("Extracting latent embeddings using the network's encoder...")
         test_tensor = torch.cat([b["data"].cpu() for b in test_loader], dim=0)
@@ -171,8 +171,8 @@ def main(cfg: DictConfig):
             datamodule=datamodule,
         )
     # --- merge embeddings scores from DR and NN, if available ---
-    dr_scores     = embeddings.get("scores", {})         if embeddings else {}
-    latent_scores = latent_embeddings.get("scores", {})  if latent_embeddings else {}
+    dr_scores     = embeddings.get("scores", {})
+    latent_scores = latent_embeddings.get("scores", {})
     embedding_metrics = {**dr_scores, **latent_scores}
 
     for tag, embed_dict in (("dr", embeddings), ("latent", latent_embeddings)):
