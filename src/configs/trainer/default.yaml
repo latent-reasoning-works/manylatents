@@ -7,13 +7,25 @@ accelerator: auto
 strategy: auto
 devices: 1
 
-deterministic: false
+deterministic: true
 
-fast_dev_run: true
+min_epochs: 5
+max_epochs: 100
 
-min_epochs: 1
-max_epochs: 10
+precision: 32
 
+limit_train_batches: 1.0 
+limit_val_batches: 1.0    
+limit_test_batches: 1.0
+
+val_check_interval: 1.0
+check_val_every_n_epoch: 1
+
+gradient_clip_val: 1.0
+accumulate_grad_batches: 1
+
+log_every_n_steps: 100
 default_root_dir: ${hydra:runtime.output_dir}
-
 detect_anomaly: false
+
+fast_dev_run: false

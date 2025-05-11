@@ -79,7 +79,7 @@ class Reconstruction(LightningModule):
             setattr(self, attr, inst)
 
         # stash the optimizer config for the actual optimizer_step
-        # leave the torch.optim instantiation for configure_optimizers
+        # leave the torch.optim instantiation for configure_optimizers        
         self._optimizer_partial = self.optimizer_config
 
         logger.info(f"Instantiated network={self.network.__class__.__name__}, "
@@ -99,21 +99,30 @@ class Reconstruction(LightningModule):
         assert self.network is not None, "Network not configured. Call configure_model() first."
         return self.network.encode(x)
 
-    def shared_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int, phase: str) -> dict:
-        """
-        Common step logic for training, validation, and testing.
-        """
-        x = batch["data"]
+    def shared_step(self, batch, batch_idx, phase: str):
+        x       = batch["data"]
         outputs = self.network(x)
-        
-        extras = {}
-        if hasattr(self.network, "encoder"):
-            extras["latent"] = self.network.encoder(x)
-            
-        loss = self.loss_fn(outputs=outputs, targets=x, **extras)
-        
-        self.log(f"{phase}_loss", loss, prog_bar=True)
-        return {"loss": loss, "outputs": outputs}
+        latent  = self.network.encoder(x)
+        raw     = x
+
+        comps = self.loss_fn.components(
+            outputs=outputs,
+            targets=x,
+            latent=latent,
+            raw=raw,
+        )
+        total_loss = sum(comps.values())
+
+        # log each term
+        for name, val in comps.items():
+            self.log(f"{phase}_{name}", val,
+                     on_step=True, on_epoch=True, prog_bar=(name=="recon"))
+
+        # and log the overall
+        self.log(f"{phase}_loss", total_loss,
+                 prog_bar=True, on_step=True, on_epoch=True)
+
+        return {"loss": total_loss, "outputs": outputs}
 
     def training_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
         return self.shared_step(batch, batch_idx, phase="train")
