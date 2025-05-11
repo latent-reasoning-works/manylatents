@@ -99,23 +99,30 @@ class Reconstruction(LightningModule):
         assert self.network is not None, "Network not configured. Call configure_model() first."
         return self.network.encode(x)
 
-    def shared_step(self, batch, batch_idx, phase: str) -> dict:
-        x = batch["data"]
+    def shared_step(self, batch, batch_idx, phase: str):
+        x       = batch["data"]
         outputs = self.network(x)
+        latent  = self.network.encoder(x)
+        raw     = x
 
-        extras = {
-        "latent": self.network.encoder(x),
-        "raw":    x, 
-        }
-
-        loss = self.loss_fn(outputs=outputs, targets=x, **extras)
-        self.log(f"{phase}_loss", 
-                 loss, 
-                 prog_bar=True,
-                 on_step=False,
-                 on_epoch=True,
+        comps = self.loss_fn.components(
+            outputs=outputs,
+            targets=x,
+            latent=latent,
+            raw=raw,
         )
-        return {"loss": loss, "outputs": outputs}
+        total_loss = sum(comps.values())
+
+        # log each term
+        for name, val in comps.items():
+            self.log(f"{phase}_{name}", val,
+                     on_step=True, on_epoch=True, prog_bar=(name=="recon"))
+
+        # and log the overall
+        self.log(f"{phase}_loss", total_loss,
+                 prog_bar=True, on_step=True, on_epoch=True)
+
+        return {"loss": total_loss, "outputs": outputs}
 
     def training_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
         return self.shared_step(batch, batch_idx, phase="train")

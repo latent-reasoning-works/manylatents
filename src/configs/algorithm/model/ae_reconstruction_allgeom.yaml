@@ -14,14 +14,9 @@ optimizer:
   lr: 0.001
 loss:
   _target_: src.algorithms.losses.geometric.AllGeomLoss
-  loss_pr:
-    _target_: src.algorithms.losses.geometric.PRLoss
-    lambda_pr: 0.01
-  loss_aniso:
-    _target_: src.algorithms.losses.geometric.AnisotropyLoss
-    lambda_aniso: 0.01
-  loss_tsa:
-    _target_: src.algorithms.losses.geometric.TSALoss
-    lambda_tsa: 0.1
-    k: 25
-    p: 1
+  lambda_pr: 0.1
+  lambda_aniso: 0.1
+  lambda_tsa: 0.1
+  k: 25
+  p: 1
+
