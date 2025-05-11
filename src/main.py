@@ -79,8 +79,8 @@ def main(cfg: DictConfig):
 
     # --- Loggers ---
     loggers = []
-    if not cfg.debug and cfg.get("logger"):
-        for lg_conf in cfg.logger.values():
+    if not cfg.debug:
+        for lg_conf in cfg.trainer.get("logger", {}).values():
             loggers.append(hydra.utils.instantiate(lg_conf))
 
     # --- Trainer ---
@@ -89,7 +89,7 @@ def main(cfg: DictConfig):
         lightning_callbacks=lightning_cbs,
         loggers=loggers,
     )
-
+    
     logger.info("Starting the experiment pipeline...")
         
     # --- DR Embedding Computation ---

@@ -6,7 +6,6 @@ defaults:
   - override /algorithm/model: ae_reconstruction_allgeom
   - override /data: hgdp_pca_precomputed
   - override /callbacks/embedding: default
-  - override /callbacks/trainer: default
   - override /trainer: default
   - override /metrics: fidelity_metrics
 
