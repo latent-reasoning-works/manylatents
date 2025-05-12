@@ -10,7 +10,7 @@ devices: 1
 deterministic: true
 
 min_epochs: 5
-max_epochs: 100
+max_epochs: 150
 
 precision: 32
 

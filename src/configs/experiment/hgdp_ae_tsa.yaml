@@ -12,5 +12,8 @@ algorithm:
   model:
     network:
       input_dim: 172152 # HGDP ncols
+    loss:
+      loss_tsa:
+        input_dim: 172152
 
 seed: 42

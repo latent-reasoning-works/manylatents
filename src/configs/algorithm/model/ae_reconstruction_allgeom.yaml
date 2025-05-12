@@ -17,13 +17,19 @@ loss:
   loss_pr:
     _target_: src.algorithms.losses.geometric.PRLoss
     lambda_pr: 0.01
+    eps: 1e-8
   loss_aniso:
     _target_: src.algorithms.losses.geometric.AnisotropyLoss
     lambda_aniso: 0.01
+    eps: 1e-8
   loss_tsa:
     _target_: src.algorithms.losses.geometric.TSALoss
-    lambda_tsa:  0.1
-    k:           25
-    p:           1
-
-
+    lambda_tsa: 0.1
+    k: 25
+    p: 1
+    eps: 1e-8
+    raw_proj: true
+    input_dim: ## similar as above, must be specified from experiment
+    proj_dim: 50 ## equals to latent_dim
+    proj_bias: false
+    offload_cpu: true
