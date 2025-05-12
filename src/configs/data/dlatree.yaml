@@ -1,6 +1,7 @@
+defaults:
+  - default
+
 _target_: src.data.dlatree.DLATreeDataModule
-batch_size: 32
-num_workers: 1
 test_split: 0.2
 n_dim: 100
 n_branch: 10

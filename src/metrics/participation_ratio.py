@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Union
 
 import numpy as np
+import torch
 from sklearn.neighbors import NearestNeighbors
 
 from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
@@ -30,6 +31,8 @@ def ParticipationRatio(embeddings: np.ndarray,
     Returns:
         float or np.ndarray: average or per-sample PR.
     """
+    if torch.is_tensor(embeddings):
+        embeddings = embeddings.cpu().numpy()
     # build knn graph (include the point itself by doing k+1)
     nbrs = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(embeddings)
     _, all_idx = nbrs.kneighbors(embeddings)

@@ -1,6 +1,7 @@
+defaults:
+  - default
+
 _target_: src.data.embryoidbody.EmbryoidBodyDataModule
-batch_size: 32
-num_workers: 1
 test_split: 0.2
 random_state: ${seed}
 adata_path: ./data/scRNAseq/EBT_counts.h5ad
