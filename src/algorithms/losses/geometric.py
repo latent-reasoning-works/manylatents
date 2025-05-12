@@ -1,133 +1,124 @@
-import numpy as np
+# src/algorithms/losses/geometric.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-# -----------------------------------------------------------------------------
 class PRLoss(nn.Module):
-    """Participation‐Ratio penalty:  λ_pr * PR(z)."""
     def __init__(self, lambda_pr: float = 0.01, eps: float = 1e-8):
         super().__init__()
         self.lambda_pr = lambda_pr
-        self.eps       = eps
+        self.eps = eps
 
-    def forward(self, latent: torch.Tensor) -> torch.Tensor:
-        # latent: [B, d]
+    def components(self, outputs, targets, latent=None, **_):
+        recon = F.mse_loss(outputs, targets)
         B, d = latent.shape
-        zc   = latent - latent.mean(0, keepdim=True)
-        cov  = (zc.T @ zc) / (B - 1 + self.eps)
-        eig  = torch.linalg.eigvalsh(cov).clamp(min=self.eps)
-        pr   = (eig.sum() ** 2) / eig.pow(2).sum()
-        return self.lambda_pr * pr
+        zc = latent - latent.mean(0, keepdim=True)
+        cov = (zc.T @ zc) / (B - 1 + self.eps)
+        eig = torch.linalg.eigvalsh(cov).clamp(min=self.eps)
+        pr_val = (eig.sum() ** 2) / (eig.pow(2).sum())
+        return {
+            "recon": recon,
+            "pr": self.lambda_pr * pr_val
+        }
+
+    def forward(self, outputs, targets, **extras):
+        comps = self.components(outputs, targets, **extras)
+        return comps["recon"] + comps["pr"]
 
 
-# -----------------------------------------------------------------------------
 class AnisotropyLoss(nn.Module):
-    """Anisotropy penalty:  λ_aniso * (1 – anisotropy(z))."""
     def __init__(self, lambda_aniso: float = 0.01, eps: float = 1e-8):
         super().__init__()
         self.lambda_aniso = lambda_aniso
-        self.eps          = eps
+        self.eps = eps
 
-    def forward(self, latent: torch.Tensor) -> torch.Tensor:
+    def components(self, outputs, targets, latent=None, **_):
+        recon = F.mse_loss(outputs, targets)
         B, d = latent.shape
-        zc   = latent - latent.mean(0, keepdim=True)
-        cov  = (zc.T @ zc) / (B - 1 + self.eps)
-        eig  = torch.linalg.eigvalsh(cov).clamp(min=self.eps)
-        aniso = eig.max() / eig.sum()
-        return self.lambda_aniso * (1.0 - aniso)
+        zc = latent - latent.mean(0, keepdim=True)
+        cov = (zc.T @ zc) / (B - 1 + self.eps)
+        eig = torch.linalg.eigvalsh(cov).clamp(min=self.eps)
+        aniso_val = eig.max() / eig.sum()
+        return {
+            "recon": recon,
+            "aniso": self.lambda_aniso * (1.0 - aniso_val)
+        }
+
+    def forward(self, outputs, targets, **extras):
+        comps = self.components(outputs, targets, **extras)
+        return comps["recon"] + comps["aniso"]
 
 
-# -----------------------------------------------------------------------------
 class TSALoss(nn.Module):
-    """
-    Tangent‐Space Approximation: λ_tsa * E[‖P_z – P_x‖₁²] over each minibatch neighbor set.
-    We compute raw‐space PCA on CPU to save GPU memory.
-    """
     def __init__(self, lambda_tsa: float = 0.1, k: int = 25, p: int = 1, eps: float = 1e-8):
         super().__init__()
         self.lambda_tsa = lambda_tsa
-        self.k          = k
-        self.p          = p
-        self.eps        = eps
+        self.k = k
+        self.p = p
+        self.eps = eps
 
-    def forward(self, latent: torch.Tensor, raw: torch.Tensor) -> torch.Tensor:
-        # latent: [B, d], raw: [B, D]
-        B, D = raw.shape
+    def components(self, outputs, targets, latent=None, raw=None, **_):
+        recon = F.mse_loss(outputs, targets)
+        B, _ = raw.shape
 
-        # pairwise distances on GPU
+        # build a kNN on this minibatch
         dists = torch.cdist(raw, raw)
-        nbrs  = dists.topk(self.k + 1, largest=False).indices[:, 1:]  # [B, k]
-
-        losses = []
+        idx   = dists.topk(self.k + 1, largest=False).indices  # [B, k+1]
+        tsa_losses = []
         for i in range(B):
-            nn_idx = nbrs[i]                # LongTensor[k]
-            Zn     = latent[nn_idx]         # [k, d]
-            Xn     = raw   [nn_idx]         # [k, D]
-
-            # — latent‐space projector —
-            Zc = Zn - Zn.mean(0, keepdim=True)
+            nbrs = idx[i, 1:]
+            Z = latent[nbrs]
+            X = raw[nbrs]
+            Zc = Z - Z.mean(0, keepdim=True)
+            Xc = X - X.mean(0, keepdim=True)
             Cz = (Zc.T @ Zc) / (self.k - 1 + self.eps)
-            eig_z, Uz = torch.linalg.eigh(Cz)
-            Ui = Uz[:, -self.p:]             # [d, p]
-            Pz = Ui @ Ui.T                   # [d, d]
+            Cx = (Xc.T @ Xc) / (self.k - 1 + self.eps)
+            _, Uz = torch.linalg.eigh(Cz)
+            Ui = Uz[:, -self.p:]
+            _, Ux = torch.linalg.eigh(Cx)
+            Vi = Ux[:, -self.p:]
+            Pz = Ui @ Ui.T
+            Px = Vi @ Vi.T
+            tsa_losses.append(torch.norm(Pz - Px) ** 2)
+        tsa_val = torch.stack(tsa_losses).mean()
 
-            # — raw‐space projector on CPU —
-            Xn_cpu = Xn.detach().cpu().numpy()             # [k, D]
-            Xc_cpu = Xn_cpu - Xn_cpu.mean(axis=0, keepdims=True)
-            Cx_cpu = (Xc_cpu.T @ Xc_cpu) / (self.k - 1 + self.eps)  # [D, D]
-            # numpy eigh on CPU
-            eig_x, Ux = np.linalg.eigh(Cx_cpu)
-            Vi = torch.from_numpy(Ux[:, -self.p:]).to(Pz.device)   # [D, p]
-            Px = Vi @ Vi.T                                         # [D, D] on GPU
+        return {
+            "recon": recon,
+            "tsa": self.lambda_tsa * tsa_val
+        }
 
-            # Frobenius‐norm squared
-            losses.append(torch.norm(Pz - Px) ** 2)
-
-        tsa_val = torch.stack(losses).mean()
-        return self.lambda_tsa * tsa_val
+    def forward(self, outputs, targets, **extras):
+        comps = self.components(outputs, targets, **extras)
+        return comps["recon"] + comps["tsa"]
 
 
-# -----------------------------------------------------------------------------
 class AllGeomLoss(nn.Module):
     """
-    Composite: MSE + PR + Anisotropy + TSA, but *only* sums each penalty once.
-    Exposes a .components(...) method so you can log/ablate each term.
+    Composite: sum of PR, Anisotropy, and TSA.
     """
-    def __init__(
-        self,
-        lambda_pr:    float = 0.01,
-        lambda_aniso: float = 0.01,
-        lambda_tsa:   float = 0.1,
-        k:            int   = 25,
-        p:            int   = 1,
-    ):
+    def __init__(self,
+                 loss_pr:    PRLoss,
+                 loss_aniso: AnisotropyLoss,
+                 loss_tsa:   TSALoss):
         super().__init__()
-        self.mse    = F.mse_loss
-        self.pr     = PRLoss(lambda_pr=lambda_pr)
-        self.aniso  = AnisotropyLoss(lambda_aniso=lambda_aniso)
-        self.tsa    = TSALoss(lambda_tsa=lambda_tsa, k=k, p=p)
+        self.pr_loss    = loss_pr
+        self.aniso_loss = loss_aniso
+        self.tsa_loss   = loss_tsa
 
-    def components(
-        self,
-        outputs: torch.Tensor,
-        targets: torch.Tensor,
-        latent:  torch.Tensor,
-        raw:     torch.Tensor,
-    ) -> dict[str, torch.Tensor]:
-        recon = self.mse(outputs, targets)
-        pr    = self.pr(latent)
-        aniso = self.aniso(latent)
-        tsa   = self.tsa(latent, raw)
-        return {"recon": recon, "pr": pr, "aniso": aniso, "tsa": tsa}
+    def components(self, outputs, targets, latent=None, raw=None, **_):
+        c1 = self.pr_loss.components(outputs, targets, latent=latent)
+        c2 = self.aniso_loss.components(outputs, targets, latent=latent)
+        c3 = self.tsa_loss.components(outputs, targets, latent=latent, raw=raw)
+        # they all include 'recon' so we pick one
+        recon = c1["recon"]
+        return {
+            "recon": recon,
+            "pr":    c1["pr"],
+            "aniso": c2["aniso"],
+            "tsa":   c3["tsa"]
+        }
 
-    def forward(
-        self,
-        outputs: torch.Tensor,
-        targets: torch.Tensor,
-        latent:  torch.Tensor,
-        raw:     torch.Tensor,
-    ) -> torch.Tensor:
-        comps = self.components(outputs, targets, latent, raw)
-        return sum(comps.values())
+    def forward(self, outputs, targets, **extras):
+        comps = self.components(outputs, targets, **extras)
+        return comps["recon"] + comps["pr"] + comps["aniso"] + comps["tsa"]

@@ -99,30 +99,27 @@ class Reconstruction(LightningModule):
         assert self.network is not None, "Network not configured. Call configure_model() first."
         return self.network.encode(x)
 
-    def shared_step(self, batch, batch_idx, phase: str):
+    def shared_step(self, batch, batch_idx, phase: str) -> dict:
         x       = batch["data"]
         outputs = self.network(x)
-        latent  = self.network.encoder(x)
-        raw     = x
+        extras  = {"latent": self.network.encoder(x), "raw": x}
 
-        comps = self.loss_fn.components(
-            outputs=outputs,
-            targets=x,
-            latent=latent,
-            raw=raw,
-        )
-        total_loss = sum(comps.values())
+        # if our loss has .components(), pull them out and log
+        if hasattr(self.loss_fn, "components"):
+            comps = self.loss_fn.components(outputs=outputs, targets=x, **extras)
+            total = sum(comps.values())
+            # log each piece e.g. train_recon, train_pr, etc.
+            self.log_dict(
+                {f"{phase}_{k}": v for k, v in comps.items()},
+                on_step=False, on_epoch=True, prog_bar=False
+            )
+            loss = total
+        else:
+            loss = self.loss_fn(outputs=outputs, targets=x, **extras)
 
-        # log each term
-        for name, val in comps.items():
-            self.log(f"{phase}_{name}", val,
-                     on_step=True, on_epoch=True, prog_bar=(name=="recon"))
-
-        # and log the overall
-        self.log(f"{phase}_loss", total_loss,
-                 prog_bar=True, on_step=True, on_epoch=True)
-
-        return {"loss": total_loss, "outputs": outputs}
+        # still log the aggregate
+        self.log(f"{phase}_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return {"loss": loss, "outputs": outputs}
 
     def training_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> dict:
         return self.shared_step(batch, batch_idx, phase="train")
