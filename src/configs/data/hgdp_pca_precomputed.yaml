@@ -4,6 +4,7 @@ defaults:
 _target_: src.data.hgdp.HGDPDataModule
 mmap_mode: null
 mode: split
+cache_dir: ${cache_dir}
 
 files:
   #plink:  "./data/HGDP+1KGP/genotypes/no_intersection_less_stringent/gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.maf0.01.LDpruned_500_50_0.05.woLowComplexity_noHLA"

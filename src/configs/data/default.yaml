@@ -1,3 +1,2 @@
 batch_size: 128
 num_workers: 1
-cache_dir: ${cache_dir}

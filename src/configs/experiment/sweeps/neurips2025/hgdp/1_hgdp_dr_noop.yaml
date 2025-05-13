@@ -1,0 +1,15 @@
+# @package _global_
+name: hgdp_NoOp
+
+defaults:
+  - override /algorithm/dimensionality_reduction: noop
+  - override /data: hgdp_split
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+    
+data:
+  filter_related: true # no fitting on related samples
+
+seed: 42
+
+

@@ -1,0 +1,17 @@
+# @package _global_
+name: hgdp_aa_phate_n_components=${algorithm.dimensionality_reduction.n_components}_knn=${algorithm.dimensionality_reduction.knn}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: phate
+  - override /data: hgdp_aa_precomputed
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+  
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.n_components: 2, 3
+      algorithm.dimensionality_reduction.knn: 15, 25, 50, 100, 250, 500, 100
+
+seed: 42

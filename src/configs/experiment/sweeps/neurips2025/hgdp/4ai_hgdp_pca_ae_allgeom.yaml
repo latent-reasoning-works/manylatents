@@ -1,19 +1,18 @@
 # @package _global_
-name: hgdp_ae_AllGeomLoss_50D
+name: hgdp_pca_ae_allgeom
 
 defaults:
   - override /algorithm/model: ae_reconstruction_allgeom
-  - override /data: hgdp_split
+  - override /data: hgdp_pca_precomputed
   - override /callbacks/embedding: default
-  - override /trainer: default
   - override /metrics: fidelity_metrics
 
 algorithm:
   model:
     network:
-      input_dim: 172152 # HGDP ncols
+      input_dim: 50
     loss:
       loss_tsa:
-        input_dim: 172152
+        input_dim: 50
 
 seed: 42

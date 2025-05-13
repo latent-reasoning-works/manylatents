@@ -1,0 +1,19 @@
+# @package _global_
+name: hgdp_pca_n_components=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: pca
+  - override /data: hgdp_split
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 50
+    
+data:
+  filter_related: true # no fitting on related samples
+
+seed: 42
+
+
