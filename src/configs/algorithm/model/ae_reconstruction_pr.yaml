@@ -29,7 +29,7 @@ loss:
     p: 1
     eps: 1e-8
     raw_proj: true
-    input_dim: ## similar as above, must be specified from experiment
+    input_dim: null ## similar as above, must be specified from experiment
     proj_dim: 50 ## equals to latent_dim
     proj_bias: false
     offload_cpu: true

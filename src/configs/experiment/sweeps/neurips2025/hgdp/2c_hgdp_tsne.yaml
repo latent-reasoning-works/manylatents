@@ -1,0 +1,20 @@
+# @package _global_
+name: hgdp_tsne_n_components=${algorithm.dimensionality_reduction.n_components}_perplexity=${algorithm.dimensionality_reduction.perplexity}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: tsne
+  - override /data: hgdp_split
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+  
+seed: 42
+
+data:
+  filter_related: true # no fitting on related samples
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithm.dimensionality_reduction.n_components: 2, 3
+      algorithm.dimensionality_reduction.perplexity: 5, 8, 17, 33, 83, 167, 333

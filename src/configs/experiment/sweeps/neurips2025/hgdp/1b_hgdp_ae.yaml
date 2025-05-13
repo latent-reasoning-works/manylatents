@@ -1,8 +1,8 @@
 # @package _global_
-name: hgdp_ae_PRLoss_50D
+name: hgdp_ae_MSELoss_50D
 
 defaults:
-  - override /algorithm/model: ae_reconstruction_pr
+  - override /algorithm/model: ae_reconstruction
   - override /data: hgdp_split
   - override /callbacks/embedding: default
   - override /trainer: default
@@ -11,9 +11,9 @@ defaults:
 algorithm:
   model:
     network:
-      input_dim: 172152 # HGDP ncols
-    loss:
-      loss_tsa:
-        input_dim: 172152
+      input_dim: 172152 # HGDP ncols     
+      
+data:
+  filter_related: true # no fitting on related samples
 
 seed: 42
