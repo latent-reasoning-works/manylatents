@@ -1,0 +1,14 @@
+# @package _global_
+name: hgdp_pca_umap_n_components=${algorithm.dimensionality_reduction.n_components}_n_neighbors=${algorithm.dimensionality_reduction.n_neighbors}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: umap
+  - override /data: hgdp_pca_precomputed
+  - override /callbacks/embedding: default
+  - override /metrics: hgdp_dr
+  
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2

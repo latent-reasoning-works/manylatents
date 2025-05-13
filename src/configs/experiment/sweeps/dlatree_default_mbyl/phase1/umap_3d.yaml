@@ -1,0 +1,14 @@
+# @package _global_
+name: mbyl_dlatree_default_umap_n_components=${algorithm.dimensionality_reduction.n_components}_n_neighbors=${algorithm.dimensionality_reduction.n_neighbors}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: umap
+  - override /data: dlatree_default
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+  
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 3

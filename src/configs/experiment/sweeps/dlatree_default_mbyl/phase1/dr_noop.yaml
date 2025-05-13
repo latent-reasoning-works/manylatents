@@ -1,0 +1,10 @@
+# @package _global_
+name: mbyl_dlatree_default_dr_noop
+
+defaults:
+  - override /algorithm/dimensionality_reduction: noop
+  - override /data: dlatree_default
+  - override /callbacks/embedding: default
+  - override /metrics: fidelity_metrics
+
+seed: 42
