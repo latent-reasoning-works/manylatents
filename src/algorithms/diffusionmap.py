@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 from typing import Optional, Union
+import numpy as np
 
 from src.utils.diffusion_map import DiffusionMap
 from .dimensionality_reduction import DimensionalityReductionModule
