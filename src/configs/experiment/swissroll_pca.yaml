@@ -8,6 +8,7 @@ defaults:
   - override /metrics: synthetic_data_metrics
 
 seed: 42
+project: manifold_genetics
 
 algorithm:
   dimensionality_reduction:
