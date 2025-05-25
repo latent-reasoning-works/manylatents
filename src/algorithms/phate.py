@@ -1,4 +1,3 @@
-
 from typing import Optional, Union
 
 import numpy as np
@@ -23,8 +22,10 @@ class PHATEModule(DimensionalityReductionModule):
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
+        fast_dev_run_dr: bool = False,
+        n_samples_fast_dev: int = 100,
     ):
-        super().__init__(n_components, random_state)
+        super().__init__(n_components, random_state, fast_dev_run_dr, n_samples_fast_dev)
         self.fit_fraction = fit_fraction
         self.model = PHATE(n_components=n_components, 
                            random_state=random_state,
@@ -42,7 +43,11 @@ class PHATEModule(DimensionalityReductionModule):
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
-        self.model.fit(x_np[:n_fit])
+        
+        # Apply fast_dev_run_dr if enabled
+        x_fit = self._prepare_fit_data(x_np[:n_fit])
+        
+        self.model.fit(x_fit)
         self._is_fitted = True
 
     def transform(self, x: Tensor) -> Tensor:

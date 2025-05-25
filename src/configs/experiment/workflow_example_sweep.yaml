@@ -1,0 +1,50 @@
+# @package _global_
+name: workflow_example_pca_autoencoder_sweep
+
+defaults:
+  - override /data: hgdp_split
+  - override /callbacks/embedding: default
+  - override /trainer: default
+  - override /metrics: fidelity_metrics
+
+seed: 42
+
+workflow:
+  steps:
+    - name: pca
+      algorithm:
+        dimensionality_reduction:
+          _target_: src.algorithms.dimensionality_reduction.PCAModule
+          n_components: ${sweep.pca.n_components}
+      evaluation:
+        enabled: true
+        metrics: ${metrics}
+        
+    - name: autoencoder
+      algorithm:
+        model:
+          _target_: src.algorithms.networks.autoencoder.Autoencoder
+          input_dim: ${sweep.pca.n_components}  # Takes input from PCA step
+          hidden_dims: [256, 128]
+          latent_dim: 25
+          activation: relu
+          batchnorm: true
+          dropout: ${sweep.autoencoder.dropout}
+      evaluation:
+        enabled: true
+        metrics: ${metrics}
+
+# Define sweep parameters
+sweep:
+  pca:
+    n_components: 50  # Default value
+  autoencoder:
+    dropout: 0.1  # Default value
+
+# Configure Hydra multirun
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      sweep.pca.n_components: [25, 50, 100]  # Sweep over PCA dimensions
+      sweep.autoencoder.dropout: [0.1, 0.2, 0.3]  # Sweep over dropout rates 

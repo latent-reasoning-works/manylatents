@@ -1,0 +1,13 @@
+# Default configuration for dimensionality reduction algorithms
+fast_dev_run_dr: true  # Enable fast dev run by default for DR algorithms
+"""If True, use only a small subset of data for dimensionality reduction steps."""
+
+n_samples_fast_dev: 100
+"""Number of samples to use when fast_dev_run_dr is enabled."""
+
+# Common parameters for all DR algorithms
+random_state: ${seed}
+"""Random seed for reproducibility."""
+
+fit_fraction: 1.0
+"""Fraction of data to use for fitting (1.0 = use all data).""" 

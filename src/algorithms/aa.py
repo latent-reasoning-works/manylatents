@@ -11,10 +11,14 @@ class ArchetypalAnalysisModule(DimensionalityReductionModule):
         n_components: int = 3,
         method: str = "pgd",
         max_iter: int = 100,
-        random_state: int = 42
+        random_state: int = 42,
+        fast_dev_run_dr: bool = False,
+        n_samples_fast_dev: int = 100,
     ):
         super().__init__(n_components=n_components, 
-                         init_seed=random_state)
+                         init_seed=random_state,
+                         fast_dev_run_dr=fast_dev_run_dr,
+                         n_samples_fast_dev=n_samples_fast_dev)
         self.method = method
         self.max_iter = max_iter
         self.model = None
@@ -25,13 +29,16 @@ class ArchetypalAnalysisModule(DimensionalityReductionModule):
         x_np = x.detach().cpu().numpy()
         method_kwargs = {"max_iter_optimizer": self.max_iter}
 
+        # Apply fast_dev_run_dr if enabled
+        x_fit = self._prepare_fit_data(x_np)
+
         self.model = AA(
             n_archetypes=self.n_components,
             method=self.method,
             method_kwargs=method_kwargs,
             random_state=self.init_seed,
         )
-        self.model.fit(x_np)
+        self.model.fit(x_fit)
         self._is_fitted = True
 
     def transform(self, x: Tensor) -> Tensor:

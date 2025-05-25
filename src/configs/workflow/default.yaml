@@ -1,0 +1,28 @@
+# @package _global_
+
+# Default workflow configuration
+workflow:
+  steps: []  # List of algorithm steps to execute
+  evaluation:
+    enabled: true  # Whether to evaluate embeddings after each step
+    metrics: ${metrics}  # Use the same metrics as configured in the experiment
+
+# Example workflow configuration:
+# workflow:
+#   steps:
+#     - name: pca
+#       algorithm:
+#         dimensionality_reduction:
+#           _target_: src.algorithms.dimensionality_reduction.PCAModule
+#           n_components: 50
+#       evaluation:
+#         enabled: true
+#     - name: autoencoder
+#       algorithm:
+#         model:
+#           _target_: src.algorithms.networks.autoencoder.Autoencoder
+#           input_dim: 50  # Takes input from previous step
+#           hidden_dims: [256, 128]
+#           latent_dim: 25
+#       evaluation:
+#         enabled: false 

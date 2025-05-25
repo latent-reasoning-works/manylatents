@@ -1,0 +1,35 @@
+# @package _global_
+name: workflow_example_pca_autoencoder
+
+defaults:
+  - override /data: hgdp_split
+  - override /callbacks/embedding: default
+  - override /trainer: default
+  - override /metrics: fidelity_metrics
+
+seed: 42
+
+workflow:
+  steps:
+    - name: pca
+      algorithm:
+        dimensionality_reduction:
+          _target_: src.algorithms.dimensionality_reduction.PCAModule
+          n_components: 50
+      evaluation:
+        enabled: true
+        metrics: ${metrics}
+        
+    - name: autoencoder
+      algorithm:
+        model:
+          _target_: src.algorithms.networks.autoencoder.Autoencoder
+          input_dim: 50  # Takes input from PCA step
+          hidden_dims: [256, 128]
+          latent_dim: 25
+          activation: relu
+          batchnorm: true
+          dropout: 0.1
+      evaluation:
+        enabled: true
+        metrics: ${metrics} 

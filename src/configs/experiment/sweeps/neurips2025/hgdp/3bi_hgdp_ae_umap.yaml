@@ -12,6 +12,6 @@ hydra:
   sweeper:
     params:
       algorithm.dimensionality_reduction.n_components: 2, 3
-      algorithm.dimensionality_reduction.n_neighbors: 15, 25, 50, 100, 250, 500, 1000
+      algorithm.dimensionality_reduction.n_neighbors: 50 #15, 25, 50, 100, 250, 500, 1000
 
 seed: 42

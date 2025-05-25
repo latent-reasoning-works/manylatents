@@ -1,0 +1,35 @@
+# @package _global_
+
+# Example workflow configuration with fast_dev_run_dr enabled
+workflow:
+  steps:
+    - name: pca
+      algorithm:
+        dimensionality_reduction:
+          _target_: src.algorithms.dimensionality_reduction.PCAModule
+          n_components: 50
+          fast_dev_run_dr: true  # Enable fast dev run
+          n_samples_fast_dev: 100  # Use only 100 samples for fitting
+      evaluation:
+        enabled: true
+    - name: umap
+      algorithm:
+        dimensionality_reduction:
+          _target_: src.algorithms.dimensionality_reduction.UMAPModule
+          n_components: 2
+          n_neighbors: 15
+          min_dist: 0.1
+          fast_dev_run_dr: true  # Enable fast dev run
+          n_samples_fast_dev: 100  # Use only 100 samples for fitting
+      evaluation:
+        enabled: true
+    - name: tsne
+      algorithm:
+        dimensionality_reduction:
+          _target_: src.algorithms.dimensionality_reduction.TSNEModule
+          n_components: 2
+          perplexity: 30
+          fast_dev_run_dr: true  # Enable fast dev run
+          n_samples_fast_dev: 100  # Use only 100 samples for fitting
+      evaluation:
+        enabled: true 

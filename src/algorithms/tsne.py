@@ -42,8 +42,10 @@ class TSNEModule(DimensionalityReductionModule):
         metric: str = "euclidean",
         initialization: str = "random",
         fit_fraction: float = 1.0,
+        fast_dev_run_dr: bool = False,
+        n_samples_fast_dev: int = 100,
     ):
-        super().__init__(n_components, random_state)
+        super().__init__(n_components, random_state, fast_dev_run_dr, n_samples_fast_dev)
         self.perplexity = perplexity
         self.n_iter_early = n_iter_early
         self.n_iter_late = n_iter_late
@@ -57,7 +59,9 @@ class TSNEModule(DimensionalityReductionModule):
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))
-        x_fit = x_np[:n_fit]
+        
+        # Apply fast_dev_run_dr if enabled
+        x_fit = self._prepare_fit_data(x_np[:n_fit])
 
         # Step 1: Compute affinities (P matrix)
         

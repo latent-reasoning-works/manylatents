@@ -9,5 +9,5 @@ wandb:
   # entity: "" 
   prefix: ""
   job_type: "train"
-  group: ""
+  group: "" ## use slurmjobid env var to group e.g. ${oc.env:SLURM_JOB_ID}
   tags: []

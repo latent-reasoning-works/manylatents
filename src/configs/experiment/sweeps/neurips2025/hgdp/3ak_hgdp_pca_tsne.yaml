@@ -12,6 +12,6 @@ hydra:
   sweeper:
     params:
       algorithm.dimensionality_reduction.n_components: 2, 3
-      algorithm.dimensionality_reduction.perplexity: 5, 8, 17, 33, 83, 167, 333
+      algorithm.dimensionality_reduction.perplexity: 17 #5, 8, 17, 33, 83, 167, 333
 
 seed: 42

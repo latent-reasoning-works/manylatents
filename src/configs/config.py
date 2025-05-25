@@ -25,6 +25,9 @@ class Config:
     metrics: Optional[Any] = None
     """Configuration for metrics used during training and evaluation."""
     
+    workflow: Optional[Any] = None
+    """Configuration for the workflow steps and their evaluation."""
+
     log_level: str = "info"
     """Logging level (one of: "debug", "info", "warning", "error", "critical")."""
 

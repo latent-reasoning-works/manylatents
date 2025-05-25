@@ -6,11 +6,14 @@ from pathlib import Path
 from typing import List, Optional
 
 import h5py
+import hydra
+import lightning
 import numpy as np
 import pandas as pd
 import rich
 import rich.logging
 import torch
+import wandb
 from lightning.pytorch import Trainer
 from omegaconf import DictConfig, OmegaConf
 
@@ -103,25 +106,41 @@ def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
         logging.warning(f"Could not detect delimiter for file '{file_path}': {e}")
         return None
 
+def setup_wandb(cfg: DictConfig) -> wandb.run:
+    """Setup wandb once for the entire workflow and return the run instance.
+    
+    This ensures the same wandb run is used across both DR modules and Lightning modules.
+    """
+    if cfg.debug:
+        wandb.init(mode="disabled")
+    else:
+        wandb.init(
+            project="ManyLatents",
+            name=cfg.name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+        )
+    return wandb.run
+
 def instantiate_trainer(
     cfg: DictConfig,
     lightning_callbacks: Optional[List] = None,
-    loggers:            Optional[List] = None,
 ) -> Trainer:
     """
     Dynamically instantiate the PL Trainer from cfg.trainer,
-    injecting `callbacks` and `logger` lists as overrides.
+    injecting `callbacks` as overrides.
     """
     # Turn the trainer sub‐config into a plain dict:
     trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
     # Remove the entries we want to override:
     trainer_kwargs.pop("callbacks", None)
-    trainer_kwargs.pop("logger",    None)
 
     if lightning_callbacks:
         trainer_kwargs["callbacks"] = lightning_callbacks
-    if loggers:
-        trainer_kwargs["logger"] = loggers
+
+    # Ensure wandb logger is configured if not in debug mode
+    if not cfg.debug and "logger" not in trainer_kwargs:
+        from lightning.pytorch.loggers import WandbLogger
+        trainer_kwargs["logger"] = WandbLogger()
 
     return Trainer(**trainer_kwargs)
 
