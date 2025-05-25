@@ -8,8 +8,8 @@ workflow:
         dimensionality_reduction:
           _target_: src.algorithms.dimensionality_reduction.PCAModule
           n_components: 50
-          fast_dev_run_dr: true  # Enable fast dev run
-          n_samples_fast_dev: 100  # Use only 100 samples for fitting
+          fast_dev_run_dr: true
+          n_samples_fast_dev: 100
       evaluation:
         enabled: true
     - name: umap
@@ -19,8 +19,8 @@ workflow:
           n_components: 2
           n_neighbors: 15
           min_dist: 0.1
-          fast_dev_run_dr: true  # Enable fast dev run
-          n_samples_fast_dev: 100  # Use only 100 samples for fitting
+          fast_dev_run_dr: true
+          n_samples_fast_dev: 100
       evaluation:
         enabled: true
     - name: tsne
@@ -29,7 +29,7 @@ workflow:
           _target_: src.algorithms.dimensionality_reduction.TSNEModule
           n_components: 2
           perplexity: 30
-          fast_dev_run_dr: true  # Enable fast dev run
-          n_samples_fast_dev: 100  # Use only 100 samples for fitting
+          fast_dev_run_dr: true
+          n_samples_fast_dev: 100
       evaluation:
         enabled: true 

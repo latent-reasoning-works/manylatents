@@ -1,3 +1,6 @@
+defaults:
+  - default
+
 _target_: src.algorithms.dm.PCAModule
 n_components: 2
-random_state: ${seed}
+# All other settings will be inherited from default.yaml

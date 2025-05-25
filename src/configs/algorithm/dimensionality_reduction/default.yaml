@@ -1,13 +1,28 @@
 # Default configuration for dimensionality reduction algorithms
-fast_dev_run_dr: true  # Enable fast dev run by default for DR algorithms
+
+# Debug settings
+fast_dev_run_dr: false  # Set to true for quick debugging with minimal data
 """If True, use only a small subset of data for dimensionality reduction steps."""
 
-n_samples_fast_dev: 100
+# Data size control for debugging
+n_samples_fast_dev: 100  # Number of samples to use when fast_dev_run_dr is enabled
 """Number of samples to use when fast_dev_run_dr is enabled."""
+
+fit_fraction: 1.0  # Fraction of data to use for fitting (1.0 = use all data)
+"""Fraction of data to use for fitting (1.0 = use all data)."""
 
 # Common parameters for all DR algorithms
 random_state: ${seed}
 """Random seed for reproducibility."""
 
-fit_fraction: 1.0
-"""Fraction of data to use for fitting (1.0 = use all data).""" 
+# Debug mode settings
+debug_mode: false  # Enable debug mode for more verbose output
+"""Enable debug mode for more verbose output."""
+
+# Memory management
+use_mmap: true  # Use memory mapping for large datasets
+"""Use memory mapping for large datasets."""
+
+# Performance settings
+batch_size: 1000  # Number of samples to process at once
+"""Number of samples to process at once.""" 

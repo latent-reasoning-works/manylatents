@@ -9,6 +9,14 @@ defaults:
 
 seed: 42
 
+# Enable fast development run mode
+trainer:
+  fast_dev_run: true
+  limit_train_batches: 1
+  limit_val_batches: 1
+  limit_test_batches: 1
+  max_epochs: 1
+
 workflow:
   steps:
     - name: pca
@@ -16,6 +24,9 @@ workflow:
         dimensionality_reduction:
           _target_: src.algorithms.dimensionality_reduction.PCAModule
           n_components: 50
+          fast_dev_run_dr: true
+          n_samples_fast_dev: 100
+          fit_fraction: 0.1  # Use only 10% of data for fitting
       evaluation:
         enabled: true
         metrics: ${metrics}

@@ -9,14 +9,17 @@ devices: 1
 
 deterministic: true
 
+# Debug settings
+fast_dev_run: false  # Set to true for quick debugging
+limit_train_batches: 1.0  # Use all batches by default, set to N for debugging
+limit_val_batches: 1.0    # Use all batches by default, set to N for debugging
+limit_test_batches: 1.0   # Use all batches by default, set to N for debugging
+
+# Training settings
 min_epochs: 5
 max_epochs: 150
 
 precision: 32
-
-limit_train_batches: 1.0 
-limit_val_batches: 1.0    
-limit_test_batches: 1.0
 
 val_check_interval: 1.0
 check_val_every_n_epoch: 1
@@ -27,5 +30,3 @@ accumulate_grad_batches: 1
 log_every_n_steps: 100
 default_root_dir: ${hydra:runtime.output_dir}
 detect_anomaly: false
-
-fast_dev_run: false

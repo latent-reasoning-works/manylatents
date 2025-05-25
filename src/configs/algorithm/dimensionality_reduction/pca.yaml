@@ -1,6 +1,6 @@
+defaults:
+  - default
+
 _target_: src.algorithms.pca.PCAModule
 n_components: 2
-random_state: 42
-fit_fraction: 1.0
-fast_dev_run_dr: true  # Enable fast dev run for testing
-n_samples_fast_dev: 100  # Use only 100 samples for testing
+# All other settings will be inherited from default.yaml

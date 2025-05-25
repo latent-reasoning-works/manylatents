@@ -159,18 +159,21 @@ def workflow_step(
             train_loader = datamodule.train_dataloader()
             test_loader = datamodule.test_dataloader()
             field_index, _ = determine_data_source(train_loader)
-            train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
-            test_tensor = torch.cat([b[field_index].cpu() for b in test_loader], dim=0)
+            
+            # Load data in batches if fast_dev_run_dr is enabled
+            if dr_cfg.get("fast_dev_run_dr", False):
+                n_samples = dr_cfg.get("n_samples_fast_dev", 100)
+                logger.info(f"Using fast_dev_run_dr: loading only {n_samples} samples")
+                
+                # Load only the required number of samples
+                train_tensor = torch.cat([b[field_index].cpu() for b in train_loader][:n_samples], dim=0)
+                test_tensor = torch.cat([b[field_index].cpu() for b in test_loader][:n_samples], dim=0)
+            else:
+                train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
+                test_tensor = torch.cat([b[field_index].cpu() for b in test_loader], dim=0)
         else:
             train_tensor = input_data
             test_tensor = input_data
-
-        # Use fast_dev_run_dr if enabled
-        if dr_cfg.get("fast_dev_run_dr", False):
-            n_samples = dr_cfg.get("n_samples_fast_dev", 100)
-            logger.info(f"Using fast_dev_run_dr: limiting data to {n_samples} samples")
-            train_tensor = train_tensor[:n_samples]
-            test_tensor = test_tensor[:n_samples]
 
         logger.info(f"Running DR step {name} on data shape: {train_tensor.shape}")
         dr_module.fit(train_tensor)

@@ -1,3 +1,6 @@
+defaults:
+  - default
+
 _target_: src.algorithms.phate.PHATEModule
 n_components: 2
 random_state: ${seed}
