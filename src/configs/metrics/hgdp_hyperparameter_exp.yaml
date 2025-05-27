@@ -9,6 +9,7 @@ defaults:
   - admixture_preservationk_medians
   - admixture_preservationk_far
   - admixture_preservationk_medians_far
+  - stratification
 - embedding:
   - trustworthiness
   - knn_preservation
