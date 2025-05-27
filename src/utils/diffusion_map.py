@@ -1,7 +1,8 @@
 import graphtools
 import numpy as np
 import scipy
-
+import logging
+logger = logging.getLogger(__name__)
 
 def compute_dm(K, alpha=0., verbose=0):
     # Using setup and notation from: https://www.stats.ox.ac.uk/~cucuring/CDT_08_Nonlinear_Dim_Red_b__Diffusion_Maps_FoDS.pdf
