@@ -1,0 +1,17 @@
+defaults:
+  - default
+
+_target_: src.data.simulated_genetic.SimulatedGeneticDataModule
+demographic_model: "OutOfAfrica_3G09"
+test_split: 0.2
+mode: "full"
+random_state: ${seed}
+batch_size: 128
+num_workers: 0
+cache_dir: "./cache"
+pop_sizes: [500,500,500]
+num_variants: null
+mac_threshold: 20
+sequence_length: 2e6       # was 2e7
+mutation_rate: 1.25e-9      # was 1.25e-8
+recombination_rate: 1e-9    # was 1e-8
