@@ -1,0 +1,54 @@
+// A lean Wright–Fisher migration model (SLiM ≥ 5.0)
+
+// ────────────────────────────────────────────────
+// 1. Adjustable parameters
+// ────────────────────────────────────────────────
+initialize() {
+    // Define constants
+    defineConstant("NUM_POPS", 4);      // Number of populations
+    defineConstant("N_INDS", 1000);     // Diploid individuals per population
+    defineConstant("GENS", 10);         // Number of generations
+    defineConstant("MIG_RATE", 0.05);   // Migration rate between neighboring populations
+    defineConstant("SEQ_LEN", 1e7);     // Length of the chromosome (10 Mb)
+    defineConstant("MU", 1e-7);         // Mutation rate per base per generation
+    defineConstant("REC_RATE", 1e-8);   // Recombination rate per base per generation
+
+    // Initialize the simulation model
+    initializeSLiMModelType("WF");
+    initializeTreeSeq();
+    initializeMutationRate(MU);
+    initializeRecombinationRate(REC_RATE);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, SEQ_LEN - 1);
+}
+
+// ────────────────────────────────────────────────
+// 3. Founders
+// ────────────────────────────────────────────────
+1 early() {
+    // Create NUM_POPS subpopulations of size N_INDS
+    for (p in 0:(NUM_POPS - 1))
+        sim.addSubpop(p, N_INDS);
+
+    // Migration matrix: only neighbours exchange MIG_RATE each generation
+    for (p in 0:(NUM_POPS - 2)) {
+        sim.subpopulations[p].setMigrationRates(p + 1, MIG_RATE);
+        sim.subpopulations[p + 1].setMigrationRates(p, MIG_RATE);
+    }
+}
+
+/* Remember founders (optional but handy) */
+1 late() { sim.treeSeqRememberIndividuals(sim.subpopulations.individuals); }
+
+// ────────────────────────────────────────────────
+// 4. Book-keeping / stop condition
+// ────────────────────────────────────────────────
+late() {
+    if (sim.generation == GENS) {
+        // remember final generation and write .trees
+        sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+        sim.treeSeqOutput("wf_migration.trees");
+        sim.simulationFinished();
+    }
+}

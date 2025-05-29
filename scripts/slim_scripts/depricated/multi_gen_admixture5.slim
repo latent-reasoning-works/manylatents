@@ -1,0 +1,72 @@
+// multi_gen_admixture_wf.slim (fixed)
+initialize() {
+    initializeSLiMModelType("WF");
+    initializeTreeSeq();
+    initializeMutationRate(1e-7);          // forward-mutating, so no recap needed
+    initializeRecombinationRate(1e-8);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, 1e7 - 1); // 10 Mb chromosome
+
+    defineConstant("NUM_POPS",      4);
+    defineConstant("N",             1000);   // diploids per pop
+    defineConstant("GENS",          10);     // forward generations
+    defineConstant("MIGRATION_RATE", 0.05);  // fraction exchanged each gen
+}
+
+1 early() {
+    for (i in 0:(NUM_POPS - 1)) sim.addSubpop(i, N);
+
+    // Initialize migration matrix (symmetric between neighbors)
+    rates = matrix(rep(0.0, NUM_POPS*NUM_POPS), nrow=NUM_POPS, byrow=T);
+    for (i in 0:(NUM_POPS-2)) {
+        rates[i, i+1] = MIGRATION_RATE;
+        rates[i+1, i] = MIGRATION_RATE;
+    }
+
+    // Set migration rates using setMigrationRates
+    for (i in 0:(NUM_POPS - 1)) {
+        for (j in 0:(NUM_POPS - 1)) {
+            if (i != j) {
+                sim.subpopulations[i].setMigrationRates(j, rates[i, j]);
+            }
+        }
+    }
+
+    sim.setValue("gen", 1);  // generation counter
+
+    // Initialize ancestry vector for each individual
+    for (pop in sim.subpopulations) {
+        for (ind in pop.individuals) {
+            anc = rep(0.0, NUM_POPS);
+            anc[pop.id] = 1.0;
+            ind.setValue("ancestry", anc);
+        }
+    }
+}
+
+/* ----- Per-generation ancestry propagation ----- */
+late() {
+    gen = sim.getValue("gen");
+
+    // Update ancestry: children average their parents' ancestry
+    for (pop in sim.subpopulations) {
+        for (ind in pop.individuals) {
+            if (isNULL(ind.mother) | isNULL(ind.father)) {
+                continue;
+            }
+            a1 = ind.mother.getValue("ancestry");
+            a2 = ind.father.getValue("ancestry");
+            ind.setValue("ancestry", (a1 + a2) / 2.0);
+        }
+    }
+
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+
+    if (gen >= GENS) {
+        sim.treeSeqOutput("multi_gen_admixture_wf.trees");
+        sim.simulationFinished();
+    }
+
+    sim.setValue("gen", gen + 1);
+}

@@ -1,0 +1,8 @@
+defaults:
+- _self_
+- dataset:
+  - gt_preservation
+  - gt_preservation_far
+  - admixture_preservationk
+- embedding:
+  - knn_preservation

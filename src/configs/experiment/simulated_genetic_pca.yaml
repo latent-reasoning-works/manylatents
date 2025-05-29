@@ -1,0 +1,14 @@
+# @package _global_
+name: simulated_genetic_pca_n_components=${algorithm.dimensionality_reduction.n_components}
+
+defaults:
+  - override /algorithm/dimensionality_reduction: pca
+  - override /data: simulated_genetic
+  - override /callbacks/embedding: default
+  - override /metrics: synthetic_data_metrics #synthetic_data_metrics_plus_admixture
+
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2

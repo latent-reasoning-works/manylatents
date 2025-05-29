@@ -1,0 +1,70 @@
+// File: simple_admixture.slim
+initialize() {
+    initializeSLiMModelType("nonWF");
+    initializeTreeSeq();
+    initializeMutationRate(1e-7);             // mutation rate here is respected
+    initializeRecombinationRate(1e-8);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, 1e7 - 1);
+
+    defineConstant("NUM_POPS", 4);
+    defineConstant("GENS", 10);
+    defineConstant("N", 1000);
+
+    defineConstant("ASSORT", matrix(c(
+        0.7, 0.1, 0.1, 0.1,
+        0.1, 0.7, 0.1, 0.1,
+        0.1, 0.1, 0.7, 0.1,
+        0.1, 0.1, 0.1, 0.7
+    ), nrow=NUM_POPS, byrow=T));
+}
+
+1 early() {
+    for (i in 0:(NUM_POPS - 1)) {
+        sim.addSubpop(i, N);
+    }
+}
+
+1 late() {
+    // initialize ancestry vector for each individual
+    for (pop in sim.subpopulations) {
+        for (ind in pop.individuals) {
+            anc = rep(0.0, NUM_POPS);
+            anc[pop.id] = 1.0;
+            ind.setValue("ancestry", anc);
+        }
+    }
+}
+
+// Define reproduction behavior
+reproduction() {
+    subpopID = individual.subpopulation.id;
+    probs = ASSORT[subpopID, ];
+    mate_pop = sample(sim.subpopulations, 1, weights=probs);
+    mate = mate_pop.sampleIndividuals(1)[0];
+    
+    offspring = subpop.addCrossed(individual, mate);
+
+    // Track ancestry proportions
+    anc1 = individual.getValue("ancestry");
+    anc2 = mate.getValue("ancestry");
+    new_anc = (anc1 + anc2) / 2.0;
+    offspring.setValue("ancestry", new_anc);
+}
+
+// Advance generation & cull parents (standard way in nonWF)
+2:GENS early() {
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+
+    // Cull parents by zeroing their fitness
+    for (ind in sim.individuals) {
+        ind.fitnessScaling = 0.0;
+    }
+}
+
+// Final output
+(GENS+1) late() {
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+    sim.treeSeqOutput("simple_admixture_output.trees");
+}

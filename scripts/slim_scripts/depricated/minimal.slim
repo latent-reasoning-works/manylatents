@@ -1,0 +1,21 @@
+// minimal_admixture.slim
+initialize() {
+    initializeTreeSeq();
+    initializeMutationRate(1e-7);
+    initializeRecombinationRate(1e-8);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, 1e7 - 1);
+}
+
+1 early() {
+    sim.addSubpop(0, 1000); // YRI
+    sim.addSubpop(1, 1000); // CEU
+    sim.addSubpop(2, 1000); // CHB
+}
+
+2 late() {
+    // Tag individuals for output
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+    sim.treeSeqOutput("minimal_output.trees");
+}

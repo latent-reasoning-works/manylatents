@@ -1,0 +1,89 @@
+// Simulate 4 populations with migration-driven admixture
+initialize() {
+    initializeSLiMModelType("nonWF");
+    initializeTreeSeq();
+    initializeMutationRate(1e-7);          // forward-mutating, so no recap needed
+    initializeRecombinationRate(1e-8);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, 1e7 - 1); // 10 Mb chromosome
+
+    defineConstant("NUM_POPS",      4);
+    defineConstant("N",             1000);   // diploids per pop
+    defineConstant("GENS",          10);     // forward generations
+    defineConstant("MIGRATION_RATE", 0.05);  // fraction exchanged each gen
+}
+
+/* ------------------------------------------------------------------ */
+/*   0. Founders                                                      */
+1 early() {
+    for (i in 0:(NUM_POPS - 1)) sim.addSubpop(i, N);
+    sim.setValue("gen", 1);  // initialize generation counter here
+}
+
+1 late() {
+    // tag founder ancestry: one-hot vector of length 4
+    for (pop in sim.subpopulations)
+        for (ind in pop.individuals) {
+            anc = rep(0.0, NUM_POPS);
+            anc[ pop.id ] = 1.0;
+            ind.setValue("ancestry", anc);
+        }
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+}
+
+/* ------------------------------------------------------------------ */
+/*   1. Reproduction                                                  */
+reproduction() {
+    // random mate in same subpop
+    mate = subpop.sampleIndividuals(1)[0];
+    child = subpop.addCrossed(individual, mate);
+
+    // mix ancestry vectors
+    a1 = individual.getValue("ancestry");
+    a2 = mate.getValue("ancestry");
+    child.setValue("ancestry", (a1 + a2)/2.0);
+}
+
+/* ------------------------------------------------------------------ */
+/*   2. End-of-generation book-keeping                                */
+early() {
+    gen = sim.getValue("gen") + 1;        // next generation number
+    if (gen > GENS) {
+        // last remember & output
+        sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+        sim.treeSeqOutput("multi_gen_admixture_migration.trees");
+        sim.simulationFinished();
+    }
+
+    /* ---- 2a.  resize pops back to N to cull parents --------------- */
+    // Cull to N by random fitnessScaling
+    for (pop in sim.subpopulations) {
+        inds = pop.individuals;
+        if (size(inds) > N) {
+            to_kill = inds.sampleIndividuals(size(inds) - N);
+            for (ind in to_kill) ind.fitnessScaling = 0.0;
+        }
+    }
+
+    /* ---- 2b.  migrate between neighbours -------------------------- */
+    migrate(0, 1);
+    migrate(1, 2);
+    migrate(2, 3);
+
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+    sim.setValue("gen", gen);
+}
+
+
+/* migration helper */
+function (void) migrate(integer a, integer b) {
+    numA = asInteger(N * MIGRATION_RATE);
+    numB = asInteger(N * MIGRATION_RATE);
+    for (ind in sim.subpopulations[a].sampleIndividuals(numA)) {
+        ind.setSubpopulation(b);
+    }
+    for (ind in sim.subpopulations[b].sampleIndividuals(numB)) {
+        ind.setSubpopulation(a);
+    }
+}

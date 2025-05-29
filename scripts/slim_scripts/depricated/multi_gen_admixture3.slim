@@ -1,0 +1,82 @@
+// multi_gen_admixture.slim
+initialize() {
+    initializeSLiMModelType("nonWF");
+    initializeTreeSeq();
+    initializeMutationRate(1e-7);
+    initializeRecombinationRate(1e-8);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, 1e7 - 1); // 10Mb genome
+
+    defineConstant("NUM_POPS", 4);
+    defineConstant("GENS", 10);
+    defineConstant("N", 1000);
+
+    defineConstant("ASSORT", matrix(c(
+        0.7, 0.1, 0.1, 0.1,
+        0.1, 0.7, 0.1, 0.1,
+        0.1, 0.1, 0.7, 0.1,
+        0.1, 0.1, 0.1, 0.7
+    ), nrow=NUM_POPS, byrow=T));
+}
+
+1 early() {
+    for (i in 0:(NUM_POPS - 1)) {
+        sim.addSubpop(i, N);
+    }
+    sim.setValue("gen", 1);
+}
+
+1 late() {
+    // Tag founder ancestry
+    for (pop in sim.subpopulations) {
+        for (ind in pop.individuals) {
+            ancestry = rep(0.0, NUM_POPS);
+            ancestry[pop.id] = 1.0;
+            ind.setValue("ancestry", ancestry);
+        }
+    }
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+}
+
+reproduction() {
+    // Assortative mating via matrix
+    probs = ASSORT[individual.subpopulation.id, ];
+    mate_pop = sample(sim.subpopulations, 1, weights=probs);
+    mate = mate_pop.sampleIndividuals(1)[0];
+
+    // Create child
+    child = subpop.addCrossed(individual, mate);
+
+    anc1 = individual.getValue("ancestry");
+    anc2 = mate.getValue("ancestry");
+    child.setValue("ancestry", (anc1 + anc2) / 2.0);
+}
+
+early() {
+    gen = sim.getValue("gen");
+
+    // Stop after GENS generations
+    if (gen > GENS) {
+        sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+        sim.treeSeqOutput("multi_gen_admixture_output.trees");
+        sim.simulationFinished();
+    }
+
+    // Kill previous generation EXCEPT final one
+    if (gen < GENS) {
+        for (pop in sim.subpopulations) {
+            for (ind in pop.individuals) {
+                ind.fitnessScaling = 0.0;
+            }
+        }
+    }
+
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+    sim.setValue("gen", gen + 1);
+}
+
+late() {
+    sim.treeSeqRememberIndividuals(sim.subpopulations.individuals);
+    sim.treeSeqOutput("multi_gen_admixture_output2.trees");
+}
