@@ -13,5 +13,10 @@ algorithm:
   dimensionality_reduction:
     n_components: 50
     
+callbacks:
+  embedding:
+    plot_embeddings:
+      label_col: label
+    
 data:
   filter_related: true # no fitting on related samples
