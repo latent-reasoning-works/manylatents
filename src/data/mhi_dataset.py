@@ -167,8 +167,4 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         """
         fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration)
 
-        # First entry is dummy row. So we ignore this!
-        fit_idx[0] = False
-        trans_idx[0] = False
-
         return fit_idx, trans_idx
