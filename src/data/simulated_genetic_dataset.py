@@ -12,6 +12,7 @@ import msprime
 from torch.utils.data import Dataset
 import omegaconf
 import pyslim
+import tskit
 
 from src.utils.data import generate_hash
 from .precomputed_mixin import PrecomputedMixin
@@ -145,7 +146,7 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
         return pd.DataFrame({
             "sample_id": samples,
             "time": times,
-            "population": categorical_pops
+            "Population": categorical_pops
         })
 
     @abstractmethod
@@ -311,7 +312,7 @@ class StdPopSimDataHumanDemoModel(SimulatedGeneticDataset):
             model = self.species.get_demographic_model(self.demographic_model)
             return model.model
         else:
-            raise Exception("Could not load {}. Not a valid model".format(demographic_model))
+            raise Exception("Could not load {}. Not a valid model".format(self.demographic_model))
         raise Exception("No demographic_model in kwargs!")
 
     def extract_latitude(self) -> pd.Series:
@@ -322,7 +323,7 @@ class StdPopSimDataHumanDemoModel(SimulatedGeneticDataset):
         return pd.Series([np.nan] * len(self.metadata))
 
     def extract_population_label(self) -> pd.Series:
-        return self.metadata["population"]
+        return self.metadata["Population"]
 
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         # Placeholder; update if applicable
@@ -332,7 +333,7 @@ class StdPopSimDataHumanDemoModel(SimulatedGeneticDataset):
         # Placeholder
         return {}
 
-    def get_labels(self, label_col: str = "population") -> np.ndarray:
+    def get_labels(self, label_col: str = "Population") -> np.ndarray:
         return self.metadata[label_col].values
 
     def get_gt_dists(self, k=10):
@@ -536,6 +537,6 @@ class CustomAdmixedModel(StdPopSimDataHumanDemoModel):
             "individual_id": np.arange(len(sample_pairs)),
             "haploids": list(sample_pairs),
             "time": times,
-            "population": categorical_pops,
+            "Population": categorical_pops,
             "ancestry": ancestry_vectors
         })
