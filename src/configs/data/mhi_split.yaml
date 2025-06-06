@@ -8,7 +8,7 @@ mode: split
 files:
   plink:  "/lustre06/project/6065672/grenier2/Matt_PHATE_project/MHI_CaG/noINDELs_fixref_vcf/common_1000G_HGDP/forMatt/SGR-2227_MHI_biobank_GSAv3.0MD_609343_SNPs_16707_ids_2021-01-04.WR_hg38-updated.missing10perc.noMAF0.QC.maxMiss0.5.fixref.noBadPosTopMed.newIDs.common1000G_HGDP.woLowComplexity_noHLA"
   metadata: "/lustre06/project/6065672/grenier2/Matt_PHATE_project/MHI_CaG/noINDELs_fixref_vcf/common_1000G_HGDP/forMatt/MHI_metadata.csv"
-  admixture: "./data/HGDP+1KGP/admixture/no_intersection_less_stringent/global.{K}_metadata.tsv"
+  admixture: "/lustre06/project/6065672/grenier2/matt_phate_project/mhi_cag/noindels_fixref_vcf/common_1000g_hgdp/formatt/unrelated/balanced/neural_admixture_gpus_mhi.random500_1.6.1/mhi.{K}_metadata.tsv"
   admixture_K: 2,3,4,5,6,7,8,9
 filter_qc: True
 filter_related: False
