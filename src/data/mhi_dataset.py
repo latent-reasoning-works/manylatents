@@ -80,13 +80,13 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         """
         Extracts population labels
         """
-        return self.metadata["label"]
+        return self.metadata["Population"]
     
     def extract_qc_filter_indices(self) -> np.ndarray:
         """
         Extracts points that has population labels.
         """
-        filters = self.metadata["label"] == "Unlabelled"
+        filters = self.metadata["Population"] == "Unlabelled"
         _filtered_indices = self.metadata[filters].index
         return ~self.metadata.index.isin(_filtered_indices)
 
@@ -106,7 +106,7 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         # Define required columns.
         required_columns = [
             'sample_id',
-            'label', 
+            'Population', 
             'related',
         ]
 
@@ -142,7 +142,7 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         admixture_ratio_dict = super().load_admixture_ratios(admixture_path, admixture_Ks)
         return admixture_ratio_dict
 
-    def get_labels(self, label_col: str = "label") -> np.ndarray:
+    def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
         Returns label array (e.g., Population) for coloring plots.
         """

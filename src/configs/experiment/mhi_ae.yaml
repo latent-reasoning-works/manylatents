@@ -12,10 +12,5 @@ algorithm:
   model:
     network:
       input_dim: 197675 # MHI ncols     
-
-callbacks:
-  embedding:
-    plot_embeddings:
-      label_col: label
       
 seed: 42

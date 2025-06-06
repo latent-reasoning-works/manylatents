@@ -1,8 +1,8 @@
 # @package _global_
-name: mhi_pca_phate
+name: mhi_pca_umap
 
 defaults:
-  - override /algorithm/dimensionality_reduction: phate
+  - override /algorithm/dimensionality_reduction: umap
   - override /data: mhi_split
   - override /callbacks/embedding: default
   - override /metrics: mhi_dr
