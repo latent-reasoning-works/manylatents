@@ -28,8 +28,7 @@ class Config:
     log_level: str = "info"
     """Logging level (one of: "debug", "info", "warning", "error", "critical")."""
 
-    #seed: int = field(default_factory=lambda: random.randint(0, int(1e5)))
-    seed: Optional[int] = field(default_factory=lambda: random.randint(0, int(1e5)))
+    seed: int = field(default_factory=lambda: random.randint(0, int(1e5)))
     """Random seed for reproducibility."""
 
     debug: bool = False
