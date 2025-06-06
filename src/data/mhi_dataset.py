@@ -134,12 +134,17 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
                 metadata[col] = False
 
         return metadata
-
+    
     def load_admixture_ratios(self, admixture_path, admixture_Ks) -> dict:
         """
         Loads admixture ratios
         """
-        admixture_ratio_dict = super().load_admixture_ratios(admixture_path, admixture_Ks)
+        admixture_ratio_dict = {}
+        if admixture_Ks is not None:
+            list_of_files = [admixture_path.replace('{K}', K) for K in admixture_Ks]
+            for file, K in zip(list_of_files, admixture_Ks):
+                # only keep admixture info + sample IDs. Drop other columns
+                admixture_ratio_dict[K] = pd.read_csv(file, sep='\t', header=None).iloc[:, :-1]
         return admixture_ratio_dict
 
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
