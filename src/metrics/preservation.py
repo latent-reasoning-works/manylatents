@@ -188,6 +188,7 @@ def compute_continental_admixture_metric_dists(
     df1 = pd.DataFrame(ancestry_coords, 
                        index=population_label.index)
     df1 = df1.rename(columns={i: f'emb{i}' for i in range(ancestry_coords.shape[1])})
+
     df2 = admixture_ratios.set_index(0).dropna()
     df2 = df2.rename(columns={i: f'ar{i}' for i in range(admixture_ratios.shape[1])}) # drop NA rows
 
@@ -265,6 +266,7 @@ def compute_k_admixture_metric_dists(
     results = {}
     for k_val, admixture_ratios_k in zip(admixtures_k, admixture_ratios_list):
         key = f"admixture_preservation_k={k_val}"
+
         results[key] = compute_continental_admixture_metric_dists(
             ancestry_coords,
             admixture_ratios_k,
@@ -349,7 +351,7 @@ def AdmixturePreservation(embeddings: np.ndarray,
     """
     return compute_continental_admixture_metric_dists(
         ancestry_coords=embeddings,
-        admixture_ratios=dataset.admixture_ratios,
+        admixture_ratios=dataset.admixture_ratios['5'],
         population_label=dataset.population_label,
         **kwargs
     )
