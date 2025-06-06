@@ -198,7 +198,7 @@ def compute_continental_admixture_metric_dists(
     df = pd.concat([df, population_label], axis=1)
 
     if use_medians:
-        df = df.groupby("Population").median().reset_index()
+        df = df.groupby(population_label.name).median().reset_index()
 
     ancestry_coords2 = df[df.columns[df.columns.map(str).str.startswith('emb')]].values
     admixture_ratios2 = df[df.columns[df.columns.map(str).str.startswith('ar')]].values
