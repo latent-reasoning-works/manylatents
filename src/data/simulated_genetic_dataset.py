@@ -98,13 +98,11 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
 
     def generate_data(self) -> Tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
         """Generate simulated genotype matrix and associated metadata."""
-        import pdb
-        pdb.set_trace()
         self.demography = self._load_demographic_model()
         self.samples, self.idx_to_name = self._define_sample_map(self.pop_sizes)
         self.ts_ancestry = self._simulate_ancestry()
         self.ts = self._simulate_mutations()
-        genotypes = self._get_diploid_genotype_matrix()
+        genotypes = self._get_diploid_genotype_matrix() # this line crashes on Mila cluster for some reason
         genotypes = self._filter_variants(genotypes)
         genotypes = self._preprocess(genotypes)
 
