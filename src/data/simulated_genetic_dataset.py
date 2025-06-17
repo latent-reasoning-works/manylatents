@@ -2,7 +2,7 @@ import logging
 import os
 from abc import abstractmethod
 from typing import Any, Dict, Optional, Tuple
-
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -14,11 +14,37 @@ import omegaconf
 import pyslim
 import tskit
 
-from src.utils.data import generate_hash
 from .precomputed_mixin import PrecomputedMixin
 from src.utils.data import preprocess_data_matrix
 
 logger = logging.getLogger(__name__)
+
+
+def trace_ancestry(ts, tracing_time=100, num_trees_to_sample=500):
+    node_pop = ts.tables.nodes.population
+    all_tree_indices = np.arange(ts.num_trees)
+    sampled_indices = np.random.choice(all_tree_indices, size=num_trees_to_sample, replace=False)
+
+    ancestry = np.zeros((ts.num_individuals, len(ts.populations())), dtype=float)
+
+    for idx in tqdm(sampled_indices, desc="Assigning ancestry ratio using sampled trees"):
+        tree = ts.at(idx)
+        for i, ind in enumerate(ts.individuals()):
+            for node in ind.nodes:
+                anc_time = tree.get_time(node)
+                current = node
+                while anc_time < tracing_time and tree.parent(current) != tskit.NULL:
+                    current = tree.parent(current)
+                    anc_time = tree.time(current)
+                pop = node_pop[current]
+                ancestry[i, pop] += tree.span
+
+    ancestry /= 2 * np.sum([ts.at(idx).span for idx in sampled_indices])
+
+    # Label populations
+    pop_names = [p.metadata.get("name", f"pop{p.id}") for p in ts.populations()]
+    df = pd.DataFrame(ancestry, columns=pop_names)
+    return df
 
 
 class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
@@ -56,7 +82,7 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
         self.cache_dir = cache_dir 
         self.mmap_mode = mmap_mode
 
-        self.data, self.metadata = self.generate_data()
+        self.data, self.metadata, self.gt_admixture_ratios = self.generate_data()
 
         if precomputed_path is not None:
             self.data = self.load_precomputed(precomputed_path, mmap_mode=mmap_mode)
@@ -70,17 +96,22 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
         self._geographic_preservation_indices = self.extract_geographic_preservation_indices()
         self.admixture_ratios = self.load_admixture_ratios()
 
-    def generate_data(self) -> Tuple[np.ndarray, pd.DataFrame]:
+    def generate_data(self) -> Tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
         """Generate simulated genotype matrix and associated metadata."""
+        import pdb
+        pdb.set_trace()
         self.demography = self._load_demographic_model()
         self.samples, self.idx_to_name = self._define_sample_map(self.pop_sizes)
         self.ts_ancestry = self._simulate_ancestry()
         self.ts = self._simulate_mutations()
-
-        genotypes = self._filter_variants(self.ts)
+        genotypes = self._get_diploid_genotype_matrix()
+        genotypes = self._filter_variants(genotypes)
         genotypes = self._preprocess(genotypes)
-        metadata = self._extract_metadata(self.ts)
-        return genotypes, metadata
+
+        metadata_df = self.extract_individual_metadata()
+        ancestry_df = trace_ancestry(self.ts, tracing_time=100, num_trees_to_sample=500)
+
+        return genotypes, metadata_df, ancestry_df
 
     def _define_sample_map(self, sizes):
         if isinstance(sizes, int):
@@ -110,16 +141,35 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
         return msprime.sim_mutations(
             self.ts_ancestry,
             rate=self.mutation_rate,
-            random_seed=self.random_state
+            random_seed=self.random_state,
+            model=msprime.JC69()
         )
 
-    def _filter_variants(self, ts):
-        G = ts.genotype_matrix()
-        ac = G.sum(axis=1)
-        n_samples = G.shape[1]
+    def _get_diploid_genotype_matrix(self):
+        haploid_G = self.ts.genotype_matrix().T
+        haploid_G = np.minimum(haploid_G, 1)
+
+        indiv_ids = self.ts.tables.nodes.individual[:]
+        diploid_inds = np.unique(indiv_ids[indiv_ids >= 0])
+        num_inds = len(diploid_inds)
+        num_sites = haploid_G.shape[1]
+
+        diploid_G = np.zeros((num_inds, num_sites), dtype=int)
+
+        for k, ind_id in enumerate(diploid_inds):
+            node_ids = self.ts.individual(ind_id).nodes
+            diploid_G[k, :] = haploid_G[node_ids[0], :] + haploid_G[node_ids[1], :]
+
+        return diploid_G
+
+    def _filter_variants(self, G_raw):
+        # transpose again to be consistent
+        G_raw = G_raw.T
+        ac = G_raw.sum(axis=1)
+        n_samples = G_raw.shape[1]
         mac = np.minimum(ac, n_samples - ac)
         keep = mac >= self.mac_threshold
-        G = G[keep]
+        G = G_raw[keep]
 
         if self.num_variants:
             G = G[:self.num_variants]
@@ -133,21 +183,29 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
                                                    trans_idx=np.arange(len(genotypes)))
         return normalized_matrix
 
-    def _extract_metadata(self, ts):
-        samples = ts.samples()
-        node_table = ts.tables.nodes
-        pop_ids = node_table.population[samples]
-        times = node_table.time[samples]
+    def extract_individual_metadata(self):
+        rows = []
+        for ind in self.ts.individuals():
+            if len(ind.nodes) != 2:
+                continue
+            node0 = self.ts.node(ind.nodes[0])
+            rows.append({
+                "individual_id": ind.id,
+                "Population_id": node0.population,
+                "time": node0.time,
+                "nodes": ind.nodes,
+            })
+        
+        df = pd.DataFrame(rows)
 
-        # convert pop_ids to named categorical variable
-        named_pops = np.array(self.idx_to_name)[pop_ids]  # vectorized
-        categorical_pops = pd.Categorical(named_pops, categories=self.idx_to_name)
+        # Add named categorical variable
+        df["Population"] = pd.Categorical(df["Population_id"]).rename_categories(self.idx_to_name)
 
-        return pd.DataFrame({
-            "sample_id": samples,
-            "time": times,
-            "Population": categorical_pops
-        })
+        return df
+    
+    def load_admixture_ratios(self) -> dict:
+        """Return admixture ratios or ancestral proportions if applicable."""
+        return {len(self.idx_to_name): self.gt_admixture_ratios}
 
     @abstractmethod
     def _load_demographic_model(self, **kwargs):
@@ -172,11 +230,6 @@ class SimulatedGeneticDataset(Dataset, PrecomputedMixin):
     @abstractmethod
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """Extract a preservation or grouping index (e.g., for spatial structure)."""
-        pass
-
-    @abstractmethod
-    def load_admixture_ratios(self) -> dict:
-        """Return admixture ratios or ancestral proportions if applicable."""
         pass
 
     @abstractmethod
@@ -338,39 +391,47 @@ class StdPopSimDataHumanDemoModel(SimulatedGeneticDataset):
 
     def get_gt_dists(self, k=10):
         """
-        Approximate geodesic distances using shortest paths over a k-NN graph
-        derived from the divergence matrix.
-
-        Parameters
-        ----------
-        ts : tskit.TreeSequence
-        k : int
-            Number of neighbors to keep for each sample (sparsification).
-
-        Returns
-        -------
-        np.ndarray
-            Geodesic distance matrix approximating the genetic manifold.
+        Compute diploid-level geodesic distances based on pairwise divergence
+        between individuals (averaged over their two nodes).
         """
         from sklearn.neighbors import NearestNeighbors
 
-        D = self.ts.divergence_matrix()
-        n = D.shape[0]
+        # Note the ground truth distance should be the average of TMRCA (avg over each haploid to get per-diploid score)
+        # See implementation here: https://tskit.dev/tskit/docs/latest/_modules/tskit/trees.html
+        D_node = self.ts.divergence_matrix()
+        
+        # Map individuals to their node pairs
+        indiv_nodes = [ind.nodes for ind in self.ts.individuals() if len(ind.nodes) == 2]
+        n = len(indiv_nodes)
+        D_indiv = np.zeros((n, n))
 
-        # Build a sparse k-NN graph from divergence
+        # Average divergence across the 4 node combinations (2x2)
+        for i in range(n):
+            for j in range(i, n):
+                node_i = indiv_nodes[i]
+                node_j = indiv_nodes[j]
+                divs = [
+                    D_node[node_i[0], node_j[0]],
+                    D_node[node_i[0], node_j[1]],
+                    D_node[node_i[1], node_j[0]],
+                    D_node[node_i[1], node_j[1]],
+                ]
+                avg_div = np.mean(divs)
+                D_indiv[i, j] = avg_div
+                D_indiv[j, i] = avg_div
+
+        # Build sparse k-NN graph
         nn = NearestNeighbors(n_neighbors=k + 1, metric="precomputed")
-        nn.fit(D)
-        distances, indices = nn.kneighbors(D)
+        nn.fit(D_indiv)
+        distances, indices = nn.kneighbors(D_indiv)
 
-        # Create sparse matrix
         graph = sp.lil_matrix((n, n))
         for i in range(n):
-            for j_idx, j in enumerate(indices[i][1:]):  # skip self
+            for j_idx, j in enumerate(indices[i][1:]):
                 dist = distances[i][j_idx + 1]
                 graph[i, j] = dist
-                graph[j, i] = dist  # make symmetric
+                graph[j, i] = dist
 
-        # Compute geodesic distances
         geo_dists = shortest_path(csgraph=graph.tocsr(), directed=False)
         return geo_dists
 
@@ -382,7 +443,6 @@ class CustomAdmixedModel(StdPopSimDataHumanDemoModel):
         mmap_mode=None,
         precomputed_path=None,
         pop_sizes=500,
-        demographic_model_path='OutOfAfrica_3G09',
         num_variants=1000,
         mac_threshold=20,
         mutation_rate=1.25e-8,
@@ -417,11 +477,6 @@ class CustomAdmixedModel(StdPopSimDataHumanDemoModel):
             Number of diploid individuals to sample per population defined in the
             demographic model.
 
-        demographic_model : str, default='OutOfAfrica_3G09'
-            Identifier for a standard human demographic model provided by `stdpopsim`.
-            Examples include 'OutOfAfrica_3G09', 
-            'Africa_1T12', or 'AmericanAdmixture_4B11'.
-
         num_variants : Union[int, None], default=1000
             Number of filtered variants to retain after applying 
             the minor allele count (MAC) threshold.
@@ -451,7 +506,6 @@ class CustomAdmixedModel(StdPopSimDataHumanDemoModel):
             ancestry and mutation simulations.
         """
         self.pop_sizes = pop_sizes
-        self.demographic_model_path = demographic_model_path
         self.num_variants = num_variants
         self.mac_threshold = mac_threshold
         self.mutation_rate = mutation_rate
@@ -459,6 +513,18 @@ class CustomAdmixedModel(StdPopSimDataHumanDemoModel):
         self.sequence_length = sequence_length
         self.ploidy = ploidy
         self.random_state = random_state
+
+        self.admixture_matrix = np.array([[0.0, 3.e-05	,3.e-05],
+                                            [3.e-05, 0.0, 0],
+                                            [0, 3.e-05, 0.0]])
+        self.admixture_start_time = 10
+        self.admixture_end_time = 0
+        self.ancestral_name = "ANC"
+        self.root_size = 1e4
+        self.growth_rate = 0.004
+        self.pop_size = 1e4
+        self.num_pops = len(self.pop_sizes)
+        self.split_time = 1000
 
         super().__init__(
             cache_dir=cache_dir,
@@ -469,74 +535,68 @@ class CustomAdmixedModel(StdPopSimDataHumanDemoModel):
     """
     Same but now we use a custom demographic model
     """
-    def generate_data(self) -> Tuple[np.ndarray, pd.DataFrame]:
-        """Generate simulated genotype matrix and associated metadata."""
-        self.demography = self._load_demographic_model()
-        self.samples, self.idx_to_name = self._define_sample_map(self.pop_sizes)
-        self.ts = pyslim.tskit.load(self.demographic_model_path)
+    def _load_demographic_model(self) -> msprime.demography.Demography:
+        """
+        Create a demography with K populations split from one ancestor and with fixed admixture 
+        proportions starting at admixture_start_time and stopping at admixture_end_time.
 
-        # Get genotype matrix (haploid, shape = num_sites × 2*num_individuals)
-        G = self.ts.genotype_matrix()
+        Parameters:
+        - num_pops (int): Number of derived populations.
+        - split_time (float): Time at which the ancestral population splits into K populations.
+        - admixture_matrix (np.ndarray): K x K matrix of migration/admixture proportions.
+        - admixture_start_time (float): Time when admixture begins (in generations ago).
+        - admixture_end_time (float): Time when admixture ends (0 = present).
+        - ancestral_name (str): Name of the root population.
+        - root_size (float): Size of ancestral population.
+        - pop_size (float): Size of each derived population.
 
-        import pdb
-        pdb.set_trace()
+        Returns:
+        - msprime.Demography object
+        """
+        assert self.admixture_matrix.shape == (self.num_pops, self.num_pops), "Admixture matrix must be KxK. Got {}".format(self.admixture_matrix.shape)
 
-        # Recapitate to add coalescent history (required for nonWF)
-        ts_recap = self.ts.recapitate(recombination_rate=1e-8, Ne=10000)
+        demog = msprime.Demography()
 
-        # Add mutations after recapitation
-        ts_mut = msprime.sim_mutations(ts_recap, rate=1e-7, random_seed=42)
+        # Add ancestral population
+        demog.add_population(name=self.ancestral_name, initial_size=self.root_size)
 
-        print(f"{ts_mut.num_sites} sites, {ts_mut.num_mutations} mutations")
+        # Add K derived populations
+        pop_names = [f"POP_{i}" for i in range(self.num_pops)]
+        for name in pop_names:
+            demog.add_population(name=name, initial_size=self.pop_size, growth_rate=self.growth_rate)
+
+        # Split K populations from ancestor
+        demog.add_population_split(time=self.split_time, derived=pop_names, ancestral=self.ancestral_name)
+
+        # Ensure zero migration to start with (optional, msprime defaults to 0)
+        for i in range(self.num_pops):
+            for j in range(self.num_pops):
+                if i != j:
+                    demog.set_migration_rate(source=pop_names[i], dest=pop_names[j], rate=0.0)
+
+        # Turn on migration at admixture_start_time
+        for i in range(self.num_pops):
+            for j in range(self.num_pops):
+                if i != j and self.admixture_matrix[i, j] > 0:
+                    demog.add_migration_rate_change(
+                        time=self.admixture_start_time,
+                        source=pop_names[i],
+                        dest=pop_names[j],
+                        rate=self.admixture_matrix[i, j]
+                    )
+
+        # Optional: turn off migration again at admixture_end_time
+        if self.admixture_end_time > 0:
+            for i in range(self.num_pops):
+                for j in range(self.num_pops):
+                    if i != j and self.admixture_matrix[i, j] > 0:
+                        demog.add_migration_rate_change(
+                            time=self.admixture_end_time,
+                            source=pop_names[i],
+                            dest=pop_names[j],
+                            rate=0.0
+                        )
         
-        # usual after?
+        demog.sort_events()
 
-        # Convert to diploid (reshape to: num_sites × num_individuals × 2)
-        G_reshaped = G.reshape(G.shape[0], -1, 2)
-
-        # Sum haplotypes → genotypes 0/1/2
-        diploid_genotypes = G_reshaped.sum(axis=-1).T
-
-        diploid_genotypes = self._preprocess(diploid_genotypes)
-
-        metadata = self._extract_metadata(self.ts)
-
-        return diploid_genotypes, metadata
-
-    def _extract_metadata(self, ts):
-        # Load SLiM-specific info
-        assert isinstance(ts, tskit.trees.TreeSequence)
-
-        samples = ts.samples()
-        node_table = ts.tables.nodes
-
-        # Group samples into diploid individuals (2 haploids per individual)
-        assert len(samples) % 2 == 0, "Expected even number of haploid samples (diploids)"
-        sample_pairs = samples.reshape(-1, 2)
-
-        # Use the first haploid in each pair to identify the individual
-        pop_ids = node_table.population[sample_pairs[:, 0]]
-        times = node_table.time[sample_pairs[:, 0]]
-        individual_ids = node_table.individual[sample_pairs[:, 0]]
-
-        # Convert population IDs to categorical labels
-        named_pops = np.array(self.idx_to_name)[pop_ids]
-        categorical_pops = pd.Categorical(named_pops, categories=self.idx_to_name)
-
-        # Extract ancestry vectors from individuals
-        individuals = ts.individuals()
-        ancestry_vectors = []
-        for ind_id in individual_ids:
-            ind = individuals[ind_id]
-            ancestry = ind.metadata.get("ancestry", None)
-            if ancestry is None:
-                ancestry = [np.nan] * len(self.idx_to_name)
-            ancestry_vectors.append(np.array(ancestry))
-
-        return pd.DataFrame({
-            "individual_id": np.arange(len(sample_pairs)),
-            "haploids": list(sample_pairs),
-            "time": times,
-            "Population": categorical_pops,
-            "ancestry": ancestry_vectors
-        })
+        return demog

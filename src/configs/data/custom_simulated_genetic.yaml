@@ -8,11 +8,9 @@ random_state: ${seed}
 batch_size: 128
 num_workers: 0
 cache_dir: "./cache"
-pop_sizes: [500,500,500,500,500]
+pop_sizes: [500,500,500]
 num_variants: null
 mac_threshold: 20
 sequence_length: 2e6       # was 2e7
 mutation_rate: 1.25e-9      # was 1.25e-8
 recombination_rate: 1e-9    # was 1e-8
-demographic_model_path: /lustre06/project/6065672/sciclun4/ActiveProjects/ManyLatents/scripts/slim_scripts/multi_gen_admixture_output.trees
-#demographic_model_path: /lustre06/project/6065672/sciclun4/ActiveProjects/ManyLatents/scripts/slim_scripts/minimal_output.trees

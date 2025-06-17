@@ -11,7 +11,6 @@ class CustomAdmixedModule(LightningDataModule):
 
     def __init__(
         self,
-        demographic_model_path: str,
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
@@ -94,8 +93,7 @@ class CustomAdmixedModule(LightningDataModule):
             sequence_length=sequence_length,
             mutation_rate=mutation_rate,
             recombination_rate=recombination_rate,
-            random_state=random_state,
-            demographic_model_path=demographic_model_path
+            random_state=random_state
         )
 
         self.mode = mode
