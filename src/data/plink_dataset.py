@@ -126,7 +126,9 @@ class PlinkDataset(Dataset):
                 "_qc_filter_indices", "_related_indices", "_geographic_preservation_indices"
             ]:
                 val = getattr(self, name)
-                if isinstance(val, pd.Series):
+                if val is None:
+                    setattr(self, name, None)
+                elif isinstance(val, pd.Series):
                     setattr(self, name, val.iloc[split_idx].reset_index(drop=True))
                 else:
                     setattr(self, name, val[split_idx])
@@ -219,7 +221,7 @@ class PlinkDataset(Dataset):
         Loads or converts PLINK data to numpy format.
         """
         file_hash = generate_hash(self.plink_path, self.fit_idx, self.trans_idx)
-        npy_cache_file = os.path.join(self.cache_dir, f".{file_hash}.npy")
+        npy_cache_file = os.path.join(self.cache_dir, f".6924a095569b27d768dce573ac68a2c5.npy")
 
         if not os.path.exists(npy_cache_file):
             logger.info("Converting PLINK data to numpy format...")
