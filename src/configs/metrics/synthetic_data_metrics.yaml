@@ -6,3 +6,6 @@ defaults:
   - gt_preservation_far
 - embedding:
   - knn_preservation
+- module:
+  - connected_components
+  - affinity_spectrum

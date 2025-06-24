@@ -65,5 +65,8 @@ class GaussianBlobDataset:
     def __len__(self):
         return len(self.X)
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, int]:
-        return self.X[idx], self.y[idx]
+    def __getitem__(self, idx: int):
+        return {
+            "data": self.X[idx],
+            "metadata": self.y[idx]
+        }
