@@ -11,7 +11,9 @@ from matplotlib.colors import ListedColormap
 import wandb
 from src.callbacks.embedding.base import EmbeddingCallback
 from src.data.hgdp_dataset import HGDPDataset
+from src.data.ukbb_dataset import UKBBDataset
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
+from src.utils.mappings import cmap_ukbb_superpops as cmap_pop_UKBB
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +70,13 @@ class PlotEmbeddings(EmbeddingCallback):
             return ListedColormap(["#1f77b4", "#ff7f0e"])
         if self.color_by_score is not None:
             return "viridis"
-        return cmap_pop_HGDP if isinstance(dataset, HGDPDataset) else "viridis"
+        if isinstance(dataset, HGDPDataset):
+            cmap = cmap_pop_HGDP
+        elif isinstance(dataset, UKBBDataset):
+            cmap = cmap_pop_UKBB
+        else:
+            cmap = "viridis"
+        return cmap
 
     def _get_embeddings(self, embeddings: dict) -> np.ndarray:
         embeddings = embeddings["embeddings"]
@@ -119,7 +127,7 @@ class PlotEmbeddings(EmbeddingCallback):
             score_min = float(color_array.min())
             score_max = float(color_array.max())
             norm = mcolors.Normalize(vmin=score_min, vmax=score_max)
-        
+
         ax = scprep.plot.scatter2d(
             embeddings_to_plot,
             s=8,
