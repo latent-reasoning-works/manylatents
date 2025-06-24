@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import pandas as pd
 import torch
@@ -25,6 +25,7 @@ class HGDPDataModule(LightningDataModule):
         delimiter: str = ",",
         filter_qc: bool = False,
         filter_related: bool = False,
+        balance_filter: Union[bool, float] = False,
         test_all: bool = False,
         remove_recent_migration: bool = False,
         mode: str = None,
@@ -42,6 +43,7 @@ class HGDPDataModule(LightningDataModule):
             delimiter (Optional[str]): Delimiter for CSV files.
             filter_qc (Optional[bool]): Whether to filter samples based on quality control.
             filter_related (Optional[bool]): Whether to filter related samples.
+            balance_filter (Union[bool, float]): subset the predominant class to be this percent of the dataset.
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): Remove recently migrated samples.
             mode (str): 'split' or 'full' mode. 'split' splits data into train/test, 
@@ -61,6 +63,7 @@ class HGDPDataModule(LightningDataModule):
         self.precomputed_path = precomputed_path
         self.filter_related = filter_related
         self.filter_qc = filter_qc
+        self.balance_filter = balance_filter
         self.test_all = test_all
         self.remove_recent_migration = remove_recent_migration
         self.mode = mode
@@ -82,6 +85,7 @@ class HGDPDataModule(LightningDataModule):
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
                 filter_qc=self.filter_qc,
+                balance_filter=self.balance_filter,
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='full',
@@ -97,6 +101,7 @@ class HGDPDataModule(LightningDataModule):
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
                 filter_qc=self.filter_qc,
+                balance_filter=self.balance_filter,
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='train',
@@ -109,6 +114,7 @@ class HGDPDataModule(LightningDataModule):
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
                 filter_qc=self.filter_qc,
+                balance_filter=self.balance_filter,
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='test',
