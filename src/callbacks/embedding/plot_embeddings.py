@@ -76,6 +76,8 @@ class PlotEmbeddings(EmbeddingCallback):
             cmap = cmap_pop_HGDP
         elif isinstance(dataset, UKBBDataset):
             cmap = cmap_pop_UKBB
+        elif isinstance(dataset, MHIDataset):
+            cmap = cmap_pop_MHI
         else:
             cmap = "viridis"
         return cmap
