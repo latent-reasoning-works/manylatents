@@ -134,3 +134,15 @@ cmap_ukbb_superpops = {
     "AMR": "red",
     "Do not know": "lightgrey"
 }
+
+cmap_mhi_superpops = {
+    "Black":            "#228B22",   # forest green
+    "Caucasian":        "#9370DB",   # medium purple
+    "Asian":            "#1E90FF",   # dodger blue
+    "Hispanic":         "#FF4500",   # orange-red
+    "Native American":  "#8B0000",   # dark red / maroon
+
+    # catch-alls
+    "Other":            "#808080",   # medium gray (similar to “MID”)
+    "Unlabelled":       "#D3D3D3",   # light gray (like “Do not know”)
+}

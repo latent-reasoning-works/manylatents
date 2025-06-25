@@ -12,8 +12,10 @@ import wandb
 from src.callbacks.embedding.base import EmbeddingCallback
 from src.data.hgdp_dataset import HGDPDataset
 from src.data.ukbb_dataset import UKBBDataset
+from src.data.mhi_dataset import MHIDataset
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 from src.utils.mappings import cmap_ukbb_superpops as cmap_pop_UKBB
+from src.utils.mappings import cmap_mhi_superpops as cmap_pop_MHI
 
 logger = logging.getLogger(__name__)
 
