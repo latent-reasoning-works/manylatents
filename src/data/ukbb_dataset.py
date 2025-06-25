@@ -159,13 +159,13 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
         return self.metadata[label_col].values
 
     def balance_filter(self, balance_filter) -> np.array:
-        
+
         num_dominant = self.metadata[(self.metadata['Population'] == 'EUR')].shape[0]
-        
+
         # "Do not know" enriched for EUR. So treat them as dominant
         num_nondominant = self.metadata[(self.metadata['Population'] != 'EUR') & (self.metadata['Population'] != 'Do not know')].shape[0]
 
-        num_to_subset = int((num_nondominant / balance_filter) - num_nondominant)
+        num_to_subset = int(num_nondominant * balance_filter)
 
         EUR_subset = np.random.choice(self.metadata[self.metadata['Population'] == 'EUR'].MetadataIDs, 
                              num_to_subset,

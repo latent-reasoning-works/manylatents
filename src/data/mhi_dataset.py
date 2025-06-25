@@ -185,7 +185,7 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         # "Do not know" enriched for EUR. So treat them as dominant
         num_nondominant = self.metadata[(self.metadata['Population'] != 'Caucasian') & (self.metadata['Population'] != 'Unlabelled')].shape[0]
 
-        num_to_subset = int((num_nondominant / balance_filter) - num_nondominant)
+        num_to_subset = int(num_nondominant * balance_filter)
 
         EUR_subset = np.random.choice(self.metadata[self.metadata['Population'] == 'Caucasian'].index, 
                              num_to_subset,
