@@ -66,21 +66,40 @@ class WandbLogScores(EmbeddingCallback):
         # 2) per-sample table (1-D arrays)
         array_keys = [k for k, v in scores.items() if np.ndim(v) == 1]
         if self.log_table and array_keys:
-            N = len(scores[array_keys[0]])
-            data = {"sample_index": np.arange(N)}
-            if self.include_labels and "label" in embeddings:
-                lbl = embeddings["label"]
-                data["label"] = (
-                    lbl.cpu().numpy().tolist() if hasattr(lbl, "cpu")
-                    else list(lbl)
-                )
+            # Group arrays by their length
+            length_to_keys = {}
             for name in array_keys:
-                data[name] = scores[name].tolist()
+                arr_len = len(scores[name])
+                length_to_keys.setdefault(arr_len, []).append(name)
 
-            df = pd.DataFrame(data)
-            table = wandb.Table(dataframe=df)
-            wandb.log({f"{tag}/per_sample_metrics": table}, commit=False)
-            logger.info(f"Logged table {tag}/per_sample_metrics")
+            for N, keys in length_to_keys.items():
+                data = {"sample_index": np.arange(N)}
+                # Only add label if it matches this group length
+                if self.include_labels and "label" in embeddings:
+                    lbl = embeddings["label"]
+                    if hasattr(lbl, "cpu"):
+                        lbl = lbl.cpu().numpy()
+                    lbl = np.asarray(lbl)
+                    if len(lbl) == N:
+                        data["label"] = lbl.tolist()
+                    else:
+                        logger.warning(f"Label length {len(lbl)} does not match group length {N}; skipping label for this table.")
+                for name in keys:
+                    arr = scores[name]
+                    if len(arr) == N:
+                        data[name] = arr.tolist()
+                    else:
+                        logger.warning(f"Array '{name}' length {len(arr)} does not match group length {N}; skipping.")
+                try:
+                    df = pd.DataFrame(data)
+                    table_key = f"{tag}/per_sample_metrics_n{N}" if len(length_to_keys) > 1 else f"{tag}/per_sample_metrics"
+                    table = wandb.Table(dataframe=df)
+                    wandb.log({table_key: table}, commit=False)
+                    logger.info(f"Logged table {table_key} with columns: {list(data.keys())}")
+                except Exception as e:
+                    logger.error(f"Failed to log per-sample table for group length {N}: {e}")
+            if len(length_to_keys) > 1:
+                logger.warning(f"Multiple per-sample array groups found (lengths: {list(length_to_keys.keys())}); logged separately.")
 
         # 3) k-curve tables (group swept scalars by base name)
         if self.log_k_curve_table and scalar_summary:
