@@ -100,6 +100,10 @@ archetypes = { git = "https://github.com/aleixalcacer/archetypes.git" }
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["src"]
+
 [[tool.uv.dependency-metadata]]
 name = "heatgeo"
 version = "0.0.1"

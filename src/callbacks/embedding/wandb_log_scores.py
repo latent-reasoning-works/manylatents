@@ -63,24 +63,49 @@ class WandbLogScores(EmbeddingCallback):
             wandb.log(scalar_summary, commit=False)
             logger.info(f"Logged scalars for {tag}: {list(scalar_summary)}")
 
-        # 2) per-sample table (1-D arrays)
+        # 2) per-sample table (1-D arrays) - handle variable lengths
         array_keys = [k for k, v in scores.items() if np.ndim(v) == 1]
         if self.log_table and array_keys:
-            N = len(scores[array_keys[0]])
-            data = {"sample_index": np.arange(N)}
+            # Find the maximum length among all arrays
+            lengths = [len(scores[k]) for k in array_keys]
+            max_length = max(lengths)
+            min_length = min(lengths)
+            
+            if max_length != min_length:
+                logger.warning(f"Arrays have different lengths: {dict(zip(array_keys, lengths))}. "
+                             f"Using max length {max_length} and padding shorter arrays with NaN.")
+            
+            data = {"sample_index": np.arange(max_length)}
+            
             if self.include_labels and "label" in embeddings:
                 lbl = embeddings["label"]
-                data["label"] = (
+                lbl_list = (
                     lbl.cpu().numpy().tolist() if hasattr(lbl, "cpu")
                     else list(lbl)
                 )
+                # Pad labels if needed
+                if len(lbl_list) < max_length:
+                    lbl_list.extend([None] * (max_length - len(lbl_list)))
+                elif len(lbl_list) > max_length:
+                    lbl_list = lbl_list[:max_length]
+                data["label"] = lbl_list
+            
             for name in array_keys:
-                data[name] = scores[name].tolist()
+                arr = scores[name]
+                arr_list = arr.tolist()
+                
+                # Pad shorter arrays with NaN
+                if len(arr_list) < max_length:
+                    arr_list.extend([np.nan] * (max_length - len(arr_list)))
+                elif len(arr_list) > max_length:
+                    arr_list = arr_list[:max_length]
+                
+                data[name] = arr_list
 
             df = pd.DataFrame(data)
             table = wandb.Table(dataframe=df)
             wandb.log({f"{tag}/per_sample_metrics": table}, commit=False)
-            logger.info(f"Logged table {tag}/per_sample_metrics")
+            logger.info(f"Logged table {tag}/per_sample_metrics with {len(df)} rows")
 
         # 3) k-curve tables (group swept scalars by base name)
         if self.log_k_curve_table and scalar_summary:
