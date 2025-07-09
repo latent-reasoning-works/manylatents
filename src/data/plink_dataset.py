@@ -218,7 +218,8 @@ class PlinkDataset(Dataset):
         if test_all:
             # for test set, include both related and unrelated
             fit_idx = related_indices & filtered_indices & recent_migrant_filter & balanced_set
-            trans_idx = filtered_indices & recent_migrant_filter & balanced_set
+            #trans_idx = filtered_indices & recent_migrant_filter & balanced_set
+            trans_idx = np.ones(len(self.metadata), dtype=bool)
         else:
             # otherwise train on unrelated and test on the related individuals
             fit_idx = related_indices & filtered_indices & recent_migrant_filter & balanced_set
