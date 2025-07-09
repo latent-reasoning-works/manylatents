@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -28,6 +28,8 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
                  delimiter: Optional[str] = ",",
                  filter_qc: Optional[bool] = False,
                  filter_related: Optional[bool] = False,
+                 balance_filter: Union[bool, float] = False,
+                 include_do_not_know: bool = False,
                  test_all: Optional[bool] = False,
                  remove_recent_migration: Optional[bool] = False):
         """
@@ -35,6 +37,7 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
         """
         self.data_split = data_split        
         self.filter_related = filter_related
+        self.include_do_not_know  = include_do_not_know
 
         # Load raw data and metadata via the parent class.
         super().__init__(files=files, 
@@ -45,6 +48,7 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
                          precomputed_path=precomputed_path,
                          filter_qc=filter_qc,
                          filter_related=filter_related,
+                         balance_filter=balance_filter,
                          test_all=test_all,
                          remove_recent_migration=remove_recent_migration)
 
@@ -145,7 +149,7 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
 
         return metadata
 
-    def get_labels(self, label_col: str = "self_described_ancestry") -> np.ndarray:
+    def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
         Returns label array (e.g., self_described_ancestry) for coloring plots.
         """
@@ -153,3 +157,26 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
 
         return self.metadata[label_col].values
+
+    def balance_filter(self, balance_filter) -> np.array:
+
+        num_dominant = self.metadata[(self.metadata['Population'] == 'EUR')].shape[0]
+
+        # "Do not know" enriched for EUR. So treat them as dominant
+        num_nondominant = self.metadata[(self.metadata['Population'] != 'EUR') & (self.metadata['Population'] != 'Do not know')].shape[0]
+
+        num_to_subset = int(num_nondominant * balance_filter)
+
+        EUR_subset = np.random.choice(self.metadata[self.metadata['Population'] == 'EUR'].MetadataIDs, 
+                             num_to_subset,
+                             replace=False)
+        #print(f'subsetting EUR from {num_dominant} to {num_to_subset}')
+        if self.include_do_not_know:
+            rest = self.metadata[self.metadata['Population'] != 'EUR'].MetadataIDs
+        else:
+            rest = self.metadata[(self.metadata['Population'] != 'EUR') & (self.metadata['Population'] != 'Do not know')].MetadataIDs
+
+        idxs = np.concatenate([EUR_subset, rest])
+        boolean_idx = self.metadata.MetadataIDs.isin(idxs)
+
+        return boolean_idx

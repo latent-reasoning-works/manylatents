@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import pandas as pd
 import torch
@@ -25,6 +25,8 @@ class MHIDataModule(LightningDataModule):
         delimiter: str = ",",
         filter_qc: bool = False,
         filter_related: bool = False,
+        balance_filter: Union[bool, float] = False,
+        include_do_not_know: bool = False,
         test_all: bool = False,
         remove_recent_migration: bool = False,
         mode: str = None,
@@ -61,6 +63,8 @@ class MHIDataModule(LightningDataModule):
         self.precomputed_path = precomputed_path
         self.filter_related = filter_related
         self.filter_qc = filter_qc
+        self.balance_filter = balance_filter
+        self.include_do_not_know = include_do_not_know
         self.test_all = test_all
         self.remove_recent_migration = remove_recent_migration
         self.mode = mode
@@ -82,6 +86,8 @@ class MHIDataModule(LightningDataModule):
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
                 filter_qc=self.filter_qc,
+                balance_filter=self.balance_filter,
+                include_do_not_know=self.include_do_not_know,
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='full',
@@ -97,6 +103,8 @@ class MHIDataModule(LightningDataModule):
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
                 filter_qc=self.filter_qc,
+                balance_filter=self.balance_filter,
+                include_do_not_know=self.include_do_not_know,
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='train',
@@ -109,6 +117,8 @@ class MHIDataModule(LightningDataModule):
                 delimiter=self.delimiter,
                 filter_related=self.filter_related,
                 filter_qc=self.filter_qc,
+                balance_filter=self.balance_filter,
+                include_do_not_know=self.include_do_not_know,
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='test',

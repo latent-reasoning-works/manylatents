@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -28,6 +28,8 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
                  delimiter: Optional[str] = ",",
                  filter_qc: Optional[bool] = False,
                  filter_related: Optional[bool] = False,
+                 balance_filter: Union[bool, float] = False,
+                 include_do_not_know: bool = False,
                  test_all: Optional[bool] = False,
                  remove_recent_migration: Optional[bool] = False):
         """
@@ -35,6 +37,7 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         """
         self.data_split = data_split        
         self.filter_related = filter_related
+        self.include_do_not_know = include_do_not_know
 
         # Load raw data and metadata via the parent class.
         super().__init__(files=files, 
@@ -45,6 +48,7 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
                          precomputed_path=precomputed_path,
                          filter_qc=filter_qc,
                          filter_related=filter_related,
+                         balance_filter=balance_filter,
                          test_all=test_all,
                          remove_recent_migration=remove_recent_migration)
 
@@ -135,17 +139,17 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
 
         return metadata
     
-    def load_admixture_ratios(self, admixture_path, admixture_Ks) -> dict:
-        """
-        Loads admixture ratios
-        """
-        admixture_ratio_dict = {}
-        if admixture_Ks is not None:
-            list_of_files = [admixture_path.replace('{K}', K) for K in admixture_Ks]
-            for file, K in zip(list_of_files, admixture_Ks):
-                # only keep admixture info + sample IDs. Drop other columns
-                admixture_ratio_dict[K] = pd.read_csv(file, sep='\t', header=None).iloc[:, :-1]
-        return admixture_ratio_dict
+    # def load_admixture_ratios(self, admixture_path, admixture_Ks) -> dict:
+    #     """
+    #     Loads admixture ratios
+    #     """
+    #     admixture_ratio_dict = {}
+    #     if admixture_Ks is not None:
+    #         list_of_files = [admixture_path.replace('{K}', K) for K in admixture_Ks]
+    #         for file, K in zip(list_of_files, admixture_Ks):
+    #             # only keep admixture info + sample IDs. Drop other columns
+    #             admixture_ratio_dict[K] = pd.read_csv(file, sep='\t', header=None).iloc[:, :-1]
+    #     return admixture_ratio_dict
 
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
@@ -156,20 +160,43 @@ class MHIDataset(PlinkDataset, PrecomputedMixin):
         
         return self.metadata[label_col].values
     
-    def extract_indices(self, 
-                        filter_qc: bool,
-                        filter_related: bool,
-                        test_all: bool,
-                        remove_recent_migration: bool
-                       ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Extracts fit/transform indices based on metadata filters.
-        Args:
-            filter_qc (Optional[bool]): Whether to filter samples based on quality control.
-            filter_related (Optional[bool]): Whether to filter related samples.
-            test_all (Optional[bool]): Whether to use all samples for testing.
-            remove_recent_migration (Optional[bool]): remove recently migrated samples.
-        """
-        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration)
+    #     def extract_indices(self, 
+    #                         filter_qc: bool,
+    #                         filter_related: bool,
+    #                         test_all: bool,
+    #                         remove_recent_migration: bool
+    #                        ) -> Tuple[np.ndarray, np.ndarray]:
+    #         """
+    #         Extracts fit/transform indices based on metadata filters.
+    #         Args:
+    #             filter_qc (Optional[bool]): Whether to filter samples based on quality control.
+    #             filter_related (Optional[bool]): Whether to filter related samples.
+    #             test_all (Optional[bool]): Whether to use all samples for testing.
+    #             remove_recent_migration (Optional[bool]): remove recently migrated samples.
+    #         """
+    #         fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration)
 
-        return fit_idx, trans_idx
+    #         return fit_idx, trans_idx
+
+    def balance_filter(self, balance_filter) -> np.array:
+
+        num_dominant = self.metadata[(self.metadata['Population'] == 'Caucasian')].shape[0]
+
+        # "Do not know" enriched for EUR. So treat them as dominant
+        num_nondominant = self.metadata[(self.metadata['Population'] != 'Caucasian') & (self.metadata['Population'] != 'Unlabelled')].shape[0]
+
+        num_to_subset = int(num_nondominant * balance_filter)
+
+        EUR_subset = np.random.choice(self.metadata[self.metadata['Population'] == 'Caucasian'].index, 
+                             num_to_subset,
+                             replace=False)
+        #print(f'subsetting EUR from {num_dominant} to {num_to_subset}')
+        if self.include_do_not_know:
+            rest = self.metadata[self.metadata['Population'] != 'Caucasian'].index
+        else:
+            rest = self.metadata[(self.metadata['Population'] != 'Caucasian') & (self.metadata['Population'] != 'Unlabelled')].index
+
+        idxs = np.concatenate([EUR_subset, rest])
+        boolean_idx = self.metadata.index.isin(idxs)
+
+        return boolean_idx

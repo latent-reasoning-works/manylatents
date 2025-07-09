@@ -1,52 +1,9 @@
 import copy
 import numpy as np
 
-# def make_palette_label_order_HGDP(metadata):
-#     metadata = metadata[1:]
-#     # get color palette
-#     pop_pallette_1000G_coarse = {'East_Asia': 'blue',
-#                                 'Europe': 'purple',
-#                                 'America': 'red',
-#                                 'Africa': 'green',
-#                                 'Central_South_Asia': 'orange'
-#                                }
-#     label_order_1000G_fine = ['YRI', 'ESN', 'GWD', 'LWK', 'MSL', 'ACB', 'ASW',
-#                                'IBS',  'CEUGBR', 'TSI', 'FIN',
-#                                'PJL', 'BEB', 'GIH', 'STUITU',
-#                                'CHB', 'CHS', 'CDX', 'KHV', 'JPT',
-#                                'MXL', 'CLM', 'PEL', 'PUR']
-#     pop_colors=["#C7E9C0","#A1D99B","#74C476","#41AB5D","#238B45","#006D2C","#00441B",
-#                 "#EFBBFF","#D896FF","#BE29EC","#800080",
-#                 "#FEEDDE","#FDBE85","#FD8D3C","#E6550D",
-#                 "#DEEBF7","#9ECAE1","#008080","#0ABAB5","#08519C",
-#                "#BC544B","#E3242B","#E0115F","#900D09","#7E2811"]
-#     pop_pallette_1000G_fine = {label:color for label,color in zip(label_order_1000G_fine, pop_colors)}
-
-#     pop_palette_hgdp_coarse = copy.deepcopy(pop_pallette_1000G_coarse)
-#     pop_palette_hgdp_coarse['Middle_East'] = 'grey'
-#     pop_palette_hgdp_coarse['Oceania'] = 'yellow'
-
-#     # create tmp object to hold the original 26 populations
-#     mapping_26 = copy.deepcopy(pop_pallette_1000G_fine)
-#     mapping_26['GBR'] = mapping_26['CEUGBR']
-#     mapping_26['CEU'] = mapping_26['CEUGBR']
-#     mapping_26['STU'] = mapping_26['STUITU']
-#     mapping_26['ITU'] = mapping_26['STUITU']
-
-#     pop_palette_hgdp_fine = {}
-#     superpopulations = metadata['Genetic_region_merged']
-#     populations = metadata['Population']
-
-#     for super_pop in np.unique(superpopulations):
-#         for pop in np.unique(populations[superpopulations==super_pop]):
-#             if pop not in mapping_26.keys():
-#                 # just use superpop color for now
-#                 pop_palette_hgdp_fine[pop] = pop_palette_hgdp_coarse[super_pop]
-#             else:
-#                 pop_palette_hgdp_fine[pop] = mapping_26[pop]
-#     return pop_palette_hgdp_fine, pop_palette_hgdp_coarse
-
 # just hard-code it
+
+# HGDP+1KGP
 cmap_pop = {
      'ACB': '#006D2C',
      'ASW': '#00441B',
@@ -127,3 +84,65 @@ cmap_pop = {
      'Melanesian': 'yellow',
      'Papuan': 'yellow',
            }
+
+# UKBB
+cmap_ukbb_pops = {
+    # African ancestry (green family)
+    'African': '#228B22',                     # forest green
+    'Caribbean': '#66CDAA',                   # medium aquamarine
+    'Any other Black background': '#2E8B57',  # sea green
+    'Black or Black British': '#006400',      # dark green
+    'White and Black African': '#8FBC8F',     # dark sea green
+
+    # European ancestry (purple family)
+    'British': '#9370DB',                     # medium purple
+    'Irish': '#8A2BE2',                       # blue violet
+    'White': '#BA55D3',                       # medium orchid
+    'Any other white background': '#DDA0DD',  # plum
+
+
+    # South/Central Asian ancestry (orange family)
+    'Indian': '#FFA500',                      # orange
+    'Pakistani': '#FF8C00',                   # dark orange
+    'Bangladeshi': '#FFB347',                 # light orange
+
+
+    # East Asian ancestry (blue family)
+    'Chinese': '#1E90FF',                     # dodger blue
+    'Asian or Asian British': '#4682B4',      # steel blue
+
+    # Mixed or unknown (gray family)
+    'White and Black Caribbean': '#D3D3D3',   
+    'White and Asian': '#D3D3D3',             
+    'Any other mixed background': '#D3D3D3',  
+    'Mixed': '#D3D3D3',                       
+    'Other ethnic group': '#D3D3D3',          
+    'Prefer not to answer': '#D3D3D3',        
+    'Do not know': '#D3D3D3',
+    'Any other Asian background': '#D3D3D3',
+
+    # Middle Eastern / ambiguous
+    'Other': '#D3D3D3'
+}
+
+cmap_ukbb_superpops = {
+    "AFR": "green",
+    "EUR": "purple",
+    "CSA": "orange",
+    "EAS": "blue",
+    "MID": "gray",
+    "AMR": "red",
+    "Do not know": "lightgrey"
+}
+
+cmap_mhi_superpops = {
+    "Black":            "#228B22",   # forest green
+    "Caucasian":        "#9370DB",   # medium purple
+    "Asian":            "#1E90FF",   # dodger blue
+    "Hispanic":         "#FF4500",   # orange-red
+    "Native American":  "#8B0000",   # dark red / maroon
+
+    # catch-alls
+    "Other":            "#808080",   # medium gray (similar to “MID”)
+    "Unlabelled":       "#D3D3D3",   # light gray (like “Do not know”)
+}

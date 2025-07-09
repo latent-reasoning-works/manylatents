@@ -1,7 +1,7 @@
 import logging
 import os
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -30,6 +30,7 @@ class PlinkDataset(Dataset):
                  delimiter: Optional[str] = ",",
                  filter_qc: Optional[bool] = False,
                  filter_related: Optional[bool] = False,
+                 balance_filter: Union[bool, float] = False,
                  test_all: Optional[bool] = False,
                  remove_recent_migration: Optional[bool] = False,
                  data_split: str = None,
@@ -45,6 +46,7 @@ class PlinkDataset(Dataset):
             delimiter (Optional[str]): Delimiter for reading metadata files.
             filter_qc (Optional[bool]): Whether to filter samples based on quality control.
             filter_related (Optional[bool]): Whether to filter related samples.
+            balance_filter (Union[bool, float]): subset the predominant class to be this percent of the dataset.
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): remove recently migrated samples.
             data_split (str): Data split to use ('train', 'test', or 'full').
@@ -92,7 +94,8 @@ class PlinkDataset(Dataset):
         self.fit_idx, self.trans_idx = self.extract_indices(filter_qc,
                                                             filter_related,
                                                             test_all,
-                                                            remove_recent_migration)
+                                                            remove_recent_migration,
+                                                            balance_filter)
 
         self.split_indices = {
             'train': np.where(self.fit_idx)[0],
@@ -180,7 +183,8 @@ class PlinkDataset(Dataset):
                         filter_qc: bool,
                         filter_related: bool,
                         test_all: bool,
-                        remove_recent_migration: bool
+                        remove_recent_migration: bool,
+                        balance_filter: Union[bool, float]
                        ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Extracts fit/transform indices based on metadata filters.
@@ -189,6 +193,7 @@ class PlinkDataset(Dataset):
             filter_related (Optional[bool]): Whether to filter related samples.
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): remove recently migrated samples.
+            balance_filter (Union[bool, float]): subset the predominant class to be this percent of the dataset.
         """
         if filter_qc:
             filtered_indices = self.qc_filter_indices
@@ -204,15 +209,23 @@ class PlinkDataset(Dataset):
             recent_migrant_filter = self.geographic_preservation_indices
         else:
             recent_migrant_filter = np.ones(len(self.metadata), dtype=bool)
+        
+        if balance_filter:
+            balanced_set = self.balance_filter(balance_filter)
+        else:
+            balanced_set = np.ones(len(self.metadata), dtype=bool)
 
         if test_all:
             # for test set, include both related and unrelated
-            fit_idx = related_indices & filtered_indices & recent_migrant_filter
-            trans_idx = filtered_indices & recent_migrant_filter
+            fit_idx = related_indices & filtered_indices & recent_migrant_filter & balanced_set
+            #trans_idx = filtered_indices & recent_migrant_filter & balanced_set
+            trans_idx = np.ones(len(self.metadata), dtype=bool)
         else:
             # otherwise train on unrelated and test on the related individuals
-            fit_idx = related_indices & filtered_indices & recent_migrant_filter
-            trans_idx = (~related_indices) & filtered_indices & recent_migrant_filter
+            fit_idx = related_indices & filtered_indices & recent_migrant_filter & balanced_set
+            trans_idx = (~related_indices) & filtered_indices & recent_migrant_filter & balanced_set
+            
+        logger.info(f"Fitting {fit_idx.sum()} points. Transforming {trans_idx.sum()} points")
 
         return fit_idx, trans_idx
 
@@ -221,7 +234,7 @@ class PlinkDataset(Dataset):
         Loads or converts PLINK data to numpy format.
         """
         file_hash = generate_hash(self.plink_path, self.fit_idx, self.trans_idx)
-        npy_cache_file = os.path.join(self.cache_dir, f".6924a095569b27d768dce573ac68a2c5.npy")
+        npy_cache_file = os.path.join(self.cache_dir, f".{file_hash}.npy")
 
         if not os.path.exists(npy_cache_file):
             logger.info("Converting PLINK data to numpy format...")
@@ -310,6 +323,10 @@ class PlinkDataset(Dataset):
         Returns:
             np.ndarray: Array of labels.
         """
+        pass
+    
+    @abstractmethod
+    def balance_filter(self, balance_filter) -> np.array:
         pass
     
     @property
