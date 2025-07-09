@@ -233,7 +233,7 @@ class PlinkDataset(Dataset):
         Loads or converts PLINK data to numpy format.
         """
         file_hash = generate_hash(self.plink_path, self.fit_idx, self.trans_idx)
-        npy_cache_file = os.path.join(self.cache_dir, f".6924a095569b27d768dce573ac68a2c5.npy")
+        npy_cache_file = os.path.join(self.cache_dir, f".{file_hash}.npy")
 
         if not os.path.exists(npy_cache_file):
             logger.info("Converting PLINK data to numpy format...")
