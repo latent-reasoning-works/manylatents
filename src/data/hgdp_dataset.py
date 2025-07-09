@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -41,6 +41,7 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                  delimiter: Optional[str] = ",",
                  filter_qc: Optional[bool] = False,
                  filter_related: Optional[bool] = False,
+                 balance_filter: Union[bool, float] = False,
                  test_all: Optional[bool] = False,
                  remove_recent_migration: Optional[bool] = False):
         """
@@ -58,6 +59,7 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          precomputed_path=precomputed_path,
                          filter_qc=filter_qc,
                          filter_related=filter_related,
+                         balance_filter=balance_filter,
                          test_all=test_all,
                          remove_recent_migration=remove_recent_migration)
 
@@ -171,7 +173,8 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                         filter_qc: bool,
                         filter_related: bool,
                         test_all: bool,
-                        remove_recent_migration: bool
+                        remove_recent_migration: bool,
+                        balance_filter: bool
                        ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Extracts fit/transform indices based on metadata filters.
@@ -181,10 +184,15 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): remove recently migrated samples.
         """
-        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration)
+        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration, balance_filter)
 
         # First entry is dummy row. So we ignore this!
         fit_idx[0] = False
         trans_idx[0] = False
 
         return fit_idx, trans_idx
+    
+    def balance_filter(self, balance_filter) -> np.array:
+        if balance_filter:
+            logger.info(f"balance filter ignored for HGDP+1KGP. Data is already pretty balanced")
+        return np.ones(len(self.metadata), dtype=bool)

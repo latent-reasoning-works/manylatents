@@ -5,7 +5,7 @@ defaults:
   - override /algorithm/dimensionality_reduction: pca
   - override /data: mhi_split
   - override /callbacks/embedding: default
-  - override /metrics: mhi_dr
+  - override /metrics: none #mhi_dr
 
 seed: 42
 
