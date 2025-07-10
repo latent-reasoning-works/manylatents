@@ -151,6 +151,10 @@ def make_metadata_file(plink_prefix, path_to_metadata_files):
 
     metadata['Population'] = metadata['fid']
     metadata.loc[reference_subset, 'Population'] = replace_for_reference(all_samples.loc[reference_subset, 'fid'])
+    
+    # remove NaNs
+    metadata.loc[metadata['SelfReportedRaceEthnicity'] != metadata['SelfReportedRaceEthnicity'], 
+                 'SelfReportedRaceEthnicity'] = 'No information'
 
     metadata = metadata.rename(columns={'iid': 'sample_id'})
 

@@ -135,8 +135,6 @@ class PlotEmbeddings(EmbeddingCallback):
             score_min = float(color_array.min())
             score_max = float(color_array.max())
             norm = mcolors.Normalize(vmin=score_min, vmax=score_max)
-        import pdb
-        pdb.set_trace()
         ax = scprep.plot.scatter2d(
             embeddings_to_plot,
             s=8,
