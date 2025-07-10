@@ -1,5 +1,5 @@
 # ukbb_data_module.py
-from typing import Optional, Dict, Any
+from typing import Union, Optional, Dict, Any
 
 import pandas as pd
 import torch
@@ -31,6 +31,8 @@ class AOUDataModule(LightningDataModule):
         delimiter: str = ",",
         filter_qc: bool = False,
         filter_related: bool = False,
+        balance_filter: Union[bool, float] = False,
+        include_do_not_know: bool = False,
         test_all: bool = False,
         mode: Optional[str] = None,
     ):
@@ -47,6 +49,8 @@ class AOUDataModule(LightningDataModule):
         self.delimiter = delimiter
         self.filter_qc = filter_qc
         self.filter_related = filter_related
+        self.balance_filter=balance_filter
+        self.include_do_not_know = include_do_not_know
         self.test_all = test_all
         self.mode = mode or "split"       # default split if caller forgets
 
@@ -73,6 +77,8 @@ class AOUDataModule(LightningDataModule):
             delimiter=self.delimiter,
             filter_qc=self.filter_qc,
             filter_related=self.filter_related,
+            balance_filter=self.balance_filter,
+            include_do_not_know=self.include_do_not_know,
             test_all=self.test_all
         )
 

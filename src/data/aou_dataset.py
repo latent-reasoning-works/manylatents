@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Union, Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -28,12 +28,15 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
                  delimiter: Optional[str] = ",",
                  filter_qc: Optional[bool] = False,
                  filter_related: Optional[bool] = False,
+                 balance_filter: Union[bool, float] = False,
+                 include_do_not_know: bool = False,
                  test_all: Optional[bool] = False):
         """
         Initializes the AOU dataset.
         """
         self.data_split = data_split        
         self.filter_related = filter_related
+        self.include_do_not_know  = include_do_not_know
 
         # Load raw data and metadata via the parent class.
         super().__init__(files=files, 
@@ -44,6 +47,7 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
                          precomputed_path=precomputed_path,
                          filter_qc=filter_qc,
                          filter_related=filter_related,
+                         balance_filter=balance_filter,
                          test_all=test_all)
 
     def extract_geographic_preservation_indices(self) -> np.ndarray:
@@ -106,7 +110,7 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
 
         # Define required columns.
         required_columns = ['fid',
-                            'iid',
+                            'sample_id',
                             'person_id',
                             'SelfReportedRaceEthnicity',
                             'date_of_birth',
@@ -123,11 +127,11 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
         )
 
         # Check if the index has the required name; if not, try to set it.
-        if metadata.index.name is None or metadata.index.name.strip() != 'iid':
-            if 'iid' in metadata.columns:
-                metadata = metadata.set_index('iid')
+        if metadata.index.name is None or metadata.index.name.strip() != 'sample_id':
+            if 'sample_id' in metadata.columns:
+                metadata = metadata.set_index('sample_id')
             else:
-                raise ValueError("Missing required column: 'iid' in metadata.")
+                raise ValueError("Missing required column: 'sample_id' in metadata.")
 
         # Convert filter columns to bool.
         filter_columns = ["filter_related"]
@@ -150,9 +154,6 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
         return self.metadata[label_col].values
     
     def balance_filter(self, balance_filter) -> np.array:
-        
-        import pdb
-        pdb.set_trace()
 
         num_dominant = self.metadata[(self.metadata['SelfReportedRaceEthnicity'] == 'White')].shape[0]
 

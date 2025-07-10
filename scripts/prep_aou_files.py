@@ -158,6 +158,11 @@ def make_metadata_file(plink_prefix, path_to_metadata_files):
 
     metadata.to_csv(os.path.join(path_to_metadata_files, 'aou_metadata.csv'))
     
+    # metadata file only with AoU
+    metadata2 = metadata[~reference_subset]
+    metadata2.to_csv(os.path.join(path_to_metadata_files, 'aou_metadata_nohgdp.csv'))
+    print('exported metadata files')
+    
     return metadata
 
 # --------------------------------------------------------------------------- #
