@@ -46,23 +46,40 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
                          filter_related=filter_related,
                          test_all=test_all)
 
+    def extract_geographic_preservation_indices(self) -> np.ndarray:
+        """
+        Extracts indices of samples that we expect to preserve geography.
+        Returns:
+            np.ndarray: Indices for subsetting for geographic preservation metric.        
+        """
+
+        return None
+    
     def extract_latitude(self) -> pd.Series:
         """
         Extracts latitudes
         """
+        if "latitude" not in self.metadata.columns:
+            logger.warning("Latitude column not found in metadata. Returning zeros.")
+            return pd.Series(np.zeros(len(self.metadata)), 
+                             index=self.metadata.index)
         return self.metadata["latitude"]
-
+    
     def extract_longitude(self) -> pd.Series:
         """
         Extracts longitudes
         """
-        return self.metadata["longitude"]
-
+        if "longitudes" not in self.metadata.columns:
+            logger.warning("longitudes column not found in metadata. Returning zeros.")
+            return pd.Series(np.zeros(len(self.metadata)), 
+                             index=self.metadata.index)
+        return self.metadata["longitudes"]
+    
     def extract_population_label(self) -> pd.Series:
         """
         Extracts population labels
         """
-        return self.metadata["self_described_ancestry"]
+        return self.metadata["SelfReportedRaceEthnicity"]
 
     def extract_qc_filter_indices(self) -> np.ndarray:
         """
@@ -78,7 +95,7 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
         """
         Extracts maximal unrelated subset
         """
-        return self.metadata['filter_related'].values
+        return np.ones(len(self.metadata), dtype=bool)
 
     def load_metadata(self, metadata_path: str) -> pd.DataFrame:
         """
@@ -88,13 +105,14 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
         logger.info(f"Loading metadata from: {full_path}")
 
         # Define required columns.
-        required_columns = ['IDs',
-                            'self_described_ancestry',
-                            'latitude',
-                            'longitude',
-                            'age',
-                            'filter_related',
-                            'urban / rural'
+        required_columns = ['fid',
+                            'iid',
+                            'person_id',
+                            'SelfReportedRaceEthnicity',
+                            'date_of_birth',
+                            'race',
+                            'ethnicity',
+                            'sex_at_birth'
                            ]
 
         metadata = load_metadata(
@@ -105,11 +123,11 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
         )
 
         # Check if the index has the required name; if not, try to set it.
-        if metadata.index.name is None or metadata.index.name.strip() != 'IDs':
-            if 'IDs' in metadata.columns:
-                metadata = metadata.set_index('IDs')
+        if metadata.index.name is None or metadata.index.name.strip() != 'iid':
+            if 'iid' in metadata.columns:
+                metadata = metadata.set_index('iid')
             else:
-                raise ValueError("Missing required column: 'IDs' in metadata.")
+                raise ValueError("Missing required column: 'iid' in metadata.")
 
         # Convert filter columns to bool.
         filter_columns = ["filter_related"]
@@ -122,11 +140,37 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
 
         return metadata
 
-    def get_labels(self, label_col: str = "self_described_ancestry") -> np.ndarray:
+    def get_labels(self, label_col: str = "SelfReportedRaceEthnicity") -> np.ndarray:
         """
-        Returns label array (e.g., self_described_ancestry) for coloring plots.
+        Returns label array (e.g., SelfReportedRaceEthnicity) for coloring plots.
         """
         if label_col not in self.metadata.columns:
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
 
         return self.metadata[label_col].values
+    
+    def balance_filter(self, balance_filter) -> np.array:
+        
+        import pdb
+        pdb.set_trace()
+
+        num_dominant = self.metadata[(self.metadata['SelfReportedRaceEthnicity'] == 'White')].shape[0]
+
+        # "Do not know" enriched for EUR. So treat them as dominant
+        num_nondominant = self.metadata[(self.metadata['SelfReportedRaceEthnicity'] != 'White') & (self.metadata['SelfReportedRaceEthnicity'] != 'No information')].shape[0]
+
+        num_to_subset = int(num_nondominant * balance_filter)
+
+        EUR_subset = np.random.choice(self.metadata[self.metadata['SelfReportedRaceEthnicity'] == 'White'].person_id, 
+                             num_to_subset,
+                             replace=False)
+        #print(f'subsetting EUR from {num_dominant} to {num_to_subset}')
+        if self.include_do_not_know:
+            rest = self.metadata[self.metadata['SelfReportedRaceEthnicity'] != 'White'].person_id
+        else:
+            rest = self.metadata[(self.metadata['SelfReportedRaceEthnicity'] != 'White') & (self.metadata['SelfReportedRaceEthnicity'] != 'No information')].person_id
+
+        idxs = np.concatenate([EUR_subset, rest])
+        boolean_idx = self.metadata.person_id.isin(idxs)
+
+        return boolean_idx

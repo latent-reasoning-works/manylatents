@@ -13,9 +13,11 @@ from src.callbacks.embedding.base import EmbeddingCallback
 from src.data.hgdp_dataset import HGDPDataset
 from src.data.ukbb_dataset import UKBBDataset
 from src.data.mhi_dataset import MHIDataset
+from src.data.aou_dataset import AOUDataset
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 from src.utils.mappings import cmap_ukbb_superpops as cmap_pop_UKBB
 from src.utils.mappings import cmap_mhi_superpops as cmap_pop_MHI
+from src.utils.mappings import race_ethnicity_only_pca_colors as cmap_pop_AOU
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +80,8 @@ class PlotEmbeddings(EmbeddingCallback):
             cmap = cmap_pop_UKBB
         elif isinstance(dataset, MHIDataset):
             cmap = cmap_pop_MHI
+        elif isinstance(dataset, AOUDataset):
+            cmap = cmap_pop_AOU
         else:
             cmap = "viridis"
         return cmap
@@ -131,7 +135,8 @@ class PlotEmbeddings(EmbeddingCallback):
             score_min = float(color_array.min())
             score_max = float(color_array.max())
             norm = mcolors.Normalize(vmin=score_min, vmax=score_max)
-
+        import pdb
+        pdb.set_trace()
         ax = scprep.plot.scatter2d(
             embeddings_to_plot,
             s=8,
