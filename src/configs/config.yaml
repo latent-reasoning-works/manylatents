@@ -5,7 +5,7 @@ defaults:
   - callbacks: default
   - hydra: default
   - algorithm: default
-  - metrics: null
+  - metrics: default
   - trainer: null # instantiate only if network is being passed
   - experiment: null
 
