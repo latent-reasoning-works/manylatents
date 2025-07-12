@@ -90,6 +90,8 @@ dependencies = [
     "hydra-submitit-launcher>=1.2.0",
     "scanpy>=1.10.3",
     "pyproj>=3.6.1",
+    "torchdr>=0.1",
+    "pykeops>=2.3",
 ]
 
 [tool.uv]

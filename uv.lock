@@ -1053,6 +1053,12 @@ wheels = [
 ]
 
 [[package]]
+name = "keopscore"
+version = "2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/91/28/94f516c55fca15be37cc75d56f9560d3be5a4badc87ca78202e06dd2d526/keopscore-2.3.tar.gz", hash = "sha256:e8a700c22efee59a7723ed7516c2d88ab143a11290dd23b07eb7bba1c9d16fef", size = 118471 }
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.5"
 source = { registry = "https://pypi.org/simple" }
@@ -1188,6 +1194,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pygments" },
     { name = "pygsp" },
+    { name = "pykeops" },
     { name = "pyparsing" },
     { name = "pyplink" },
     { name = "pyproj" },
@@ -1210,6 +1217,7 @@ dependencies = [
     { name = "tasklogger" },
     { name = "threadpoolctl" },
     { name = "torch" },
+    { name = "torchdr" },
     { name = "torchmetrics" },
     { name = "tornado" },
     { name = "tqdm" },
@@ -1271,6 +1279,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.9.2" },
     { name = "pygments", specifier = "==2.17.2" },
     { name = "pygsp", specifier = "==0.5.1" },
+    { name = "pykeops", specifier = ">=2.3" },
     { name = "pyparsing", specifier = "==3.0.9" },
     { name = "pyplink", specifier = ">=1.3.7" },
     { name = "pyproj", specifier = ">=3.6.1" },
@@ -1293,6 +1302,7 @@ requires-dist = [
     { name = "tasklogger", specifier = "==1.2.0" },
     { name = "threadpoolctl", specifier = "==3.4.0" },
     { name = "torch", specifier = "==2.3.1" },
+    { name = "torchdr", specifier = ">=0.1" },
     { name = "torchmetrics", specifier = ">=1.6.1" },
     { name = "tornado", specifier = "==6.3.3" },
     { name = "tqdm", specifier = ">=4.67.1" },
@@ -1702,6 +1712,7 @@ name = "nvidia-nccl-cu12"
 version = "2.20.5"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/bb/d09dda47c881f9ff504afd6f9ca4f502ded6d8fc2f572cacc5e39da91c28/nvidia_nccl_cu12-2.20.5-py3-none-manylinux2014_aarch64.whl", hash = "sha256:1fc150d5c3250b170b29410ba682384b14581db722b2531b0d8d33c595f33d01", size = 176238458 },
     { url = "https://files.pythonhosted.org/packages/4b/2a/0a131f572aa09f741c30ccd45a8e56316e8be8dfc7bc19bf0ab7cfef7b19/nvidia_nccl_cu12-2.20.5-py3-none-manylinux2014_x86_64.whl", hash = "sha256:057f6bf9685f75215d0c53bf3ac4a10b3e6578351de307abad9e18a99182af56", size = 176249402 },
 ]
 
@@ -1711,6 +1722,7 @@ version = "12.6.85"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9d/d7/c5383e47c7e9bf1c99d5bd2a8c935af2b6d705ad831a7ec5c97db4d82f4f/nvidia_nvjitlink_cu12-12.6.85-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:eedc36df9e88b682efe4309aa16b5b4e78c2407eac59e8c10a6a47535164369a", size = 19744971 },
+    { url = "https://files.pythonhosted.org/packages/31/db/dc71113d441f208cdfe7ae10d4983884e13f464a6252450693365e166dcf/nvidia_nvjitlink_cu12-12.6.85-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cf4eaa7d4b6b543ffd69d6abfb11efdeb2db48270d94dfd3a452c24150829e41", size = 19270338 },
 ]
 
 [[package]]
@@ -2069,6 +2081,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pybind11"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/83/698d120e257a116f2472c710932023ad779409adf2734d2e940f34eea2c5/pybind11-3.0.0.tar.gz", hash = "sha256:c3f07bce3ada51c3e4b76badfa85df11688d12c46111f9d242bc5c9415af7862", size = 544819 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/9c/85f50a5476832c3efc67b6d7997808388236ae4754bf53e1749b3bc27577/pybind11-3.0.0-py3-none-any.whl", hash = "sha256:7c5cac504da5a701b5163f0e6a7ba736c713a096a5378383c5b4b064b753f607", size = 292118 },
+]
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 source = { registry = "https://pypi.org/simple" }
@@ -2143,6 +2164,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/87/78/78793c753799de6f2
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d4/89/2f4aa73cccf12bec5179ac5d52a68b508120c838b7e5d456f5ea0c8beade/PyGSP-0.5.1-py2.py3-none-any.whl", hash = "sha256:884765260256f143a92053c420797053fda0f4eba1573471526fb4e62a4c4cde", size = 1829421 },
 ]
+
+[[package]]
+name = "pykeops"
+version = "2.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "keopscore" },
+    { name = "numpy" },
+    { name = "pybind11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/e1/3bb0af9916632e712cc0b0326679647d7452e626811dbc2b15b277add460/pykeops-2.3.tar.gz", hash = "sha256:458fa77985efd2161be9c719e8dd41e495526cd735d3262aec09902505f5bdba", size = 552155 }
 
 [[package]]
 name = "pymdown-extensions"
@@ -2786,6 +2818,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/63/1654275881bb550a6e6beebef4590aee702fce1cf3d12880b7da7091e248/torch-2.3.1-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:3d7a7f7ef21a7520510553dc3938b0c57c116a7daee20736a9e25cbc0e832bdc", size = 86933061 },
     { url = "https://files.pythonhosted.org/packages/19/b8/9f9f6b40d6b485f42ef560990e27722046d3bcd0ebcde47d54adc2d74432/torch-2.3.1-cp39-cp39-win_amd64.whl", hash = "sha256:4777f6cefa0c2b5fa87223c213e7b6f417cf254a45e5829be4ccd1b2a4ee1011", size = 159723492 },
     { url = "https://files.pythonhosted.org/packages/3e/17/d605f9b95078fb9a4a5d931480b5d35755dc8018349bf70c859f0be47c6d/torch-2.3.1-cp39-none-macosx_11_0_arm64.whl", hash = "sha256:2bb5af780c55be68fe100feb0528d2edebace1d55cb2e351de735809ba7391eb", size = 61003330 },
+]
+
+[[package]]
+name = "torchdr"
+version = "0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "torch" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3d/7e/6cf80d08d92d10cbe50dc31bc71bc215f0527d07cc8704df161dbea2e68d/torchdr-0.1.tar.gz", hash = "sha256:c50e89f6aa2cf008b450b1dd72330a38f12d08c35042ff948a4a34205542d93e", size = 1478029 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/ed/aafc373ba2fb738e5f9a850969e9eb3db63378225771229c21c831309c66/torchdr-0.1-py3-none-any.whl", hash = "sha256:ebb9fca5ab48e0af33f9d1d1103fdd13bd6d4805abad22f3736d2fc1bd2c9d6e", size = 74226 },
 ]
 
 [[package]]
