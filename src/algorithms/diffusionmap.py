@@ -3,7 +3,7 @@ from torch import Tensor
 from typing import Optional, Union
 import numpy as np
 
-from src.utils.diffusion_map import DiffusionMap
+from .diffusionmap_algorithm import DiffusionMap
 from .dimensionality_reduction import DimensionalityReductionModule
 
 class DiffusionMapModule(DimensionalityReductionModule):
