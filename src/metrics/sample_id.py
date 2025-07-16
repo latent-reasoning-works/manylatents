@@ -11,8 +11,6 @@ def sample_id(embeddings: np.ndarray,
     """
     Fetches sample IDs (for downstream analysis)
     """
-    import pdb
-    pdb.set_trace()
 
     if hasattr(dataset, 'metadata') and 'sample_id' in dataset.metadata:
         sample_ids = dataset.metadata['sample_id']
