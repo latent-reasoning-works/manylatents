@@ -223,7 +223,8 @@ class PlinkDataset(Dataset):
         else:
             # otherwise train on unrelated and test on the related individuals
             fit_idx = related_indices & filtered_indices & recent_migrant_filter & balanced_set
-            trans_idx = (~related_indices) & filtered_indices & recent_migrant_filter & balanced_set
+            #trans_idx = (~related_indices) & filtered_indices & recent_migrant_filter & balanced_set
+            trans_idx = filtered_indices & recent_migrant_filter & balanced_set
             
         logger.info(f"Fitting {fit_idx.sum()} points. Transforming {trans_idx.sum()} points")
 
