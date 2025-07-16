@@ -151,7 +151,7 @@ def main(project_name, output_dir):
     runs = api.runs(project_name)
 
     records = []
-    for run in tqdm(runs, desc="Processing W&B runs"):
+    for run in tqdm(runs, desc="Processing W&B runs from ManyLatents"):
         summary = run.summary._json_dict
         config_raw = {k: v for k, v in run.config.items() if not k.startswith("_")}
         name = run.name
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--project",
         type=str,
-        default="cesar-valdez-mcgill-university/manifold_genetics",
+        required=True,
         help="W&B project name in the form 'entity/project-name'",
     )
     parser.add_argument(
