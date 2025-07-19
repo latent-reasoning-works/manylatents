@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 from collections.abc import MutableMapping
 import wandb
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 # -------------------------
@@ -139,6 +140,43 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
 
     return out
 
+def process_run(run, artifact_dir):
+    try:
+        summary = run.summary._json_dict
+        config_raw = {k: v for k, v in run.config.items() if not k.startswith("_")}
+        name = run.name
+
+        config_flat = {}
+        for k, v in config_raw.items():
+            if isinstance(v, dict):
+                config_flat.update(flatten_dict(v, 
+                                                parent_key=f"config.{k}"))
+            else:
+                config_flat[f"config.{k}"] = v
+        summary_flat = flatten_dict(summary, 
+                                    parent_key="summary")
+        admix_Ks = parse_admixture_Ks(config_raw)
+
+        artifacts_info, artifact_paths = download_logged_artifacts(run, artifact_dir)
+
+        admix_metrics = {}
+        for _, safe_alias, dl_path in artifacts_info:
+            admix_metrics.update(extract_admix_from_artifact_dir(dl_path, 
+                                                                 admix_Ks))
+
+        record = {}
+        record.update(config_flat)
+        record.update(summary_flat)
+        record.update(artifact_paths)
+        record.update(admix_metrics)
+        record["name"] = name
+        record["run_id"] = run.id
+        record["run_path"] = "/".join(run.path)
+
+        return record
+    except Exception as e:
+        print(f"[!] Failed to process run {run.id}: {e}")
+        return None
 
 # -------------------------
 # Main
@@ -151,44 +189,21 @@ def main(project_name, output_dir):
     runs = api.runs(project_name)
 
     records = []
-    for run in tqdm(runs, desc="Processing W&B runs from ManyLatents"):
-        summary = run.summary._json_dict
-        config_raw = {k: v for k, v in run.config.items() if not k.startswith("_")}
-        name = run.name
+    
+    # Parallel processing of runs
+    max_workers = min(8, os.cpu_count() or 4)
+    records = []
 
-        # flatten config + summary
-        config_flat = {}
-        for k, v in config_raw.items():
-            if isinstance(v, dict):
-                config_flat.update(flatten_dict(v, parent_key=f"config.{k}"))
-            else:
-                config_flat[f"config.{k}"] = v
-        summary_flat = flatten_dict(summary, parent_key="summary")
-
-        # parse admixture Ks from config
-        admix_Ks = parse_admixture_Ks(config_raw)
-
-        # download artifacts + collect paths
-        artifacts_info, artifact_paths = download_logged_artifacts(run, artifact_dir)
-
-        # extract admixture preservation metrics from artifacts
-        admix_metrics = {}
-        for _art_obj, safe_alias, dl_path in artifacts_info:  
-            admix_metrics.update(extract_admix_from_artifact_dir(dl_path, 
-                                                                 admix_Ks, 
-                                                                 False))
-
-        # build record
-        record = {}
-        record.update(config_flat)
-        record.update(summary_flat)
-        record.update(artifact_paths)
-        record.update(admix_metrics)
-        record["name"] = name
-        record["run_id"] = run.id
-        record["run_path"] = "/".join(run.path)
-
-        records.append(record)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_run, 
+                                   run, 
+                                   artifact_dir) for run in runs]
+        for future in tqdm(as_completed(futures), 
+                           total=len(futures), 
+                           desc="Processing W&B runs"):
+            result = future.result()
+            if result:
+                records.append(result)
 
     df = pd.DataFrame(records)
     out_csv = os.path.join(output_dir, "wandb_runs.csv")
