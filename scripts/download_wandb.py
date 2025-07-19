@@ -115,7 +115,7 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
                 print(f"[admix found] {fpath} cols={admix_cols}")
 
             # choose first row; adjust if needed
-            row0 = df.iloc[0]
+            row0 = df #.iloc[0]
 
             for col in admix_cols:
                 val = row0[col]
@@ -131,7 +131,10 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
                     # otherwise, try broadcast scalar fallback
                     val = cand_vals
 
-                if isinstance(val, (list, tuple, np.ndarray)) and len(val) == len(admix_Ks):
+                if isinstance(val, (list, 
+                                    tuple, 
+                                    pd.Series,
+                                    np.ndarray)) and len(val) == len(admix_Ks):
                     for k, v in zip(admix_Ks, val):
                         out[f"admixture_preservation.{col}.{k}"] = v
                 else:
@@ -140,7 +143,7 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
 
     return out
 
-def process_run(run, artifact_dir):
+def process_run(run, artifact_dir, verbose):
     try:
         summary = run.summary._json_dict
         config_raw = {k: v for k, v in run.config.items() if not k.startswith("_")}
@@ -162,7 +165,8 @@ def process_run(run, artifact_dir):
         admix_metrics = {}
         for _, safe_alias, dl_path in artifacts_info:
             admix_metrics.update(extract_admix_from_artifact_dir(dl_path, 
-                                                                 admix_Ks))
+                                                                 admix_Ks,
+                                                                 verbose))
 
         record = {}
         record.update(config_flat)
@@ -181,7 +185,7 @@ def process_run(run, artifact_dir):
 # -------------------------
 # Main
 # -------------------------
-def main(project_name, output_dir):
+def main(project_name, output_dir, verbose):
     os.makedirs(output_dir, exist_ok=True)
     artifact_dir = os.path.join(output_dir, "artifacts")
 
@@ -197,7 +201,8 @@ def main(project_name, output_dir):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_run, 
                                    run, 
-                                   artifact_dir) for run in runs]
+                                   artifact_dir,
+                                   verbose) for run in runs]
         for future in tqdm(as_completed(futures), 
                            total=len(futures), 
                            desc="Processing W&B runs"):
@@ -231,5 +236,10 @@ if __name__ == "__main__":
         default="outputs/wandb_export",
         help="Directory to store output CSV and artifacts",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Verbose output",
+    )
     args = parser.parse_args()
-    main(args.project, args.output_dir)
+    main(args.project, args.output_dir, args.verbose)
