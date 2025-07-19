@@ -6,6 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 from collections.abc import MutableMapping
 import wandb
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 # -------------------------
@@ -114,7 +115,7 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
                 print(f"[admix found] {fpath} cols={admix_cols}")
 
             # choose first row; adjust if needed
-            row0 = df.iloc[0]
+            row0 = df #.iloc[0]
 
             for col in admix_cols:
                 val = row0[col]
@@ -130,7 +131,10 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
                     # otherwise, try broadcast scalar fallback
                     val = cand_vals
 
-                if isinstance(val, (list, tuple, np.ndarray)) and len(val) == len(admix_Ks):
+                if isinstance(val, (list, 
+                                    tuple, 
+                                    pd.Series,
+                                    np.ndarray)) and len(val) == len(admix_Ks):
                     for k, v in zip(admix_Ks, val):
                         out[f"admixture_preservation.{col}.{k}"] = v
                 else:
@@ -139,46 +143,31 @@ def extract_admix_from_artifact_dir(local_dir, admix_Ks, verbose=False):
 
     return out
 
-
-# -------------------------
-# Main
-# -------------------------
-def main(project_name, output_dir):
-    os.makedirs(output_dir, exist_ok=True)
-    artifact_dir = os.path.join(output_dir, "artifacts")
-
-    api = wandb.Api()
-    runs = api.runs(project_name)
-
-    records = []
-    for run in tqdm(runs, desc="Processing W&B runs from ManyLatents"):
+def process_run(run, artifact_dir, verbose):
+    try:
         summary = run.summary._json_dict
         config_raw = {k: v for k, v in run.config.items() if not k.startswith("_")}
         name = run.name
 
-        # flatten config + summary
         config_flat = {}
         for k, v in config_raw.items():
             if isinstance(v, dict):
-                config_flat.update(flatten_dict(v, parent_key=f"config.{k}"))
+                config_flat.update(flatten_dict(v, 
+                                                parent_key=f"config.{k}"))
             else:
                 config_flat[f"config.{k}"] = v
-        summary_flat = flatten_dict(summary, parent_key="summary")
-
-        # parse admixture Ks from config
+        summary_flat = flatten_dict(summary, 
+                                    parent_key="summary")
         admix_Ks = parse_admixture_Ks(config_raw)
 
-        # download artifacts + collect paths
         artifacts_info, artifact_paths = download_logged_artifacts(run, artifact_dir)
 
-        # extract admixture preservation metrics from artifacts
         admix_metrics = {}
-        for _art_obj, safe_alias, dl_path in artifacts_info:  
+        for _, safe_alias, dl_path in artifacts_info:
             admix_metrics.update(extract_admix_from_artifact_dir(dl_path, 
-                                                                 admix_Ks, 
-                                                                 False))
+                                                                 admix_Ks,
+                                                                 verbose))
 
-        # build record
         record = {}
         record.update(config_flat)
         record.update(summary_flat)
@@ -188,7 +177,38 @@ def main(project_name, output_dir):
         record["run_id"] = run.id
         record["run_path"] = "/".join(run.path)
 
-        records.append(record)
+        return record
+    except Exception as e:
+        print(f"[!] Failed to process run {run.id}: {e}")
+        return None
+
+# -------------------------
+# Main
+# -------------------------
+def main(project_name, output_dir, verbose):
+    os.makedirs(output_dir, exist_ok=True)
+    artifact_dir = os.path.join(output_dir, "artifacts")
+
+    api = wandb.Api()
+    runs = api.runs(project_name)
+
+    records = []
+    
+    # Parallel processing of runs
+    max_workers = min(8, os.cpu_count() or 4)
+    records = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_run, 
+                                   run, 
+                                   artifact_dir,
+                                   verbose) for run in runs]
+        for future in tqdm(as_completed(futures), 
+                           total=len(futures), 
+                           desc="Processing W&B runs"):
+            result = future.result()
+            if result:
+                records.append(result)
 
     df = pd.DataFrame(records)
     out_csv = os.path.join(output_dir, "wandb_runs.csv")
@@ -216,5 +236,10 @@ if __name__ == "__main__":
         default="outputs/wandb_export",
         help="Directory to store output CSV and artifacts",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Verbose output",
+    )
     args = parser.parse_args()
-    main(args.project, args.output_dir)
+    main(args.project, args.output_dir, args.verbose)
