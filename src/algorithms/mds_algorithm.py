@@ -103,6 +103,7 @@ class MultidimensionalScaling():
     def smacof(
             self,
             D,
+            metric=True,
             init=None,
             max_iter=3000,
             eps=1e-6,
@@ -144,7 +145,7 @@ class MultidimensionalScaling():
         Y, _ = manifold.smacof(
             D,
             n_components=self.ndim,
-            metric=self.how,
+            metric=metric,
             max_iter=max_iter,
             eps=eps,
             random_state=self.seed,

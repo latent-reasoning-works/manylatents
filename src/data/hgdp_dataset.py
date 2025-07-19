@@ -135,6 +135,7 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
         # Check if the index has the required name; if not, try to set it.
         if metadata.index.name is None or metadata.index.name.strip() != 'project_meta.sample_id':
             if 'project_meta.sample_id' in metadata.columns:
+                metadata['sample_id'] = metadata['project_meta.sample_id'] # store for future use
                 metadata = metadata.set_index('project_meta.sample_id')
             else:
                 raise ValueError("Missing required column: 'project_meta.sample_id' in metadata.")

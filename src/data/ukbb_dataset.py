@@ -134,6 +134,7 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
         # Check if the index has the required name; if not, try to set it.
         if metadata.index.name is None or metadata.index.name.strip() != 'IDs':
             if 'IDs' in metadata.columns:
+                metadata['sample_id'] = metadata['IDs']
                 metadata = metadata.set_index('IDs')
             else:
                 raise ValueError("Missing required column: 'IDs' in metadata.")

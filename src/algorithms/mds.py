@@ -2,7 +2,7 @@ import torch
 from torch import Tensor
 from typing import Optional, Union
 import numpy as np
-from src.utils.mds import MultidimensionalScaling
+from .mds_algorithm import MultidimensionalScaling
 from .dimensionality_reduction import DimensionalityReductionModule
 
 
