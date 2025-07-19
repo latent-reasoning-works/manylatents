@@ -249,7 +249,14 @@ def compute_ground_truth_preservation(ancestry_coords,
 
 
 ##############################################################################
-# 5) Example Aggregators
+# 5) Normalization helper
+##############################################################################
+def scale_embs(embs):
+    # Make sure each component is at the same level
+    return embs.values / np.abs(embs.values).max(axis=0)
+
+##############################################################################
+# 6) Example Aggregators
 ##############################################################################
 
 def compute_k_admixture_metric_dists(
@@ -268,7 +275,7 @@ def compute_k_admixture_metric_dists(
         key = f"admixture_preservation_k={k_val}"
 
         results[key] = compute_continental_admixture_metric_dists(
-            ancestry_coords,
+            scale_embs(ancestry_coords),
             admixture_ratios_k,
             population_label,
             use_medians=False,
@@ -292,17 +299,17 @@ def compute_quality_metrics(
     """
     metrics_dict = {
         "geographic_preservation": compute_geographic_metric(
-            ancestry_coords, latitude, longitude, 
+            scale_embs(ancestry_coords), latitude, longitude, 
             use_medians=False, only_far=False,
             subset_to_test_on=subset_to_test_on
         ),
         "geographic_preservation_medians": compute_geographic_metric(
-            ancestry_coords, latitude, longitude,
+            scale_embs(ancestry_coords), latitude, longitude,
             use_medians=True, only_far=False,
             subset_to_test_on=subset_to_test_on
         ),
         "geographic_preservation_far": compute_geographic_metric(
-            ancestry_coords, latitude, longitude,
+            scale_embs(ancestry_coords), latitude, longitude,
             use_medians=False, only_far=True,
             subset_to_test_on=subset_to_test_on
         ),
@@ -310,7 +317,7 @@ def compute_quality_metrics(
 
     # Admixture aggregator
     admixture_dict = compute_k_admixture_metric_dists(
-        ancestry_coords,
+        scale_embs(ancestry_coords),
         admixtures_k,
         admixture_ratios_list,
         population_label,
@@ -322,7 +329,7 @@ def compute_quality_metrics(
 
 
 ##############################################################################
-# 6) Single-Value Wrappers (conform to Metric(Protocol))
+# 7) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
 def GeographicPreservation(embeddings: np.ndarray,
@@ -335,7 +342,7 @@ def GeographicPreservation(embeddings: np.ndarray,
     #module = kwargs.pop('module', None)  # Pop but ignore or handle separately
 
     return compute_geographic_metric(
-        ancestry_coords=embeddings,
+        ancestry_coords=scale_embs(embeddings),
         latitude=dataset.latitude,
         longitude=dataset.longitude,
         subset_to_test_on=dataset.geographic_preservation_indices,
@@ -350,7 +357,7 @@ def AdmixturePreservation(embeddings: np.ndarray,
     Another single-value wrapper returning Spearman correlation.
     """
     return compute_continental_admixture_metric_dists(
-        ancestry_coords=embeddings,
+        ancestry_coords=scale_embs(embeddings),
         admixture_ratios=dataset.admixture_ratios['5'],
         population_label=dataset.population_label,
         **kwargs
@@ -367,7 +374,7 @@ def AdmixturePreservationK(embeddings: np.ndarray,
     return_vector = np.zeros(len(dataset.admixture_ratios))
     for i, key in enumerate(dataset.admixture_ratios.keys()):
         return_vector[i] = compute_continental_admixture_metric_dists(
-            ancestry_coords=embeddings,
+            ancestry_coords=scale_embs(embeddings),
             admixture_ratios=dataset.admixture_ratios[key],
             population_label=dataset.population_label,
             **kwargs
@@ -381,7 +388,7 @@ def AdmixtureLaplacian(embeddings: np.ndarray,
     Laplacian-based metric -> single float for callback usage.
     """
     return compute_continental_admixture_metric_laplacian(
-        ancestry_coords=embeddings,
+        ancestry_coords=scale_embs(embeddings),
         admixture_ratios=dataset.admixture_ratios
     )
 
@@ -399,6 +406,6 @@ def GroundTruthPreservation(embeddings: np.ndarray,
     if "use_medians" in kwargs:
         raise ValueError("'use_medians' argument is not allowed.")
 
-    return compute_ground_truth_preservation(embeddings,
+    return compute_ground_truth_preservation(scale_embs(embeddings),
                                              gt_dists,
                                              **kwargs)
