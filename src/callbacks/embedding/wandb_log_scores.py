@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 import wandb
+from wandb import Table
 from src.callbacks.embedding.base import EmbeddingCallback
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,10 @@ class WandbLogScores(EmbeddingCallback):
 
         # matches "foo__n_neighbors_15" etc.
         self._knn_re = re.compile(r"(?P<base>.+)__n_neighbors_(?P<k>\d+)$")
+        
+        # increase wandb table limit
+        Table.MAX_ROWS = 50_000            # rows shown in the run-dashboard copy
+        Table.MAX_ARTIFACT_ROWS = 500_000  # rows stored in the artifact copy
 
     def on_dr_end(self, dataset, embeddings: dict) -> dict:
         run = wandb.run
