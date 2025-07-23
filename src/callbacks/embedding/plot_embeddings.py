@@ -15,6 +15,7 @@ from src.data.ukbb_dataset import UKBBDataset
 from src.data.mhi_dataset import MHIDataset
 from src.utils.mappings import cmap_pop as cmap_pop_HGDP
 from src.utils.mappings import cmap_ukbb_superpops as cmap_pop_UKBB
+from src.utils.mappings import cmap_ukbb_pops as cmap_sire_UKBB
 from src.utils.mappings import cmap_mhi_superpops as cmap_pop_MHI
 
 logger = logging.getLogger(__name__)
@@ -67,18 +68,24 @@ class PlotEmbeddings(EmbeddingCallback):
         )
 
     def _get_colormap(self, dataset: any) -> any:
+        cmap = None
         if self.color_by_score == "tangent_space":
             # Define discrete colors for the two categories (adjust colors as needed)
             return ListedColormap(["#1f77b4", "#ff7f0e"])
         if self.color_by_score is not None:
             return "viridis"
         if isinstance(dataset, HGDPDataset):
-            cmap = cmap_pop_HGDP
+            if self.label_col == 'Population':
+                cmap = cmap_pop_HGDP
         elif isinstance(dataset, UKBBDataset):
-            cmap = cmap_pop_UKBB
+            if self.label_col == 'Population':
+                cmap = cmap_pop_UKBB
+            elif self.label_col == 'self_described_ancestry':
+                cmap = cmap_sire_UKBB
         elif isinstance(dataset, MHIDataset):
-            cmap = cmap_pop_MHI
-        else:
+            if self.label_col == 'Population':
+                cmap = cmap_pop_MHI
+        if not cmap:
             cmap = "viridis"
         return cmap
 
