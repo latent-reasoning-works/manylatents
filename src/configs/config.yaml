@@ -11,3 +11,4 @@ defaults:
 
 seed: 2
 debug: false
+project: ManyLatents
