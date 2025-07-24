@@ -111,10 +111,16 @@ def main(cfg: DictConfig):
         dr_module.fit(train_tensor)
         _embeddings = dr_module.transform(test_tensor)
         logger.info(f"DR embedding completed with shape: {_embeddings.shape}")
+
+        label_col = cfg.get('callbacks', {}).get('embedding', {}).get('plot_embeddings', {}).get('label_col')
+        if label_col is not None:
+            labels = getattr(datamodule.test_dataset, "get_labels", lambda: None)(label_col)
+        else:
+            labels = getattr(datamodule.test_dataset, "get_labels", lambda: None)()
         
         embeddings = {## conforms to EmbeddingOutputs interface
             "embeddings": _embeddings,
-            "label": getattr(datamodule.test_dataset, "get_labels", lambda: None)(),
+            "label": labels,
             "metadata": {"source": "DR", "data_shape": test_tensor.shape},
         }
         logger.info("Evaluating embeddings (from DR output)...")

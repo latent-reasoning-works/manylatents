@@ -68,7 +68,7 @@ class PlotEmbeddings(EmbeddingCallback):
         )
 
     def _get_colormap(self, dataset: any) -> any:
-        cmap = None
+        cmap = "viridis"
         if self.color_by_score == "tangent_space":
             # Define discrete colors for the two categories (adjust colors as needed)
             return ListedColormap(["#1f77b4", "#ff7f0e"])
@@ -85,8 +85,6 @@ class PlotEmbeddings(EmbeddingCallback):
         elif isinstance(dataset, MHIDataset):
             if self.label_col == 'Population':
                 cmap = cmap_pop_MHI
-        if not cmap:
-            cmap = "viridis"
         return cmap
 
     def _get_embeddings(self, embeddings: dict) -> np.ndarray:
