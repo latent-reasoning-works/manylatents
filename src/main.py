@@ -45,7 +45,7 @@ def main(cfg: DictConfig):
         wandb.init(mode="disabled")
     else:
         wandb.init(
-            project="ManyLatents",
+            project=cfg.project,
             name=cfg.name,
             config=OmegaConf.to_container(cfg, resolve=True),
         )
