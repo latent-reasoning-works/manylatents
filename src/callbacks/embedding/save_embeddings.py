@@ -71,7 +71,7 @@ class SaveEmbeddings(EmbeddingCallback):
 
         logger.info(f"Saved embeddings successfully to {self.save_path}")
 
-    def on_dr_end(self, dataset: any, embeddings: dict) -> str:
+    def on_latent_end(self, dataset: any, embeddings: dict) -> str:
         self.save_embeddings(embeddings)
         self.register_output("saved_embeddings", self.save_path)
 

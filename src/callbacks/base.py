@@ -12,8 +12,8 @@ class BaseCallback(ABC):
         """Called at the end of the experiment."""
         pass
 
-    def on_dr_end(self, original_data, embeddings) -> None:
-        """Called when DR processing completes."""
+    def on_latent_end(self, original_data, embeddings) -> None:
+        """Called when latent processing completes."""
         pass
 
     def on_training_start(self) -> None:

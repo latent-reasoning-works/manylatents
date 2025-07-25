@@ -40,9 +40,9 @@ class EmbeddingCallback(BaseCallback, ABC):
         logger.info(f"Output registered under key: {key}")
 
     @abstractmethod
-    def on_dr_end(self, dataset: Any, embeddings: EmbeddingOutputs) -> Any:
+    def on_latent_end(self, dataset: Any, embeddings: EmbeddingOutputs) -> Any:
         """
-        Called when the Dimensionality Reduction process is complete.
+        Called when the latent process is complete.
         
         Args:
             dataset (Any): A dataset object that exposes properties/methods 

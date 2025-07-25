@@ -31,7 +31,7 @@ class WandbLogScores(EmbeddingCallback):
         # matches "foo__n_neighbors_15" etc.
         self._knn_re = re.compile(r"(?P<base>.+)__n_neighbors_(?P<k>\d+)$")
 
-    def on_dr_end(self, dataset, embeddings: dict) -> dict:
+    def on_latent_end(self, dataset, embeddings: dict) -> dict:
         run = wandb.run
         if run is None:
             return {}

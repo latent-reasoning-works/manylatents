@@ -61,9 +61,9 @@ def main(cfg: DictConfig):
     
     # --- Algorithm modules ---
     if not cfg.eval_only:
-        dr_module, lightning_module = instantiate_algorithm(cfg, datamodule)
+        latent_module, lightning_module = instantiate_algorithm(cfg, datamodule)
     else:
-        dr_module, lightning_module = None, None
+        latent_module, lightning_module = None, None
 
     # --- Callbacks ---
     trainer_cb_cfg   = cfg.trainer.get("callbacks", {})
@@ -92,10 +92,10 @@ def main(cfg: DictConfig):
     
     logger.info("Starting the experiment pipeline...")
         
-    # --- DR Embedding Computation ---
+    # --- Latent Embedding Computation ---
     embeddings: dict = {}
     if cfg.eval_only:
-        logger.info("Evaluation-only mode (DR): Loading precomputed DR outputs.")
+        logger.info("Evaluation-only mode (Latent): Loading precomputed latent outputs.")
         embeddings = load_precomputed_embeddings(cfg)
     elif "latent_module" in cfg.algorithm and cfg.algorithm.latent_module is not None:
         # Unroll train and test dataloaders to obtain tensors.
@@ -103,26 +103,26 @@ def main(cfg: DictConfig):
         train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
         test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
         logger.info(
-            f"Running Dimensionality Reduction (DR) {data_source}:\n"
+            f"Running Latent Module {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
         )
         ## fit, transform ops
-        dr_module.fit(train_tensor)
-        _embeddings = dr_module.transform(test_tensor)
-        logger.info(f"DR embedding completed with shape: {_embeddings.shape}")
+        latent_module.fit(train_tensor)
+        _embeddings = latent_module.transform(test_tensor)
+        logger.info(f"Latent embedding completed with shape: {_embeddings.shape}")
         
         embeddings = {## conforms to EmbeddingOutputs interface
             "embeddings": _embeddings,
             "label": getattr(datamodule.test_dataset, "get_labels", lambda: None)(),
-            "metadata": {"source": "DR", "data_shape": test_tensor.shape},
+            "metadata": {"source": "Latent", "data_shape": test_tensor.shape},
         }
-        logger.info("Evaluating embeddings (from DR output)...")
+        logger.info("Evaluating embeddings (from Latent output)...")
         embeddings["scores"] = evaluate(
             embeddings,
             cfg=cfg,
             datamodule=datamodule,
-            module=dr_module
+            module=latent_module
         ) 
         
     # --- Neural Network (Lightning) setup and evaluation ---
@@ -171,17 +171,17 @@ def main(cfg: DictConfig):
             datamodule=datamodule,
         )
     # --- merge embeddings scores from DR and NN, if available ---
-    dr_scores     = embeddings.get("scores", {})
-    latent_scores = latent_embeddings.get("scores", {})
-    embedding_metrics = {**dr_scores, **latent_scores}
+    latent_scores     = embeddings.get("scores", {})
+    latent_embeddings_scores = latent_embeddings.get("scores", {})
+    embedding_metrics = {**latent_scores, **latent_embeddings_scores}
 
-    for tag, embed_dict in (("dr", embeddings), ("latent", latent_embeddings)):
+    for tag, embed_dict in (("latent", embeddings), ("latent", latent_embeddings)):
         if not embed_dict:
             continue
         outputs = dict(embed_dict)
         outputs["metrics"] = embedding_metrics
         for cb in embedding_cbs:
-            cb.on_dr_end(dataset=datamodule.test_dataset, embeddings=outputs)
+            cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=outputs)
 
     logger.info("Experiment complete.")
     
@@ -191,15 +191,15 @@ def main(cfg: DictConfig):
     return
 
 def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[LatentModule], Optional[LightningModule]]:
-    dr_module = None
+    latent_module = None
     lightning_module = None
 
     if "latent_module" in cfg.algorithm and cfg.algorithm.latent_module is not None:
-        dr_cfg = cfg.algorithm.latent_module
-        if "_target_" not in dr_cfg:
+        latent_cfg = cfg.algorithm.latent_module
+        if "_target_" not in latent_cfg:
             raise ValueError("Missing _target_ in latent_module config")
-        logger.info(f"Instantiating Latent Module: {dr_cfg._target_.split('.')[-1]}")
-        dr_module = hydra.utils.instantiate(dr_cfg)
+        logger.info(f"Instantiating Latent Module: {latent_cfg._target_.split('.')[-1]}")
+        latent_module = hydra.utils.instantiate(latent_cfg)
 
     if "model" in cfg.algorithm and cfg.algorithm.model is not None:
         model_cfg = cfg.algorithm.model
@@ -208,7 +208,7 @@ def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[LatentM
         if not isinstance(lightning_module, LightningModule):
             raise TypeError(f"Model must be a LightningModule, got {type(lightning_module)}")
     
-    return dr_module, lightning_module
+    return latent_module, lightning_module
 
 def instantiate_model(cfg_model, datamodule):
     if isinstance(cfg_model, (dict)) or OmegaConf.is_config(cfg_model):

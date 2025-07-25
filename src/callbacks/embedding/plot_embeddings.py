@@ -191,7 +191,7 @@ class PlotEmbeddings(EmbeddingCallback):
             wandb.log({"embedding_plot": wandb.Image(self.save_path)})
         return self.save_path
 
-    def on_dr_end(self, dataset: any, embeddings: dict) -> str:
+    def on_latent_end(self, dataset: any, embeddings: dict) -> str:
         emb2d = self._get_embeddings(embeddings)
         colors = self._get_color_array(dataset, embeddings)
         path = self._plot_embeddings(dataset, emb2d, colors)
