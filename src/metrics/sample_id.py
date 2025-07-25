@@ -1,12 +1,12 @@
 import logging
 import numpy as np
 from typing import Optional
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 logger = logging.getLogger(__name__)
 
 def sample_id(embeddings: np.ndarray, 
               dataset, 
-              module: Optional[DimensionalityReductionModule] = None,
+              module: Optional[LatentModule] = None,
               random_state=42):  
     """
     Fetches sample IDs (for downstream analysis)

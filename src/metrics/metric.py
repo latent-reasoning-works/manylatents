@@ -2,14 +2,14 @@ from typing import Optional, Protocol
 
 import numpy as np
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 
 class Metric(Protocol):
     def __call__(self, 
                  embeddings: np.ndarray, 
                  dataset: Optional[object] = None, 
-                 module: Optional[DimensionalityReductionModule] = None
+                 module: Optional[LatentModule] = None
             ) -> float:
         ...
     

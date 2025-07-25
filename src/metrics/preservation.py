@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import spearmanr
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 from src.utils.metrics import (
     compute_average_smoothness,
     compute_geodesic_distances,
@@ -327,7 +327,7 @@ def compute_quality_metrics(
 
 def GeographicPreservation(embeddings: np.ndarray,
                            dataset, 
-                           module: Optional[DimensionalityReductionModule] = None,
+                           module: Optional[LatentModule] = None,
                            **kwargs) -> float:
     """
     Minimal wrapper that passes extra keyword arguments to compute_geographic_metric.
@@ -344,7 +344,7 @@ def GeographicPreservation(embeddings: np.ndarray,
 
 def AdmixturePreservation(embeddings: np.ndarray,
                           dataset, 
-                          module: Optional[DimensionalityReductionModule] = None,
+                          module: Optional[LatentModule] = None,
                           **kwargs) -> float:
     """
     Another single-value wrapper returning Spearman correlation.
@@ -358,7 +358,7 @@ def AdmixturePreservation(embeddings: np.ndarray,
 
 def AdmixturePreservationK(embeddings: np.ndarray,
                            dataset, 
-                           module: Optional[DimensionalityReductionModule] = None,
+                           module: Optional[LatentModule] = None,
                            **kwargs) -> np.array:
     """
     A vector-value wrapper returning admixture preservation scores for all Ks.
@@ -376,7 +376,7 @@ def AdmixturePreservationK(embeddings: np.ndarray,
 
 def AdmixtureLaplacian(embeddings: np.ndarray,
                        dataset, 
-                       module: Optional[DimensionalityReductionModule] = None) -> float:
+                       module: Optional[LatentModule] = None) -> float:
     """
     Laplacian-based metric -> single float for callback usage.
     """
@@ -387,7 +387,7 @@ def AdmixtureLaplacian(embeddings: np.ndarray,
 
 def GroundTruthPreservation(embeddings: np.ndarray, 
                             dataset, 
-                            module: Optional[DimensionalityReductionModule] = None,
+                            module: Optional[LatentModule] = None,
                             **kwargs) -> float:
     """
     Computes preservation of embedding distance versus ground truth distance (on synthetic data)

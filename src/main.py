@@ -8,7 +8,7 @@ from lightning import LightningModule
 from omegaconf import DictConfig, OmegaConf
 
 import wandb
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 from src.configs import register_configs
 from src.experiment import (
     evaluate,
@@ -97,7 +97,7 @@ def main(cfg: DictConfig):
     if cfg.eval_only:
         logger.info("Evaluation-only mode (DR): Loading precomputed DR outputs.")
         embeddings = load_precomputed_embeddings(cfg)
-    elif "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
+    elif "latent_module" in cfg.algorithm and cfg.algorithm.latent_module is not None:
         # Unroll train and test dataloaders to obtain tensors.
         ### To be replaced with a more efficient method.
         train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
@@ -190,15 +190,15 @@ def main(cfg: DictConfig):
         
     return
 
-def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[DimensionalityReductionModule], Optional[LightningModule]]:
+def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[LatentModule], Optional[LightningModule]]:
     dr_module = None
     lightning_module = None
 
-    if "dimensionality_reduction" in cfg.algorithm and cfg.algorithm.dimensionality_reduction is not None:
-        dr_cfg = cfg.algorithm.dimensionality_reduction
+    if "latent_module" in cfg.algorithm and cfg.algorithm.latent_module is not None:
+        dr_cfg = cfg.algorithm.latent_module
         if "_target_" not in dr_cfg:
-            raise ValueError("Missing _target_ in dimensionality_reduction config")
-        logger.info(f"Instantiating Dimensionality Reduction: {dr_cfg._target_.split('.')[-1]}")
+            raise ValueError("Missing _target_ in latent_module config")
+        logger.info(f"Instantiating Latent Module: {dr_cfg._target_.split('.')[-1]}")
         dr_module = hydra.utils.instantiate(dr_cfg)
 
     if "model" in cfg.algorithm and cfg.algorithm.model is not None:

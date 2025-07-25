@@ -3,10 +3,10 @@ import torch
 from sklearn.decomposition import PCA
 from torch import Tensor
 
-from .dimensionality_reduction import DimensionalityReductionModule
+from .latent_module_base import LatentModule
 
 
-class PCAModule(DimensionalityReductionModule):
+class PCAModule(LatentModule):
     def __init__(self, 
                  n_components: int = 2, 
                  random_state: int = 42, 

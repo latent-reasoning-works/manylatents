@@ -4,9 +4,9 @@ from typing import Optional, Union
 import numpy as np
 
 from .diffusionmap_algorithm import DiffusionMap
-from .dimensionality_reduction import DimensionalityReductionModule
+from .latent_module_base import LatentModule
 
-class DiffusionMapModule(DimensionalityReductionModule):
+class DiffusionMapModule(LatentModule):
     def __init__(
         self,
         n_components: int = 2,

@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 from scipy.linalg import svd
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 def affinity_spectrum(embeddings: np.ndarray, kernel_matrix: np.ndarray, top_k: int = 25) -> np.ndarray:
     """
@@ -40,7 +40,7 @@ def affinity_spectrum(embeddings: np.ndarray, kernel_matrix: np.ndarray, top_k: 
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def AffinitySpectrum(dataset, embeddings: np.ndarray, module: DimensionalityReductionModule, top_k: int = 25) -> np.ndarray:
+def AffinitySpectrum(dataset, embeddings: np.ndarray, module: LatentModule, top_k: int = 25) -> np.ndarray:
     kernel_matrix = getattr(module, "kernel_matrix", None)
     if kernel_matrix is None:
         warnings.warn(

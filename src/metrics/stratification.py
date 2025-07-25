@@ -3,12 +3,12 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from typing import Optional
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 logger = logging.getLogger(__name__)
 
 def kmeans_stratification(embeddings: np.ndarray, 
                         dataset, 
-                        module: Optional[DimensionalityReductionModule] = None,
+                        module: Optional[LatentModule] = None,
                         random_state=42):  
     """
     Computes the Adjusted Rand Index (ARI) between the KMeans clustering labels and the provided dataset labels.

@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 import networkx as nx
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 def connected_components(embeddings: np.ndarray, kernel_matrix: np.ndarray) -> list:
     """
@@ -24,7 +24,7 @@ def connected_components(embeddings: np.ndarray, kernel_matrix: np.ndarray) -> l
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def ConnectedComponents(dataset, embeddings: np.ndarray, module: DimensionalityReductionModule) -> np.ndarray:
+def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule) -> np.ndarray:
     kernel_matrix = getattr(module, "kernel_matrix", None)
     if kernel_matrix is None:
         warnings.warn(

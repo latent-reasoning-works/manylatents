@@ -4,12 +4,12 @@ import numpy as np
 import torch
 from sklearn.metrics import pairwise_distances
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 
 def Continuity(embeddings: np.ndarray,
                dataset: Optional[object] = None,
-               module: Optional[DimensionalityReductionModule] = None,
+               module: Optional[LatentModule] = None,
                n_neighbors: int = 25,
                metric: str = 'euclidean',
                return_per_sample: bool = False,

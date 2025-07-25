@@ -2,10 +2,10 @@ import torch
 from archetypes import AA
 from torch import Tensor
 
-from .dimensionality_reduction import DimensionalityReductionModule
+from .latent_module_base import LatentModule
 
 
-class ArchetypalAnalysisModule(DimensionalityReductionModule):
+class ArchetypalAnalysisModule(LatentModule):
     def __init__(
         self,
         n_components: int = 3,

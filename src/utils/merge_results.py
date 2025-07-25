@@ -51,8 +51,8 @@ def add_config_to_df(df: pd.DataFrame, config_path: Path, sections: List[str]) -
         if section_cfg is not None:
             flat_cfg = flatten_omegaconf(section_cfg, section)
             for key, value in flat_cfg.items():
-                if key == "algorithm.dimensionality_reduction._target_":
-                    key = "algorithm.dimensionality_reduction.method"
+                if key == "algorithm.latent_module._target_":
+                    key = "algorithm.latent_module.method"
                 if key.endswith("._partial_") or key.endswith("._target_") or key.endswith(".verbose") or key.endswith(".n_jobs"):
                     continue
                 parts = key.split(".")
@@ -129,7 +129,7 @@ def main():
         type=str,
         nargs='*',
         default=[
-            "algorithm.dimensionality_reduction",
+            "algorithm.latent_module",
             "metrics.embedding.trustworthiness",
         ],
         help="Config sections to extract (default: the four main ones)"

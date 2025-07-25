@@ -6,10 +6,10 @@ import torch
 from torch import Tensor
 from umap import UMAP
 
-from .dimensionality_reduction import DimensionalityReductionModule
+from .latent_module_base import LatentModule
 
 
-class UMAPModule(DimensionalityReductionModule):
+class UMAPModule(LatentModule):
     def __init__(
         self,
         n_components: int = 2,

@@ -3,10 +3,10 @@ from torch import Tensor
 from typing import Optional, Union
 import numpy as np
 from .mds_algorithm import MultidimensionalScaling
-from .dimensionality_reduction import DimensionalityReductionModule
+from .latent_module_base import LatentModule
 
 
-class MDSModule(DimensionalityReductionModule):
+class MDSModule(LatentModule):
     def __init__(
         self,
         ndim: int = 2,

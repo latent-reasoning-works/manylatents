@@ -4,7 +4,7 @@ from omegaconf import OmegaConf
 from .config import Config
 
 ## doesn't currently import algos, networks, 
-## dimensionality_reduction or datamodules, to be completed.
+## latent modules or datamodules, to be completed.
 
 def register_configs():
     cs = ConfigStore.instance()

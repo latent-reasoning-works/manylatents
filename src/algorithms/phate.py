@@ -6,10 +6,10 @@ import torch
 from phate import PHATE
 from torch import Tensor
 
-from .dimensionality_reduction import DimensionalityReductionModule
+from .latent_module_base import LatentModule
 
 
-class PHATEModule(DimensionalityReductionModule):
+class PHATEModule(LatentModule):
     def __init__(
         self,
         n_components: int = 2,

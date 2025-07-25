@@ -4,12 +4,12 @@ import numpy as np
 import torch
 from sklearn.manifold import trustworthiness as sk_trustworthiness
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 
 def Trustworthiness(embeddings: np.ndarray, 
                     dataset: object, 
-                    module: Optional[DimensionalityReductionModule] = None,
+                    module: Optional[LatentModule] = None,
                     n_neighbors: int = 25, 
                     metric: str = 'euclidean') -> float:
     """

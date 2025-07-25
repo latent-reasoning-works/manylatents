@@ -2,12 +2,12 @@ from typing import Optional
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 def KNNPreservation(
     embeddings: np.ndarray,
     dataset,
-    module: Optional[DimensionalityReductionModule] = None,
+    module: Optional[LatentModule] = None,
     n_neighbors: int = 10,
     metric: str = 'euclidean') -> float:
     """

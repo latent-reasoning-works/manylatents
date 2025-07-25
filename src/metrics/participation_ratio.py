@@ -5,13 +5,13 @@ import numpy as np
 import torch
 from sklearn.neighbors import NearestNeighbors
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 logger = logging.getLogger(__name__)
 
 def ParticipationRatio(embeddings: np.ndarray,
                        dataset: Optional[object] = None,
-                       module: Optional[DimensionalityReductionModule] = None,
+                       module: Optional[LatentModule] = None,
                        n_neighbors: int = 25,
                        return_per_sample: bool = False) -> Union[float, np.ndarray]:
     """

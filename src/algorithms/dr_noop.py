@@ -1,9 +1,9 @@
 from torch import Tensor
 
-from src.algorithms.dimensionality_reduction import DimensionalityReductionModule
+from src.algorithms.latent_module_base import LatentModule
 
 
-class NoOpModule(DimensionalityReductionModule):
+class NoOpModule(LatentModule):
     def __init__(self):
         super().__init__(n_components=0, init_seed=42)
         self._is_fitted = True 
