@@ -1,9 +1,11 @@
 
 from hydra_zen import builds, store
+import inspect
 
 from .pca import PCAModule
 from .phate import PHATEModule
 from .tsne import TSNEModule
+from .latent_module_base import LatentModule
 
 algorithm_store = store(group="algorithm")
 
@@ -36,3 +38,12 @@ tsne_config = builds(
     populate_full_signature=True
 )
 algorithm_store(tsne_config, name="tsne")
+
+
+def get_all_latent_modules():
+    """Return all LatentModule subclasses defined in this package (excluding the base)."""
+    modules = []
+    for name, obj in globals().items():
+        if inspect.isclass(obj) and issubclass(obj, LatentModule) and obj is not LatentModule:
+            modules.append(obj)
+    return modules
