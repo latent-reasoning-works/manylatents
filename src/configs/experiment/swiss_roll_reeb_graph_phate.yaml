@@ -1,0 +1,13 @@
+# @package _global_
+
+defaults:
+  - override /algorithm/dimensionality_reduction: phate
+  - override /data: swissroll
+  - override /metrics:
+      - reeb_graph
+
+seed: 42
+
+algorithm:
+  dimensionality_reduction:
+    n_components: 2
