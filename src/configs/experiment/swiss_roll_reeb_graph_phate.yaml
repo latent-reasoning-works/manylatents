@@ -1,13 +1,24 @@
 # @package _global_
-
 defaults:
+  - /callbacks/embedding/reeb_graph_visualization
   - override /algorithm/dimensionality_reduction: phate
   - override /data: swissroll
-  - override /metrics:
-      - reeb_graph
+  - override /callbacks/embedding: default
+  - override /metrics: reeb_graph
 
 seed: 42
 
 algorithm:
   dimensionality_reduction:
     n_components: 2
+    knn: 10
+    t: 2
+    n_pca: 50
+
+callbacks:
+  embedding:
+    reeb_graph_visualization:
+      figsize: [8, 6]
+
+metrics:
+  n_bins: 15

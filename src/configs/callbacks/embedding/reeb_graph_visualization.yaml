@@ -1,0 +1,3 @@
+reeb_graph_visualization:
+  _target_: src.callbacks.embedding.reeb_graph_visualization.ReebGraphVisualizationCallback
+  figsize: [8, 6]

@@ -131,7 +131,7 @@ def ReebGraphNodesEdges(
 
     logger.info(f"ReebGraphNodesEdges computed with {len(nodes)} nodes and {len(edges)} edges.")
 
-    return {'nodes': nodes, 'edges': edges}
+    return {'nodes': nodes, 'edges': edges, 'graph': G}
 
 
 
