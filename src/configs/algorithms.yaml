@@ -1,0 +1,5 @@
+# Algorithms configuration using the new compose-once pattern
+algorithms:
+  - _target_: src.algorithms.pca.PCAModule
+    n_components: 2
+    random_state: 42 

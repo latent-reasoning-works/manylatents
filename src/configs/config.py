@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 
 @dataclass
@@ -10,8 +10,8 @@ class Config:
     This class defines the structure of the Hydra configuration for the experiment.
     """
 
-    algorithm: Any
-    """Configuration for the algorithm (a LightningModule)."""
+    algorithms: List[Any] = field(default_factory=list)
+    """Configuration for algorithms (list of LatentModule or LightningModule instances)."""
 
     data: Optional[Any] = None
     """Configuration for the data (dataset + transforms + dataloader creation)."""

@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Dict, Any, List
 
 import hydra
 import lightning
@@ -27,16 +27,15 @@ logger = logging.getLogger(__name__)
 register_configs()
 
 @hydra.main(config_path="../src/configs", config_name="config", version_base=None)
-def main(cfg: DictConfig):
+def main(cfg: DictConfig) -> Dict[str, Any]:
     """
     Main entry point:
-      - Instantiates datamodule, algorithm, and trainer as needed.
-      - Computes embeddings either via DR or via a neural network’s encoder.
-      - Runs training and evaluation.      
+      - Instantiates datamodule, algorithms, and trainer as needed.
+      - Computes embeddings through a unified latent module interface.
+      - Runs training and evaluation.
       
-    This version builds a unified embedding container (a dict with at least "embeddings")
-    that is passed to a unified evaluate() routine (registered for dict types) to compute
-    dataset-level and module-level metrics.
+    Returns:
+        A dictionary with keys: embeddings, label, metadata, scores
     """
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
@@ -60,11 +59,8 @@ def main(cfg: DictConfig):
     field_index, data_source = determine_data_source(train_loader)
     
     # --- Algorithm modules ---
-    if not cfg.eval_only:
-        latent_module, lightning_module = instantiate_algorithm(cfg, datamodule)
-    else:
-        latent_module, lightning_module = None, None
-
+    algorithms = instantiate_algorithms(cfg, datamodule)
+    
     # --- Callbacks ---
     trainer_cb_cfg   = cfg.trainer.get("callbacks", {})
     embedding_cb_cfg = cfg.get("callbacks", {}).get("embedding", {})
@@ -93,129 +89,149 @@ def main(cfg: DictConfig):
     logger.info("Starting the experiment pipeline...")
         
     # --- Latent Embedding Computation ---
-    embeddings: dict = {}
+    embeddings: Dict[str, Any] = {}
+    
     if cfg.eval_only:
-        logger.info("Evaluation-only mode (Latent): Loading precomputed latent outputs.")
+        logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
         embeddings = load_precomputed_embeddings(cfg)
-    elif "latent_module" in cfg.algorithm and cfg.algorithm.latent_module is not None:
-        # Unroll train and test dataloaders to obtain tensors.
-        ### To be replaced with a more efficient method.
+    else:
+        # Unroll train and test dataloaders to obtain tensors
         train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
         test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
+        
         logger.info(
-            f"Running Latent Module {data_source}:\n"
+            f"Running Latent Algorithms on {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
             f"Test tensor shape: {test_tensor.shape}"
         )
-        ## fit, transform ops
-        latent_module.fit(train_tensor)
-        _embeddings = latent_module.transform(test_tensor)
-        logger.info(f"Latent embedding completed with shape: {_embeddings.shape}")
         
-        embeddings = {## conforms to EmbeddingOutputs interface
-            "embeddings": _embeddings,
-            "label": getattr(datamodule.test_dataset, "get_labels", lambda: None)(),
-            "metadata": {"source": "Latent", "data_shape": test_tensor.shape},
-        }
-        logger.info("Evaluating embeddings (from Latent output)...")
-        embeddings["scores"] = evaluate(
-            embeddings,
-            cfg=cfg,
-            datamodule=datamodule,
-            module=latent_module
-        ) 
-        
-    # --- Neural Network (Lightning) setup and evaluation ---
-    model_metrics, model_error = None, None
-    if cfg.algorithm.get("model"):
-        if cfg.eval_only and cfg.pretrained_ckpt: ## load from checkpoint if supplied
-            logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
-            lightning_module = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-        else: ## else instantiate a new model from its config
-            lightning_module = hydra.utils.instantiate(
-                cfg.algorithm.model, datamodule=datamodule
+        # Process each algorithm
+        for i, algorithm in enumerate(algorithms):
+            if isinstance(algorithm, LatentModule):
+                logger.info(f"Processing algorithm {i+1}/{len(algorithms)}: {type(algorithm).__name__}")
+                
+                # Fit and transform
+                algorithm.fit(train_tensor)
+                _embeddings = algorithm.transform(test_tensor)
+                logger.info(f"Algorithm {type(algorithm).__name__} embedding shape: {_embeddings.shape}")
+                
+                # Create embedding output
+                algorithm_embeddings = {
+                    "embeddings": _embeddings,
+                    "label": getattr(datamodule.test_dataset, "get_labels", lambda: None)(),
+                    "metadata": {
+                        "source": f"algorithm_{i+1}", 
+                        "algorithm_type": type(algorithm).__name__,
+                        "data_shape": test_tensor.shape
+                    },
+                }
+                
+                # Evaluate embeddings
+                logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
+                algorithm_embeddings["scores"] = evaluate(
+                    algorithm_embeddings,
+                    cfg=cfg,
+                    datamodule=datamodule,
+                    module=algorithm
                 )
                 
+                # Use the first algorithm's output as the main result
+                if not embeddings:
+                    embeddings = algorithm_embeddings
+                else:
+                    # Merge scores from multiple algorithms
+                    embeddings["scores"].update(algorithm_embeddings["scores"])
+    
+    # --- Neural Network processing (if any algorithms are LightningModules) ---
+    lightning_modules = [alg for alg in algorithms if isinstance(alg, LightningModule)]
+    
+    for lightning_module in lightning_modules:
+        if cfg.eval_only and cfg.pretrained_ckpt:
+            logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
+            lightning_module = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
+        
         if not cfg.eval_only:
             logger.info("Running training...")
             trainer.fit(lightning_module, datamodule=datamodule)
         
         logger.info("Running model evaluation.")
-        model_metrics, model_error = evaluate(
+        evaluation_result = evaluate(
             lightning_module,
             cfg=cfg,
             trainer=trainer,
             datamodule=datamodule,
         )
+        
+        # Handle different return types from evaluate
+        if isinstance(evaluation_result, tuple):
+            model_metrics, model_error = evaluation_result
+        else:
+            model_metrics, model_error = evaluation_result, None
+            
         logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
         
-    # --- Additional Evaluation for Latent Embeddings from the NN (if available) ---
-    latent_embeddings: dict = {}
-    if lightning_module and hasattr(lightning_module, "encode"):
-        logger.info("Extracting latent embeddings using the network's encoder...")
-        test_tensor = torch.cat([b["data"].cpu() for b in test_loader], dim=0)
-        latents = lightning_module.encode(test_tensor)
-        latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+        # Extract latent embeddings from the network's encoder if available
+        if hasattr(lightning_module, "encode"):
+            logger.info("Extracting latent embeddings using the network's encoder...")
+            test_tensor = torch.cat([b["data"].cpu() for b in test_loader], dim=0)
+            latents = lightning_module.encode(test_tensor)
+            latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+                
+            logger.info(f"Latent embeddings shape: {latents.shape}")
+            nn_embeddings = {
+                "embeddings": latents,
+                "label": datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None,
+                "metadata": {"source": "neural_network", "data_shape": test_tensor.shape},
+            }
             
-        logger.info(f"Latent embeddings shape: {latents.shape}")
-        latent_embeddings = {## conforms to EmbeddingOutputs interface
-            "embeddings": latents,
-            "label": datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None,
-            "metadata": {"source": "latent", "data_shape": test_tensor.shape},
-        }
-        
-        logger.info("Evaluating embeddings (from encoder output)...")
-        latent_embeddings["scores"] = evaluate(
-            latent_embeddings,
-            cfg=cfg,
-            datamodule=datamodule,
-        )
-    # --- merge embeddings scores from DR and NN, if available ---
-    latent_scores     = embeddings.get("scores", {})
-    latent_embeddings_scores = latent_embeddings.get("scores", {})
-    embedding_metrics = {**latent_scores, **latent_embeddings_scores}
+            logger.info("Evaluating embeddings (from encoder output)...")
+            nn_embeddings["scores"] = evaluate(
+                nn_embeddings,
+                cfg=cfg,
+                datamodule=datamodule,
+            )
+            
+            # Merge scores
+            if embeddings:
+                embeddings["scores"].update(nn_embeddings["scores"])
+            else:
+                embeddings = nn_embeddings
 
-    for tag, embed_dict in (("latent", embeddings), ("latent", latent_embeddings)):
-        if not embed_dict:
-            continue
-        outputs = dict(embed_dict)
-        outputs["metrics"] = embedding_metrics
+    # --- Callback processing ---
+    if embeddings and embedding_cbs:
         for cb in embedding_cbs:
-            cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=outputs)
+            cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
 
     logger.info("Experiment complete.")
     
     if wandb.run:
         wandb.finish()
         
-    return
+    return embeddings
 
-def instantiate_algorithm(cfg: DictConfig, datamodule) -> Tuple[Optional[LatentModule], Optional[LightningModule]]:
-    latent_module = None
-    lightning_module = None
-
-    if "latent_module" in cfg.algorithm and cfg.algorithm.latent_module is not None:
-        latent_cfg = cfg.algorithm.latent_module
-        if "_target_" not in latent_cfg:
-            raise ValueError("Missing _target_ in latent_module config")
-        logger.info(f"Instantiating Latent Module: {latent_cfg._target_.split('.')[-1]}")
-        latent_module = hydra.utils.instantiate(latent_cfg)
-
-    if "model" in cfg.algorithm and cfg.algorithm.model is not None:
-        model_cfg = cfg.algorithm.model
-        # Dynamically instantiate or use the already-instantiated module.
-        lightning_module = instantiate_model(model_cfg, datamodule)
-        if not isinstance(lightning_module, LightningModule):
-            raise TypeError(f"Model must be a LightningModule, got {type(lightning_module)}")
+def instantiate_algorithms(cfg: DictConfig, datamodule) -> List[Any]:
+    """Instantiate all algorithms from the algorithms list in config."""
+    algorithms = []
     
-    return latent_module, lightning_module
-
-def instantiate_model(cfg_model, datamodule):
-    if isinstance(cfg_model, (dict)) or OmegaConf.is_config(cfg_model):
-        model = hydra.utils.instantiate(cfg_model, datamodule=datamodule)
-    else:
-        model = cfg_model
-    return model
+    if "algorithms" not in cfg:
+        logger.warning("No algorithms configured in config")
+        return algorithms
+    
+    for i, algorithm_cfg in enumerate(cfg.algorithms):
+        if "_target_" not in algorithm_cfg:
+            raise ValueError(f"Missing _target_ in algorithm config {i}")
+        
+        logger.info(f"Instantiating Algorithm {i+1}: {algorithm_cfg._target_.split('.')[-1]}")
+        
+        # Check if this is a LightningModule that needs datamodule
+        if "model" in algorithm_cfg._target_.lower() or "lightning" in algorithm_cfg._target_.lower():
+            algorithm = hydra.utils.instantiate(algorithm_cfg, datamodule=datamodule)
+        else:
+            algorithm = hydra.utils.instantiate(algorithm_cfg)
+            
+        algorithms.append(algorithm)
+    
+    return algorithms
 
 if __name__ == "__main__":
     main()
