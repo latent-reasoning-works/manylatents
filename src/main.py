@@ -1,11 +1,13 @@
+import copy
 import logging
+from itertools import product
 from typing import Optional, Dict, Any, List
 
 import hydra
 import lightning
 import torch
 from lightning import LightningModule
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, OmegaConf, ListConfig
 
 import wandb
 from src.algorithms.latent_module_base import LatentModule
@@ -88,7 +90,7 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
     
     logger.info("Starting the experiment pipeline...")
         
-    # --- Latent Embedding Computation ---
+    # --- Sequential Algorithm Execution ---
     embeddings: Dict[str, Any] = {}
     
     if cfg.eval_only:
@@ -100,29 +102,79 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
         test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
         
         logger.info(
-            f"Running Latent Algorithms on {data_source}:\n"
+            f"Running Sequential Algorithm Workflow on {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
-            f"Test tensor shape: {test_tensor.shape}"
+            f"Test tensor shape: {test_tensor.shape}\n"
+            f"Workflow length: {len(algorithms)} algorithms"
         )
         
-        # Process each algorithm
+        # Execute algorithms sequentially - each algorithm's output feeds into the next
+        current_data = test_tensor
+        all_scores = {}
+        
         for i, algorithm in enumerate(algorithms):
+            logger.info(f"Executing algorithm {i+1}/{len(algorithms)}: {type(algorithm).__name__}")
+            
+            latents = None
+            
+            # --- Compute latents based on algorithm type ---
             if isinstance(algorithm, LatentModule):
-                logger.info(f"Processing algorithm {i+1}/{len(algorithms)}: {type(algorithm).__name__}")
+                # LatentModule: fit/transform pattern
+                algorithm.fit(train_tensor)  # Always fit on original train data
+                latents = algorithm.transform(current_data)
+                logger.info(f"LatentModule embedding shape: {latents.shape}")
                 
-                # Fit and transform
-                algorithm.fit(train_tensor)
-                _embeddings = algorithm.transform(test_tensor)
-                logger.info(f"Algorithm {type(algorithm).__name__} embedding shape: {_embeddings.shape}")
+            elif isinstance(algorithm, LightningModule):
+                # LightningModule: training or eval-only
+        
+                # Handle eval-only mode with pretrained checkpoint
+                if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
+                    logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
+                    algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
                 
-                # Create embedding output
+                # Training phase (if not eval_only)
+                if not cfg.eval_only:
+                    logger.info("Running training...")
+                    trainer.fit(algorithm, datamodule=datamodule)
+                
+                # Model evaluation
+                logger.info("Running model evaluation.")
+                evaluation_result = evaluate(
+                    algorithm,
+                    cfg=cfg,
+                    trainer=trainer,
+                    datamodule=datamodule,
+                )
+                
+                # Handle evaluation results
+                if isinstance(evaluation_result, tuple):
+                    model_metrics, model_error = evaluation_result
+                else:
+                    model_metrics, model_error = evaluation_result, None
+                    
+                logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
+                
+                # Extract embeddings from encoder
+                if hasattr(algorithm, "encode"):
+                    logger.info("Extracting embeddings using network encoder...")
+                    latents = algorithm.encode(current_data)
+                    latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+                    logger.info(f"LightningModule embedding shape: {latents.shape}")
+                else:
+                    logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method - skipping")
+                    continue
+            
+            # --- Unified embedding wrapping (same for all algorithm types) ---
+            if latents is not None:
                 algorithm_embeddings = {
-                    "embeddings": _embeddings,
+                    "embeddings": latents,
                     "label": getattr(datamodule.test_dataset, "get_labels", lambda: None)(),
                     "metadata": {
                         "source": f"algorithm_{i+1}", 
                         "algorithm_type": type(algorithm).__name__,
-                        "data_shape": test_tensor.shape
+                        "data_shape": current_data.shape,
+                        "workflow_position": i+1,
+                        "workflow_total": len(algorithms)
                     },
                 }
                 
@@ -132,70 +184,23 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
                     algorithm_embeddings,
                     cfg=cfg,
                     datamodule=datamodule,
-                    module=algorithm
+                    module=algorithm if isinstance(algorithm, LatentModule) else None
                 )
                 
-                # Use the first algorithm's output as the main result
-                if not embeddings:
-                    embeddings = algorithm_embeddings
-                else:
-                    # Merge scores from multiple algorithms
-                    embeddings["scores"].update(algorithm_embeddings["scores"])
-    
-    # --- Neural Network processing (if any algorithms are LightningModules) ---
-    lightning_modules = [alg for alg in algorithms if isinstance(alg, LightningModule)]
-    
-    for lightning_module in lightning_modules:
-        if cfg.eval_only and cfg.pretrained_ckpt:
-            logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
-            lightning_module = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-        
-        if not cfg.eval_only:
-            logger.info("Running training...")
-            trainer.fit(lightning_module, datamodule=datamodule)
-        
-        logger.info("Running model evaluation.")
-        evaluation_result = evaluate(
-            lightning_module,
-            cfg=cfg,
-            trainer=trainer,
-            datamodule=datamodule,
-        )
-        
-        # Handle different return types from evaluate
-        if isinstance(evaluation_result, tuple):
-            model_metrics, model_error = evaluation_result
-        else:
-            model_metrics, model_error = evaluation_result, None
-            
-        logger.info(f"Model evaluation completed. Summary Error: {model_error}, Metrics: {model_metrics}")
-        
-        # Extract latent embeddings from the network's encoder if available
-        if hasattr(lightning_module, "encode"):
-            logger.info("Extracting latent embeddings using the network's encoder...")
-            test_tensor = torch.cat([b["data"].cpu() for b in test_loader], dim=0)
-            latents = lightning_module.encode(test_tensor)
-            latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+                # Update scores collection
+                all_scores.update(algorithm_embeddings["scores"])
                 
-            logger.info(f"Latent embeddings shape: {latents.shape}")
-            nn_embeddings = {
-                "embeddings": latents,
-                "label": datamodule.test_dataset.get_labels() if hasattr(datamodule.test_dataset, "get_labels") else None,
-                "metadata": {"source": "neural_network", "data_shape": test_tensor.shape},
-            }
-            
-            logger.info("Evaluating embeddings (from encoder output)...")
-            nn_embeddings["scores"] = evaluate(
-                nn_embeddings,
-                cfg=cfg,
-                datamodule=datamodule,
-            )
-            
-            # Merge scores
-            if embeddings:
-                embeddings["scores"].update(nn_embeddings["scores"])
-            else:
-                embeddings = nn_embeddings
+                # Use the last algorithm's output as final embeddings
+                embeddings = algorithm_embeddings
+                
+                # Update current_data for next algorithm in workflow
+                current_data = torch.tensor(latents) if not isinstance(latents, torch.Tensor) else latents
+                logger.info(f"Updated workflow data shape for next algorithm: {current_data.shape}")
+        
+        # Ensure final embeddings contain all scores from the workflow
+        if embeddings:
+            embeddings["scores"] = all_scores
+            embeddings["metadata"]["workflow_final"] = True
 
     # --- Callback processing ---
     if embeddings and embedding_cbs:
@@ -210,28 +215,116 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
     return embeddings
 
 def instantiate_algorithms(cfg: DictConfig, datamodule) -> List[Any]:
-    """Instantiate all algorithms from the algorithms list in config."""
-    algorithms = []
+    """Instantiate algorithms from configuration, supporting sequential workflows and list expansion.
     
+    Supports:
+    1. Sequential workflows: [pca, umap, autoencoder] - each processes previous output
+    2. List parameter expansion: n_components: [2, 5, 10] creates multiple algorithm instances
+    3. Parallel mode: (placeholder for future implementation)
+    
+    Args:
+        cfg: Configuration containing algorithms specification
+        datamodule: DataModule instance
+        
+    Returns:
+        List of algorithm instances ready for sequential execution
+    """
     if "algorithms" not in cfg:
         logger.warning("No algorithms configured in config")
-        return algorithms
+        return []
     
-    for i, algorithm_cfg in enumerate(cfg.algorithms):
-        if "_target_" not in algorithm_cfg:
-            raise ValueError(f"Missing _target_ in algorithm config {i}")
-        
-        logger.info(f"Instantiating Algorithm {i+1}: {algorithm_cfg._target_.split('.')[-1]}")
-        
-        # Check if this is a LightningModule that needs datamodule
-        if "model" in algorithm_cfg._target_.lower() or "lightning" in algorithm_cfg._target_.lower():
-            algorithm = hydra.utils.instantiate(algorithm_cfg, datamodule=datamodule)
-        else:
-            algorithm = hydra.utils.instantiate(algorithm_cfg)
-            
+    # Check for parallel mode (placeholder - not implemented yet)
+    execution_mode = getattr(cfg, 'algorithm_execution_mode', 'sequential')
+    if execution_mode == 'parallel':
+        raise NotImplementedError(
+            "Parallel algorithm execution not yet implemented. "
+            "This will require integration with hydra launcher for proper distributed execution."
+        )
+    
+    # Expand algorithm configurations similar to flatten_and_unroll_metrics
+    expanded_configs = _expand_algorithm_configs(cfg.algorithms)
+    
+    algorithms = []
+    for i, algorithm_cfg in enumerate(expanded_configs):
+        algorithm = _instantiate_algorithm_config(algorithm_cfg, datamodule)
         algorithms.append(algorithm)
+        logger.info(f"Instantiated algorithm {i+1}/{len(expanded_configs)}: {type(algorithm).__name__}")
     
     return algorithms
+
+
+def _expand_algorithm_configs(algorithm_configs) -> List[DictConfig]:
+    """Expand algorithm configurations with list-valued parameters.
+    
+    Similar to flatten_and_unroll_metrics, creates multiple algorithm instances
+    when parameters have list values.
+    
+    Example:
+        Input: {_target_: PCA, n_components: [2, 5, 10]}
+        Output: [{_target_: PCA, n_components: 2}, 
+                 {_target_: PCA, n_components: 5}, 
+                 {_target_: PCA, n_components: 10}]
+    """
+    if not isinstance(algorithm_configs, (list, ListConfig)):
+        algorithm_configs = [algorithm_configs]
+    
+    expanded = []
+    
+    for config in algorithm_configs:
+        if not isinstance(config, DictConfig):
+            expanded.append(config)
+            continue
+        
+        # Find parameters with list values (similar to flatten_and_unroll_metrics)
+        sweep_keys = []
+        sweep_vals = []
+        for k, v in config.items():
+            if isinstance(v, (list, tuple, ListConfig)) and k != "_target_":
+                sweep_keys.append(k)
+                sweep_vals.append(list(v))
+        
+        if not sweep_keys:
+            # No list parameters, use as-is
+            expanded.append(config)
+        else:
+            # Create cartesian product of list parameters
+            for combo in product(*sweep_vals):
+                config_copy = copy.deepcopy(config)
+                for k, val in zip(sweep_keys, combo):
+                    # Convert to native types
+                    if isinstance(val, ListConfig): 
+                        val = list(val)
+                    if isinstance(val, float) and float(val).is_integer():
+                        val = int(val)
+                    setattr(config_copy, k, val)
+                expanded.append(config_copy)
+    
+    return expanded
+
+
+def _instantiate_algorithm_config(algorithm_cfg: DictConfig, datamodule) -> Any:
+    """Instantiate a single algorithm configuration.
+    
+    Args:
+        algorithm_cfg: Algorithm configuration with _target_ and parameters
+        datamodule: DataModule instance for algorithms that need it
+        
+    Returns:
+        Instantiated algorithm (LatentModule or LightningModule)
+    """
+    if "_target_" not in algorithm_cfg:
+        raise ValueError("Missing _target_ in algorithm config")
+    
+    target = algorithm_cfg._target_
+    logger.info(f"Instantiating {target.split('.')[-1]}")
+    
+    # Check if this is a LightningModule that needs datamodule
+    if ("model" in target.lower() or 
+        "lightning" in target.lower() or 
+        "networks" in target.lower()):
+        return hydra.utils.instantiate(algorithm_cfg, datamodule=datamodule)
+    else:
+        return hydra.utils.instantiate(algorithm_cfg)
 
 if __name__ == "__main__":
     main()
