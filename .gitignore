@@ -98,3 +98,6 @@ venv.bak/
 ## handle for local folders
 _*
 !__init__.py
+
+## AI Agents
+CLAUDE.md

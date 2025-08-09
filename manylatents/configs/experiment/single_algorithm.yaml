@@ -1,0 +1,15 @@
+# @package _global_
+name: single_algorithm_pca_swissroll
+
+defaults:
+  - override /algorithm/latent: pca
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /metrics: test_metric
+
+seed: 42
+project: your_project
+
+algorithm:
+  latent:
+    n_components: 2

@@ -1,0 +1,20 @@
+# @package _global_
+name: multiple_algorithms_pca_to_autoencoder
+
+defaults:
+  - override /algorithm: [latent/pca, lightning/ae_reconstruction]
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /trainer: default
+  - override /metrics: synthetic_data_metrics
+
+seed: 42
+project: your_project
+
+algorithm:
+  - latent:
+      n_components: 10  # PCA reduces to 10D first
+  - model:
+      network:
+        input_dim: 10   # Autoencoder takes 10D PCA output
+        latent_dim: 2   # Final embedding is 2D
