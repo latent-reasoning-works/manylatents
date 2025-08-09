@@ -1,0 +1,199 @@
+import logging
+import os
+from typing import Dict, Optional, Tuple, Union
+
+import numpy as np
+import pandas as pd
+
+from manylatents.utils.data import load_metadata
+
+from .plink_dataset import PlinkDataset
+from .precomputed_mixin import PrecomputedMixin
+
+logger = logging.getLogger(__name__)
+
+
+def hgdp_add_dummy_row(metadata: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds a dummy row to the metadata DataFrame to account for missing data in the first row.
+    """
+    null_row = pd.DataFrame([{col: np.nan for col in metadata.columns}])
+    filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+    for _filter in filter_columns:
+        if _filter in metadata.columns:
+            null_row[_filter] = False
+    metadata = pd.concat([null_row, metadata], ignore_index=True)
+    return metadata
+
+
+class HGDPDataset(PlinkDataset, PrecomputedMixin):
+    """
+    PyTorch Dataset for HGDP + 1000 Genomes data.
+    Returns both raw data and (optionally) precomputed embeddings.
+    """
+    def __init__(self, 
+                 files: Dict[str, str], 
+                 cache_dir: str, 
+                 data_split: str = "full",
+                 mmap_mode: Optional[str] = None, 
+                 precomputed_path: Optional[str] = None,
+                 metadata: Optional[pd.DataFrame] = None,
+                 delimiter: Optional[str] = ",",
+                 filter_qc: Optional[bool] = False,
+                 filter_related: Optional[bool] = False,
+                 balance_filter: Union[bool, float] = False,
+                 test_all: Optional[bool] = False,
+                 remove_recent_migration: Optional[bool] = False):
+        """
+        Initializes the HGDP dataset.
+        """
+        self.data_split = data_split        
+        self.filter_related = filter_related
+
+        # Load raw data and metadata via the parent class.
+        super().__init__(files=files, 
+                         cache_dir=cache_dir, 
+                         mmap_mode=mmap_mode,
+                         delimiter=delimiter,
+                         data_split=data_split,
+                         precomputed_path=precomputed_path,
+                         filter_qc=filter_qc,
+                         filter_related=filter_related,
+                         balance_filter=balance_filter,
+                         test_all=test_all,
+                         remove_recent_migration=remove_recent_migration)
+
+    def extract_geographic_preservation_indices(self) -> np.ndarray:
+        """
+        Extracts indices of samples that we expect to preserve geography.
+        Returns:
+            np.ndarray: Indices for subsetting for geographic preservation metric.        
+        """
+
+        american_idx = self.metadata['Genetic_region_merged'] == 'America'
+        rest_idx = self.metadata['Population'].isin(['ACB', 'ASW', 'CEU'])
+
+        return ~(american_idx | rest_idx)
+
+    def extract_latitude(self) -> pd.Series:
+        """
+        Extracts latitudes
+        """
+        return self.metadata["latitude"]
+    
+    def extract_longitude(self) -> pd.Series:
+        """
+        Extracts longitudes
+        """
+        return self.metadata["longitude"]
+    
+    def extract_population_label(self) -> pd.Series:
+        """
+        Extracts population labels
+        """
+        return self.metadata["Population"]
+    
+    def extract_qc_filter_indices(self) -> np.ndarray:
+        """
+        Extracts points that passed QC
+        """
+        filters = ["filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+        _filtered_indices = self.metadata[self.metadata[filters].any(axis=1)].index
+        return ~self.metadata.index.isin(_filtered_indices)
+
+    def extract_related_indices(self) -> np.ndarray:
+        """
+        Extracts maximal unrelated subset
+        """
+        return ~self.metadata['filter_king_related'].values
+
+    def load_metadata(self, metadata_path: str) -> pd.DataFrame:
+        """
+        Loads and processes metadata for the HGDP dataset.
+        """
+        full_path = os.path.abspath(metadata_path)
+        logger.info(f"Loading metadata from: {full_path}")
+
+        # Define required columns.
+        required_columns = [
+            'project_meta.sample_id',
+            'filter_king_related',
+            'filter_pca_outlier',
+            'hard_filtered',
+            'filter_contaminated',
+            'Genetic_region_merged',
+            'Population'
+        ]
+
+        metadata = load_metadata(
+            file_path=full_path,
+            required_columns=required_columns,
+            additional_processing=hgdp_add_dummy_row,
+            delimiter=self.delimiter
+        )
+
+        # Check if the index has the required name; if not, try to set it.
+        if metadata.index.name is None or metadata.index.name.strip() != 'project_meta.sample_id':
+            if 'project_meta.sample_id' in metadata.columns:
+                metadata['sample_id'] = metadata['project_meta.sample_id'] # store for future use
+                metadata = metadata.set_index('project_meta.sample_id')
+            else:
+                raise ValueError("Missing required column: 'project_meta.sample_id' in metadata.")
+
+        # Convert filter columns to bool.
+        filter_columns = ["filter_king_related", "filter_pca_outlier", "hard_filtered", "filter_contaminated"]
+        for col in filter_columns:
+            if col in metadata.columns:
+                metadata[col] = metadata[col].astype(bool)
+            else:
+                logger.warning(f"Missing filter column in metadata: {col}. Filling with False.")
+                metadata[col] = False
+
+        return metadata
+
+    def load_admixture_ratios(self, admixture_path, admixture_Ks) -> dict:
+        """
+        Loads admixture ratios
+        """
+        admixture_ratio_dict = super().load_admixture_ratios(admixture_path, admixture_Ks)
+        if admixture_Ks is not None:
+            for key in admixture_ratio_dict:
+                admixture_ratio_dict[key] = hgdp_add_dummy_row(admixture_ratio_dict[key])
+        return admixture_ratio_dict
+
+    def get_labels(self, label_col: str = "Population") -> np.ndarray:
+        """
+        Returns label array (e.g., Population) for coloring plots.
+        """
+        if label_col not in self.metadata.columns:
+            raise ValueError(f"Label column '{label_col}' not found in metadata.")
+        
+        return self.metadata[label_col].values
+    
+    def extract_indices(self, 
+                        filter_qc: bool,
+                        filter_related: bool,
+                        test_all: bool,
+                        remove_recent_migration: bool,
+                        balance_filter: bool
+                       ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Extracts fit/transform indices based on metadata filters.
+        Args:
+            filter_qc (Optional[bool]): Whether to filter samples based on quality control.
+            filter_related (Optional[bool]): Whether to filter related samples.
+            test_all (Optional[bool]): Whether to use all samples for testing.
+            remove_recent_migration (Optional[bool]): remove recently migrated samples.
+        """
+        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration, balance_filter)
+
+        # First entry is dummy row. So we ignore this!
+        fit_idx[0] = False
+        trans_idx[0] = False
+
+        return fit_idx, trans_idx
+    
+    def balance_filter(self, balance_filter) -> np.array:
+        if balance_filter:
+            logger.info(f"balance filter ignored for HGDP+1KGP. Data is already pretty balanced")
+        return np.ones(len(self.metadata), dtype=bool)

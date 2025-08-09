@@ -1,3 +1,0 @@
-affinity_spectrum:
-  _target_: src.metrics.affinity_spectrum.AffinitySpectrum
-  _partial_: True

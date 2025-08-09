@@ -1,0 +1,17 @@
+defaults:
+  - default
+
+_target_: manylatents.data.dlatree.DLATreeDataModule
+test_split: 0.2
+n_dim: 100
+n_branch: 10
+branch_lengths: [300,300,25,300,300,300,25,300,300,300]
+rand_multiplier: 2.0
+gap_multiplier: 7
+random_state: ${seed}
+sigma: 0.5
+disconnect_branches: [2,4,6,8]
+sampling_density_factors: null
+mode: full
+precomputed_path: null
+mmap_mode: null

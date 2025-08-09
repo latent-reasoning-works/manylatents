@@ -1,0 +1,23 @@
+# @package _global_
+name: eval_algorithm_pretrained_autoencoder
+
+defaults:
+  - override /algorithm/model: ae_reconstruction
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /trainer: default
+  - override /metrics/embedding: anisotropy
+
+seed: 42
+project: your_project
+
+# Evaluation-only mode: load pre-trained checkpoint
+trainer:
+  max_epochs: 0  # No training, evaluation only
+
+algorithm:
+  model:
+    network:
+      input_dim: 3      # SwissRoll is 3D
+      latent_dim: 2     # 2D embedding
+    checkpoint_path: "data/checkpoints/swissroll_autoencoder.ckpt"  # Path to pre-trained model

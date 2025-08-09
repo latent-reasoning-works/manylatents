@@ -1,0 +1,14 @@
+defaults:
+  - default
+  
+_target_: manylatents.data.saddlesurface.SaddleSurfaceDataModule
+test_split: 0.2
+n_distributions: 100
+n_points_per_distribution: 50
+noise: 0.1
+manifold_noise: 0.1
+a: 1.0
+b: 1.0
+random_state: ${seed}
+rotate_to_dim: 5
+mode: full

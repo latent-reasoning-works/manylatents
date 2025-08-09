@@ -1,0 +1,5 @@
+_target_: manylatents.algorithms.networks.autoencoder.Autoencoder
+input_dim: null ## currently must be specified in the experiment config
+hidden_dims: [128, 64]
+bottleneck_dim: 32
+activation: "relu"

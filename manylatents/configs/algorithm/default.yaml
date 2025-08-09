@@ -1,0 +1,4 @@
+defaults:
+  - latent: null
+  - lightning: null
+  - _self_

@@ -1,5 +1,0 @@
-fractal_dimension:
-  _target_: src.metrics.fractal_dimension.FractalDimension
-  _partial_: True
-  n_box_sizes: 10
-
