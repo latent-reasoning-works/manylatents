@@ -1,7 +1,7 @@
-_target_: src.algorithms.reconstruction.Reconstruction
+_target_: src.algorithms.lightning.reconstruction.Reconstruction
 datamodule: ${data}
 network:
-  _target_: src.algorithms.networks.autoencoder.Autoencoder
+  _target_: src.algorithms.lightning.networks.autoencoder.Autoencoder
   input_dim: null # must be currently specified from experiment
   hidden_dims: [512, 256, 128]
   latent_dim: 50
@@ -13,4 +13,4 @@ optimizer:
   _partial_: true
   lr: 0.001
 loss:
-  _target_: src.algorithms.losses.mse.MSELoss
+  _target_: src.algorithms.lightning.losses.mse.MSELoss

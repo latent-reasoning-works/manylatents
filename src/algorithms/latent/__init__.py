@@ -1,0 +1,1 @@
+# LatentModule algorithms (fit/transform pattern)

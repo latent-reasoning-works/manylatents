@@ -1,4 +1,4 @@
-_target_: src.algorithms.tsne.TSNEModule
+_target_: src.algorithms.latent.tsne.TSNEModule
 n_components: 2
 random_state: ${seed}
 perplexity: 30

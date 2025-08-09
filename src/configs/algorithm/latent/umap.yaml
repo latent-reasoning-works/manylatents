@@ -1,4 +1,4 @@
-_target_: src.algorithms.umap.UMAPModule
+_target_: src.algorithms.latent.umap.UMAPModule
 n_components: 2
 random_state: ${seed}
 n_neighbors: 15

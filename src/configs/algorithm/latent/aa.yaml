@@ -1,4 +1,4 @@
-_target_: src.algorithms.aa.ArchetypalAnalysisModule
+_target_: src.algorithms.latent.aa.ArchetypalAnalysisModule
 n_components: 50  # number of archetypes
 method: pgd     # or 'mu' (multiplicative updates)
 max_iter: 100

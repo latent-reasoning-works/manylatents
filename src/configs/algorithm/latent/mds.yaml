@@ -1,4 +1,4 @@
-_target_: src.algorithms.mds.MDSModule
+_target_: src.algorithms.latent.mds.MDSModule
 ndim: 2
 seed: ${seed}
 how: metric   #  choose from ['classic', 'metric', 'nonmetric']
