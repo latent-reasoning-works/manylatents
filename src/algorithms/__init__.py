@@ -2,9 +2,9 @@
 from hydra_zen import builds, store
 import inspect
 
-from .pca import PCAModule
-from .phate import PHATEModule
-from .tsne import TSNEModule
+from .latent.pca import PCAModule
+from .latent.phate import PHATEModule
+from .latent.tsne import TSNEModule
 from .latent_module_base import LatentModule
 
 algorithm_store = store(group="algorithm")

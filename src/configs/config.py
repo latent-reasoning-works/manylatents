@@ -10,8 +10,8 @@ class Config:
     This class defines the structure of the Hydra configuration for the experiment.
     """
 
-    algorithms: List[Any] = field(default_factory=list)
-    """Configuration for algorithms (list of LatentModule or LightningModule instances)."""
+    algorithm: Any = None
+    """Configuration for algorithm - supports both nested overrides and list specification."""
 
     data: Optional[Any] = None
     """Configuration for the data (dataset + transforms + dataloader creation)."""

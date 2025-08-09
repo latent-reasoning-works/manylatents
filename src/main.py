@@ -229,8 +229,8 @@ def instantiate_algorithms(cfg: DictConfig, datamodule) -> List[Any]:
     Returns:
         List of algorithm instances ready for sequential execution
     """
-    if "algorithms" not in cfg:
-        logger.warning("No algorithms configured in config")
+    if "algorithm" not in cfg or cfg.algorithm is None:
+        logger.warning("No algorithm configured in config")
         return []
     
     # Check for parallel mode (placeholder - not implemented yet)
@@ -242,7 +242,7 @@ def instantiate_algorithms(cfg: DictConfig, datamodule) -> List[Any]:
         )
     
     # Expand algorithm configurations similar to flatten_and_unroll_metrics
-    expanded_configs = _expand_algorithm_configs(cfg.algorithms)
+    expanded_configs = _expand_algorithm_configs(cfg.algorithm)
     
     algorithms = []
     for i, algorithm_cfg in enumerate(expanded_configs):
@@ -256,15 +256,24 @@ def instantiate_algorithms(cfg: DictConfig, datamodule) -> List[Any]:
 def _expand_algorithm_configs(algorithm_configs) -> List[DictConfig]:
     """Expand algorithm configurations with list-valued parameters.
     
+    Handles both nested dict structures (from overrides) and direct list formats.
     Similar to flatten_and_unroll_metrics, creates multiple algorithm instances
     when parameters have list values.
     
-    Example:
-        Input: {_target_: PCA, n_components: [2, 5, 10]}
-        Output: [{_target_: PCA, n_components: 2}, 
-                 {_target_: PCA, n_components: 5}, 
-                 {_target_: PCA, n_components: 10}]
+    Example inputs:
+        Nested dict: {latent: {_target_: PCA, n_components: [2, 5, 10]}}
+        Direct list: [{_target_: PCA, n_components: 2}]
     """
+    # Handle nested dict structure from overrides (e.g. {latent: {...}, lightning: {...}})
+    if isinstance(algorithm_configs, DictConfig) and not algorithm_configs.get("_target_"):
+        configs_list = []
+        # Extract algorithm configs from nested structure
+        for algo_type in ["latent", "lightning"]:
+            if algo_type in algorithm_configs and algorithm_configs[algo_type] is not None:
+                configs_list.append(algorithm_configs[algo_type])
+        algorithm_configs = configs_list
+    
+    # Ensure we have a list
     if not isinstance(algorithm_configs, (list, ListConfig)):
         algorithm_configs = [algorithm_configs]
     

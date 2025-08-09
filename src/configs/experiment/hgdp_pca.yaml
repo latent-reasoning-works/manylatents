@@ -1,16 +1,16 @@
 # @package _global_
-name: hgdp_pca_n_components=${algorithm.dimensionality_reduction.n_components}
+name: hgdp_pca_n_components=${algorithms.latent.n_components}
 
 defaults:
-  - override /algorithm/dimensionality_reduction: pca
+  - override /algorithms/latent: pca
   - override /data: hgdp_split
   - override /callbacks/embedding: default
   - override /metrics: hgdp_dr
 
 seed: 42
 
-algorithm:
-  dimensionality_reduction:
+algorithms:
+  latent:
     n_components: 50
     
 data:

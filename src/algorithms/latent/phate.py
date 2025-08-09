@@ -6,7 +6,7 @@ import torch
 from phate import PHATE
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from ..latent_module_base import LatentModule
 
 
 class PHATEModule(LatentModule):

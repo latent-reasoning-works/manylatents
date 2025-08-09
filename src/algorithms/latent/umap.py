@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 from umap import UMAP
 
-from .latent_module_base import LatentModule
+from ..latent_module_base import LatentModule
 
 
 class UMAPModule(LatentModule):

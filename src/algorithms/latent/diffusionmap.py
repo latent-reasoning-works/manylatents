@@ -4,7 +4,7 @@ from typing import Optional, Union
 import numpy as np
 
 from .diffusionmap_algorithm import DiffusionMap
-from .latent_module_base import LatentModule
+from ..latent_module_base import LatentModule
 
 class DiffusionMapModule(LatentModule):
     def __init__(

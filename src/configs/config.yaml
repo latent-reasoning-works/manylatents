@@ -4,7 +4,7 @@ defaults:
   - data: null
   - callbacks: default
   - hydra: default
-  - algorithms: null
+  - algorithm: default
   - metrics: null
   - trainer: null # instantiate only if network is being passed
   - experiment: null
@@ -16,7 +16,7 @@ project: ManyLatents
 # Trainer configuration
 trainer:
   max_epochs: 1
-  gpus: 0
+  accelerator: cpu
 
 # Callbacks configuration
 callbacks:

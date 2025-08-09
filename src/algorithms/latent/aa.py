@@ -2,7 +2,7 @@ import torch
 from archetypes import AA
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from ..latent_module_base import LatentModule
 
 
 class ArchetypalAnalysisModule(LatentModule):

@@ -3,7 +3,7 @@ from torch import Tensor
 from typing import Optional, Union
 import numpy as np
 from .mds_algorithm import MultidimensionalScaling
-from .latent_module_base import LatentModule
+from ..latent_module_base import LatentModule
 
 
 class MDSModule(LatentModule):

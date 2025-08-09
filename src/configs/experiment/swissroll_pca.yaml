@@ -1,8 +1,8 @@
 # @package _global_
-name: swissroll_pca_n_components=${algorithm.dimensionality_reduction.n_components}
+name: swissroll_pca_n_components=${algorithm.latent.n_components}
 
 defaults:
-  - override /algorithm/dimensionality_reduction: pca
+  - override /algorithm/latent: pca
   - override /data: swissroll
   - override /callbacks/embedding: default
   - override /metrics: synthetic_data_metrics
@@ -11,6 +11,6 @@ seed: 42
 project: manifold_genetics
 
 algorithm:
-  dimensionality_reduction:
+  latent:
     n_components: 2
     
