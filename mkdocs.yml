@@ -1,3 +1,7 @@
 site_name: ManyLatents
 theme:
   name: material
+
+nav:
+  - Home: index.md
+  - Testing: testing.md

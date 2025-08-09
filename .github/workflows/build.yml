@@ -12,55 +12,124 @@ permissions:
   contents: read
 
 jobs:
-  build-and-run:
-    name: Build, Test & Run Main
+  # Core build and unit tests
+  build-and-test:
+    name: Build & Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 10
+    
     steps:
-      # 1) Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) (Optional) Set up Python 3.9
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 3) Install uv
       - name: Install UV package manager
         uses: astral-sh/setup-uv@v5
         with:
           version: 'latest'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 4) Create & activate venv, install deps
       - name: Install dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
           uv sync
 
-      # 5) Run your pytest suite (and collect coverage)
-      - name: Run tests
+      - name: Run pytest suite
         run: |
           source .venv/bin/activate
           pytest --maxfail=1 --disable-warnings -q --cov=manylatents --cov-report=xml
 
-      # 6) Run main.py with a basic config
-      - name: Run main.py smoke
-        run: |
-          source .venv/bin/activate
-          python -m manylatents.main \
-            algorithm=dimensionality_reduction/noop \
-            metrics=test_metric \
-            data=test_data \
-            debug=true
-
-      # 7) Upload coverage report
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
+
+  # Integration tests with algorithm matrix
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        test-config:
+          # Basic smoke test - fastest
+          - name: "smoke-test"
+            algorithm: "latent/noop"
+            data: "test_data"
+            metrics: "test_metric"
+            timeout: 2
+          
+          # Core latent algorithms with synthetic data
+          - name: "pca-swissroll"
+            algorithm: "latent/pca"
+            data: "swissroll"
+            metrics: "synthetic_data_metrics"
+            timeout: 8
+            
+          - name: "umap-swissroll"
+            algorithm: "latent/umap" 
+            data: "swissroll"
+            metrics: "synthetic_data_metrics"
+            timeout: 10
+            
+          # Neural network algorithm (basic autoencoder)
+          - name: "autoencoder-swissroll"
+            algorithm: "lightning/ae_reconstruction"
+            data: "swissroll"
+            metrics: "synthetic_data_metrics"
+            timeout: 15
+            
+          # Sequential workflow test (future: enable when ready)
+          # - name: "sequential-pca-umap"
+          #   algorithms: "[latent/pca,latent/umap]"
+          #   data: "swissroll"
+          #   metrics: "synthetic_data_metrics"
+          #   timeout: 12
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install UV package manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: 'latest'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          uv sync
+
+      - name: Run integration test - ${{ matrix.test-config.name }}
+        timeout-minutes: ${{ matrix.test-config.timeout }}
+        run: |
+          source .venv/bin/activate
+          python -m manylatents.main \
+            algorithm=${{ matrix.test-config.algorithm }} \
+            data=${{ matrix.test-config.data }} \
+            metrics=${{ matrix.test-config.metrics }} \
+            debug=true \
+            trainer.max_epochs=1
+
+      - name: Upload test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-outputs-${{ matrix.test-config.name }}
+          path: outputs/
+          retention-days: 3
