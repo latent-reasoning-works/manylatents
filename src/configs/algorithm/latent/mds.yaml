@@ -1,9 +1,0 @@
-_target_: src.algorithms.latent.mds.MDSModule
-ndim: 2
-seed: ${seed}
-how: metric   #  choose from ['classic', 'metric', 'nonmetric']
-solver: smacof  # choose from ["sgd", "smacof"]
-distance_metric: euclidean  # recommended values: 'euclidean' and 'cosine'
-n_jobs: -1
-verbose: False
-fit_fraction: 1.0

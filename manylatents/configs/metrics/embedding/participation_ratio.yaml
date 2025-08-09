@@ -1,0 +1,5 @@
+participation_ratio:
+  _target_: manylatents.metrics.participation_ratio.ParticipationRatio
+  _partial_: True
+  n_neighbors: 25
+  return_per_sample: True

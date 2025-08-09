@@ -1,4 +1,0 @@
-admixture_preservation_far:
-  _target_: src.metrics.preservation.AdmixturePreservationK
-  _partial_: True
-  only_far: True

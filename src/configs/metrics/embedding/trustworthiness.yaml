@@ -1,5 +1,0 @@
-trustworthiness:
-  _target_: src.metrics.trustworthiness.Trustworthiness
-  _partial_: True
-  n_neighbors: 5
-  metric: euclidean

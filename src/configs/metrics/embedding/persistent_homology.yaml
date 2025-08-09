@@ -1,5 +1,0 @@
-persistent_homology:
-  _target_: src.metrics.persistent_homology.PersistentHomology
-  _partial_: True
-  homology_dim: 1
-  persistence_threshold: 0.1

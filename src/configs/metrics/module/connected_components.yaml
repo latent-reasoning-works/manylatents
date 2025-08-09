@@ -1,3 +1,0 @@
-connected_components:
-  _target_: src.metrics.connected_components.ConnectedComponents
-  _partial_: True

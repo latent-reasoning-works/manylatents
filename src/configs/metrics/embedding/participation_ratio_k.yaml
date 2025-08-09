@@ -1,5 +1,0 @@
-participation_ratio:
-  _target_: src.metrics.participation_ratio.ParticipationRatio
-  _partial_: True
-  n_neighbors: [15,25,50,100,250]
-  return_per_sample: True

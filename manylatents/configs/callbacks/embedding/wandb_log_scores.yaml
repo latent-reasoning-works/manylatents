@@ -1,0 +1,6 @@
+wandb_log_scores:
+      _target_: manylatents.callbacks.embedding.wandb_log_scores.WandbLogScores
+      log_summary:    true
+      log_table:      true
+      log_k_curve_table: true
+      include_labels: false

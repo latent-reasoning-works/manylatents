@@ -1,0 +1,5 @@
+trustworthiness:
+  _target_: manylatents.metrics.trustworthiness.Trustworthiness
+  _partial_: True
+  n_neighbors: [15,25,50,100,250]
+  metric: euclidean

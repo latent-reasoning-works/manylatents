@@ -1,3 +1,0 @@
-anisotropy:
-  _target_: src.metrics.anisotropy.Anisotropy
-  _partial_: True

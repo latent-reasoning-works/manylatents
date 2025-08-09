@@ -1,0 +1,9 @@
+plot_embeddings:
+  _target_: manylatents.callbacks.embedding.plot_embeddings.PlotEmbeddings
+  save_dir: ${hydra:runtime.output_dir}
+  experiment_name: "${name}.png"
+  figsize: [8, 6]
+  label_col: Population
+  legend: false
+  color_by_score: null
+

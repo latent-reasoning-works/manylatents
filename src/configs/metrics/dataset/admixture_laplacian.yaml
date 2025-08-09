@@ -1,3 +1,0 @@
-admixture_laplacian:
-  _target_: src.metrics.preservation.AdmixtureLaplacian
-  _partial_: True

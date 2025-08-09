@@ -1,0 +1,5 @@
+local_intrinsic_dimensionality:
+  _target_: manylatents.metrics.lid.LocalIntrinsicDimensionality
+  _partial_: True
+  k: 20
+  

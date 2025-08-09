@@ -1,3 +1,0 @@
-admixture_preservation:
-  _target_: src.metrics.preservation.AdmixturePreservationK
-  _partial_: True

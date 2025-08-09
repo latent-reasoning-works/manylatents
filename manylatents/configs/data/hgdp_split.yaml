@@ -1,0 +1,18 @@
+defaults:
+  - default
+
+_target_: manylatents.data.hgdp.HGDPDataModule
+cache_dir: ${cache_dir}
+mmap_mode: null
+mode: split
+files:
+  plink:  "./data/HGDP+1KGP/genotypes/no_intersection_less_stringent/gnomad.genomes.v3.1.2.hgdp_tgp.PASSfiltered.newIDs.onlySNPs.noDuplicatePos.noMiss5perc.maf0.01.LDpruned_500_50_0.05.woLowComplexity_noHLA"
+  metadata: "./data/HGDP+1KGP/gnomad_derived_metadata_with_filtered_sampleids.csv"
+  admixture: "./data/HGDP+1KGP/admixture/no_intersection_less_stringent/global.{K}_metadata.tsv"
+  admixture_K: 2,3,4,5,6,7,8,9
+filter_qc: True
+filter_related: False
+test_all: True
+remove_recent_migration: False
+precomputed_path: null
+delimiter: ","

@@ -39,13 +39,13 @@ To be finalized..
 1. **Run a dimensionality reduction experiment** (e.g., PCA on HGDP dataset):
 
     ```bash
-    python -m src.main experiment=hgdp_pca
+    python -m manylatents.main experiment=hgdp_pca
     ```
 
 2. **Override hyperparameters from the command line**:
 
     ```bash
-    python -m src.main experiment=hgdp_pca algorithm.dimensionality_reduction.n_components=10
+    python -m manylatents.main experiment=hgdp_pca algorithm.dimensionality_reduction.n_components=10
     ```
 
 3. **Logs and Outputs** will be saved under:
@@ -75,7 +75,7 @@ Want to add a new DR method (e.g., UMAP, Isomap)? Follow these steps:
 2. Inherit from `DimensionalityReduction` and implement the required methods:
 
 ```python
-from src.algorithms.dimensionality_reduction import DimensionalityReduction
+from manylatents.algorithms.dimensionality_reduction import DimensionalityReduction
 import torch
 
 class YourModelModule(DimensionalityReduction):
@@ -99,7 +99,7 @@ class YourModelModule(DimensionalityReduction):
 Add a new config file under `src/configs/algorithm/dimensionality_reduction/yourmodel.yaml`:
 
 ```yaml
-_target_: src.algorithms.yourmodel.YourModelModule
+_target_: manylatents.algorithms.yourmodel.YourModelModule
 n_components: 2
 ```
 
@@ -111,7 +111,7 @@ Create a unit test in src/algorithms/yourmodel_test.py:
 
 ```python
 import torch
-from src.algorithms.yourmodel import YourModelModule
+from manylatents.algorithms.yourmodel import YourModelModule
 
 def test_yourmodel_instantiation():
     model = YourModelModule(n_components=3)
@@ -136,7 +136,7 @@ pytest src/tests/algorithms/dr_compliance_test.py
 Run the experiment using your new model:
 
 ```bash
-python -m src.main experiment=data_yourmodel
+python -m manylatents.main experiment=data_yourmodel
 ```
 
 ## ✅ Contributing

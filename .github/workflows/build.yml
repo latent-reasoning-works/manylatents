@@ -46,13 +46,13 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          pytest --maxfail=1 --disable-warnings -q --cov=src --cov-report=xml
+          pytest --maxfail=1 --disable-warnings -q --cov=manylatents --cov-report=xml
 
       # 6) Run main.py with a basic config
       - name: Run main.py smoke
         run: |
           source .venv/bin/activate
-          python -m src.main \
+          python -m manylatents.main \
             algorithm=dimensionality_reduction/noop \
             metrics=test_metric \
             data=test_data \

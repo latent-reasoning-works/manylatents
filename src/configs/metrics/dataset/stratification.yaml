@@ -1,4 +1,0 @@
-stratification:
-  _target_: src.metrics.stratification.kmeans_stratification
-  _partial_: True
-  random_state: ${seed}

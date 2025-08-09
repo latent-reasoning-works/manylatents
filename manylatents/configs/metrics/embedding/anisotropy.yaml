@@ -1,0 +1,3 @@
+anisotropy:
+  _target_: manylatents.metrics.anisotropy.Anisotropy
+  _partial_: True

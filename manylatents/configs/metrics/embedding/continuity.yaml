@@ -1,0 +1,4 @@
+continuity:
+  _target_: manylatents.metrics.continuity.Continuity
+  _partial_: True
+  return_per_sample: True
