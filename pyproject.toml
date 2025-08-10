@@ -8,7 +8,7 @@ authors = [
     { name = "Matthew Scicluna", email = "matthew.scicluna@mila.quebec"}
 ]
 readme = "README.md"
-requires-python = ">=3.9, <3.10"
+requires-python = ">=3.10, <3.13"
 
 dependencies = [
     "asttokens==2.4.1",
@@ -24,7 +24,7 @@ dependencies = [
     "graphtools==1.5.3",
     "h5py==3.10.0",
     "ipykernel==6.29.4",
-    "ipython==7.34.0",
+    "ipython>=8.0.0",
     "jedi==0.19.1",
     "joblib==1.3.2",
     "jupyter_client==8.6.1",
@@ -33,7 +33,7 @@ dependencies = [
     "matplotlib>=3.8",
     "matplotlib_inline==0.1.6",
     "nest_asyncio==1.6.0",
-    "numpy>=1.23.5",
+    "numpy>=1.25",
     "packaging==24.0",
     "pandas>=2.0.0",
     "parso==0.8.4",
@@ -68,7 +68,7 @@ dependencies = [
     "wrapt==1.16.0",
     "requests>=2.25.0",
     "rootutils>=1.0.0",
-    "heatgeo",
+    "heatgeo>=0.0.1",
     "torch==2.3.1",
     "hydra-core>=1.3.2",
     "tqdm>=4.67.1",
@@ -92,20 +92,27 @@ dependencies = [
     "pyproj>=3.6.1",
 ]
 
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["manylatents"]
+
 [tool.uv]
 managed = true
 
 [tool.uv.sources]
 archetypes = { git = "https://github.com/aleixalcacer/archetypes.git" }
 
-[tool.hatch.build.targets.wheel]
-packages = ["src"]
-
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["src"]
+testpaths = ["manylatents"]
 
 [[tool.uv.dependency-metadata]]
 name = "heatgeo"
 version = "0.0.1"
-requires-dist = ["numpy>=1.23.5"]
+requires-dist = ["numpy>=1.25"]
