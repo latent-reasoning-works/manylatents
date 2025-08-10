@@ -11,7 +11,7 @@ resolution-markers = [
 [[manifest.dependency-metadata]]
 name = "heatgeo"
 version = "0.0.1"
-requires-dist = ["numpy>=1.25"]
+requires-dist = ["numpy>=1.23.5"]
 
 [[package]]
 name = "absl-py"

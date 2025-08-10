@@ -108,4 +108,4 @@ testpaths = ["src"]
 [[tool.uv.dependency-metadata]]
 name = "heatgeo"
 version = "0.0.1"
-requires-dist = ["numpy>=1.25"]
+requires-dist = ["numpy>=1.23.5"]
