@@ -155,27 +155,26 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
     else:
         raise ValueError(f"Unsupported format: {format}")
     
-def setup_logging(debug: bool = False):
+def setup_logging(debug: bool = False) -> None:
     """
-    Configures logging dynamically using Hydra's built-in system.
-    
-    Args:
-        debug (bool): If True, enables local-only logging without WandB.
+    Set up rich-formatted console logging.
+    Debug=True -> DEBUG level, Debug=False -> INFO level.
     """
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    # Reset root logger handlers to avoid duplicates
+    root = logging.getLogger()
+    root.handlers.clear()
 
-    # Remove existing handlers to avoid duplicate logs
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    level = logging.DEBUG if debug else logging.INFO
+    root.setLevel(level)
 
-    # Console Logging (Rich Formatting)
-    console_handler = rich.logging.RichHandler(
-        markup=True, rich_tracebacks=True, tracebacks_width=100, tracebacks_show_locals=False
+    console = rich.logging.RichHandler(
+        markup=True,
+        rich_tracebacks=True,
+        tracebacks_width=100,
+        tracebacks_show_locals=False,
     )
-    console_handler.setLevel(logging.DEBUG if debug else logging.INFO)
-
-    logger.addHandler(console_handler)
+    console.setLevel(level)
+    root.addHandler(console)
 
 def is_numeric(value: str) -> bool:
     try:

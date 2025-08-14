@@ -23,6 +23,7 @@ from manylatents.utils.utils import (
     load_precomputed_embeddings,
     setup_logging,
 )
+from manylatents.utils.pipeline import run_pipeline
 
 logger = logging.getLogger(__name__)
 

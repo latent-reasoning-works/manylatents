@@ -2,7 +2,7 @@
 name: eval_algorithm_pretrained_autoencoder
 
 defaults:
-  - override /algorithm/model: ae_reconstruction
+  - override /algorithm/lightning: ae_reconstruction
   - override /data: swissroll
   - override /callbacks/embedding: default
   - override /trainer: default
@@ -16,7 +16,7 @@ trainer:
   max_epochs: 0  # No training, evaluation only
 
 algorithm:
-  model:
+  lightning:
     network:
       input_dim: 3      # SwissRoll is 3D
       latent_dim: 2     # 2D embedding

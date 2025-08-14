@@ -4,20 +4,10 @@ defaults:
   - data: null
   - callbacks: default
   - hydra: default
-  - algorithm: default
+  - algorithm/latent: null
+  - algorithm/lightning: null
   - metrics: null
   - trainer: null # instantiate only if network is being passed
   - experiment: null
 
-seed: 2
-debug: false
-project: ManyLatents
-
-# Trainer configuration
-trainer:
-  max_epochs: 1
-  accelerator: cpu
-
-# Callbacks configuration
-callbacks:
-  embedding: {}
+pipeline: []

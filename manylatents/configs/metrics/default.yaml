@@ -1,4 +1,5 @@
 defaults:
 - dataset: null
 - embedding: null
+- module: null
 - _self_
