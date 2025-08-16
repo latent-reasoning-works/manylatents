@@ -2,7 +2,7 @@
 name: single_algorithm_pca_swissroll
 
 defaults:
-  - override /algorithm/latent: pca
+  - override /algorithms/latent: pca
   - override /data: swissroll
   - override /callbacks/embedding: default
   - override /metrics: test_metric
@@ -10,6 +10,6 @@ defaults:
 seed: 42
 project: your_project
 
-algorithm:
+algorithms:
   latent:
     n_components: 2

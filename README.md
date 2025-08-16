@@ -6,7 +6,6 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
-[![Build Status](https://github.com/username/manylatents/workflows/Build%20and%20Integration%20Tests/badge.svg)](https://github.com/username/manylatents/actions)
 [![Hydra](https://img.shields.io/badge/Config-Hydra-blue)](https://hydra.cc/)
 [![Lightning](https://img.shields.io/badge/Framework-PyTorch%20Lightning-792ee5)](https://lightning.ai/)
 [![Docs](https://img.shields.io/badge/docs-MkDocs-blue)](https://squidfunk.github.io/mkdocs-material/)
@@ -54,24 +53,46 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### Basic Usage
+### Single Algorithm Usage
 
 ```bash
-# Run PCA on synthetic data
-python -m manylatents.main experiment=hgdp_pca
+# Run PCA on Swiss roll data
+python -m manylatents.main experiment=single_algorithm
 
-# Override hyperparameters
+# Run custom algorithm combinations
 python -m manylatents.main \
-  algorithm=latent/pca \
+  algorithms/latent=pca \
   data=swissroll \
-  algorithm.n_components=3
+  algorithms.latent.n_components=3
 
 # Train an autoencoder
 python -m manylatents.main \
-  algorithm=lightning/ae_reconstruction \
+  algorithms/lightning=ae_reconstruction \
   data=swissroll \
   trainer.max_epochs=50
 ```
+
+### Pipeline Usage
+
+For multi-step sequential workflows, use the pipeline orchestrator:
+
+```bash
+# Run a sequential pipeline (PCA → Autoencoder)
+# Note: + prefix required since run_pipeline.py is at root directory
+python run_pipeline.py +experiment/pipeline=multiple_algorithms
+
+# The pipeline will:
+# 1. Submit PCA job to SLURM
+# 2. Wait for completion
+# 3. Submit autoencoder job using PCA output
+# 4. Track progress with W&B logging
+```
+
+Pipeline configurations support:
+- **Sequential processing**: Each step uses output from previous step
+- **SLURM integration**: Automatic job submission and dependency management
+- **Mixed algorithms**: Combine traditional DR with neural networks
+- **Configurable resources**: Per-step CPU/GPU/memory allocation
 
 ---
 
@@ -99,6 +120,61 @@ manylatents/
 - **`LatentModule`**: Traditional DR with `fit()`/`transform()` interface
 - **`LightningModule`**: Neural networks with full training loops
 - **Sequential workflows**: Chain multiple algorithms automatically
+
+---
+
+## 🔄 Pipeline Workflows
+
+### Sequential Pipeline Architecture
+
+The pipeline orchestrator (`run_pipeline.py`) enables complex multi-step workflows:
+
+```bash
+# Basic pipeline syntax (+ prefix required for root-level script)
+python run_pipeline.py +experiment/pipeline=<pipeline_name>
+
+# Example: PCA followed by autoencoder
+python run_pipeline.py +experiment/pipeline=multiple_algorithms
+```
+
+### Pipeline Configuration
+
+Define pipelines in YAML with automatic resource management:
+
+```yaml
+# manylatents/configs/experiment/pipeline/my_pipeline.yaml
+name: my_custom_pipeline
+
+defaults:
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /trainer: default
+
+pipeline:
+  - latent/pca                     # Step 1: PCA preprocessing
+  - lightning/ae_reconstruction:   # Step 2: Neural network with custom params
+      network:
+        latent_dim: 2
+        input_dim: 2
+```
+
+### Pipeline Features
+
+- **🔗 Automatic chaining**: Each step receives output from previous step
+- **📊 W&B integration**: Unified experiment tracking across all steps  
+- **⚡ SLURM scheduling**: Automatic job submission with dependency management
+- **🎛️ Resource allocation**: Per-step CPU/GPU/memory configuration
+- **📁 Output management**: Organized intermediate results in `pipeline_runs/`
+- **🔄 Mixed workflows**: Combine traditional DR methods with neural networks
+
+### Pipeline vs Single Algorithm
+
+| Feature | Single Algorithm | Pipeline |
+|---------|------------------|----------|
+| **Entry point** | `python -m manylatents.main` | `python run_pipeline.py +experiment/pipeline=<name>` |
+| **Job scheduling** | Direct execution | SLURM orchestration |
+| **Data flow** | Single input/output | Sequential processing |
+| **Use case** | Quick experiments | Complex workflows |
 
 ---
 
@@ -193,15 +269,21 @@ class MyNetwork(LightningModule):
 # Full test suite
 pytest
 
-# Quick smoke test  
+# Test single algorithm
+python -m manylatents.main experiment=single_algorithm
+
+# Test pipeline workflow (+ prefix required for root-level script)
+python run_pipeline.py +experiment/pipeline=multiple_algorithms
+
+# Quick smoke test with minimal data
 python -m manylatents.main \
-  algorithm=latent/noop \
+  algorithms/latent=noop \
   data=test_data \
   debug=true
 
 # Test specific combination
 python -m manylatents.main \
-  algorithm=latent/pca \
+  algorithms/latent=pca \
   data=swissroll \
   trainer.max_epochs=1
 ```

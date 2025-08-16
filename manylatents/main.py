@@ -11,7 +11,8 @@ from omegaconf import DictConfig, OmegaConf, ListConfig
 
 import wandb
 from manylatents.algorithms.latent_module_base import LatentModule
-from manylatents.configs import register_configs
+# Config registration now happens automatically on import
+import manylatents.configs  # This triggers ConfigStore registration
 from manylatents.experiment import (
     evaluate,
     instantiate_callbacks,
@@ -27,7 +28,7 @@ from manylatents.utils.utils import (
 
 logger = logging.getLogger(__name__)
 
-register_configs()
+# Config registration now happens automatically on import
 
 @hydra.main(config_path="../manylatents/configs", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> Dict[str, Any]:
@@ -59,7 +60,7 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
         field_index, data_source = determine_data_source(train_loader)
         
         # --- Algorithm module ---
-        algorithm = instantiate_algorithm(cfg.algorithm, datamodule)
+        algorithm = instantiate_algorithm(cfg.algorithms, datamodule)
         
         # --- Callbacks ---
         trainer_cb_cfg   = cfg.trainer.get("callbacks", {})

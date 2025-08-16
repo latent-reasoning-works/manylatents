@@ -38,6 +38,9 @@ wandb/
 *.crc
 *.npz
 
+# Pipeline orchestrator runs
+pipeline_runs/
+
 ## recommendations from the Mila research project template:
 # Distribution / packaging
 .Python

@@ -4,8 +4,8 @@ defaults:
   - data: null
   - callbacks: default
   - hydra: default
-  - algorithm/latent: null
-  - algorithm/lightning: null
+  - algorithms/latent: null
+  - algorithms/lightning: null
   - pipeline: null
   - metrics: null
   - trainer: null # instantiate only if network is being passed

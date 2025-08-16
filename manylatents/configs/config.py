@@ -8,10 +8,14 @@ class Config:
     """Configuration schema for the experiment.
 
     This class defines the structure of the Hydra configuration for the experiment.
+    Schema for individual algorithm components is automatically derived from their 
+    Python class __init__ signatures via the config groups in algorithms/latent/ 
+    and algorithms/lightning/.
     """
 
-    algorithm: Any = None
-    """Configuration for algorithm - supports both nested overrides and list specification."""
+    # Algorithms configuration - schema automatically derived from algorithm class signatures
+    algorithms: Optional[Dict[str, Any]] = None
+    """Configuration for algorithms - supports nested latent and lightning configurations."""
 
     pipeline: List[Any] = field(default_factory=list)
     """An ordered list of algorithms to run sequentially."""
