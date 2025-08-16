@@ -1,4 +1,5 @@
 # @package _global_
+# Generic sequential pipeline example: PCA → Autoencoder
 name: multiple_algorithms
 
 defaults:

@@ -1,0 +1,2 @@
+defaults:
+  - override /launcher: gpu_job

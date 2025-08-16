@@ -17,14 +17,13 @@ from manylatents.experiment import (
     instantiate_callbacks,
     instantiate_datamodule,
     instantiate_trainer,
-    instantiate_algorithms,
+    instantiate_algorithm,
 )
 from manylatents.utils.data import determine_data_source
 from manylatents.utils.utils import (
     load_precomputed_embeddings,
     setup_logging,
 )
-from manylatents.utils.pipeline import resolve_algorithm_calls
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +58,8 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
         test_loader = datamodule.test_dataloader()
         field_index, data_source = determine_data_source(train_loader)
         
-        # --- Algorithm modules ---
-        algorithms = instantiate_algorithms(cfg, datamodule)
+        # --- Algorithm module ---
+        algorithm = instantiate_algorithm(cfg.algorithm, datamodule)
         
         # --- Callbacks ---
         trainer_cb_cfg   = cfg.trainer.get("callbacks", {})
@@ -87,9 +86,9 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
             loggers=loggers,
         )
         
-        logger.info("Starting the experiment pipeline...")
+        logger.info("Starting single algorithm execution...")
             
-        # --- Sequential Algorithm Execution ---
+        # --- Single Algorithm Execution ---
         embeddings: Dict[str, Any] = {}
         
         if cfg.eval_only:
@@ -101,105 +100,80 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
             test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
             
             logger.info(
-                f"Running Sequential Algorithm Workflow on {data_source}:\n"
+                f"Running Single Algorithm on {data_source}:\n"
                 f"Train tensor shape: {train_tensor.shape}\n"
                 f"Test tensor shape: {test_tensor.shape}\n"
-                f"Workflow length: {len(algorithms)} algorithms"
+                f"Algorithm: {type(algorithm).__name__}"
             )
             
-            # Execute algorithms sequentially - each algorithm's output feeds into the next
-            current_data = test_tensor
-            all_scores = {}
+            latents = None
             
-            for i, algorithm in enumerate(algorithms):
-                logger.info(f"Executing algorithm {i+1}/{len(algorithms)}: {type(algorithm).__name__}")
+            # --- Compute latents based on algorithm type ---
+            if isinstance(algorithm, LatentModule):
+                # LatentModule: fit/transform pattern
+                algorithm.fit(train_tensor)
+                latents = algorithm.transform(test_tensor)
+                logger.info(f"LatentModule embedding shape: {latents.shape}")
                 
-                latents = None
+            elif isinstance(algorithm, LightningModule):
+                # LightningModule: training or eval-only
+        
+                # Handle eval-only mode with pretrained checkpoint
+                if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
+                    logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
+                    algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
                 
-                # --- Compute latents based on algorithm type ---
-                if isinstance(algorithm, LatentModule):
-                    # LatentModule: fit/transform pattern
-                    algorithm.fit(train_tensor)  # Always fit on original train data
-                    latents = algorithm.transform(current_data)
-                    logger.info(f"LatentModule embedding shape: {latents.shape}")
+                # Training phase (if not eval_only)
+                if not cfg.eval_only:
+                    logger.info("Running training...")
+                    trainer.fit(algorithm, datamodule=datamodule)
+                
+                # Model evaluation
+                logger.info("Running model evaluation.")
+                evaluation_result = evaluate(
+                    algorithm,
+                    cfg=cfg,
+                    trainer=trainer,
+                    datamodule=datamodule,
+                )
+                
+                # Handle evaluation results
+                if isinstance(evaluation_result, tuple):
+                    model_metrics, model_error = evaluation_result
+                else:
+                    model_metrics, model_error = evaluation_result, None
                     
-                elif isinstance(algorithm, LightningModule):
-                    # LightningModule: training or eval-only
+                logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
+                
+                # Extract embeddings from encoder
+                if hasattr(algorithm, "encode"):
+                    logger.info("Extracting embeddings using network encoder...")
+                    latents = algorithm.encode(test_tensor)
+                    latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+                    logger.info(f"LightningModule embedding shape: {latents.shape}")
+                else:
+                    logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method - skipping")
             
-                    # Handle eval-only mode with pretrained checkpoint
-                    if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
-                        logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
-                        algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-                    
-                    # Training phase (if not eval_only)
-                    if not cfg.eval_only:
-                        logger.info("Running training...")
-                        trainer.fit(algorithm, datamodule=datamodule)
-                    
-                    # Model evaluation
-                    logger.info("Running model evaluation.")
-                    evaluation_result = evaluate(
-                        algorithm,
-                        cfg=cfg,
-                        trainer=trainer,
-                        datamodule=datamodule,
-                    )
-                    
-                    # Handle evaluation results
-                    if isinstance(evaluation_result, tuple):
-                        model_metrics, model_error = evaluation_result
-                    else:
-                        model_metrics, model_error = evaluation_result, None
-                        
-                    logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
-                    
-                    # Extract embeddings from encoder
-                    if hasattr(algorithm, "encode"):
-                        logger.info("Extracting embeddings using network encoder...")
-                        latents = algorithm.encode(current_data)
-                        latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
-                        logger.info(f"LightningModule embedding shape: {latents.shape}")
-                    else:
-                        logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method - skipping")
-                        continue
+            # --- Unified embedding wrapping ---
+            if latents is not None:
+                embeddings = {
+                    "embeddings": latents,
+                    "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
+                    "metadata": {
+                        "source": "single_algorithm", 
+                        "algorithm_type": type(algorithm).__name__,
+                        "data_shape": test_tensor.shape,
+                    },
+                }
                 
-                # --- Unified embedding wrapping (same for all algorithm types) ---
-                if latents is not None:
-                    algorithm_embeddings = {
-                        "embeddings": latents,
-                        "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
-                        "metadata": {
-                            "source": f"algorithm_{i+1}", 
-                            "algorithm_type": type(algorithm).__name__,
-                            "data_shape": current_data.shape,
-                            "workflow_position": i+1,
-                            "workflow_total": len(algorithms)
-                        },
-                    }
-                    
-                    # Evaluate embeddings
-                    logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
-                    algorithm_embeddings["scores"] = evaluate(
-                        algorithm_embeddings,
-                        cfg=cfg,
-                        datamodule=datamodule,
-                        module=algorithm if isinstance(algorithm, LatentModule) else None
-                    )
-                    
-                    # Update scores collection
-                    all_scores.update(algorithm_embeddings["scores"])
-                    
-                    # Use the last algorithm's output as final embeddings
-                    embeddings = algorithm_embeddings
-                    
-                    # Update current_data for next algorithm in workflow
-                    current_data = torch.tensor(latents) if not isinstance(latents, torch.Tensor) else latents
-                    logger.info(f"Updated workflow data shape for next algorithm: {current_data.shape}")
-            
-            # Ensure final embeddings contain all scores from the workflow
-            if embeddings:
-                embeddings["scores"] = all_scores
-                embeddings["metadata"]["workflow_final"] = True
+                # Evaluate embeddings
+                logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
+                embeddings["scores"] = evaluate(
+                    embeddings,
+                    cfg=cfg,
+                    datamodule=datamodule,
+                    module=algorithm if isinstance(algorithm, LatentModule) else None
+                )
 
         # --- Callback processing ---
         if embeddings and embedding_cbs:

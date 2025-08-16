@@ -1,0 +1,3 @@
+defaults:
+  - /resources: cpu
+  - _self_
