@@ -4,7 +4,6 @@ name: pipeline_step_lightning
 
 defaults:
   - override /algorithms/lightning: null  # To be specified in pipeline config
-  - override /data: swissroll  # Default, can be overridden
   - override /callbacks/embedding: default  # Includes save_embeddings, plot_embeddings, wandb_log_scores
   - override /trainer: default
   - override /trainer/logger: wandb

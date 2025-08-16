@@ -1,5 +1,5 @@
 # @package _global_
-# Generic sequential pipeline example: PCA → Autoencoder
+# Sequential pipeline example: PCA → Autoencoder on Swiss Roll data
 name: multiple_algorithms
 
 defaults:
@@ -13,8 +13,10 @@ pipeline:
     overrides:
       - algorithms/latent=pca
       - algorithms.latent.n_components=50
+      - data=swissroll  # First step uses specified data source
   - experiment: pipeline_step_lightning
     overrides:
       - algorithms/lightning=ae_reconstruction
       - algorithms.lightning.network.latent_dim=2
-      - algorithms.lightning.network.input_dim=50 
+      - algorithms.lightning.network.input_dim=50
+      # No data override - will be handled by run_pipeline.py 

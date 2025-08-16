@@ -14,12 +14,22 @@ def main():
 
     pipeline_steps = cfg.pipeline
     
+    # Get the save format from a pipeline step config that includes callbacks
+    # Load the first step's experiment config to get the save format
+    first_step = pipeline_steps[0]
+    first_experiment = first_step.get('experiment')
+    with initialize(config_path="manylatents/configs", version_base=None):
+        step_cfg = compose(config_name="config", overrides=[f"experiment={first_experiment}"])
+    save_format = step_cfg.callbacks.embedding.save_embeddings.save_format
+    
     run_name = cfg.get('name', 'pipeline_run')
     shared_fs_path = Path(f"/network/scratch/c/cesar.valdez/manyLatents/pipeline_runs/{run_name}-{uuid.uuid4().hex[:8]}")
     shared_fs_path.mkdir(parents=True, exist_ok=True)
     previous_job = None
+    previous_output_file = None  # Track exact output file for next step
 
     print(f"Orchestrating pipeline '{run_name}' with steps: {pipeline_steps}")
+    print(f"Using save format: {save_format}")
 
     for i, step_config in enumerate(pipeline_steps):
         # Extract experiment and overrides from pipeline step
@@ -65,15 +75,20 @@ def main():
             timeout_min=get_launcher_param(launcher_cfg, 'timeout_min', 60)
         )
         
-        # Define I/O paths and worker arguments
-        output_file = shared_fs_path / f"step_{i}_{step_name}.pt"
+        # Define I/O paths using the format from config
+        output_file = shared_fs_path / f"step_{i}_{step_name}.{save_format}"
         
         # Build worker overrides starting with experiment
         worker_overrides = [f"experiment={experiment_name}"]
         
         # Add data input configuration
         if i > 0:
-            worker_overrides.append(f"data.precomputed_path={shared_fs_path / f'step_{i-1}_*.pt'}")
+            # For steps after the first, use precomputed data from previous step
+            worker_overrides.append(f"data.precomputed_path={previous_output_file}")
+        else:
+            # For first step, ensure data source is specified in pipeline config
+            # The data override should already be in step_overrides from pipeline config
+            pass
         
         # Add custom save path for pipeline chaining
         worker_overrides.append(f"callbacks.embedding.save_embeddings.save_path={output_file}")
@@ -97,6 +112,7 @@ def main():
                 job = executor.submit(func)
         
         previous_job = job
+        previous_output_file = output_file  # Store exact output path for next step
         print(f"  --> Submitted as Job ID: {job.job_id}")
 
 if __name__ == "__main__":
