@@ -1,5 +1,6 @@
 import functools
 import logging
+import inspect
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
@@ -15,6 +16,7 @@ from torch.utils.data import DataLoader
 from manylatents.callbacks.embedding.base import EmbeddingCallback
 from manylatents.utils.data import subsample_data_and_dataset
 from manylatents.utils.metrics import flatten_and_unroll_metrics
+from manylatents.utils.pipeline import resolve_algorithm_calls
 from manylatents.utils.utils import check_or_make_dirs
 
 logger = logging.getLogger(__name__)
@@ -76,7 +78,37 @@ def instantiate_trainer(
     return Trainer(**trainer_kwargs)
 
 
-    
+def instantiate_algorithms(
+    cfg: DictConfig,
+    datamodule: LightningDataModule | None = None,
+) -> list[Any]:
+    """
+    Resolves and instantiates a list of algorithms from the configuration, conditionally
+    injecting the datamodule instance if an algorithm's constructor accepts it.
+    """
+    # Resolve the list of algorithm configurations from the pipeline/single mode
+    algorithm_calls = resolve_algorithm_calls(cfg)
+
+    algorithms = []
+    for algo_config in algorithm_calls:
+        # Get the class of the algorithm we are about to build
+        target_class = hydra.utils.get_class(algo_config["_target_"])
+        
+        # Inspect its constructor to see if it needs a 'datamodule'
+        signature = inspect.signature(target_class.__init__)
+        
+        if "datamodule" in signature.parameters:
+            # If it does, provide it during instantiation
+            algo = hydra.utils.instantiate(algo_config, datamodule=datamodule)
+        else:
+            # If not, instantiate it without the datamodule
+            algo = hydra.utils.instantiate(algo_config)
+        
+        algorithms.append(algo)
+    return algorithms
+
+
+
 @functools.singledispatch
 def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
     """Evaluates the algorithm.

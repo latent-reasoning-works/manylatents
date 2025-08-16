@@ -13,6 +13,9 @@ class Config:
     algorithm: Any = None
     """Configuration for algorithm - supports both nested overrides and list specification."""
 
+    pipeline: List[Any] = field(default_factory=list)
+    """An ordered list of algorithms to run sequentially."""
+
     data: Optional[Any] = None
     """Configuration for the data (dataset + transforms + dataloader creation)."""
 
