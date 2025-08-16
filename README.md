@@ -30,7 +30,7 @@
 - 🔧 **Modular Architecture**: Unified `LatentModule` interface for all algorithms
 - ⚡ **Lightning Integration**: Seamless neural network training with PyTorch Lightning
 - 🎛️ **Hydra Configuration**: Flexible, composable experiment configurations
-- 🔄 **Sequential Processing**: Chain algorithms for complex pipelines
+- 🔄 **Sequential Pipelines**: Chain multiple algorithms (e.g., PCA → Autoencoder → final embedding)
 - 📊 **Rich Evaluation**: Comprehensive metrics for embedding quality
 - 🧪 **Extensive Testing**: Matrix testing across algorithm-dataset combinations
 
@@ -56,7 +56,7 @@ pip install -e .
 ### Single Algorithm Usage
 
 ```bash
-# Run PCA on Swiss roll data
+# Run pre-configured experiment (PCA on Swiss roll)
 python -m manylatents.main experiment=single_algorithm
 
 # Run custom algorithm combinations
@@ -72,27 +72,28 @@ python -m manylatents.main \
   trainer.max_epochs=50
 ```
 
-### Pipeline Usage
+### Sequential Pipeline Usage
 
-For multi-step sequential workflows, use the pipeline orchestrator:
+For multi-step sequential workflows, use pipeline configurations from the `pipeline/` folder:
 
 ```bash
 # Run a sequential pipeline (PCA → Autoencoder)
-# Note: + prefix required since run_pipeline.py is at root directory
-python run_pipeline.py +experiment/pipeline=multiple_algorithms
+python -m manylatents.main experiment=multiple_algorithms
 
 # The pipeline will:
-# 1. Submit PCA job to SLURM
-# 2. Wait for completion
-# 3. Submit autoencoder job using PCA output
+# 1. Run PCA on input data
+# 2. Pass PCA output to autoencoder
+# 3. Generate final embedding
 # 4. Track progress with W&B logging
 ```
 
+**Note**: Pipeline configurations are located in `manylatents/configs/experiment/pipeline/` for chainable multi-algorithm workflows.
+
 Pipeline configurations support:
-- **Sequential processing**: Each step uses output from previous step
-- **SLURM integration**: Automatic job submission and dependency management
+- **Sequential processing**: Each algorithm receives output from previous step
 - **Mixed algorithms**: Combine traditional DR with neural networks
-- **Configurable resources**: Per-step CPU/GPU/memory allocation
+- **Per-step overrides**: Custom hyperparameters for each algorithm
+- **Unified interface**: Same main.py entry point as single algorithms
 
 ---
 
@@ -127,54 +128,59 @@ manylatents/
 
 ### Sequential Pipeline Architecture
 
-The pipeline orchestrator (`run_pipeline.py`) enables complex multi-step workflows:
+The unified pipeline system enables complex multi-step workflows through the main interface:
 
 ```bash
-# Basic pipeline syntax (+ prefix required for root-level script)
-python run_pipeline.py +experiment/pipeline=<pipeline_name>
+# Basic pipeline syntax
+python -m manylatents.main experiment=<pipeline_name>
 
 # Example: PCA followed by autoencoder
-python run_pipeline.py +experiment/pipeline=multiple_algorithms
+python -m manylatents.main experiment=multiple_algorithms
 ```
 
 ### Pipeline Configuration
 
-Define pipelines in YAML with automatic resource management:
+Define pipelines in YAML with sequential algorithm execution:
 
 ```yaml
 # manylatents/configs/experiment/pipeline/my_pipeline.yaml
 name: my_custom_pipeline
 
 defaults:
+  - _self_
   - override /data: swissroll
   - override /callbacks/embedding: default
   - override /trainer: default
 
 pipeline:
-  - latent/pca                     # Step 1: PCA preprocessing
-  - lightning/ae_reconstruction:   # Step 2: Neural network with custom params
-      network:
-        latent_dim: 2
-        input_dim: 2
+  - experiment: pipeline_step_latent    # Step 1: Traditional DR method
+    overrides:
+      - algorithms/latent=pca
+      - algorithms.latent.n_components=50
+  - experiment: pipeline_step_lightning # Step 2: Neural network
+    overrides:
+      - algorithms/lightning=ae_reconstruction
+      - algorithms.lightning.network.latent_dim=2
+      - algorithms.lightning.network.input_dim=50
 ```
 
 ### Pipeline Features
 
-- **🔗 Automatic chaining**: Each step receives output from previous step
+- **🔗 Automatic chaining**: Each algorithm receives output from previous step
 - **📊 W&B integration**: Unified experiment tracking across all steps  
-- **⚡ SLURM scheduling**: Automatic job submission with dependency management
-- **🎛️ Resource allocation**: Per-step CPU/GPU/memory configuration
-- **📁 Output management**: Organized intermediate results in `pipeline_runs/`
+- **🎛️ Per-step configuration**: Custom hyperparameters for each algorithm
+- **📁 Output management**: Organized intermediate results tracking
 - **🔄 Mixed workflows**: Combine traditional DR methods with neural networks
+- **⚡ Unified interface**: Same main.py entry point as single algorithms
 
 ### Pipeline vs Single Algorithm
 
 | Feature | Single Algorithm | Pipeline |
 |---------|------------------|----------|
-| **Entry point** | `python -m manylatents.main` | `python run_pipeline.py +experiment/pipeline=<name>` |
-| **Job scheduling** | Direct execution | SLURM orchestration |
-| **Data flow** | Single input/output | Sequential processing |
-| **Use case** | Quick experiments | Complex workflows |
+| **Entry point** | `python -m manylatents.main` | `python -m manylatents.main` |
+| **Configuration** | `algorithms/latent=pca` | `experiment=multiple_algorithms` |
+| **Data flow** | Single input/output | Sequential algorithm chaining |
+| **Use case** | Single DR method | Multi-step workflows |
 
 ---
 
@@ -190,6 +196,11 @@ pipeline:
 - ✅ **Autoencoder** - Reconstruction-based dimensionality reduction
 - ✅ **VAE** - Variational Autoencoder (coming soon)
 - ✅ **Custom architectures** - Extensible neural network support
+
+### Sequential Pipelines
+- 🔗 **Algorithm Chaining** - Connect traditional DR methods with neural networks
+- ⚙️ **Per-Step Configuration** - Custom hyperparameters for each pipeline stage
+- 📊 **Unified Tracking** - Single W&B experiment across all pipeline steps
 
 ### Datasets
 - 🧬 **Genomic**: HGDP, All of Us (AOU), UK Biobank (UKBB)
@@ -272,8 +283,8 @@ pytest
 # Test single algorithm
 python -m manylatents.main experiment=single_algorithm
 
-# Test pipeline workflow (+ prefix required for root-level script)
-python run_pipeline.py +experiment/pipeline=multiple_algorithms
+# Test pipeline workflow
+python -m manylatents.main experiment=multiple_algorithms
 
 # Quick smoke test with minimal data
 python -m manylatents.main \
