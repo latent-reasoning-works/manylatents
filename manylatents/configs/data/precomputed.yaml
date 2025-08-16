@@ -1,0 +1,16 @@
+defaults:
+  - default
+
+_target_: manylatents.data.precomputed_datamodule.PrecomputedDataModule
+
+# The path to your pre-computed data file (e.g., .csv or .npy)
+# This should be overridden from the command line or an experiment config.
+path: null 
+
+# Optional: specify the column name for labels if using a CSV with labels
+label_col: null 
+
+# 'full' uses all data for train/test, 'split' creates a random split
+mode: full 
+test_split: 0.2
+seed: ${seed}
