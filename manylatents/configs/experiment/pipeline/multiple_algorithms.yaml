@@ -3,18 +3,18 @@
 name: multiple_algorithms
 
 defaults:
-  - override /data: swissroll
-  - override /callbacks/embedding: default
-  - override /trainer: default
-  - override /metrics: test_metric
   - _self_
 
 seed: 42
 project: your_project
 
 pipeline:
-  - latent/pca
-  - lightning/ae_reconstruction:
-      network:
-        latent_dim: 2
-        input_dim: 2 
+  - experiment: pipeline_step_latent
+    overrides:
+      - algorithms/latent=pca
+      - algorithms.latent.n_components=50
+  - experiment: pipeline_step_lightning
+    overrides:
+      - algorithms/lightning=ae_reconstruction
+      - algorithms.lightning.network.latent_dim=2
+      - algorithms.lightning.network.input_dim=50 
