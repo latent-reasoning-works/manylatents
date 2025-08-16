@@ -4,6 +4,7 @@ name: pipeline_step_lightning
 
 defaults:
   - override /algorithms/lightning: null  # To be specified in pipeline config
+  - override /data: precomputed  # Use precomputed data for pipeline chaining
   - override /callbacks/embedding: default  # Includes save_embeddings, plot_embeddings, wandb_log_scores
   - override /trainer: default
   - override /trainer/logger: wandb
@@ -12,3 +13,7 @@ defaults:
 
 seed: 42
 project: your_project
+
+# Lightning trainer configuration
+trainer:
+  fast_dev_run: false  # Set to true for quick testing (runs only 1 batch)

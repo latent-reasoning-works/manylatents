@@ -10,9 +10,11 @@ class PCAModule(LatentModule):
     def __init__(self, 
                  n_components: int = 2, 
                  random_state: int = 42, 
-                 fit_fraction: float = 1.0):
+                 fit_fraction: float = 1.0,
+                 **kwargs):
         super().__init__(n_components=n_components, 
-                         init_seed=random_state)
+                         init_seed=random_state,
+                         **kwargs)
         self.fit_fraction = fit_fraction
         self.model = PCA(n_components=n_components,
                          random_state=random_state)

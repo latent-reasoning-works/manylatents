@@ -84,15 +84,24 @@ def main():
         # Add data input configuration
         if i > 0:
             # For steps after the first, use precomputed data from previous step
-            worker_overrides.append(f"data.precomputed_path={previous_output_file}")
+            # Use predictable filename from previous step
+            prev_step_name = pipeline_steps[i-1].get('experiment')
+            prev_static_filename = f"step_{i-1:02d}_{prev_step_name}"
+            previous_output_file = f"{shared_fs_path}/{i-1:02d}_{prev_step_name}/embeddings_{prev_static_filename}.{save_format}"
+            worker_overrides.append(f"data.path={previous_output_file}")
         else:
             # For first step, ensure data source is specified in pipeline config
             # The data override should already be in step_overrides from pipeline config
             pass
         
-        # Add custom save directory for pipeline chaining
+        # Add custom save directory for pipeline chaining with static filenames
+        static_filename = f"step_{i:02d}_{step_name}"
         worker_overrides.append(f"callbacks.embedding.save_embeddings.save_dir={step_output_dir}")
-        worker_overrides.append(f"callbacks.embedding.save_embeddings.experiment_name={step_name}")
+        worker_overrides.append(f"callbacks.embedding.plot_embeddings.save_dir={step_output_dir}")
+        worker_overrides.append(f"callbacks.embedding.save_embeddings.experiment_name={static_filename}")
+        worker_overrides.append(f"+callbacks.embedding.save_embeddings.use_timestamp=false")
+        # Direct Lightning outputs to the same directory
+        worker_overrides.append(f"trainer.default_root_dir={step_output_dir}")
         
         # Add step-specific overrides
         worker_overrides.extend(step_overrides)
@@ -116,10 +125,6 @@ def main():
             job = executor.submit(func)
         
         previous_job = job
-        # Store output directory for next step - will need to find actual file later
-        previous_output_dir = step_output_dir
-        # For simplicity, assume the saved file will be found by glob pattern
-        previous_output_file = f"{step_output_dir}/embeddings_{step_name}_*.{save_format}"
         print(f"  --> Submitted as Job ID: {job.job_id}")
 
 if __name__ == "__main__":

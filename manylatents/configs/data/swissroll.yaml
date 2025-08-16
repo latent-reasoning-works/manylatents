@@ -9,7 +9,7 @@ noise: 0.1
 manifold_noise: 0.1
 width: 10.0
 random_state: ${seed}
-rotate_to_dim: 5
+rotate_to_dim: 200
 mode: full
 precomputed_path: null
 mmap_mode: null

@@ -60,7 +60,13 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
         field_index, data_source = determine_data_source(train_loader)
         
         # --- Algorithm module ---
-        algorithm = instantiate_algorithm(cfg.algorithms, datamodule)
+        # Determine which algorithm to instantiate based on configuration
+        if hasattr(cfg.algorithms, 'latent') and cfg.algorithms.latent is not None:
+            algorithm = instantiate_algorithm(cfg.algorithms.latent, datamodule)
+        elif hasattr(cfg.algorithms, 'lightning') and cfg.algorithms.lightning is not None:
+            algorithm = instantiate_algorithm(cfg.algorithms.lightning, datamodule)
+        else:
+            raise ValueError("No algorithm specified in configuration")
         
         # --- Callbacks ---
         trainer_cb_cfg   = cfg.trainer.get("callbacks", {})

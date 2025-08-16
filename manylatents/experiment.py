@@ -112,10 +112,13 @@ def evaluate_embeddings(
 
     embeddings = EmbeddingOutputs.get("embeddings")
  
-    if datamodule.mode == "split":
+    # Handle different datamodule types - some store mode directly, others in hparams
+    mode = getattr(datamodule, 'mode', None) or getattr(datamodule.hparams, 'mode', 'full')
+    
+    if mode == "split":
         ds = datamodule.test_dataset
     else:
-        ds = datamodule.train_dataset ## defaults to full datset on full runs
+        ds = datamodule.train_dataset ## defaults to full dataset on full runs
 
     logger.info(f"Reference data shape: {ds.data.shape}")
     logger.info(f"Computing embedding metrics for {ds.data.shape[0]} samples.")

@@ -16,12 +16,14 @@ class SaveEmbeddings(EmbeddingCallback):
                  save_dir: str = "outputs", 
                  save_format: str = "npy", 
                  experiment_name: str = "experiment",
-                 include_metrics: bool = False) -> None:
+                 include_metrics: bool = False,
+                 use_timestamp: bool = True) -> None:
         super().__init__()
         self.save_dir        = save_dir
         self.save_format     = save_format
         self.experiment_name = experiment_name
         self.include_metrics = include_metrics
+        self.use_timestamp   = use_timestamp
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
@@ -31,8 +33,11 @@ class SaveEmbeddings(EmbeddingCallback):
         if "labels" not in metadata and "label" in embeddings:
             metadata["labels"] = embeddings["label"]
 
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname = f"embeddings_{self.experiment_name}_{ts}.{self.save_format}"
+        if self.use_timestamp:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fname = f"embeddings_{self.experiment_name}_{ts}.{self.save_format}"
+        else:
+            fname = f"embeddings_{self.experiment_name}.{self.save_format}"
         self.save_path = os.path.join(self.save_dir, fname)
 
         logger.debug(f"save_embeddings() called with embeddings shape: {X.shape}")
