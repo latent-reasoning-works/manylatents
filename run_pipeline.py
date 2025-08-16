@@ -36,8 +36,8 @@ def main():
         experiment_name = step_config.get('experiment')
         step_overrides = step_config.get('overrides', [])
         
-        # Get experiment name for job naming
-        step_name = experiment_name.replace('pipeline_step_', '')
+        # Use the actual experiment name for clearer identification
+        step_name = experiment_name
         
         # Load experiment config to get launcher configuration  
         try:
@@ -58,7 +58,7 @@ def main():
         }
         
         # Configure the submitit Executor for this job
-        executor = submitit.AutoExecutor(folder=shared_fs_path / "submitit_logs" / f"step_{i}")
+        executor = submitit.AutoExecutor(folder=shared_fs_path / "submitit_logs" / f"{i:02d}_{step_name}")
         # Handle both dict and DictConfig access patterns
         def get_launcher_param(cfg, key, default=None):
             if isinstance(cfg, dict):
@@ -75,8 +75,8 @@ def main():
             timeout_min=get_launcher_param(launcher_cfg, 'timeout_min', 60)
         )
         
-        # Define I/O paths using the format from config
-        output_file = shared_fs_path / f"step_{i}_{step_name}.{save_format}"
+        # Define I/O paths using the actual experiment name
+        step_output_dir = shared_fs_path / f"{i:02d}_{step_name}"
         
         # Build worker overrides starting with experiment
         worker_overrides = [f"experiment={experiment_name}"]
@@ -90,8 +90,9 @@ def main():
             # The data override should already be in step_overrides from pipeline config
             pass
         
-        # Add custom save path for pipeline chaining
-        worker_overrides.append(f"callbacks.embedding.save_embeddings.save_path={output_file}")
+        # Add custom save directory for pipeline chaining
+        worker_overrides.append(f"callbacks.embedding.save_embeddings.save_dir={step_output_dir}")
+        worker_overrides.append(f"callbacks.embedding.save_embeddings.experiment_name={step_name}")
         
         # Add step-specific overrides
         worker_overrides.extend(step_overrides)
@@ -104,15 +105,21 @@ def main():
             *worker_overrides
         ])
         
-        job = None
-        with executor.batch():
-            if previous_job:
-                job = executor.submit(func, after=previous_job) # Chain dependency
-            else:
-                job = executor.submit(func)
+        # Submit job with proper dependency handling
+        if previous_job:
+            # Set up SLURM dependency before submitting
+            executor.update_parameters(slurm_additional_parameters={"dependency": f"afterok:{previous_job.job_id}"})
+            job = executor.submit(func)
+            # Reset additional parameters for next job
+            executor.update_parameters(slurm_additional_parameters={})
+        else:
+            job = executor.submit(func)
         
         previous_job = job
-        previous_output_file = output_file  # Store exact output path for next step
+        # Store output directory for next step - will need to find actual file later
+        previous_output_dir = step_output_dir
+        # For simplicity, assume the saved file will be found by glob pattern
+        previous_output_file = f"{step_output_dir}/embeddings_{step_name}_*.{save_format}"
         print(f"  --> Submitted as Job ID: {job.job_id}")
 
 if __name__ == "__main__":
