@@ -1,0 +1,16 @@
+magnitude_dimension:
+  _target_: manylatents.metrics.magnitude_dimension.MagnitudeDimension
+  _partial_: True
+  # Configurable parameters with default values
+  n_ts: 50
+  log_scale: false
+  scale_finding: "convergence"
+  target_prop: 0.95
+  metric: "euclidean"
+  p: 2
+  n_neighbors: 12
+  method: "cholesky"
+  one_point_property: true
+  perturb_singularities: true
+  positive_magnitude: false
+  exact: false

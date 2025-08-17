@@ -8,6 +8,9 @@ defaults:
   - algorithms/lightning: null
   - pipeline: null
   - metrics: null
+  - metrics/embedding: null
+  - metrics/module: null
+  - metrics/dataset: null
   - trainer: null # instantiate only if network is being passed
   - experiment: null
 
