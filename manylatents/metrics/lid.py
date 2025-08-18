@@ -6,13 +6,17 @@ from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
 
-def LocalIntrinsicDimensionality(dataset, embeddings: np.ndarray, k: int = 20) -> float:
+def LocalIntrinsicDimensionality(embeddings: np.ndarray, 
+                                 dataset=None, 
+                                 module=None,
+                                 k: int = 20) -> float:
     """
     Compute the mean Local Intrinsic Dimensionality (LID) for the embedding.
 
     Parameters:
-      - dataset: Provided for protocol compliance.
       - embeddings: A numpy array (or torch tensor) representing the low-dimensional embeddings.
+      - dataset: Provided for protocol compliance (unused).
+      - module: Provided for protocol compliance (unused).
       - k: The number of nearest neighbors to consider.
 
     Returns:

@@ -6,7 +6,11 @@ from ripser import ripser
 
 logger = logging.getLogger(__name__)
 
-def PersistentHomology(dataset, embeddings: np.ndarray, homology_dim: int = 1, persistence_threshold: float = 0.1) -> float:
+def PersistentHomology(embeddings: np.ndarray, 
+                       dataset=None, 
+                       module=None,
+                       homology_dim: int = 1, 
+                       persistence_threshold: float = 0.1) -> float:
     """
     Compute a persistent homology metric for the embedding.
 
@@ -15,8 +19,9 @@ def PersistentHomology(dataset, embeddings: np.ndarray, homology_dim: int = 1, p
     (death - birth) exceeds a given threshold.
 
     Parameters:
-      - dataset: Provided for protocol compliance.
       - embeddings: A numpy array (or torch tensor) representing the low-dimensional embeddings.
+      - dataset: Provided for protocol compliance (unused).
+      - module: Provided for protocol compliance (unused).
       - homology_dim: Homology dimension to analyze (e.g., 0 for connected components, 1 for loops).
       - persistence_threshold: Minimum persistence for a feature to be counted.
 
