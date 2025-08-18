@@ -11,10 +11,12 @@ class ArchetypalAnalysisModule(LatentModule):
         n_components: int = 3,
         method: str = "pgd",
         max_iter: int = 100,
-        random_state: int = 42
+        random_state: int = 42,
+        **kwargs
     ):
         super().__init__(n_components=n_components, 
-                         init_seed=random_state)
+                         init_seed=random_state,
+                         **kwargs)
         self.method = method
         self.max_iter = max_iter
         self.model = None
