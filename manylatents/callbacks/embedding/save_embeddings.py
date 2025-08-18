@@ -39,6 +39,9 @@ class SaveEmbeddings(EmbeddingCallback):
         else:
             fname = f"embeddings_{self.experiment_name}.{self.save_format}"
         self.save_path = os.path.join(self.save_dir, fname)
+        
+        # Ensure parent directory exists
+        os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
 
         logger.debug(f"save_embeddings() called with embeddings shape: {X.shape}")
         logger.info(f"Computed save path: {self.save_path}")
