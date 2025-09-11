@@ -44,10 +44,12 @@ class PHATEModule(LatentModule):
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
         
-        # Store lightweight statistics for permutation detection in transform
+        # Store lightweight statistics and small sample for permutation detection in transform
         self._training_shape = x_np[:n_fit].shape
         self._training_mean = np.mean(x_np[:n_fit], axis=0)
         self._training_std = np.std(x_np[:n_fit], axis=0)
+        # Store first 10 rows for identity checking (small memory footprint)
+        self._training_sample = x_np[:min(10, n_fit)].copy()
         
         self.model.fit(x_np[:n_fit])
         self._is_fitted = True
@@ -62,7 +64,8 @@ class PHATEModule(LatentModule):
         # Check for potential data permutation issues
         if (x_np.shape == self._training_shape and 
             np.allclose(np.mean(x_np, axis=0), self._training_mean, rtol=1e-5) and
-            np.allclose(np.std(x_np, axis=0), self._training_std, rtol=1e-5)):
+            np.allclose(np.std(x_np, axis=0), self._training_std, rtol=1e-5) and
+            not np.array_equal(x_np[:len(self._training_sample)], self._training_sample)):
             
             import warnings
             warnings.warn(
