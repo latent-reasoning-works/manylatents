@@ -62,8 +62,7 @@ class PHATEModule(LatentModule):
         # Check for potential data permutation issues
         if (x_np.shape == self._training_shape and 
             np.allclose(np.mean(x_np, axis=0), self._training_mean, rtol=1e-5) and
-            np.allclose(np.std(x_np, axis=0), self._training_std, rtol=1e-5) and
-            not np.array_equal(x_np, x_np[:len(self._training_mean)])):
+            np.allclose(np.std(x_np, axis=0), self._training_std, rtol=1e-5)):
             
             import warnings
             warnings.warn(
