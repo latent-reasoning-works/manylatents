@@ -15,5 +15,5 @@ random_state: ${seed}
 return_centers: false
 mode: full          
 precomputed_path: null
-mmap_mode: null       
-
+mmap_mode: null
+shuffle_traindata: false

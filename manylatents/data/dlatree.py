@@ -14,6 +14,7 @@ class DLATreeDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
+        shuffle_traindata: bool = True,
         n_branch: int = 20,
         branch_lengths: Union[List[int], int, None] = None, 
         rand_multiplier: float = 2.0,
@@ -85,6 +86,7 @@ class DLATreeDataModule(LightningDataModule):
         
             
         self.batch_size = batch_size
+        self.shuffle_traindata = shuffle_traindata
         self.test_split = test_split
         self.num_workers = num_workers
 
@@ -156,7 +158,7 @@ class DLATreeDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 
