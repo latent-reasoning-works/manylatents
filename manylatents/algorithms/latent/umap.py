@@ -20,8 +20,9 @@ class UMAPModule(LatentModule):
         n_epochs: Optional[int] = 200,
         learning_rate: float = 1.0,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
+        **kwargs
     ):
-        super().__init__(n_components, random_state)
+        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
         self.model = UMAP(n_components=n_components, 
                            random_state=random_state,

@@ -42,8 +42,9 @@ class TSNEModule(LatentModule):
         metric: str = "euclidean",
         initialization: str = "random",
         fit_fraction: float = 1.0,
+        **kwargs
     ):
-        super().__init__(n_components, random_state)
+        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.perplexity = perplexity
         self.n_iter_early = n_iter_early
         self.n_iter_late = n_iter_late

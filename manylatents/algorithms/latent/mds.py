@@ -9,19 +9,20 @@ from ..latent_module_base import LatentModule
 class MDSModule(LatentModule):
     def __init__(
         self,
-        ndim: int = 2,
-        seed: Optional[int] = 42,
+        n_components: int = 2,
+        random_state: Optional[int] = 42,
         how: str = "metric", #  choose from ['classic', 'metric', 'nonmetric']
         solver: str = "smacof", # choose from ["sgd", "smacof"]
         distance_metric: str = 'euclidean', # recommended values: 'euclidean' and 'cosine'
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
+        **kwargs
     ):
-        super().__init__(ndim, seed)
+        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
-        self.model = MultidimensionalScaling(ndim=ndim, 
-                                            seed=seed,
+        self.model = MultidimensionalScaling(ndim=n_components, 
+                                            seed=random_state,
                                             how=how,
                                             solver=solver,
                                             distance_metric=distance_metric,

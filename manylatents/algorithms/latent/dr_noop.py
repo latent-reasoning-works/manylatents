@@ -4,8 +4,8 @@ from manylatents.algorithms.latent_module_base import LatentModule
 
 
 class NoOpModule(LatentModule):
-    def __init__(self):
-        super().__init__(n_components=0, init_seed=42)
+    def __init__(self, **kwargs):
+        super().__init__(n_components=0, init_seed=42, **kwargs)
         self._is_fitted = True 
 
     def fit(self, x: Tensor) -> None:

@@ -23,8 +23,9 @@ class PHATEModule(LatentModule):
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
+        **kwargs
     ):
-        super().__init__(n_components, random_state)
+        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
         self.model = PHATE(n_components=n_components, 
                            random_state=random_state,
