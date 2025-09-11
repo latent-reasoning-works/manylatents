@@ -44,11 +44,14 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
 
+    import os
+    wandb_mode = "disabled" if cfg.debug else os.getenv("WANDB_MODE", "online")
+    
     with wandb.init(
         project=cfg.project,
         name=cfg.name,
         config=OmegaConf.to_container(cfg, resolve=True),
-        mode="disabled" if cfg.debug else "online",
+        mode=wandb_mode,
     ) as run: 
         lightning.seed_everything(cfg.seed, workers=True)
     
