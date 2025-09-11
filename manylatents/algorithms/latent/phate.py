@@ -43,6 +43,12 @@ class PHATEModule(LatentModule):
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
+        
+        # Store lightweight statistics for permutation detection in transform
+        self._training_shape = x_np[:n_fit].shape
+        self._training_mean = np.mean(x_np[:n_fit], axis=0)
+        self._training_std = np.std(x_np[:n_fit], axis=0)
+        
         self.model.fit(x_np[:n_fit])
         self._is_fitted = True
 
@@ -52,6 +58,21 @@ class PHATEModule(LatentModule):
             raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
         
         x_np = x.detach().cpu().numpy()
+        
+        # Check for potential data permutation issues
+        if (x_np.shape == self._training_shape and 
+            np.allclose(np.mean(x_np, axis=0), self._training_mean, rtol=1e-5) and
+            np.allclose(np.std(x_np, axis=0), self._training_std, rtol=1e-5) and
+            not np.array_equal(x_np, x_np[:len(self._training_mean)])):
+            
+            import warnings
+            warnings.warn(
+                "Transform data has identical shape and statistics to training data but are not identical. "
+                "This may indicate shuffled vs unshuffled versions of the same dataset. "
+                "Consider setting 'shuffle_traindata: false' in your data config to avoid PHATE warnings.",
+                UserWarning
+            )
+        
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
