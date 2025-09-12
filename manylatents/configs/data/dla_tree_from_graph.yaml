@@ -1,0 +1,46 @@
+defaults:
+  - default
+
+_target_: manylatents.data.dlatree.DLATreeFromGraphDataModule
+
+n_dim: 100
+random_state: ${seed}
+sigma: 0.5
+mode: full
+precomputed_path: null
+mmap_mode: null
+test_split: 0.2
+shuffle_traindata: false
+
+# Graph topology definition
+graph_edges:
+  # Main trunk: N1--E1--N2--E2--N3--EX1--N4--E3--N5--EX2--N6--E4--N7
+  - [1, 2, "trunk", 1, 300]   # N1--E1--N2
+  - [2, 3, "trunk", 2, 300]   # N2--E2--N3
+  - [3, 4, "trunk", "EX1", 1]  # N3--EX1--N4 (gap edge)
+  - [4, 5, "trunk", 3, 25]   # N4--E3--N5
+  - [5, 6, "trunk", "EX2", 1]  # N5--EX2--N6 (gap edge)
+  - [6, 7, "trunk", 4, 300]   # N6--E4--N7
+  
+  # Branch 1: N2--E6--N10--EX3--N11--E7--N12
+  - [2, 10, "branch", 6, 300]  # N2--E6--N10
+  - [10, 11, "branch", "EX3", 1] # N10--EX3--N11 (gap edge)
+  - [11, 12, "branch", 7, 25] # N11--E7--N12
+  
+  # Branch 2: N6--E5--N9
+  - [6, 9, "branch", 5, 300]   # N6--E5--N9
+
+gap_edges:
+  # Define which edges should have gaps (smaller gap_multiplier)
+  - [3, 4, 0.1]  # EX1 gap
+  - [5, 6, 0.1]  # EX2 gap  
+  - [10, 11, 0.1] # EX3 gap
+
+# Branch labels for visualization
+branch_labels:
+  1: "Main Trunk"
+  2: "Branch A" 
+  3: "Branch B"
+
+# Use colorful discrete colormap
+sampling_density_factors: null

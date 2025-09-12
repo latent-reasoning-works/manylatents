@@ -477,26 +477,34 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
         for i in range(1, n_branch):
             ind = np.random.randint(branch_start_indices[i - 1], branch_start_indices[i - 1] + branch_lengths[i - 1])
 
-            # Create the ground truth branch first
+            # Create the ground truth branch first - always connects to ground truth position
             new_branch_gt = np.cumsum(
                 -1 + rand_multiplier * np.random.rand(branch_lengths[i], n_dim), axis=0
             )
-            new_branch_gt += M_gt[ind]
+            new_branch_gt += M_gt[ind]  # Connect to original (pre-jump) position
 
-            # Create the potentially disconnected branch
+            # Create the potentially disconnected branch - starts from ground truth, then jumps
             new_branch = new_branch_gt.copy()
             if i in disconnect_branches:
+                # Jump from the END of the previous branch instead of connection point
+                prev_branch_end_idx = branch_start_indices[i-1] + branch_lengths[i-1] - 1
+                prev_branch_end = M[prev_branch_end_idx]  # End of actual (jumped) previous branch
                 jump = np.random.normal(gap_multiplier, 0.1, n_dim)  # Jump offset
-                new_branch += jump  # Apply the jump to all points in the branch
+                
+                # Apply jump from the previous branch's end position
+                jump_start = prev_branch_end + jump
+                branch_offset = jump_start - new_branch[0]  # Calculate offset needed
+                new_branch += branch_offset  # Apply offset to entire branch
 
                 # Check if the jump places the branch too close to another branch
                 distances = np.linalg.norm(M - new_branch[0], axis=1)
                 if np.min(distances) < rand_multiplier:
                     raise ValueError(f"Jump for branch {i} is too close to another branch. Adjust gap_multiplier.")
 
-            M_gt = np.concatenate([M_gt, new_branch_gt])
-            M = np.concatenate([M, new_branch])
-            branch_start_indices.append(M.shape[0] - branch_lengths[i])
+            # Keep ground truth and actual data separate - M_gt maintains original topology
+            M_gt = np.concatenate([M_gt, new_branch_gt])  # Ground truth maintains tree topology
+            M = np.concatenate([M, new_branch])           # Actual data includes jumps
+            branch_start_indices.append(M_gt.shape[0] - branch_lengths[i])  # Use M_gt indices
 
         # Reduce sampling density for certain branches
         if sampling_density_factors:
@@ -525,8 +533,424 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
         if mask is not None:
             C = C[mask]
 
+
         return M, M_gt, C
 
+
+class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
+    def __init__(
+        self,
+        graph_edges,  # List of (from_node, to_node, edge_type, edge_id, length)
+        n_dim: int = 50,
+        rand_multiplier: float = 2.0,
+        random_state: int = 42,
+        sigma: float = 0.5,
+        save_graph_viz: bool = True,
+        save_dir: str = "outputs",
+        precomputed_path: Optional[str] = None,
+        mmap_mode: Optional[str] = None,
+        # Gap functionality: simply exclude these edge_ids from data generation
+        excluded_edges: Optional[List] = None,
+        # Deprecated parameters (kept for backwards compatibility)
+        gap_edges=None,
+    ):
+        """
+        Generate a DLA tree from explicit graph topology using pure graph traversal.
+        
+        Simplified approach with optional edge exclusion for gap functionality.
+        
+        Parameters:
+        -----------
+        graph_edges : list of tuples
+            List of (from_node, to_node, edge_type, edge_id, length)
+            - from_node, to_node: node identifiers (strings or integers)
+            - edge_type: edge type for visualization (e.g., "trunk", "branch")  
+            - edge_id: integer identifier for the edge (becomes population label)
+            - length: number of samples to generate for this population/edge
+            
+        excluded_edges : list, optional
+            List of edge_ids to exclude from data generation (creates "gaps").
+            These edges are skipped during data generation but kept in visualization.
+            
+        Algorithm:
+        ----------
+        1. Traverse graph edges in order
+        2. For each edge not in excluded_edges, generate 'length' samples using DLA random walk
+        3. Each included edge represents a distinct population with edge_id as label
+        4. Excluded edges create natural gaps in the data
+            
+        Example:
+        --------
+        graph_edges = [
+            (1, 2, "trunk", 1, 300),    # Edge 1: 300 samples, population label=1
+            (2, 3, "trunk", 2, 300),    # Edge 2: 300 samples, population label=2
+            (2, 4, "branch", 3, 150),   # Edge 3: 150 samples, population label=3 
+        ]
+        excluded_edges = [2]  # Edge 2 will be excluded, creating a gap
+        """
+        super().__init__()
+        self.graph_edges = graph_edges
+        self.excluded_edges = set(excluded_edges or [])  # Convert to set for fast lookup
+        self.n_dim = n_dim
+        self.rand_multiplier = rand_multiplier
+        self.random_state = random_state
+        self.sigma = sigma
+        self.save_graph_viz = save_graph_viz
+        self.save_dir = save_dir
+        
+        # Backward compatibility warning
+        if gap_edges is not None:
+            print("Warning: gap_edges parameter is deprecated and will be ignored in simplified DLA tree implementation")
+        
+        # Generate the data using simplified approach
+        data, data_gt, metadata = self._generate_from_graph_simplified()
+        
+        # Load precomputed or use generated data
+        if precomputed_path is not None and os.path.exists(precomputed_path):
+            self.data = self.load_precomputed(precomputed_path, mmap_mode)
+        else:
+            self.data = data
+            
+        self.data_gt = data_gt
+        
+        # Convert edge_ids to color indices directly (same logic as graph topology)
+        from manylatents.utils.mappings import cmap_dla_tree
+        
+        def edge_id_to_color_index(edge_id):
+            """Convert edge_id to color index using same logic as graph visualization."""
+            if isinstance(edge_id, str):
+                return hash(edge_id) % len(cmap_dla_tree) + 1
+            else:
+                return edge_id  # Direct mapping: edge_id 1 → color_idx 1
+        
+        # Store color indices directly as metadata
+        self.metadata = np.array([edge_id_to_color_index(label) for label in metadata])
+        
+        # Generate and save visualization
+        if save_graph_viz:
+            self._visualize_and_save_graph()
+
+    def _generate_from_graph(self):
+        """Generate DLA tree from graph specification."""
+        np.random.seed(self.random_state)
+        
+        # Step 1: Determine unique nodes and create positions
+        all_nodes = set()
+        for from_node, to_node, _, _, _ in self.graph_edges:
+            all_nodes.add(from_node)
+            all_nodes.add(to_node)
+        for from_node, to_node, _ in self.gap_edges:
+            all_nodes.add(from_node) 
+            all_nodes.add(to_node)
+        
+        # Step 2: Assign random positions to nodes in high-dimensional space
+        node_positions = {}
+        for i, node in enumerate(sorted(all_nodes)):
+            if i == 0:  # Root node at origin
+                node_positions[node] = np.zeros(self.n_dim)
+            else:
+                # Random position for this node
+                node_positions[node] = np.random.randn(self.n_dim) * 10
+        
+        # Step 3: Generate DLA branches for each edge
+        M = np.empty((0, self.n_dim))
+        M_gt = np.empty((0, self.n_dim))
+        metadata_list = []
+        
+        # Create set of gap edge pairs for quick lookup
+        gap_edge_pairs = {(from_node, to_node) for from_node, to_node, _ in self.gap_edges}
+        
+        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+            # Skip edges that are defined as gaps - they shouldn't have data
+            if (from_node, to_node) in gap_edge_pairs:
+                continue
+                
+            # Generate DLA branch from from_node to to_node for data edges only
+            branch_data = self._generate_dla_branch(
+                start_pos=node_positions[from_node],
+                end_pos=node_positions[to_node], 
+                length=length,
+                branch_id=edge_id
+            )
+            
+            M = np.concatenate([M, branch_data])
+            M_gt = np.concatenate([M_gt, branch_data])  # Same as M for now
+            metadata_list.extend([edge_id] * length)
+        
+        # Step 4: Apply gaps by moving nodes connected by gap_edges
+        for from_node, to_node, gap_size in self.gap_edges:
+            gap_vector = np.random.randn(self.n_dim) * gap_size
+            node_positions[to_node] += gap_vector
+            
+            # Update all branches that start from to_node
+            current_idx = 0
+            for from_node_edge, to_node_edge, edge_type, edge_id, length in self.graph_edges:
+                if from_node_edge == to_node:
+                    # This branch starts from the moved node, update its position
+                    M[current_idx:current_idx + length] += gap_vector
+                current_idx += length
+        
+        # Step 5: Add noise
+        noise = np.random.normal(0, self.sigma, M.shape)
+        M += noise
+        M_gt += noise
+        
+        metadata = np.array(metadata_list)
+        return M, M_gt, metadata
+
+    def _generate_from_graph_simplified(self):
+        """
+        Simplified DLA tree generation using pure graph traversal.
+        
+        Algorithm:
+        1. Build graph connectivity from edges  
+        2. Traverse graph starting from root
+        3. For each edge, generate DLA random walk with specified length
+        4. Each edge becomes a population with edge_id as label
+        """
+        np.random.seed(self.random_state)
+        
+        # Build adjacency structure and find root
+        graph_dict = {}  # node -> list of (target_node, edge_type, edge_id, length)
+        all_nodes = set()
+        
+        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+            if from_node not in graph_dict:
+                graph_dict[from_node] = []
+            graph_dict[from_node].append((to_node, edge_type, edge_id, length))
+            all_nodes.add(from_node)
+            all_nodes.add(to_node)
+        
+        # Find root node (node that appears in from_node but never in to_node)
+        to_nodes = {to_node for from_node, to_node, _, _, _ in self.graph_edges}
+        root_candidates = [node for node in all_nodes if node not in to_nodes]
+        
+        if not root_candidates:
+            # If no clear root, use the first node
+            root_node = sorted(all_nodes)[0]
+        else:
+            root_node = root_candidates[0]
+        
+        print(f"Starting DLA tree generation from root node: {root_node}")
+        
+        # Initialize data storage
+        all_data = []
+        all_metadata = []
+        node_positions = {root_node: np.zeros(self.n_dim)}  # Root at origin
+        
+        # Traverse graph using depth-first traversal
+        def traverse_and_generate(current_node, current_position):
+            if current_node not in graph_dict:
+                return
+                
+            for target_node, edge_type, edge_id, length in graph_dict[current_node]:
+                print(f"Generating edge {edge_id}: {current_node} -> {target_node} ({length} samples)")
+                
+                # Generate DLA branch for this edge (always generate all edges first)
+                branch_data = self._generate_dla_branch_simple(
+                    start_pos=current_position,
+                    length=length
+                )
+                
+                # Always add to data for proper connectivity
+                all_data.append(branch_data)
+                all_metadata.extend([edge_id] * length)
+                
+                # Target position is end of this branch
+                target_position = branch_data[-1]
+                node_positions[target_node] = target_position
+                
+                # Recursively process branches from target node
+                traverse_and_generate(target_node, target_position)
+        
+        # Start traversal from root
+        traverse_and_generate(root_node, node_positions[root_node])
+        
+        # Combine all branch data
+        if all_data:
+            M = np.vstack(all_data)
+        else:
+            M = np.empty((0, self.n_dim))
+            
+        M_gt = M.copy()  # Ground truth same as generated data
+        metadata = np.array(all_metadata)
+        
+        # Apply gap functionality: remove excluded edges AFTER generating all data
+        if self.excluded_edges:
+            # Create mask for samples we want to KEEP (not in excluded edges)
+            keep_mask = ~np.isin(metadata, list(self.excluded_edges))
+            
+            # Apply logical subsetting
+            M = M[keep_mask]
+            M_gt = M_gt[keep_mask]  
+            metadata = metadata[keep_mask]
+            
+            excluded_edges_found = set(all_metadata) & self.excluded_edges
+            print(f"Applied gaps: removed edges {sorted(excluded_edges_found)} from data")
+            print(f"Remaining edges: {sorted(set(metadata))}")
+        
+        # Add global noise
+        if self.sigma > 0:
+            noise = np.random.normal(0, self.sigma, M.shape)
+            M += noise
+            M_gt += noise
+        
+        print(f"Final DLA tree: {len(M)} total samples across {len(set(metadata)) if len(metadata) > 0 else 0} populations")
+        
+        return M, M_gt, metadata
+
+    def _generate_dla_branch_simple(self, start_pos, length):
+        """
+        Generate a simple DLA branch using cumulative random walk.
+        
+        Based on PHATE tree.py approach - generates natural branching patterns.
+        """
+        if length == 0:
+            return np.empty((0, self.n_dim))
+        
+        if length == 1:
+            return start_pos.reshape(1, -1)
+        
+        # Generate cumulative random walk
+        # Use random steps scaled by rand_multiplier
+        random_steps = np.cumsum(
+            -1 + self.rand_multiplier * np.random.rand(length, self.n_dim), 
+            axis=0
+        )
+        
+        # Scale the walk to have reasonable magnitude
+        # Each step should be small relative to overall tree size
+        random_steps = random_steps * 0.5  # Scale factor for tree size
+        
+        # Add start position to get absolute positions
+        branch = start_pos + random_steps
+        
+        return branch
+    
+    def _create_proportional_layout(self, G):
+        """Create a layout where edge lengths are proportional to sample counts."""
+        import numpy as np
+        import networkx as nx
+        
+        # First, create a good-looking layout using spring layout
+        pos = nx.spring_layout(G, seed=self.random_state, k=2, iterations=50)
+        
+        # Now adjust edge lengths to be proportional to sample counts
+        # We'll do this iteratively by moving nodes to achieve target edge lengths
+        target_lengths = {}
+        
+        # Calculate target lengths for each edge based on sample counts
+        for u, v, d in G.edges(data=True):
+            if 'gap_size' not in d:  # Only for data edges
+                sample_count = d.get('length', 300)
+                # Normalize to reasonable visual length (baseline 300 samples = 1.0 unit)
+                target_lengths[(u, v)] = sample_count / 300.0
+        
+        # Iteratively adjust positions to match target edge lengths
+        for iteration in range(20):  # Limited iterations to avoid infinite loops
+            for (u, v), target_length in target_lengths.items():
+                if u in pos and v in pos:
+                    # Current edge vector
+                    edge_vec = pos[v] - pos[u]
+                    current_length = np.linalg.norm(edge_vec)
+                    
+                    if current_length > 0:  # Avoid division by zero
+                        # Scale edge to target length
+                        direction = edge_vec / current_length
+                        new_edge_vec = direction * target_length
+                        
+                        # Move the second node to achieve target length
+                        # (keep first node fixed for stability)
+                        pos[v] = pos[u] + new_edge_vec
+        
+        return pos
+    
+    def _generate_dla_branch(self, start_pos, end_pos, length, branch_id):
+        """Generate a DLA branch between two positions."""
+        # Direction vector from start to end
+        direction = end_pos - start_pos
+        
+        # Generate DLA-style cumulative random walk
+        random_steps = np.cumsum(
+            -1 + self.rand_multiplier * np.random.rand(length, self.n_dim), axis=0
+        )
+        
+        # Scale and orient the random walk to go from start to end
+        if length > 1:
+            # Normalize random walk to unit length, then scale to desired direction
+            random_steps = random_steps / np.linalg.norm(random_steps[-1]) * np.linalg.norm(direction)
+            random_steps = random_steps + direction * np.linspace(0, 1, length).reshape(-1, 1)
+        
+        # Add start position
+        branch = start_pos + random_steps
+        return branch
+        
+    def _visualize_and_save_graph(self):
+        """Create and save a visualization of the graph topology."""
+        try:
+            import matplotlib.pyplot as plt
+            import networkx as nx
+            
+            # Create networkx graph
+            G = nx.DiGraph()
+            
+            # Add all edges (simplified - no gaps to skip)
+            for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+                G.add_edge(from_node, to_node, edge_type=edge_type, edge_id=edge_id, length=length)
+            
+            # Create layout
+            pos = nx.spring_layout(G, seed=self.random_state)
+            
+            # Plot
+            plt.figure(figsize=(6, 4))
+            
+            # Don't draw nodes - they're just placeholders
+            # The meaningful data clusters are the EDGES (branches)
+            
+            # Get colormap for edge coloring (same as embeddings)
+            from manylatents.utils.mappings import cmap_dla_tree
+            
+            # All edges are data edges (simplified approach - no gaps)
+            regular_edges = [(u, v, d) for u, v, d in G.edges(data=True)]
+            
+            # Color edges using the same colormap as embeddings
+            edge_colors = []
+            edge_labels = {}
+            for u, v, d in regular_edges:
+                edge_id = d['edge_id']
+                # Map edge_id to color index (same logic as metadata)
+                if isinstance(edge_id, str):
+                    # For string IDs, use hash for consistent coloring
+                    color_idx = hash(edge_id) % len(cmap_dla_tree) + 1
+                else:
+                    # For numeric IDs, direct mapping
+                    color_idx = edge_id
+                
+                color = cmap_dla_tree[color_idx]
+                edge_colors.append(color)
+                edge_labels[(u, v)] = f"{edge_id}"
+            
+            # Draw regular edges (data branches) with colormap colors (no arrows)
+            nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v, d in regular_edges], 
+                                 edge_color=edge_colors, width=6, alpha=0.8, arrows=False)
+            
+            # Add edge labels (only for regular edges)
+            nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=8)
+            
+            plt.title("DLA Tree Graph Topology\n(Colored Edges = Data Branches)")
+            plt.axis('off')
+            
+            # Save
+            import os
+            os.makedirs(self.save_dir, exist_ok=True)
+            save_path = os.path.join(self.save_dir, "dla_tree_graph_topology.png")
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            print(f"Graph topology visualization saved to: {save_path}")
+            
+        except ImportError:
+            print("NetworkX or matplotlib not available for graph visualization")
 
 
 if __name__ == "__main__":
