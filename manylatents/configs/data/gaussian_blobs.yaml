@@ -1,19 +1,14 @@
 defaults:
   - default
-
-_target_: src.data.dataloaderguassian
-
-
+  
+_target_: manylatents.data.gaussian_blobs.GaussianBlobDataModule
 test_split: 0.2
-n_samples: 100             
+n_samples: 1000
 n_features: 2
-centers: null              
+centers: 5
 cluster_std: 1.0
 center_box: [-10.0, 10.0]
 shuffle: true
 random_state: ${seed}
 return_centers: false
-mode: full          
-precomputed_path: null
-mmap_mode: null       
-
+mode: full

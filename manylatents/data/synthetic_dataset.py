@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import graphtools
 import numpy as np
 from sklearn.metrics import pairwise_distances
+from sklearn.datasets import make_blobs
 from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
@@ -632,10 +633,88 @@ class Torus(SyntheticDataset, PrecomputedMixin):
         return self.graph
 
 
+class GaussianBlobs(SyntheticDataset):
+    def __init__(
+        self,
+        n_samples=100,
+        n_features=2,
+        centers=None,
+        cluster_std=1.0,
+        center_box=(-10.0, 10.0),
+        shuffle=True,
+        random_state=42,
+        return_centers=False,
+    ):
+        """
+        Initialize a Gaussian Blob dataset using sklearn's make_blobs.
+        
+        Parameters:
+        ----------
+        n_samples : int or list of int, default=100
+            Number of samples to generate, or list of samples per center.
+            
+        n_features : int, default=2
+            Number of features for each sample.
+            
+        centers : int, array-like or None, default=None
+            Number of centers to generate, or fixed center locations.
+            
+        cluster_std : float or list of float, default=1.0
+            Standard deviation of the clusters.
+            
+        center_box : tuple of float, default=(-10.0, 10.0)
+            Bounding box for each cluster center when centers are generated at random.
+            
+        shuffle : bool, default=True
+            Shuffle the samples.
+            
+        random_state : int, default=42
+            Random state for reproducibility.
+            
+        return_centers : bool, default=False
+            Whether to return the centers.
+        """
+        super().__init__()
+        
+        # Convert center_box to tuple if it's a list (for YAML compatibility)
+        if not isinstance(center_box, tuple):
+            center_box = tuple(center_box)
+        
+        # Generate the blob data using sklearn
+        result = make_blobs(
+            n_samples=n_samples,
+            n_features=n_features,
+            centers=centers,
+            cluster_std=cluster_std,
+            center_box=center_box,
+            shuffle=shuffle,
+            random_state=random_state,
+            return_centers=return_centers
+        )
+        
+        if return_centers:
+            self.data, self.metadata, self.centers = result
+        else:
+            self.data, self.metadata = result
+            self.centers = None
+    
+    def get_gt_dists(self):
+        """
+        Compute pairwise Euclidean distances as ground truth distances.
+        """
+        return pairwise_distances(self.data, metric="euclidean")
+    
+    def get_graph(self):
+        """Create a graphtools graph if does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
+
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "torus" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus"
+    data_name = "gaussian_blobs" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
@@ -646,6 +725,8 @@ if __name__ == "__main__":
         dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
     elif data_name == "torus":
         dataset = Torus(n_points=500, noise=0.05, major_radius=3.0, minor_radius=1.0, random_state=42, rotate_to_dim=5)
+    elif data_name == "gaussian_blobs":
+        dataset = GaussianBlobs(n_samples=500, n_features=2, centers=5, cluster_std=1.0, random_state=42)
     
     data = dataset.data
     labels = dataset.metadata
@@ -658,6 +739,12 @@ if __name__ == "__main__":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
+    elif data_name == "gaussian_blobs":
+        plt.figure(figsize=(8, 6))
+        plt.scatter(data[:, 0], data[:, 1], c=labels, cmap='tab20', s=10)
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('Gaussian Blobs Dataset')
     elif data_name == "dla_tree":
         # visualize by phate
         import phate
