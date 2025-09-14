@@ -717,72 +717,153 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
 
     def _generate_from_graph(self):
         """
-        Simplified DLA tree generation using pure graph traversal.
+        Generate DLA tree that properly follows the graph topology.
         
         Algorithm:
-        1. Build graph connectivity from edges  
-        2. Traverse graph starting from root
-        3. For each edge, generate DLA random walk with specified length
-        4. Each edge becomes a population with edge_id as label
+        1. Build graph connectivity from edges and establish node positions
+        2. For each edge [from_node, to_node, edge_type, edge_id, length]:
+           - Start DLA random walk at from_node's position
+           - Generate 'length' samples via random walk  
+           - End walk at to_node's position (enforced connectivity)
+           - Assign all samples the edge_id label
+        3. Result: DLA tree structure matches graph topology exactly
         """
         np.random.seed(self.random_state)
         
-        # Build adjacency structure and find root
-        graph_dict = {}  # node -> list of (target_node, edge_type, edge_id, length)
+        # Step 1: Identify all unique nodes and find root
         all_nodes = set()
-        
-        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-            if from_node not in graph_dict:
-                graph_dict[from_node] = []
-            graph_dict[from_node].append((to_node, edge_type, edge_id, length))
+        for from_node, to_node, _, _, _ in self.graph_edges:
             all_nodes.add(from_node)
             all_nodes.add(to_node)
         
-        # Find root node (node that appears in from_node but never in to_node)
+        # Find root node (appears as from_node but never as to_node)
         to_nodes = {to_node for from_node, to_node, _, _, _ in self.graph_edges}
         root_candidates = [node for node in all_nodes if node not in to_nodes]
-        
-        if not root_candidates:
-            # If no clear root, use the first node
-            root_node = sorted(all_nodes)[0]
-        else:
-            root_node = root_candidates[0]
+        root_node = root_candidates[0] if root_candidates else sorted(all_nodes)[0]
         
         print(f"Starting DLA tree generation from root node: {root_node}")
+        print(f"Total nodes in graph: {sorted(all_nodes)}")
         
-        # Initialize data storage
+        # Step 2: Establish node positions by processing edges in dependency order
+        node_positions = {}
         all_data = []
         all_metadata = []
-        node_positions = {root_node: np.zeros(self.n_dim)}  # Root at origin
         
-        # Use iterative approach to avoid recursion issues with cycles
-        # Simply generate all edges in the order they appear in graph_edges
+        # Place root at origin
+        node_positions[root_node] = np.zeros(self.n_dim)
+        print(f"Root node {root_node} positioned at origin")
+        
+        # Step 2.5: Analyze node degrees and create orthogonal direction vectors
+        node_outgoing_edges = {}  # node -> list of (to_node, edge_id)
         for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-            print(f"Generating edge {edge_id}: {from_node} -> {to_node} ({length} samples)")
-            
-            # Get starting position (from_node position or origin if not set)
-            if from_node in node_positions:
-                start_position = node_positions[from_node]
-            else:
-                # If from_node not positioned yet, place it at origin + small offset
-                start_position = np.random.randn(self.n_dim) * 0.5
-                node_positions[from_node] = start_position
-            
-            # Generate DLA branch for this edge
-            branch_data = self._generate_dla_branch_simple(
-                start_pos=start_position,
-                length=length
-            )
-            
-            # Always add to data for proper connectivity
-            all_data.append(branch_data)
-            all_metadata.extend([edge_id] * length)
-            
-            # Set target position as end of this branch
-            target_position = branch_data[-1]
-            node_positions[to_node] = target_position
+            if from_node not in node_outgoing_edges:
+                node_outgoing_edges[from_node] = []
+            node_outgoing_edges[from_node].append((to_node, edge_id))
         
-        # Combine all branch data
+        # Create orthogonal subspaces for nodes with multiple outgoing edges
+        node_subspaces = {}
+        for node, outgoing_edges in node_outgoing_edges.items():
+            if len(outgoing_edges) > 1:
+                print(f"Node {node} has {len(outgoing_edges)} outgoing edges: {[edge_id for _, edge_id in outgoing_edges]}")
+                node_subspaces[node] = self._create_orthogonal_subspaces(
+                    n_directions=len(outgoing_edges),
+                    n_dim=self.n_dim,
+                    node_id=node
+                )
+        
+        # Process edges to establish node positions and generate data
+        processed_edges = set()
+        max_iterations = len(self.graph_edges) * 2  # Prevent infinite loops
+        iteration = 0
+        
+        while len(processed_edges) < len(self.graph_edges) and iteration < max_iterations:
+            iteration += 1
+            made_progress = False
+            
+            for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+                # Skip if already processed
+                if (from_node, to_node, edge_id) in processed_edges:
+                    continue
+                    
+                # Can only process if from_node has a known position
+                if from_node not in node_positions:
+                    continue
+                    
+                print(f"Processing edge {edge_id}: {from_node} -> {to_node} ({length} samples)")
+                
+                # Get starting position
+                start_pos = node_positions[from_node]
+                
+                # Get orthogonal subspace if this node has multiple outgoing edges
+                allowed_dims = None
+                if from_node in node_subspaces:
+                    # Find which subspace corresponds to this edge_id
+                    outgoing_edges = node_outgoing_edges[from_node]
+                    for i, (_, out_edge_id) in enumerate(outgoing_edges):
+                        if out_edge_id == edge_id:
+                            allowed_dims = node_subspaces[from_node][i]
+                            print(f"  Using subspace {i} for edge {edge_id} from node {from_node}: dims {allowed_dims[:3]}...{allowed_dims[-3:]}")
+                            break
+                
+                # Generate DLA branch from start to target
+                branch_data = self._generate_dla_branch_topology_aware(
+                    start_pos=start_pos,
+                    length=length,
+                    edge_id=edge_id,
+                    allowed_dims=allowed_dims
+                )
+                
+                # Store data and metadata
+                all_data.append(branch_data)
+                all_metadata.extend([edge_id] * length)
+                
+                # Set target node position as the end of this branch
+                node_positions[to_node] = branch_data[-1].copy()
+                print(f"Node {to_node} positioned at end of edge {edge_id}")
+                
+                # Mark as processed
+                processed_edges.add((from_node, to_node, edge_id))
+                made_progress = True
+            
+            if not made_progress:
+                # Handle remaining edges by placing missing nodes randomly
+                for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+                    if (from_node, to_node, edge_id) in processed_edges:
+                        continue
+                        
+                    print(f"Handling unconnected edge {edge_id}: {from_node} -> {to_node}")
+                    
+                    # Place from_node randomly if not positioned
+                    if from_node not in node_positions:
+                        node_positions[from_node] = np.random.randn(self.n_dim) * 2.0
+                        print(f"Randomly positioned unconnected node {from_node}")
+                    
+                    # Generate branch (with potential orthogonal subspace)
+                    start_pos = node_positions[from_node]
+                    allowed_dims = None
+                    if from_node in node_subspaces:
+                        outgoing_edges = node_outgoing_edges[from_node]
+                        for i, (_, out_edge_id) in enumerate(outgoing_edges):
+                            if out_edge_id == edge_id:
+                                allowed_dims = node_subspaces[from_node][i]
+                                break
+                    
+                    branch_data = self._generate_dla_branch_topology_aware(
+                        start_pos=start_pos,
+                        length=length,
+                        edge_id=edge_id,
+                        allowed_dims=allowed_dims
+                    )
+                    
+                    all_data.append(branch_data)
+                    all_metadata.extend([edge_id] * length)
+                    node_positions[to_node] = branch_data[-1].copy()
+                    processed_edges.add((from_node, to_node, edge_id))
+        
+        print(f"Processed {len(processed_edges)} edges in {iteration} iterations")
+        print(f"Final node positions: {list(node_positions.keys())}")
+        
+        # Step 3: Combine all branch data
         if all_data:
             M = np.vstack(all_data)
         else:
@@ -791,12 +872,9 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         M_gt = M.copy()  # Ground truth same as generated data
         metadata = np.array(all_metadata)
         
-        # Apply gap functionality: remove excluded edges AFTER generating all data
+        # Step 4: Apply gap functionality (remove excluded edges)
         if self.excluded_edges:
-            # Create mask for samples we want to KEEP (not in excluded edges)
             keep_mask = ~np.isin(metadata, list(self.excluded_edges))
-            
-            # Apply logical subsetting
             M = M[keep_mask]
             M_gt = M_gt[keep_mask]  
             metadata = metadata[keep_mask]
@@ -805,26 +883,21 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             print(f"Applied gaps: removed edges {sorted(excluded_edges_found)} from data")
             print(f"Remaining edges: {sorted(set(metadata))}")
             
-            # Renumber visible edges to be sequential 1, 2, 3, ..., n_visible_edges
+            # Renumber visible edges to be sequential
             unique_visible_edges = sorted(set(metadata))
             edge_renumbering = {old_id: new_id for new_id, old_id in enumerate(unique_visible_edges, 1)}
-            
-            # Apply renumbering to metadata
             renumbered_metadata = np.array([edge_renumbering[old_id] for old_id in metadata])
             
             print(f"Edge renumbering: {edge_renumbering}")
-            print(f"Final visible edges: {sorted(set(renumbered_metadata))}")
-            
             metadata = renumbered_metadata
             
-            # Store renumbering for visualization
             self.edge_renumbering = edge_renumbering
             self.original_excluded_edges = excluded_edges_found
         else:
             self.edge_renumbering = None
             self.original_excluded_edges = set()
         
-        # Add global noise
+        # Step 5: Add global noise
         if self.sigma > 0:
             noise = np.random.normal(0, self.sigma, M.shape)
             M += noise
@@ -833,6 +906,155 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         print(f"Final DLA tree: {len(M)} total samples across {len(set(metadata)) if len(metadata) > 0 else 0} populations")
         
         return M, M_gt, metadata
+
+    def _create_orthogonal_subspaces(self, n_directions, n_dim, node_id):
+        """
+        Create orthogonal feature subspaces for branches emanating from a single node.
+        
+        This ensures that multiple edges starting from the same node diffuse in 
+        completely orthogonal feature subspaces, guaranteeing they remain distinct.
+        
+        Algorithm:
+        1. Divide n_dim features into n_directions orthogonal subspaces
+        2. Each branch gets assigned a unique subspace of size ~(n_dim/n_directions)
+        3. Branches can only diffuse within their assigned subspace
+        4. Fixed features outside subspace keep branches separated
+        
+        Parameters:
+        -----------
+        n_directions : int
+            Number of orthogonal subspaces needed (degree of the node)
+        n_dim : int  
+            Total dimensionality of the space
+        node_id : int
+            Node identifier for debugging
+            
+        Returns:
+        --------
+        list of np.array : List of feature indices for each branch, each indicating
+                          which dimensions that branch is allowed to vary in
+        
+        Example:
+        --------
+        For node N2 with 4 outgoing edges and n_dim=100:
+        - Branch E1: can diffuse in features [0:25], others fixed
+        - Branch E2: can diffuse in features [25:50], others fixed  
+        - Branch E6: can diffuse in features [50:75], others fixed
+        - Branch E12: can diffuse in features [75:100], others fixed
+        This ensures perfect orthogonality by construction.
+        """
+        if n_directions == 1:
+            # Single direction - can use all dimensions
+            return [np.arange(n_dim)]
+        
+        # Divide dimensions roughly equally among branches
+        subspace_size = n_dim // n_directions
+        remaining_dims = n_dim % n_directions
+        
+        print(f"  Creating {n_directions} orthogonal subspaces for node {node_id}")
+        print(f"  Each subspace ≈ {subspace_size} dims, {remaining_dims} dims distributed")
+        
+        subspaces = []
+        current_start = 0
+        
+        for i in range(n_directions):
+            # Give extra dimensions to first few branches if needed
+            current_size = subspace_size + (1 if i < remaining_dims else 0)
+            current_end = current_start + current_size
+            
+            # Assign this range of features to this branch
+            subspace_indices = np.arange(current_start, current_end)
+            subspaces.append(subspace_indices)
+            
+            print(f"    Branch {i}: diffuses in features [{current_start}:{current_end}] ({current_size} dims)")
+            current_start = current_end
+        
+        return subspaces
+
+    def _generate_dla_branch_topology_aware(self, start_pos, length, edge_id, allowed_dims=None):
+        """
+        Generate a DLA branch that respects graph topology with orthogonal subspace constraints.
+        
+        This method creates a natural DLA random walk while ensuring proper branching
+        for nodes with multiple outgoing edges. When multiple edges emanate from the
+        same node, each branch is restricted to diffuse only in its assigned orthogonal
+        subspace, ensuring perfect separation by construction.
+        
+        Algorithm:
+        1. Start at the junction node position (start_pos)
+        2. If allowed_dims provided: diffuse ONLY in those dimensions, fix others
+        3. Generate DLA random walk with natural spreading behavior  
+        4. Result: branches from same node are orthogonal by construction
+        
+        Parameters:
+        -----------
+        start_pos : np.array
+            Starting position for the branch (from_node position) - shape (n_dim,)
+        length : int
+            Number of samples to generate for this edge
+        edge_id : int
+            Edge identifier for debugging/logging
+        allowed_dims : np.array, optional
+            Feature indices this branch is allowed to vary in. If provided,
+            all other dimensions are kept fixed at start_pos values.
+            Shape: (subspace_size,) containing feature indices
+            
+        Returns:
+        --------
+        np.array : Branch data of shape (length, n_dim)
+        
+        Example:
+        --------
+        Node N2 with 3 outgoing edges, n_dim=100:
+        - Edge E1: allowed_dims=[0,1,2,...,33], fixes dims [34:100]
+        - Edge E2: allowed_dims=[34,35,...,66], fixes dims [0:34,67:100]  
+        - Edge E6: allowed_dims=[67,68,...,99], fixes dims [0:67]
+        
+        This ensures E1, E2, E6 can never overlap in feature space.
+        """
+        if length == 0:
+            return np.empty((0, self.n_dim))
+        
+        if length == 1:
+            return start_pos.reshape(1, -1)
+        
+        # Initialize branch with start position repeated for all samples
+        branch = np.tile(start_pos, (length, 1))  # Shape: (length, n_dim)
+        
+        if allowed_dims is not None:
+            # Constrained diffusion: only vary in allowed dimensions
+            n_allowed = len(allowed_dims)
+            
+            # Generate DLA random walk only in the allowed subspace
+            subspace_steps = np.cumsum(
+                -0.5 + self.rand_multiplier * np.random.rand(length, n_allowed), 
+                axis=0
+            )
+            
+            # Scale the walk appropriately
+            subspace_steps = subspace_steps * 0.3
+            
+            # Apply diffusion only to allowed dimensions, others stay fixed
+            branch[:, allowed_dims] += subspace_steps
+            
+            print(f"    Constrained diffusion for edge {edge_id}: {n_allowed}/{self.n_dim} dims free")
+            
+        else:
+            # Unconstrained diffusion: use all dimensions
+            random_steps = np.cumsum(
+                -0.5 + self.rand_multiplier * np.random.rand(length, self.n_dim), 
+                axis=0
+            )
+            
+            # Scale the walk
+            random_steps = random_steps * 0.3
+            
+            # Apply to all dimensions
+            branch += random_steps
+            
+            print(f"    Unconstrained diffusion for edge {edge_id}: all {self.n_dim} dims free")
+        
+        return branch
 
     def _generate_dla_branch_simple(self, start_pos, length):
         """

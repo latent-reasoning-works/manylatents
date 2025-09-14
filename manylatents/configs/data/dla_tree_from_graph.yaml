@@ -12,35 +12,46 @@ mmap_mode: null
 test_split: 0.2
 shuffle_traindata: false
 
-# Graph topology definition
 graph_edges:
-  # Main trunk: N1--E1--N2--E2--N3--EX1--N4--E3--N5--EX2--N6--E4--N7
-  - [1, 2, "trunk", 1, 300]   # N1--E1--N2
-  - [2, 3, "trunk", 2, 300]   # N2--E2--N3
-  - [3, 4, "trunk", "EX1", 1]  # N3--EX1--N4 (gap edge)
-  - [4, 5, "trunk", 3, 25]   # N4--E3--N5
-  - [5, 6, "trunk", "EX2", 1]  # N5--EX2--N6 (gap edge)
-  - [6, 7, "trunk", 4, 300]   # N6--E4--N7
-  
-  # Branch 1: N2--E6--N10--EX3--N11--E7--N12
-  - [2, 10, "branch", 6, 300]  # N2--E6--N10
-  - [10, 11, "branch", "EX3", 1] # N10--EX3--N11 (gap edge)
-  - [11, 12, "branch", 7, 25] # N11--E7--N12
-  
-  # Branch 2: N6--E5--N9
-  - [6, 9, "branch", 5, 300]   # N6--E5--N9
+  # =========================
+  # Main trunk - Data edges (sequential numbering 1-7)
+  # =========================
+  - [1, 2, "trunk", 1, 300]      # N1--E1--N2   (Main trunk start)
+  - [2, 3, "trunk", 2, 300]      # N2--E2--N3   (Trunk continuation)
+  - [8, 13, "trunk", 3, 300]     # N8--E3--N13  (Trunk segment, keeps samples alive)
+  - [4, 5, "trunk", 4, 300]      # N4--E4--N5   (Trunk continuation)
+  - [6, 7, "trunk", 5, 100]      # N6--E5--N7   (Trunk end, subsampled)
 
-gap_edges:
-  # Define which edges should have gaps (smaller gap_multiplier)
-  - [3, 4, 0.1]  # EX1 gap
-  - [5, 6, 0.1]  # EX2 gap  
-  - [10, 11, 0.1] # EX3 gap
+  # =========================
+  # Branch A (from N2) - Data edges
+  # =========================
+  - [2, 10, "branch", 6, 300]    # N2--E6--N10  (Branch A start)
+  - [11, 12, "branch", 7, 100]   # N11--E7--N12 (Branch A end, subsampled)
+
+  # =========================
+  # Branch B (from N6) - Data edge
+  # =========================
+  - [6, 9, "branch", 8, 300]     # N6--E8--N9   (Branch B)
+
+  # =========================
+  # Gap edges (excluded from data, numbered 9-12)
+  # =========================
+  - [13, 4, "trunk", 9, 50]      # N13--E9--N4  (gap, disconnects N4 from N8)
+  - [5, 6, "trunk", 10, 50]      # N5--E10--N6  (gap in trunk)
+  - [10, 11, "branch", 11, 50]   # N10--E11--N11 (gap in Branch A)
+  - [2, 8, "cross", 12, 50]      # N2--E12--N8  (cross-link gap)
+
+# =========================
+# Excluded edges (gaps) - now sequential at the end
+# =========================
+excluded_edges: [9, 10, 11, 12]
 
 # Branch labels for visualization
 branch_labels:
   1: "Main Trunk"
-  2: "Branch A" 
+  2: "Branch A"
   3: "Branch B"
+  4: "Cross Links"
 
 # Use colorful discrete colormap
 sampling_density_factors: null
