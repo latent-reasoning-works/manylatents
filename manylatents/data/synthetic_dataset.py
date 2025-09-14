@@ -738,33 +738,32 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         all_metadata = []
         node_positions = {root_node: np.zeros(self.n_dim)}  # Root at origin
         
-        # Traverse graph using depth-first traversal
-        def traverse_and_generate(current_node, current_position):
-            if current_node not in graph_dict:
-                return
-                
-            for target_node, edge_type, edge_id, length in graph_dict[current_node]:
-                print(f"Generating edge {edge_id}: {current_node} -> {target_node} ({length} samples)")
-                
-                # Generate DLA branch for this edge (always generate all edges first)
-                branch_data = self._generate_dla_branch_simple(
-                    start_pos=current_position,
-                    length=length
-                )
-                
-                # Always add to data for proper connectivity
-                all_data.append(branch_data)
-                all_metadata.extend([edge_id] * length)
-                
-                # Target position is end of this branch
-                target_position = branch_data[-1]
-                node_positions[target_node] = target_position
-                
-                # Recursively process branches from target node
-                traverse_and_generate(target_node, target_position)
-        
-        # Start traversal from root
-        traverse_and_generate(root_node, node_positions[root_node])
+        # Use iterative approach to avoid recursion issues with cycles
+        # Simply generate all edges in the order they appear in graph_edges
+        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+            print(f"Generating edge {edge_id}: {from_node} -> {to_node} ({length} samples)")
+            
+            # Get starting position (from_node position or origin if not set)
+            if from_node in node_positions:
+                start_position = node_positions[from_node]
+            else:
+                # If from_node not positioned yet, place it at origin + small offset
+                start_position = np.random.randn(self.n_dim) * 0.5
+                node_positions[from_node] = start_position
+            
+            # Generate DLA branch for this edge
+            branch_data = self._generate_dla_branch_simple(
+                start_pos=start_position,
+                length=length
+            )
+            
+            # Always add to data for proper connectivity
+            all_data.append(branch_data)
+            all_metadata.extend([edge_id] * length)
+            
+            # Set target position as end of this branch
+            target_position = branch_data[-1]
+            node_positions[to_node] = target_position
         
         # Combine all branch data
         if all_data:
@@ -788,6 +787,25 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             excluded_edges_found = set(all_metadata) & self.excluded_edges
             print(f"Applied gaps: removed edges {sorted(excluded_edges_found)} from data")
             print(f"Remaining edges: {sorted(set(metadata))}")
+            
+            # Renumber visible edges to be sequential 1, 2, 3, ..., n_visible_edges
+            unique_visible_edges = sorted(set(metadata))
+            edge_renumbering = {old_id: new_id for new_id, old_id in enumerate(unique_visible_edges, 1)}
+            
+            # Apply renumbering to metadata
+            renumbered_metadata = np.array([edge_renumbering[old_id] for old_id in metadata])
+            
+            print(f"Edge renumbering: {edge_renumbering}")
+            print(f"Final visible edges: {sorted(set(renumbered_metadata))}")
+            
+            metadata = renumbered_metadata
+            
+            # Store renumbering for visualization
+            self.edge_renumbering = edge_renumbering
+            self.original_excluded_edges = excluded_edges_found
+        else:
+            self.edge_renumbering = None
+            self.original_excluded_edges = set()
         
         # Add global noise
         if self.sigma > 0:
@@ -826,7 +844,196 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         branch = start_pos + random_steps
         
         return branch
+
+    def _create_hierarchical_layout(self, G):
+        """Create a custom layout that avoids edge overlaps by using hierarchical positioning."""
+        import networkx as nx
+        import numpy as np
+        
+        # Find root node (no incoming edges in a DAG, or use degree-based heuristic)
+        all_nodes = set(G.nodes())
+        target_nodes = set()
+        for u, v in G.edges():
+            target_nodes.add(v)
+        
+        root_candidates = all_nodes - target_nodes
+        if root_candidates:
+            root = min(root_candidates)  # Use smallest node ID as root
+        else:
+            # If cyclic, use node with highest out-degree
+            root = max(G.nodes(), key=lambda n: G.out_degree(n))
+        
+        # Build levels using BFS from root
+        levels = {}
+        queue = [(root, 0)]
+        visited = set()
+        
+        while queue:
+            node, level = queue.pop(0)
+            if node in visited:
+                continue
+            visited.add(node)
+            
+            if level not in levels:
+                levels[level] = []
+            levels[level].append(node)
+            
+            # Add neighbors to next level
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    queue.append((neighbor, level + 1))
+        
+        # Position nodes hierarchically
+        pos = {}
+        max_level = max(levels.keys()) if levels else 0
+        
+        for level, nodes in levels.items():
+            n_nodes = len(nodes)
+            if n_nodes == 1:
+                # Single node: center it
+                pos[nodes[0]] = (0, max_level - level)
+            else:
+                # Multiple nodes: spread them horizontally
+                x_positions = np.linspace(-n_nodes/2, n_nodes/2, n_nodes)
+                for i, node in enumerate(sorted(nodes)):
+                    pos[node] = (x_positions[i], max_level - level)
+        
+        # Handle any remaining nodes (in case of complex connectivity)
+        for node in G.nodes():
+            if node not in pos:
+                pos[node] = (np.random.uniform(-2, 2), np.random.uniform(-1, 1))
+        
+        return pos
+
+    def _create_better_layout(self, G):
+        """Try multiple layout algorithms to find one that looks good."""
+        import networkx as nx
+        import numpy as np
+        
+        # Find root node for tree-based layouts
+        all_nodes = set(G.nodes())
+        target_nodes = set(v for u, v in G.edges())
+        root_candidates = all_nodes - target_nodes
+        root = min(root_candidates) if root_candidates else min(G.nodes())
+        
+        try:
+            # Try graphviz dot layout (hierarchical, clean)
+            pos = nx.nx_agraph.graphviz_layout(G, prog='dot')
+            print("Using graphviz dot layout")
+            return pos
+        except:
+            pass
+        
+        try:
+            # Try networkx tree layout
+            pos = nx.nx_agraph.graphviz_layout(G, prog='neato')  
+            print("Using graphviz neato layout")
+            return pos
+        except:
+            pass
+        
+        try:
+            # Try kamada-kawai layout (force-directed but more stable)
+            pos = nx.kamada_kawai_layout(G, scale=2)
+            print("Using Kamada-Kawai layout")
+            return pos
+        except:
+            pass
+        
+        # Fallback: improved spring layout with better parameters
+        print("Using improved spring layout")
+        pos = nx.spring_layout(
+            G, 
+            k=3,  # Increase spacing between nodes
+            iterations=100,  # More iterations for better convergence
+            scale=2,  # Larger scale
+            seed=self.random_state
+        )
+        
+        return pos
     
+    def _create_semantic_layout(self, G):
+        """
+        Create a layout based purely on graph structure without automatic layout algorithms.
+        Positions nodes based on their semantic relationships in the graph.
+        """
+        import numpy as np
+        import networkx as nx
+        
+        # Find the root node (node that appears as source but not as target)
+        all_nodes = set(G.nodes())
+        target_nodes = {v for u, v in G.edges()}
+        root_candidates = all_nodes - target_nodes
+        root = min(root_candidates) if root_candidates else min(G.nodes())
+        
+        pos = {}
+        
+        # Build tree levels using BFS traversal
+        levels = {0: [root]}
+        visited = {root}
+        queue = [(root, 0)]
+        
+        while queue:
+            node, level = queue.pop(0)
+            # Add children to next level
+            children = [neighbor for neighbor in G.neighbors(node) if neighbor not in visited]
+            if children:
+                next_level = level + 1
+                if next_level not in levels:
+                    levels[next_level] = []
+                for child in children:
+                    levels[next_level].append(child)
+                    visited.add(child)
+                    queue.append((child, next_level))
+        
+        # Position nodes semantically
+        # Root at origin, each level gets positioned based on graph structure
+        pos[root] = (0, 0)
+        
+        for level_num, nodes in levels.items():
+            if level_num == 0:  # Root level already positioned
+                continue
+                
+            y_pos = -level_num * 2  # Move down for each level
+            
+            # For each node in this level, position based on its parent
+            for i, node in enumerate(nodes):
+                # Find parent (node that connects to this one from previous level)
+                parent = None
+                for prev_level_node in levels.get(level_num - 1, []):
+                    if G.has_edge(prev_level_node, node):
+                        parent = prev_level_node
+                        break
+                
+                if parent and parent in pos:
+                    # Position relative to parent
+                    parent_x = pos[parent][0]
+                    # Spread children horizontally around parent
+                    parent_children = [n for n in nodes if any(G.has_edge(p, n) for p in levels.get(level_num - 1, []) if p == parent)]
+                    child_index = parent_children.index(node)
+                    n_children = len(parent_children)
+                    
+                    if n_children == 1:
+                        x_pos = parent_x
+                    else:
+                        # Spread children around parent
+                        spacing = 3.0  # Horizontal spacing between siblings
+                        x_offset = (child_index - (n_children - 1) / 2) * spacing
+                        x_pos = parent_x + x_offset
+                else:
+                    # Fallback: spread nodes horizontally at this level
+                    spacing = 4.0
+                    x_pos = (i - (len(nodes) - 1) / 2) * spacing
+                
+                pos[node] = (x_pos, y_pos)
+        
+        # Handle any unpositioned nodes (shouldn't happen with well-formed trees)
+        for node in G.nodes():
+            if node not in pos:
+                pos[node] = (np.random.uniform(-2, 2), np.random.uniform(-2, 2))
+        
+        return pos
+
     def _create_proportional_layout(self, G):
         """Create a layout where edge lengths are proportional to sample counts."""
         import numpy as np
@@ -898,8 +1105,8 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
                 G.add_edge(from_node, to_node, edge_type=edge_type, edge_id=edge_id, length=length)
             
-            # Create layout
-            pos = nx.spring_layout(G, seed=self.random_state)
+            # Use custom semantic layout based on graph structure
+            pos = self._create_semantic_layout(G)
             
             # Plot
             plt.figure(figsize=(6, 4))
@@ -913,31 +1120,64 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             # All edges are data edges (simplified approach - no gaps)
             regular_edges = [(u, v, d) for u, v, d in G.edges(data=True)]
             
-            # Color edges using the same colormap as embeddings
-            edge_colors = []
-            edge_labels = {}
+            # Separate edges into visible and gap edges for different drawing styles
+            visible_edges = []
+            gap_edges = []
+            visible_edge_colors = []
+            visible_edge_labels = {}
+            gap_edge_labels = {}
+            
             for u, v, d in regular_edges:
-                edge_id = d['edge_id']
-                # Map edge_id to color index (same logic as metadata)
-                if isinstance(edge_id, str):
-                    # For string IDs, use hash for consistent coloring
-                    color_idx = hash(edge_id) % len(cmap_dla_tree) + 1
-                else:
-                    # For numeric IDs, direct mapping
-                    color_idx = edge_id
+                original_edge_id = d['edge_id']
                 
-                color = cmap_dla_tree[color_idx]
-                edge_colors.append(color)
-                edge_labels[(u, v)] = f"{edge_id}"
+                if original_edge_id in self.original_excluded_edges:
+                    # Gap edge: will be drawn as transparent outline
+                    gap_edges.append((u, v))
+                    gap_edge_labels[(u, v)] = f"({original_edge_id})"  # Parentheses to indicate gap
+                else:
+                    # Visible edge: use renumbered ID for coloring and labeling
+                    visible_edges.append((u, v))
+                    
+                    if self.edge_renumbering is not None:
+                        display_edge_id = self.edge_renumbering.get(original_edge_id, original_edge_id)
+                    else:
+                        display_edge_id = original_edge_id
+                    
+                    # Map display_edge_id to color index
+                    if isinstance(display_edge_id, str):
+                        color_idx = hash(display_edge_id) % len(cmap_dla_tree) + 1
+                    else:
+                        color_idx = display_edge_id
+                    
+                    color = cmap_dla_tree[color_idx]
+                    visible_edge_colors.append(color)
+                    visible_edge_labels[(u, v)] = f"{display_edge_id}"
             
-            # Draw regular edges (data branches) with colormap colors (no arrows)
-            nx.draw_networkx_edges(G, pos, edgelist=[(u, v) for u, v, d in regular_edges], 
-                                 edge_color=edge_colors, width=6, alpha=0.8, arrows=False)
+            # Draw visible edges (data branches) with colormap colors
+            if visible_edges:
+                nx.draw_networkx_edges(G, pos, edgelist=visible_edges, 
+                                     edge_color=visible_edge_colors, width=6, alpha=0.8, arrows=False)
             
-            # Add edge labels (only for regular edges)
-            nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=8)
+            # Draw gap edges as transparent outlines
+            if gap_edges:
+                nx.draw_networkx_edges(G, pos, edgelist=gap_edges, 
+                                     edge_color='gray', width=3, alpha=0.3, arrows=False, 
+                                     style='dashed')
             
-            plt.title("DLA Tree Graph Topology\n(Colored Edges = Data Branches)")
+            # Add edge labels for visible edges
+            if visible_edge_labels:
+                nx.draw_networkx_edge_labels(G, pos, visible_edge_labels, font_size=8)
+            
+            # Add edge labels for gap edges (in parentheses to indicate they're gaps)
+            if gap_edge_labels:
+                nx.draw_networkx_edge_labels(G, pos, gap_edge_labels, font_size=7, font_color='gray', alpha=0.7)
+            
+            # Dynamic title based on whether gaps are present
+            if self.original_excluded_edges:
+                gap_info = f"(Dashed = Gaps: {sorted(self.original_excluded_edges)})"
+                plt.title(f"DLA Tree Graph Topology\n{gap_info}")
+            else:
+                plt.title("DLA Tree Graph Topology\n(All Edges Visible)")
             plt.axis('off')
             
             # Save
