@@ -528,7 +528,7 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
 
         C = np.array(
             [i for branch_idx, branch_len in enumerate(branch_lengths)
-             for i in [branch_idx] * branch_len]
+             for i in [branch_idx + 1] * branch_len]  # Add 1 to start labels from 1 instead of 0
         )
         if mask is not None:
             C = C[mask]
