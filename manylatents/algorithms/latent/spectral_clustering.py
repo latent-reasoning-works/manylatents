@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 from sklearn.cluster import SpectralClustering
 from typing import Optional, Union
-from .latent_module_base import LatentModule
+from ..latent_module_base import LatentModule
 
 class SpectralClusteringModule(LatentModule):
     def __init__(
@@ -50,6 +50,12 @@ class SpectralClusteringModule(LatentModule):
         self._is_fitted = True
 
     def transform(self, x: Union[Tensor, np.ndarray]) -> Tensor:
+        """
+        Transform data to cluster labels.
+        
+        Note: SpectralClustering doesn't support out-of-sample prediction.
+        This method only works for the exact same data that was used for fitting.
+        """
         if not self._is_fitted:
             raise RuntimeError("SpectralClustering model is not fitted yet. Call `fit` first.")
         # SpectralClustering does not support out-of-sample prediction, so only works for fitted data

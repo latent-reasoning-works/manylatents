@@ -1,0 +1,12 @@
+_target_: manylatents.algorithms.latent.spectral_clustering.SpectralClusteringModule
+n_components: 2
+n_clusters: 5
+eigen_solver: auto
+n_init: 10
+gamma: 1.0
+affinity: precomputed
+n_neighbors: 10
+eigen_tol: auto
+assign_labels: kmeans
+degree: 3
+coef0: 1
