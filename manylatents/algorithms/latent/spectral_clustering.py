@@ -14,7 +14,7 @@ class SpectralClusteringModule(LatentModule):
         random_state: Optional[int] = None,
         n_init: int = 10,
         gamma: float = 1.0,
-        affinity: str = 'precomputed',
+        affinity: str = 'rbf',
         n_neighbors: int = 10,
         eigen_tol: Union[float, str] = 'auto',
         assign_labels: str = 'kmeans',
@@ -23,8 +23,9 @@ class SpectralClusteringModule(LatentModule):
         kernel_params: Optional[dict] = None,
         n_jobs: Optional[int] = None,
         verbose: bool = False,
+        **kwargs
     ):
-        super().__init__(init_seed=random_state)
+        super().__init__(n_components=n_components, init_seed=random_state,**kwargs)
         self.model = SpectralClustering(
             n_clusters=n_clusters,
             eigen_solver=eigen_solver,

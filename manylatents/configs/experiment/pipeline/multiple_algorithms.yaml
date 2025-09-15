@@ -13,7 +13,7 @@ pipeline:
     overrides:
       - algorithms/latent=pca
       - algorithms.latent.n_components=50
-      - data=swissroll  # First step uses specified data source
+      - data=swiss_roll  # First step uses specified data source
   - experiment: pipeline_step_lightning
     overrides:
       - algorithms/lightning=ae_reconstruction

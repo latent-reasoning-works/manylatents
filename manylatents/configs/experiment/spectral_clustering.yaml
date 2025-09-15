@@ -1,0 +1,21 @@
+# @package _global_
+name: spectral_clustering_post_pca
+
+defaults:
+  - override /algorithms/latent: spectral_clustering
+  - override /data: precomputed_swiss_roll
+  - override /metrics: test_metric
+  - override /callbacks/embedding: default
+  - override /metrics: test_metric
+
+seed: 42
+project: spectral_clustering
+
+algorithms:
+  latent:
+    n_clusters: 20
+
+callbacks:
+  embeddings:
+    plot_embeddings:
+      label_col: label

@@ -3,12 +3,12 @@ name: single_algorithm_pca_swissroll
 
 defaults:
   - override /algorithms/latent: pca
-  - override /data: swissroll
+  - override /data: swiss_roll
   - override /callbacks/embedding: default
   - override /metrics: test_metric
 
 seed: 42
-project: your_project
+project: spectral_clustering
 
 algorithms:
   latent:
