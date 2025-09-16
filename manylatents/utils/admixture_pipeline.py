@@ -16,16 +16,21 @@ logger = logging.getLogger(__name__)
 class AdmixtureProcessor:
     """Process neural admixture outputs for different datasets (UKBB, HGDP+1KGP)."""
     
-    def __init__(self, dataset_type: str = "UKBB", k_range: Tuple[int, int] = (2, 10)):
+    def __init__(self, dataset_type: str = "UKBB", k_range: Tuple[int, int] = (2, 10),
+                 q_train_prefix: str = "neuralAdmixture", q_test_prefix: str = "random_data_unseen"):
         """
         Initialize admixture processor.
-        
+
         Args:
-            dataset_type: Type of dataset ('UKBB' or 'HGDP')  
+            dataset_type: Type of dataset ('UKBB' or 'HGDP')
             k_range: Range of K values to process (min_k, max_k)
+            q_train_prefix: Prefix for training Q files
+            q_test_prefix: Prefix for test Q files
         """
         self.dataset_type = dataset_type
         self.k_min, self.k_max = k_range
+        self.q_train_prefix = q_train_prefix
+        self.q_test_prefix = q_test_prefix
         self.required_files = {}
         self.processed_data = {}
         
@@ -67,16 +72,30 @@ class AdmixtureProcessor:
             self.required_files[f'samples_{name}'] = str(samples_file)
         
         # Check neural admixture Q files for each K
-        missing_files = []
+        missing_train_files = []
+        missing_test_files = []
         for k in range(self.k_min, self.k_max + 1):
-            q_file = admix_path / f"neuralAdmixture.{k}.Q"
-            if not q_file.exists():
-                missing_files.append(str(q_file))
+            # Check training Q file
+            q_train_file = admix_path / f"{self.q_train_prefix}.{k}.Q"
+            if not q_train_file.exists():
+                missing_train_files.append(str(q_train_file))
             else:
-                self.required_files[f'admixture_k{k}'] = str(q_file)
-                
-        if missing_files:
-            logger.error(f"Missing admixture files: {missing_files}")
+                self.required_files[f'admixture_train_k{k}'] = str(q_train_file)
+
+            # Check test Q file
+            q_test_file = admix_path / f"{self.q_test_prefix}.{k}.Q"
+            if not q_test_file.exists():
+                missing_test_files.append(str(q_test_file))
+            else:
+                self.required_files[f'admixture_test_k{k}'] = str(q_test_file)
+
+        # Raise errors for missing files
+        if missing_train_files:
+            logger.error(f"Missing training Q files: {missing_train_files}")
+            return False
+
+        if missing_test_files:
+            logger.error(f"Missing test Q files: {missing_test_files}")
             return False
             
         # Store admixture directory
@@ -145,42 +164,24 @@ class AdmixtureProcessor:
         processed_data = {}
         
         for k in range(self.k_min, self.k_max + 1):
-            if f'admixture_k{k}' not in self.required_files:
-                logger.warning(f"Skipping K={k}, file not found")
+            train_key = f'admixture_train_k{k}'
+            test_key = f'admixture_test_k{k}'
+
+            if train_key not in self.required_files or test_key not in self.required_files:
+                logger.error(f"Skipping K={k}, required files not found in validation")
                 continue
-                
+
             try:
                 # Load Q files for train and test
-                q_train = pd.read_csv(self.required_files[f'admixture_k{k}'], sep=' ', header=None)
-                
-                # Look for corresponding test file
-                test_patterns = [
-                    f"*unseen.{k}.Q",
-                    f"*_test.{k}.Q", 
-                    f"random*unseen.{k}.Q"
-                ]
-                
-                q_test_file = None
-                for pattern in test_patterns:
-                    matches = list(admix_dir.glob(pattern))
-                    if matches:
-                        q_test_file = matches[0]
-                        break
-                        
-                if q_test_file:
-                    q_test = pd.read_csv(q_test_file, sep=' ', header=None)
-                    logger.info(f"K={k}: Loaded train ({len(q_train)}) and test ({len(q_test)}) Q files")
-                else:
-                    logger.warning(f"K={k}: No test Q file found, using train only")
-                    q_test = pd.DataFrame()  # Empty DataFrame
+                q_train = pd.read_csv(self.required_files[train_key], sep=' ', header=None)
+                q_test = pd.read_csv(self.required_files[test_key], sep=' ', header=None)
+
+                logger.info(f"K={k}: Loaded train ({len(q_train)}) and test ({len(q_test)}) Q files")
                 
                 # Combine train and test data with sample IDs
-                if not q_test.empty:
-                    q_train_with_ids = pd.concat([q_train, fam_train[['ID']]], axis=1)
-                    q_test_with_ids = pd.concat([q_test, fam_test[['ID']]], axis=1)
-                    q_combined = pd.concat([q_train_with_ids, q_test_with_ids], ignore_index=True)
-                else:
-                    q_combined = pd.concat([q_train, fam_train[['ID']]], axis=1)
+                q_train_with_ids = pd.concat([q_train, fam_train[['ID']]], axis=1)
+                q_test_with_ids = pd.concat([q_test, fam_test[['ID']]], axis=1)
+                q_combined = pd.concat([q_train_with_ids, q_test_with_ids], ignore_index=True)
                 
                 # Merge with metadata
                 metadata_cols = self._get_metadata_columns()
@@ -522,15 +523,17 @@ class AdmixtureVisualizer:
         return pd.concat(subsampled_groups, axis=0)
 
 
-def run_admixture_pipeline(admixture_dir: str, metadata_path: str, 
+def run_admixture_pipeline(admixture_dir: str, metadata_path: str,
                           output_dir: str, dataset_type: str = "UKBB",
                           k_range: Tuple[int, int] = (2, 10),
                           create_plots: bool = True,
                           samples_train: Optional[str] = None,
-                          samples_test: Optional[str] = None) -> Dict[str, any]:
+                          samples_test: Optional[str] = None,
+                          q_train_prefix: str = "neuralAdmixture",
+                          q_test_prefix: str = "random_data_unseen") -> Dict[str, any]:
     """
     Run complete admixture processing pipeline.
-    
+
     Args:
         admixture_dir: Directory with neural admixture outputs
         metadata_path: Path to metadata CSV
@@ -540,14 +543,16 @@ def run_admixture_pipeline(admixture_dir: str, metadata_path: str,
         create_plots: Whether to create visualization plots
         samples_train: Path to samples.txt (optional)
         samples_test: Path to samples_unseen.txt (optional)
-        
+        q_train_prefix: Prefix for training Q files
+        q_test_prefix: Prefix for test Q files
+
     Returns:
         Dictionary with pipeline results
     """
     logger.info(f"Starting admixture pipeline for {dataset_type}")
     
     # Initialize processor
-    processor = AdmixtureProcessor(dataset_type, k_range)
+    processor = AdmixtureProcessor(dataset_type, k_range, q_train_prefix, q_test_prefix)
     
     # Validate files
     if not processor.validate_files(admixture_dir, metadata_path, samples_train, samples_test):
