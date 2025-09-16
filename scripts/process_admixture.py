@@ -114,7 +114,21 @@ Examples:
         type=str,
         help='Path to samples_unseen.txt (test samples). Auto-detected if not provided.'
     )
-    
+
+    parser.add_argument(
+        '--q-train-prefix',
+        type=str,
+        default='neuralAdmixture',
+        help='Prefix for training Q files (default: neuralAdmixture). Files expected: {prefix}.{k}.Q'
+    )
+
+    parser.add_argument(
+        '--q-test-prefix',
+        type=str,
+        default='random_data_unseen',
+        help='Prefix for test Q files (default: random_data_unseen). Files expected: {prefix}.{k}.Q'
+    )
+
     parser.add_argument(
         '--no-plots',
         action='store_true',
@@ -158,7 +172,9 @@ Examples:
             k_range=(args.k_min, args.k_max),
             create_plots=not args.no_plots,
             samples_train=args.samples_train,
-            samples_test=args.samples_test
+            samples_test=args.samples_test,
+            q_train_prefix=args.q_train_prefix,
+            q_test_prefix=args.q_test_prefix
         )
         
         # Print summary
