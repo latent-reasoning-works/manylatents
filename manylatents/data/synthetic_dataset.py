@@ -1483,6 +1483,33 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         except ImportError:
             print("NetworkX or matplotlib not available for graph visualization")
 
+    def get_gt_dists(self):
+        """
+        Compute geodesic distances as shortest paths over the tree graph.
+        Uses the same approach as DLATree.
+        """
+        if self.graph is None:
+            self.get_graph()
+        geodesic_dist = shortest_path(csgraph=self.graph.tocsr(), directed=False)
+        return geodesic_dist
+
+    def get_graph(self):
+        """
+        Build a sparse adjacency graph connecting neighboring points along the tree structure.
+        Uses the same approach as DLATree, connecting consecutive points in data_gt.
+        """
+        if self.graph is None:
+            n_points = self.data_gt.shape[0]
+            adj_matrix = sp.lil_matrix((n_points, n_points))
+
+            for i in range(n_points - 1):
+                distance = np.linalg.norm(self.data_gt[i] - self.data_gt[i + 1])
+                adj_matrix[i, i + 1] = distance
+                adj_matrix[i + 1, i] = distance
+
+            self.graph = adj_matrix
+        return self.graph
+
 
 if __name__ == "__main__":
 
