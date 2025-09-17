@@ -688,15 +688,15 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             print("Warning: gap_edges parameter is deprecated and will be ignored in simplified DLA tree implementation")
         
         # Generate the data using simplified approach
-        data, data_gt, metadata = self._generate_from_graph()
+        data, graph, metadata = self._generate_from_graph()
         
         # Load precomputed or use generated data
         if precomputed_path is not None and os.path.exists(precomputed_path):
             self.data = self.load_precomputed(precomputed_path, mmap_mode)
         else:
             self.data = data
-            
-        self.data_gt = data_gt
+
+        self.graph = graph
         
         # Convert edge_ids to color indices directly (same logic as graph topology)
         from manylatents.utils.mappings import cmap_dla_tree
@@ -868,44 +868,115 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             M = np.vstack(all_data)
         else:
             M = np.empty((0, self.n_dim))
-            
-        M_gt = M.copy()  # Ground truth same as generated data
+
         metadata = np.array(all_metadata)
-        
-        # Step 4: Apply gap functionality (remove excluded edges)
+
+        # Step 3.5: Build COMPLETE adjacency graph including gap edges (for ground truth)
+        n_points_complete = M.shape[0]
+        complete_adj_matrix = sp.lil_matrix((n_points_complete, n_points_complete))
+
+        # Track point indices for each edge (including gaps for ground truth)
+        edge_to_points = {}
+        node_to_boundary_points = {}
+        point_idx = 0
+
+        # Build mapping from graph topology (ALL edges, including gaps)
+        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+            edge_points = list(range(point_idx, point_idx + length))
+            edge_to_points[edge_id] = edge_points
+
+            # Track boundary points for nodes
+            if from_node not in node_to_boundary_points:
+                node_to_boundary_points[from_node] = []
+            if to_node not in node_to_boundary_points:
+                node_to_boundary_points[to_node] = []
+
+            node_to_boundary_points[from_node].append(edge_points[0])
+            node_to_boundary_points[to_node].append(edge_points[-1])
+
+            point_idx += length
+
+        # Connect consecutive points within ALL edges (including gaps for ground truth)
+        for edge_id, point_indices in edge_to_points.items():
+            for i in range(len(point_indices) - 1):
+                curr_idx = point_indices[i]
+                next_idx = point_indices[i + 1]
+                if curr_idx < n_points_complete and next_idx < n_points_complete:
+                    distance = np.linalg.norm(M[curr_idx] - M[next_idx])
+                    complete_adj_matrix[curr_idx, next_idx] = distance
+                    complete_adj_matrix[next_idx, curr_idx] = distance
+
+        # Connect ALL chains at graph junctions (including gap edges)
+        for node, boundary_points in node_to_boundary_points.items():
+            for i in range(len(boundary_points)):
+                for j in range(i + 1, len(boundary_points)):
+                    point_i = boundary_points[i]
+                    point_j = boundary_points[j]
+                    if point_i < n_points_complete and point_j < n_points_complete:
+                        distance = np.linalg.norm(M[point_i] - M[point_j])
+                        complete_adj_matrix[point_i, point_j] = distance
+                        complete_adj_matrix[point_j, point_i] = distance
+
+        # Step 4: Apply gap functionality (remove excluded edges from final data)
         if self.excluded_edges:
             keep_mask = ~np.isin(metadata, list(self.excluded_edges))
-            M = M[keep_mask]
-            M_gt = M_gt[keep_mask]  
-            metadata = metadata[keep_mask]
-            
+            M_final = M[keep_mask]
+            metadata_final = metadata[keep_mask]
+
             excluded_edges_found = set(all_metadata) & self.excluded_edges
             print(f"Applied gaps: removed edges {sorted(excluded_edges_found)} from data")
-            print(f"Remaining edges: {sorted(set(metadata))}")
-            
+            print(f"Remaining edges: {sorted(set(metadata_final))}")
+
             # Renumber visible edges to be sequential
-            unique_visible_edges = sorted(set(metadata))
+            unique_visible_edges = sorted(set(metadata_final))
             edge_renumbering = {old_id: new_id for new_id, old_id in enumerate(unique_visible_edges, 1)}
-            renumbered_metadata = np.array([edge_renumbering[old_id] for old_id in metadata])
-            
+            renumbered_metadata = np.array([edge_renumbering[old_id] for old_id in metadata_final])
+
             print(f"Edge renumbering: {edge_renumbering}")
-            metadata = renumbered_metadata
-            
+            metadata_final = renumbered_metadata
+
             self.edge_renumbering = edge_renumbering
             self.original_excluded_edges = excluded_edges_found
         else:
+            M_final = M
+            metadata_final = metadata
             self.edge_renumbering = None
             self.original_excluded_edges = set()
-        
+
         # Step 5: Add global noise
         if self.sigma > 0:
-            noise = np.random.normal(0, self.sigma, M.shape)
-            M += noise
-            M_gt += noise
-        
-        print(f"Final DLA tree: {len(M)} total samples across {len(set(metadata)) if len(metadata) > 0 else 0} populations")
-        
-        return M, M_gt, metadata
+            noise_final = np.random.normal(0, self.sigma, M_final.shape)
+            M_final += noise_final
+
+            # Also add noise to complete matrix for consistent ground truth
+            noise_complete = np.random.normal(0, self.sigma, M.shape)
+            M += noise_complete
+
+            # Update complete adjacency matrix with noisy positions
+            complete_adj_matrix = sp.lil_matrix((n_points_complete, n_points_complete))
+            for edge_id, point_indices in edge_to_points.items():
+                for i in range(len(point_indices) - 1):
+                    curr_idx = point_indices[i]
+                    next_idx = point_indices[i + 1]
+                    if curr_idx < n_points_complete and next_idx < n_points_complete:
+                        distance = np.linalg.norm(M[curr_idx] - M[next_idx])
+                        complete_adj_matrix[curr_idx, next_idx] = distance
+                        complete_adj_matrix[next_idx, curr_idx] = distance
+
+            for node, boundary_points in node_to_boundary_points.items():
+                for i in range(len(boundary_points)):
+                    for j in range(i + 1, len(boundary_points)):
+                        point_i = boundary_points[i]
+                        point_j = boundary_points[j]
+                        if point_i < n_points_complete and point_j < n_points_complete:
+                            distance = np.linalg.norm(M[point_i] - M[point_j])
+                            complete_adj_matrix[point_i, point_j] = distance
+                            complete_adj_matrix[point_j, point_i] = distance
+
+        print(f"Final DLA tree: {len(M_final)} total samples across {len(set(metadata_final)) if len(metadata_final) > 0 else 0} populations")
+        print(f"Ground truth graph: {complete_adj_matrix.shape[0]} points including gaps")
+
+        return M_final, complete_adj_matrix, metadata_final
 
     def _create_orthogonal_subspaces(self, n_directions, n_dim, node_id):
         """
@@ -1485,29 +1556,35 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
 
     def get_gt_dists(self):
         """
-        Compute geodesic distances as shortest paths over the tree graph.
-        Uses the same approach as DLATree.
+        Compute geodesic distances as shortest paths over the complete tree graph (including gaps).
+        Returns distances only for the final data points (excluding gap points).
         """
-        if self.graph is None:
-            self.get_graph()
-        geodesic_dist = shortest_path(csgraph=self.graph.tocsr(), directed=False)
-        return geodesic_dist
+        # Compute geodesic distances on complete graph (including gaps)
+        geodesic_dist_complete = shortest_path(csgraph=self.graph.tocsr(), directed=False)
+
+        if self.excluded_edges:
+            # Build mapping from complete graph indices to final data indices
+            all_metadata = []
+            point_idx = 0
+            for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+                all_metadata.extend([edge_id] * length)
+                point_idx += length
+
+            # Create mask for points that are kept in final data (non-excluded edges)
+            keep_mask = ~np.isin(all_metadata, list(self.excluded_edges))
+
+            # Extract distances only for kept points
+            geodesic_dist_final = geodesic_dist_complete[keep_mask][:, keep_mask]
+
+            return geodesic_dist_final
+        else:
+            # No gaps, return complete distances
+            return geodesic_dist_complete
 
     def get_graph(self):
         """
-        Build a sparse adjacency graph connecting neighboring points along the tree structure.
-        Uses the same approach as DLATree, connecting consecutive points in data_gt.
+        Return the precomputed adjacency graph built during data generation.
         """
-        if self.graph is None:
-            n_points = self.data_gt.shape[0]
-            adj_matrix = sp.lil_matrix((n_points, n_points))
-
-            for i in range(n_points - 1):
-                distance = np.linalg.norm(self.data_gt[i] - self.data_gt[i + 1])
-                adj_matrix[i, i + 1] = distance
-                adj_matrix[i + 1, i] = distance
-
-            self.graph = adj_matrix
         return self.graph
 
 
