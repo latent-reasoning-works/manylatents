@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import graphtools
 import numpy as np
 from sklearn.metrics import pairwise_distances
+from sklearn.datasets import make_blobs
 from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
@@ -528,11 +529,192 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
         return M, M_gt, C
 
 
+class Torus(SyntheticDataset, PrecomputedMixin):
+    def __init__(
+        self,
+        n_points=5000,
+        noise=0.1,
+        major_radius=3.0,
+        minor_radius=1.0,
+        random_state=42,
+        rotate_to_dim=3,
+        precomputed_path=None,
+        mmap_mode=None,
+    ):
+        """
+        Initialize a synthetic Torus dataset with uniformly distributed points.
+
+        Parameters:
+        ----------
+        n_points : int, default=5000
+            Total number of points to generate on the torus surface.
+
+        noise : float, default=0.1
+            Standard deviation of isotropic Gaussian noise added to each data point.
+
+        major_radius : float, default=3.0
+            Major radius of the torus (distance from center to tube center).
+
+        minor_radius : float, default=1.0
+            Minor radius of the torus (radius of the tube).
+
+        random_state : int, default=42
+            Seed for random number generator to ensure reproducibility.
+
+        rotate_to_dim : int, default=3
+            The higher dimensionality of the space to which the manifold is rotated.
+            Rotation is only applied when this value is greater than 3.
+
+        precomputed_path : str, optional
+            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
+        """
+        super().__init__()
+        np.random.seed(random_state)
+        rng = np.random.default_rng(random_state)
+
+        # Generate uniformly distributed angles
+        self.theta_all = 2 * np.pi * rng.random(n_points)  # [0, 2π]
+        self.phi_all = 2 * np.pi * rng.random(n_points)    # [0, 2π]
+        
+        # Convert to Cartesian coordinates
+        x = (major_radius + minor_radius * np.cos(self.phi_all)) * np.cos(self.theta_all)
+        y = (major_radius + minor_radius * np.cos(self.phi_all)) * np.sin(self.theta_all)
+        z = minor_radius * np.sin(self.phi_all)
+        
+        X = np.stack((x, y, z), axis=-1)  # shape (n_points, 3)
+        
+        # Add global noise
+        noise_term = noise * rng.normal(size=X.shape)
+        X = X + noise_term
+        
+        # Store parameters
+        self.major_radius = major_radius
+        self.minor_radius = minor_radius
+        
+        # Load precomputed embeddings or use generated data
+        if precomputed_path is not None and os.path.exists(precomputed_path):
+            self.data = self.load_precomputed(precomputed_path, mmap_mode)
+        else:
+            self.data = X
+            if rotate_to_dim > 3:
+                self.data = self.rotate_to_dim(rotate_to_dim)
+
+        # Create simple metadata
+        self.metadata = np.zeros(n_points, dtype=int)
+
+    def get_gt_dists(self):
+        """
+        Compute geodesic distances on the torus surface using parameter space distances.
+        """
+        # Vectorized computation using broadcasting
+        theta = self.theta_all[:, np.newaxis]  # shape (n_points, 1)
+        phi = self.phi_all[:, np.newaxis]      # shape (n_points, 1)
+        
+        # Compute pairwise differences with broadcasting
+        theta_diff = np.abs(theta - self.theta_all)  # shape (n_points, n_points)
+        phi_diff = np.abs(phi - self.phi_all)        # shape (n_points, n_points)
+        
+        # Apply periodic boundary conditions
+        theta_diff = np.minimum(theta_diff, 2 * np.pi - theta_diff)
+        phi_diff = np.minimum(phi_diff, 2 * np.pi - phi_diff)
+        
+        # Compute geodesic distances
+        distances = np.sqrt((self.major_radius * theta_diff)**2 + (self.minor_radius * phi_diff)**2)
+        
+        return distances
+
+    def get_graph(self):
+        """Create a graphtools graph if does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
+
+class GaussianBlobs(SyntheticDataset):
+    def __init__(
+        self,
+        n_samples=100,
+        n_features=2,
+        centers=None,
+        cluster_std=1.0,
+        center_box=(-10.0, 10.0),
+        shuffle=True,
+        random_state=42,
+        return_centers=False,
+    ):
+        """
+        Initialize a Gaussian Blob dataset using sklearn's make_blobs.
+        
+        Parameters:
+        ----------
+        n_samples : int or list of int, default=100
+            Number of samples to generate, or list of samples per center.
+            
+        n_features : int, default=2
+            Number of features for each sample.
+            
+        centers : int, array-like or None, default=None
+            Number of centers to generate, or fixed center locations.
+            
+        cluster_std : float or list of float, default=1.0
+            Standard deviation of the clusters.
+            
+        center_box : tuple of float, default=(-10.0, 10.0)
+            Bounding box for each cluster center when centers are generated at random.
+            
+        shuffle : bool, default=True
+            Shuffle the samples.
+            
+        random_state : int, default=42
+            Random state for reproducibility.
+            
+        return_centers : bool, default=False
+            Whether to return the centers.
+        """
+        super().__init__()
+        
+        # Convert center_box to tuple if it's a list (for YAML compatibility)
+        if not isinstance(center_box, tuple):
+            center_box = tuple(center_box)
+        
+        # Generate the blob data using sklearn
+        result = make_blobs(
+            n_samples=n_samples,
+            n_features=n_features,
+            centers=centers,
+            cluster_std=cluster_std,
+            center_box=center_box,
+            shuffle=shuffle,
+            random_state=random_state,
+            return_centers=return_centers
+        )
+        
+        if return_centers:
+            self.data, self.metadata, self.centers = result
+        else:
+            self.data, self.metadata = result
+            self.centers = None
+    
+    def get_gt_dists(self):
+        """
+        Compute pairwise Euclidean distances as ground truth distances.
+        """
+        return pairwise_distances(self.data, metric="euclidean")
+    
+    def get_graph(self):
+        """Create a graphtools graph if does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
 
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "dla_tree" # "swiss_roll" or "saddle_surface" or "dla_tree"
+    data_name = "gaussian_blobs" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
@@ -541,6 +723,10 @@ if __name__ == "__main__":
         dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
     elif data_name == "dla_tree":
         dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
+    elif data_name == "torus":
+        dataset = Torus(n_points=500, noise=0.05, major_radius=3.0, minor_radius=1.0, random_state=42, rotate_to_dim=5)
+    elif data_name == "gaussian_blobs":
+        dataset = GaussianBlobs(n_samples=500, n_features=2, centers=5, cluster_std=1.0, random_state=42)
     
     data = dataset.data
     labels = dataset.metadata
@@ -549,10 +735,16 @@ if __name__ == "__main__":
     print("Data shape:", dataset.data.shape)
     print("Labels shape:", dataset.metadata.shape)
     
-    if data_name == "swiss_roll" or data_name == "saddle_surface":
+    if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "torus":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(data[:,2], data[:,0], data[:,1], c=labels, cmap='tab20')
+        ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
+    elif data_name == "gaussian_blobs":
+        plt.figure(figsize=(8, 6))
+        plt.scatter(data[:, 0], data[:, 1], c=labels, cmap='tab20', s=10)
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        plt.title('Gaussian Blobs Dataset')
     elif data_name == "dla_tree":
         # visualize by phate
         import phate

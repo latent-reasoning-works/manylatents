@@ -1,0 +1,4 @@
+defaults:
+  - gaussian_blobs
+
+centers: 1
