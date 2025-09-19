@@ -1,4 +1,5 @@
 import os
+import logging
 import torch
 from torch.utils.data import Dataset
 import graphtools
@@ -9,6 +10,7 @@ import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
 from typing import Union, List, Optional, Dict
 from .precomputed_mixin import PrecomputedMixin
+from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
 
 class SyntheticDataset(Dataset):
@@ -540,7 +542,7 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
 class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
     def __init__(
         self,
-        graph_edges,  # List of (from_node, to_node, edge_type, edge_id, length)
+        graph_edges,  # List of (from_node, to_node, edge_id, length)
         n_dim: int = 50,
         rand_multiplier: float = 2.0,
         random_state: int = 42,
@@ -551,8 +553,6 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         mmap_mode: Optional[str] = None,
         # Gap functionality: simply exclude these edge_ids from data generation
         excluded_edges: Optional[List] = None,
-        # Deprecated parameters (kept for backwards compatibility)
-        gap_edges=None,
     ):
         """
         Generate a DLA (Diffusion-Limited Aggregation) tree from explicit graph topology.
@@ -571,9 +571,8 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         Parameters:
         -----------
         graph_edges : list of tuples
-            List of (from_node, to_node, edge_type, edge_id, length) where:
+            List of (from_node, to_node, edge_id, length) where:
             - from_node, to_node: Node identifiers (strings or integers)
-            - edge_type: Edge classification ("trunk", "branch", "cross") for visualization
             - edge_id: Integer identifier for the edge (becomes population label)
             - length: Number of samples to generate for this population/edge
             
@@ -608,9 +607,6 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         mmap_mode : str, optional
             Memory mapping mode for loading precomputed data.
         
-        gap_edges : deprecated
-            Legacy parameter, use excluded_edges instead.
-            
         Algorithm Details:
         ------------------
         1. **Graph Parsing**: Build adjacency structure from graph_edges
@@ -643,10 +639,10 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         ```python
         # Define tree topology
         graph_edges = [
-            (1, 2, "trunk", 1, 300),    # Main trunk: 300 samples, edge 1
-            (2, 3, "trunk", 2, 300),    # Continuation: 300 samples, edge 2  
-            (2, 4, "branch", 3, 150),   # Side branch: 150 samples, edge 3
-            (2, 5, "cross", 4, 75),     # Cross-link: 75 samples, edge 4
+            (1, 2, 1, 300),    # Main trunk: 300 samples, edge 1
+            (2, 3, 2, 300),    # Continuation: 300 samples, edge 2
+            (2, 4, 3, 150),    # Side branch: 150 samples, edge 3
+            (2, 5, 4, 75),     # Cross-link: 75 samples, edge 4
         ]
         
         # Create gaps by excluding certain edges
@@ -683,12 +679,8 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         self.save_graph_viz = save_graph_viz
         self.save_dir = save_dir
         
-        # Backward compatibility warning
-        if gap_edges is not None:
-            print("Warning: gap_edges parameter is deprecated and will be ignored in simplified DLA tree implementation")
-        
         # Generate the data using simplified approach
-        data, graph, metadata = self._generate_from_graph()
+        data, graph, metadata = self._generate_simplified()
         
         # Load precomputed or use generated data
         if precomputed_path is not None and os.path.exists(precomputed_path):
@@ -697,286 +689,297 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             self.data = data
 
         self.graph = graph
-        
-        # Convert edge_ids to color indices directly (same logic as graph topology)
-        from manylatents.utils.mappings import cmap_dla_tree
-        
-        def edge_id_to_color_index(edge_id):
-            """Convert edge_id to color index using same logic as graph visualization."""
-            if isinstance(edge_id, str):
-                return hash(edge_id) % len(cmap_dla_tree) + 1
-            else:
-                return edge_id  # Direct mapping: edge_id 1 → color_idx 1
-        
-        # Store color indices directly as metadata
-        self.metadata = np.array([edge_id_to_color_index(label) for label in metadata])
+
+        self.metadata = metadata
         
         # Generate and save visualization
         if save_graph_viz:
-            self._visualize_and_save_graph()
+            visualizer = DLATreeGraphVisualizer(
+                graph_edges=self.graph_edges,
+                excluded_edges=self.excluded_edges,
+                edge_renumbering=getattr(self, 'edge_renumbering', None),
+                original_excluded_edges=getattr(self, 'original_excluded_edges', set()),
+                random_state=self.random_state,
+                save_dir=self.save_dir
+            )
+            visualizer.visualize_and_save_graph()
+            # Also generate sample graph visualization
+            if hasattr(self, 'sample_graph'):
+                visualizer.visualize_sample_graph(self.sample_graph, save_path="outputs/sample_graph.png")
 
-    def _generate_from_graph(self):
+    def _generate_simplified(self):
         """
-        Generate DLA tree that properly follows the graph topology.
-        
+        Simplified DLA tree generation that builds data and graph simultaneously.
+
         Algorithm:
-        1. Build graph connectivity from edges and establish node positions
-        2. For each edge [from_node, to_node, edge_type, edge_id, length]:
-           - Start DLA random walk at from_node's position
-           - Generate 'length' samples via random walk  
-           - End walk at to_node's position (enforced connectivity)
-           - Assign all samples the edge_id label
-        3. Result: DLA tree structure matches graph topology exactly
+        1. Generate all DLA samples in order (including gaps)
+        2. Build adjacency graph as we go (connect consecutive points + node transitions)
+        3. Store indices of visible samples
+        4. Return visible data, complete graph, visible metadata
         """
         np.random.seed(self.random_state)
-        
-        # Step 1: Identify all unique nodes and find root
+
+        # Find root node (appears as from_node but never as to_node)
         all_nodes = set()
-        for from_node, to_node, _, _, _ in self.graph_edges:
+        for from_node, to_node, _, _ in self.graph_edges:
             all_nodes.add(from_node)
             all_nodes.add(to_node)
-        
-        # Find root node (appears as from_node but never as to_node)
-        to_nodes = {to_node for from_node, to_node, _, _, _ in self.graph_edges}
-        root_candidates = [node for node in all_nodes if node not in to_nodes]
-        root_node = root_candidates[0] if root_candidates else sorted(all_nodes)[0]
-        
-        print(f"Starting DLA tree generation from root node: {root_node}")
-        print(f"Total nodes in graph: {sorted(all_nodes)}")
-        
-        # Step 2: Establish node positions by processing edges in dependency order
-        node_positions = {}
+
+        to_nodes = {to_node for from_node, to_node, _, _ in self.graph_edges}
+        root_node = next((node for node in all_nodes if node not in to_nodes), sorted(all_nodes)[0])
+
+        import logging
+
+        # Initialize
         all_data = []
         all_metadata = []
-        
-        # Place root at origin
-        node_positions[root_node] = np.zeros(self.n_dim)
-        print(f"Root node {root_node} positioned at origin")
-        
-        # Step 2.5: Analyze node degrees and create orthogonal direction vectors
-        node_outgoing_edges = {}  # node -> list of (to_node, edge_id)
-        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
+        node_positions = {root_node: np.zeros(self.n_dim)}
+
+        # Create orthogonal subspaces for branching nodes
+        node_outgoing_edges = {}
+        for from_node, to_node, edge_id, length in self.graph_edges:
             if from_node not in node_outgoing_edges:
                 node_outgoing_edges[from_node] = []
             node_outgoing_edges[from_node].append((to_node, edge_id))
-        
-        # Create orthogonal subspaces for nodes with multiple outgoing edges
+
         node_subspaces = {}
         for node, outgoing_edges in node_outgoing_edges.items():
             if len(outgoing_edges) > 1:
-                print(f"Node {node} has {len(outgoing_edges)} outgoing edges: {[edge_id for _, edge_id in outgoing_edges]}")
                 node_subspaces[node] = self._create_orthogonal_subspaces(
-                    n_directions=len(outgoing_edges),
-                    n_dim=self.n_dim,
-                    node_id=node
-                )
-        
-        # Process edges to establish node positions and generate data
+                    n_directions=len(outgoing_edges), n_dim=self.n_dim, node_id=node)
+
+        # Process edges in dependency order
         processed_edges = set()
-        max_iterations = len(self.graph_edges) * 2  # Prevent infinite loops
         iteration = 0
-        
+        max_iterations = len(self.graph_edges) * 2
+
         while len(processed_edges) < len(self.graph_edges) and iteration < max_iterations:
             iteration += 1
             made_progress = False
-            
-            for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-                # Skip if already processed
-                if (from_node, to_node, edge_id) in processed_edges:
+
+            for from_node, to_node, edge_id, length in self.graph_edges:
+                if (from_node, to_node, edge_id) in processed_edges or from_node not in node_positions:
                     continue
-                    
-                # Can only process if from_node has a known position
-                if from_node not in node_positions:
-                    continue
-                    
-                print(f"Processing edge {edge_id}: {from_node} -> {to_node} ({length} samples)")
-                
-                # Get starting position
+
+                # Get starting position and subspace constraints
                 start_pos = node_positions[from_node]
-                
-                # Get orthogonal subspace if this node has multiple outgoing edges
                 allowed_dims = None
                 if from_node in node_subspaces:
-                    # Find which subspace corresponds to this edge_id
                     outgoing_edges = node_outgoing_edges[from_node]
                     for i, (_, out_edge_id) in enumerate(outgoing_edges):
                         if out_edge_id == edge_id:
                             allowed_dims = node_subspaces[from_node][i]
-                            print(f"  Using subspace {i} for edge {edge_id} from node {from_node}: dims {allowed_dims[:3]}...{allowed_dims[-3:]}")
                             break
-                
-                # Generate DLA branch from start to target
+
+                # Generate DLA branch
                 branch_data = self._generate_dla_branch_topology_aware(
-                    start_pos=start_pos,
-                    length=length,
-                    edge_id=edge_id,
-                    allowed_dims=allowed_dims
-                )
-                
-                # Store data and metadata
+                    start_pos=start_pos, length=length, edge_id=edge_id, allowed_dims=allowed_dims)
+
                 all_data.append(branch_data)
                 all_metadata.extend([edge_id] * length)
-                
-                # Set target node position as the end of this branch
                 node_positions[to_node] = branch_data[-1].copy()
-                print(f"Node {to_node} positioned at end of edge {edge_id}")
-                
-                # Mark as processed
                 processed_edges.add((from_node, to_node, edge_id))
                 made_progress = True
-            
-            if not made_progress:
-                # Handle remaining edges by placing missing nodes randomly
-                for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-                    if (from_node, to_node, edge_id) in processed_edges:
-                        continue
-                        
-                    print(f"Handling unconnected edge {edge_id}: {from_node} -> {to_node}")
-                    
-                    # Place from_node randomly if not positioned
-                    if from_node not in node_positions:
-                        node_positions[from_node] = np.random.randn(self.n_dim) * 2.0
-                        print(f"Randomly positioned unconnected node {from_node}")
-                    
-                    # Generate branch (with potential orthogonal subspace)
-                    start_pos = node_positions[from_node]
-                    allowed_dims = None
-                    if from_node in node_subspaces:
-                        outgoing_edges = node_outgoing_edges[from_node]
-                        for i, (_, out_edge_id) in enumerate(outgoing_edges):
-                            if out_edge_id == edge_id:
-                                allowed_dims = node_subspaces[from_node][i]
-                                break
-                    
-                    branch_data = self._generate_dla_branch_topology_aware(
-                        start_pos=start_pos,
-                        length=length,
-                        edge_id=edge_id,
-                        allowed_dims=allowed_dims
-                    )
-                    
-                    all_data.append(branch_data)
-                    all_metadata.extend([edge_id] * length)
-                    node_positions[to_node] = branch_data[-1].copy()
-                    processed_edges.add((from_node, to_node, edge_id))
-        
-        print(f"Processed {len(processed_edges)} edges in {iteration} iterations")
-        print(f"Final node positions: {list(node_positions.keys())}")
-        
-        # Step 3: Combine all branch data
-        if all_data:
-            M = np.vstack(all_data)
-        else:
-            M = np.empty((0, self.n_dim))
 
-        metadata = np.array(all_metadata)
+        # Combine all data
+        M_complete = np.vstack(all_data) if all_data else np.empty((0, self.n_dim))
+        metadata_complete = np.array(all_metadata)
 
-        # Step 3.5: Build COMPLETE adjacency graph including gap edges (for ground truth)
-        n_points_complete = M.shape[0]
-        complete_adj_matrix = sp.lil_matrix((n_points_complete, n_points_complete))
+        # Create junction samples and build proper sample graph
+        import networkx as nx
 
-        # Track point indices for each edge (including gaps for ground truth)
-        edge_to_points = {}
-        node_to_boundary_points = {}
+        # Identify all unique nodes that will need junction samples
+        all_nodes = set()
+        for from_node, to_node, _, _ in self.graph_edges:
+            all_nodes.add(from_node)
+            all_nodes.add(to_node)
+
+        # Initialize junction data structures
+        junction_data = []
+        junction_metadata = []
+        nodes_needing_junctions = all_nodes.copy()
+
+        # Process edges and create junction samples at actual edge boundaries
         point_idx = 0
+        edge_boundaries = {}  # node_id -> list of (sample_index, position)
 
-        # Build mapping from graph topology (ALL edges, including gaps)
-        for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-            edge_points = list(range(point_idx, point_idx + length))
-            edge_to_points[edge_id] = edge_points
+        for from_node, to_node, edge_id, length in self.graph_edges:
+            edge_samples = list(range(point_idx, point_idx + length))
+            first_sample_idx = edge_samples[0]
+            last_sample_idx = edge_samples[-1]
 
-            # Track boundary points for nodes
-            if from_node not in node_to_boundary_points:
-                node_to_boundary_points[from_node] = []
-            if to_node not in node_to_boundary_points:
-                node_to_boundary_points[to_node] = []
+            # Record boundary positions for junction creation
+            if from_node not in edge_boundaries:
+                edge_boundaries[from_node] = []
+            if to_node not in edge_boundaries:
+                edge_boundaries[to_node] = []
 
-            node_to_boundary_points[from_node].append(edge_points[0])
-            node_to_boundary_points[to_node].append(edge_points[-1])
+            edge_boundaries[from_node].append((first_sample_idx, M_complete[first_sample_idx]))
+            edge_boundaries[to_node].append((last_sample_idx, M_complete[last_sample_idx]))
 
             point_idx += length
 
-        # Connect consecutive points within ALL edges (including gaps for ground truth)
-        for edge_id, point_indices in edge_to_points.items():
-            for i in range(len(point_indices) - 1):
-                curr_idx = point_indices[i]
-                next_idx = point_indices[i + 1]
-                if curr_idx < n_points_complete and next_idx < n_points_complete:
-                    distance = np.linalg.norm(M[curr_idx] - M[next_idx])
-                    complete_adj_matrix[curr_idx, next_idx] = distance
-                    complete_adj_matrix[next_idx, curr_idx] = distance
+        # Combine all data: original samples + junction samples
+        M_with_junctions = np.vstack([M_complete, np.array(junction_data)]) if junction_data else M_complete
+        metadata_with_junctions = np.concatenate([metadata_complete, junction_metadata]) if junction_data else metadata_complete
 
-        # Connect ALL chains at graph junctions (including gap edges)
-        for node, boundary_points in node_to_boundary_points.items():
-            for i in range(len(boundary_points)):
-                for j in range(i + 1, len(boundary_points)):
-                    point_i = boundary_points[i]
-                    point_j = boundary_points[j]
-                    if point_i < n_points_complete and point_j < n_points_complete:
-                        distance = np.linalg.norm(M[point_i] - M[point_j])
-                        complete_adj_matrix[point_i, point_j] = distance
-                        complete_adj_matrix[point_j, point_i] = distance
 
-        # Step 4: Apply gap functionality (remove excluded edges from final data)
+        # Build NetworkX graph where nodes are samples (including junctions)
+        sample_graph = nx.Graph()
+        n_total = M_with_junctions.shape[0]
+
+        # Add all samples as nodes with correct labels
+        for i in range(n_total):
+            is_junction = metadata_with_junctions[i] == 'junction'
+            # Convert to int for comparison with excluded_edges
+            if not is_junction:
+                try:
+                    edge_id_int = int(metadata_with_junctions[i])
+                    is_gap = edge_id_int in self.excluded_edges
+                except (ValueError, TypeError):
+                    is_gap = False
+            else:
+                is_gap = False
+            is_visible = not is_junction and not is_gap
+
+            # Use original edge_id for now, will update with renumbered ID later
+            original_edge_id = metadata_with_junctions[i]
+
+            sample_graph.add_node(i,
+                                pos=M_with_junctions[i],
+                                edge_id=original_edge_id,
+                                is_junction=is_junction,
+                                is_gap=is_gap,
+                                is_visible=is_visible)
+
+        # Connect samples within each edge + connect to junction samples
+        point_idx = 0
+        for from_node, to_node, edge_id, length in self.graph_edges:
+            edge_samples = list(range(point_idx, point_idx + length))
+
+            # Connect consecutive samples within the edge
+            for i in range(len(edge_samples) - 1):
+                curr_idx = edge_samples[i]
+                next_idx = edge_samples[i + 1]
+                # Use unit weights for topological distances
+                sample_graph.add_edge(curr_idx, next_idx,
+                                    weight=1.0,
+                                    edge_type='within_branch',
+                                    branch_id=edge_id)
+
+            # Connect edges directly at their boundaries (no junction samples needed)
+            # This maintains tree connectivity with minimal edge weights
+
+            point_idx += length
+
+        # Connect edges at shared nodes (direct edge-to-edge connections)
+        for node_id in nodes_needing_junctions:
+            if node_id in edge_boundaries and len(edge_boundaries[node_id]) > 1:
+                # Connect all edges that meet at this node
+                boundary_samples = [sample_idx for sample_idx, _ in edge_boundaries[node_id]]
+
+                # Connect all pairs with small weight (e.g., 1.0) to maintain connectivity
+                for i in range(len(boundary_samples)):
+                    for j in range(i + 1, len(boundary_samples)):
+                        sample_i, sample_j = boundary_samples[i], boundary_samples[j]
+                        # Use small fixed weight to avoid large distances
+                        sample_graph.add_edge(sample_i, sample_j,
+                                            weight=1.0,  # Small fixed weight
+                                            edge_type='junction_direct',
+                                            branch_id=0)
+
+
+        # Store the complete sample graph for visualization and ground truth
+        self.sample_graph = sample_graph
+
+
+        # Create adjacency matrix
+        adj_matrix = nx.adjacency_matrix(sample_graph, weight='weight').astype(np.float64)
+
+        # Extract visible data (from original M_complete, not M_with_junctions)
+        original_visible_mask = ~np.isin(metadata_complete, list(self.excluded_edges))
+        original_visible_indices = np.where(original_visible_mask)[0]
+        M_visible = M_complete[original_visible_indices]
+        metadata_visible = metadata_complete[original_visible_indices]
+
+
+        # Store the mapping from final dataset order to M_complete positions
+        # This is crucial for ground truth alignment!
+        final_to_complete_mapping = original_visible_indices.copy()
+
+        # Renumber visible edge labels to be sequential (1, 2, 3, ...)
         if self.excluded_edges:
-            keep_mask = ~np.isin(metadata, list(self.excluded_edges))
-            M_final = M[keep_mask]
-            metadata_final = metadata[keep_mask]
-
-            excluded_edges_found = set(all_metadata) & self.excluded_edges
-            print(f"Applied gaps: removed edges {sorted(excluded_edges_found)} from data")
-            print(f"Remaining edges: {sorted(set(metadata_final))}")
-
-            # Renumber visible edges to be sequential
-            unique_visible_edges = sorted(set(metadata_final))
+            unique_visible_edges = sorted(set(metadata_visible))
             edge_renumbering = {old_id: new_id for new_id, old_id in enumerate(unique_visible_edges, 1)}
-            renumbered_metadata = np.array([edge_renumbering[old_id] for old_id in metadata_final])
-
-            print(f"Edge renumbering: {edge_renumbering}")
-            metadata_final = renumbered_metadata
-
+            metadata_visible = np.array([edge_renumbering[old_id] for old_id in metadata_visible])
             self.edge_renumbering = edge_renumbering
-            self.original_excluded_edges = excluded_edges_found
+            self.original_excluded_edges = set(metadata_complete) & self.excluded_edges
         else:
-            M_final = M
-            metadata_final = metadata
             self.edge_renumbering = None
             self.original_excluded_edges = set()
 
-        # Step 5: Add global noise
+        # --- expose original and renumbered labels consistently ---
+        self.original_metadata = metadata_complete[original_visible_indices]  # original edge_ids (pre-renumber)
+        self.metadata = metadata_visible                                      # renumbered labels 1..K
+
+        if self.excluded_edges:
+            self.edge_renumbering = edge_renumbering                          # {old_id -> new_id}
+            self.inverse_edge_renumbering = {v: k for k, v in edge_renumbering.items()}  # {new_id -> old_id}
+        else:
+            self.edge_renumbering = None
+            self.inverse_edge_renumbering = None
+
+        # Add noise if specified
         if self.sigma > 0:
-            noise_final = np.random.normal(0, self.sigma, M_final.shape)
-            M_final += noise_final
+            M_visible += np.random.normal(0, self.sigma, M_visible.shape)
+            M_with_junctions += np.random.normal(0, self.sigma, M_with_junctions.shape)
 
-            # Also add noise to complete matrix for consistent ground truth
-            noise_complete = np.random.normal(0, self.sigma, M.shape)
-            M += noise_complete
 
-            # Update complete adjacency matrix with noisy positions
-            complete_adj_matrix = sp.lil_matrix((n_points_complete, n_points_complete))
-            for edge_id, point_indices in edge_to_points.items():
-                for i in range(len(point_indices) - 1):
-                    curr_idx = point_indices[i]
-                    next_idx = point_indices[i + 1]
-                    if curr_idx < n_points_complete and next_idx < n_points_complete:
-                        distance = np.linalg.norm(M[curr_idx] - M[next_idx])
-                        complete_adj_matrix[curr_idx, next_idx] = distance
-                        complete_adj_matrix[next_idx, curr_idx] = distance
+        # Store complete arrays aligned to sample_graph indexing
+        self.M_complete = M_with_junctions           # rows correspond 1:1 to sample_graph node indices
+        self.adj_matrix_complete = adj_matrix        # same index space
 
-            for node, boundary_points in node_to_boundary_points.items():
-                for i in range(len(boundary_points)):
-                    for j in range(i + 1, len(boundary_points)):
-                        point_i = boundary_points[i]
-                        point_j = boundary_points[j]
-                        if point_i < n_points_complete and point_j < n_points_complete:
-                            distance = np.linalg.norm(M[point_i] - M[point_j])
-                            complete_adj_matrix[point_i, point_j] = distance
-                            complete_adj_matrix[point_j, point_i] = distance
+        # --- Build consistent mapping from dataset.data row order -> sample_graph node indices ---
+        # visible rows in dataset.data come from M_complete[original_visible_indices]
+        # node indices == row indices of M_with_junctions used to add nodes to sample_graph
+        # (we constructed nodes in that same order), so we can reuse original_visible_indices
+        self.graph_indices_for_visible_rows = final_to_complete_mapping.copy().astype(int)
 
-        print(f"Final DLA tree: {len(M_final)} total samples across {len(set(metadata_final)) if len(metadata_final) > 0 else 0} populations")
-        print(f"Ground truth graph: {complete_adj_matrix.shape[0]} points including gaps")
+        # optional sanity check: ensure all mapped nodes are visible nodes
+        visible_nodes = {i for i, d in self.sample_graph.nodes(data=True) if d.get("is_visible", False)}
+        assert set(self.graph_indices_for_visible_rows).issubset(visible_nodes), (
+            "Some dataset rows map to non-visible graph nodes; check visibility mask construction."
+        )
 
-        return M_final, complete_adj_matrix, metadata_final
+        # Return placeholder adjacency matrix for visible data
+        visible_adj_placeholder = sp.lil_matrix((len(M_visible), len(M_visible)))
+
+        # Store data for testing
+        self.data = M_visible
+        self.metadata = metadata_visible
+
+        return M_visible, visible_adj_placeholder, metadata_visible
+
+    def visualize_sample_graph(self, save_path="debug_outputs/sample_graph.png", max_nodes=500):
+        """
+        Visualize the sample-level graph where nodes are samples and edges connect them.
+
+        This method is now a wrapper around the DLATreeGraphVisualizer class.
+        """
+        if not hasattr(self, 'sample_graph'):
+            print("No sample graph available. Run generation first.")
+            return
+
+        visualizer = DLATreeGraphVisualizer(
+            graph_edges=self.graph_edges,
+            excluded_edges=self.excluded_edges,
+            edge_renumbering=getattr(self, 'edge_renumbering', None),
+            original_excluded_edges=getattr(self, 'original_excluded_edges', set()),
+            random_state=self.random_state,
+            save_dir=self.save_dir
+        )
+        visualizer.visualize_sample_graph(self.sample_graph, save_path, max_nodes)
+
 
     def _create_orthogonal_subspaces(self, n_directions, n_dim, node_id):
         """
@@ -1022,8 +1025,7 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         subspace_size = n_dim // n_directions
         remaining_dims = n_dim % n_directions
         
-        print(f"  Creating {n_directions} orthogonal subspaces for node {node_id}")
-        print(f"  Each subspace ≈ {subspace_size} dims, {remaining_dims} dims distributed")
+        logging.debug(f"Creating {n_directions} orthogonal subspaces for node {node_id}: ~{subspace_size} dims each, {remaining_dims} distributed")
         
         subspaces = []
         current_start = 0
@@ -1037,7 +1039,7 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             subspace_indices = np.arange(current_start, current_end)
             subspaces.append(subspace_indices)
             
-            print(f"    Branch {i}: diffuses in features [{current_start}:{current_end}] ({current_size} dims)")
+            logging.debug(f"Branch {i}: diffuses in features [{current_start}:{current_end}] ({current_size} dims)")
             current_start = current_end
         
         return subspaces
@@ -1091,500 +1093,67 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         
         # Initialize branch with start position repeated for all samples
         branch = np.tile(start_pos, (length, 1))  # Shape: (length, n_dim)
+
         
         if allowed_dims is not None:
             # Constrained diffusion: only vary in allowed dimensions
             n_allowed = len(allowed_dims)
-            
+
+
             # Generate DLA random walk only in the allowed subspace
-            subspace_steps = np.cumsum(
-                -0.5 + self.rand_multiplier * np.random.rand(length, n_allowed), 
-                axis=0
-            )
-            
+            # First sample stays at start_pos (no displacement)
+            random_increments = -0.5 + self.rand_multiplier * np.random.rand(length, n_allowed)
+            random_increments[0] = 0  # First sample stays exactly at start_pos
+            subspace_steps = np.cumsum(random_increments, axis=0)
+
+
             # Scale the walk appropriately
             subspace_steps = subspace_steps * 0.3
-            
+
             # Apply diffusion only to allowed dimensions, others stay fixed
             branch[:, allowed_dims] += subspace_steps
             
-            print(f"    Constrained diffusion for edge {edge_id}: {n_allowed}/{self.n_dim} dims free")
+            logging.debug(f"Constrained diffusion for edge {edge_id}: {n_allowed}/{self.n_dim} dims free")
             
         else:
             # Unconstrained diffusion: use all dimensions
-            random_steps = np.cumsum(
-                -0.5 + self.rand_multiplier * np.random.rand(length, self.n_dim), 
-                axis=0
-            )
-            
+            # First sample stays at start_pos (no displacement)
+            random_increments = -0.5 + self.rand_multiplier * np.random.rand(length, self.n_dim)
+            random_increments[0] = 0  # First sample stays exactly at start_pos
+            random_steps = np.cumsum(random_increments, axis=0)
+
+
             # Scale the walk
             random_steps = random_steps * 0.3
-            
+
             # Apply to all dimensions
             branch += random_steps
             
-            print(f"    Unconstrained diffusion for edge {edge_id}: all {self.n_dim} dims free")
+            logging.debug(f"Unconstrained diffusion for edge {edge_id}: all {self.n_dim} dims free")
         
         return branch
 
-    def _generate_dla_branch_simple(self, start_pos, length):
+    def get_gt_dists(self, include_gaps: bool = False):
         """
-        Generate a simple DLA branch using cumulative random walk.
-        
-        Based on PHATE tree.py approach - generates natural branching patterns.
+        Compute geodesic distances as shortest paths over the complete tree graph.
+
+        Args:
+            include_gaps: If True, return complete matrix including gap/junction samples.
+                          If False, return matrix aligned to dataset.data rows only.
         """
-        if length == 0:
-            return np.empty((0, self.n_dim))
-        
-        if length == 1:
-            return start_pos.reshape(1, -1)
-        
-        # Generate cumulative random walk
-        # Use random steps scaled by rand_multiplier
-        random_steps = np.cumsum(
-            -1 + self.rand_multiplier * np.random.rand(length, self.n_dim), 
-            axis=0
+        geodesic_dist_complete = shortest_path(
+            csgraph=self.adj_matrix_complete.tocsr(), directed=False
         )
-        
-        # Scale the walk to have reasonable magnitude
-        # Each step should be small relative to overall tree size
-        random_steps = random_steps * 0.5  # Scale factor for tree size
-        
-        # Add start position to get absolute positions
-        branch = start_pos + random_steps
-        
-        return branch
 
-    def _create_hierarchical_layout(self, G):
-        """Create a custom layout that avoids edge overlaps by using hierarchical positioning."""
-        import networkx as nx
-        import numpy as np
-        
-        # Find root node (no incoming edges in a DAG, or use degree-based heuristic)
-        all_nodes = set(G.nodes())
-        target_nodes = set()
-        for u, v in G.edges():
-            target_nodes.add(v)
-        
-        root_candidates = all_nodes - target_nodes
-        if root_candidates:
-            root = min(root_candidates)  # Use smallest node ID as root
-        else:
-            # If cyclic, use node with highest out-degree
-            root = max(G.nodes(), key=lambda n: G.out_degree(n))
-        
-        # Build levels using BFS from root
-        levels = {}
-        queue = [(root, 0)]
-        visited = set()
-        
-        while queue:
-            node, level = queue.pop(0)
-            if node in visited:
-                continue
-            visited.add(node)
-            
-            if level not in levels:
-                levels[level] = []
-            levels[level].append(node)
-            
-            # Add neighbors to next level
-            for neighbor in G.neighbors(node):
-                if neighbor not in visited:
-                    queue.append((neighbor, level + 1))
-        
-        # Position nodes hierarchically
-        pos = {}
-        max_level = max(levels.keys()) if levels else 0
-        
-        for level, nodes in levels.items():
-            n_nodes = len(nodes)
-            if n_nodes == 1:
-                # Single node: center it
-                pos[nodes[0]] = (0, max_level - level)
-            else:
-                # Multiple nodes: spread them horizontally
-                x_positions = np.linspace(-n_nodes/2, n_nodes/2, n_nodes)
-                for i, node in enumerate(sorted(nodes)):
-                    pos[node] = (x_positions[i], max_level - level)
-        
-        # Handle any remaining nodes (in case of complex connectivity)
-        for node in G.nodes():
-            if node not in pos:
-                pos[node] = (np.random.uniform(-2, 2), np.random.uniform(-1, 1))
-        
-        return pos
-
-    def _create_better_layout(self, G):
-        """Try multiple layout algorithms to find one that looks good."""
-        import networkx as nx
-        import numpy as np
-        
-        # Find root node for tree-based layouts
-        all_nodes = set(G.nodes())
-        target_nodes = set(v for u, v in G.edges())
-        root_candidates = all_nodes - target_nodes
-        root = min(root_candidates) if root_candidates else min(G.nodes())
-        
-        try:
-            # Try graphviz dot layout (hierarchical, clean)
-            pos = nx.nx_agraph.graphviz_layout(G, prog='dot')
-            print("Using graphviz dot layout")
-            return pos
-        except:
-            pass
-        
-        try:
-            # Try networkx tree layout
-            pos = nx.nx_agraph.graphviz_layout(G, prog='neato')  
-            print("Using graphviz neato layout")
-            return pos
-        except:
-            pass
-        
-        try:
-            # Try kamada-kawai layout (force-directed but more stable)
-            pos = nx.kamada_kawai_layout(G, scale=2)
-            print("Using Kamada-Kawai layout")
-            return pos
-        except:
-            pass
-        
-        # Fallback: improved spring layout with better parameters
-        print("Using improved spring layout")
-        pos = nx.spring_layout(
-            G, 
-            k=3,  # Increase spacing between nodes
-            iterations=100,  # More iterations for better convergence
-            scale=2,  # Larger scale
-            seed=self.random_state
-        )
-        
-        return pos
-    
-    def _create_semantic_layout(self, G):
-        """
-        Create a layout based purely on graph structure without automatic layout algorithms.
-        Positions nodes based on their semantic relationships in the graph.
-        """
-        import numpy as np
-        import networkx as nx
-        
-        # Find the root node (node that appears as source but not as target)
-        all_nodes = set(G.nodes())
-        target_nodes = {v for u, v in G.edges()}
-        root_candidates = all_nodes - target_nodes
-        root = min(root_candidates) if root_candidates else min(G.nodes())
-        
-        pos = {}
-        
-        # Build tree levels using BFS traversal
-        levels = {0: [root]}
-        visited = {root}
-        queue = [(root, 0)]
-        
-        while queue:
-            node, level = queue.pop(0)
-            # Add children to next level
-            children = [neighbor for neighbor in G.neighbors(node) if neighbor not in visited]
-            if children:
-                next_level = level + 1
-                if next_level not in levels:
-                    levels[next_level] = []
-                for child in children:
-                    levels[next_level].append(child)
-                    visited.add(child)
-                    queue.append((child, next_level))
-        
-        # Position nodes semantically
-        # Root at origin, each level gets positioned based on graph structure
-        pos[root] = (0, 0)
-        
-        for level_num, nodes in levels.items():
-            if level_num == 0:  # Root level already positioned
-                continue
-                
-            y_pos = -level_num * 2  # Move down for each level
-            
-            # For each node in this level, position based on its parent
-            for i, node in enumerate(nodes):
-                # Find parent (node that connects to this one from previous level)
-                parent = None
-                for prev_level_node in levels.get(level_num - 1, []):
-                    if G.has_edge(prev_level_node, node):
-                        parent = prev_level_node
-                        break
-                
-                if parent and parent in pos:
-                    # Position relative to parent
-                    parent_x = pos[parent][0]
-                    # Spread children horizontally around parent
-                    parent_children = [n for n in nodes if any(G.has_edge(p, n) for p in levels.get(level_num - 1, []) if p == parent)]
-                    child_index = parent_children.index(node)
-                    n_children = len(parent_children)
-                    
-                    if n_children == 1:
-                        x_pos = parent_x
-                    else:
-                        # Spread children around parent
-                        spacing = 3.0  # Horizontal spacing between siblings
-                        x_offset = (child_index - (n_children - 1) / 2) * spacing
-                        x_pos = parent_x + x_offset
-                else:
-                    # Fallback: spread nodes horizontally at this level
-                    spacing = 4.0
-                    x_pos = (i - (len(nodes) - 1) / 2) * spacing
-                
-                pos[node] = (x_pos, y_pos)
-        
-        # Handle any unpositioned nodes (shouldn't happen with well-formed trees)
-        for node in G.nodes():
-            if node not in pos:
-                pos[node] = (np.random.uniform(-2, 2), np.random.uniform(-2, 2))
-        
-        return pos
-
-    def _create_proportional_layout(self, G):
-        """Create a layout where edge lengths are proportional to sample counts."""
-        import numpy as np
-        import networkx as nx
-        
-        # First, create a good-looking layout using spring layout
-        pos = nx.spring_layout(G, seed=self.random_state, k=2, iterations=50)
-        
-        # Now adjust edge lengths to be proportional to sample counts
-        # We'll do this iteratively by moving nodes to achieve target edge lengths
-        target_lengths = {}
-        
-        # Calculate target lengths for each edge based on sample counts
-        for u, v, d in G.edges(data=True):
-            if 'gap_size' not in d:  # Only for data edges
-                sample_count = d.get('length', 300)
-                # Normalize to reasonable visual length (baseline 300 samples = 1.0 unit)
-                target_lengths[(u, v)] = sample_count / 300.0
-        
-        # Iteratively adjust positions to match target edge lengths
-        for iteration in range(20):  # Limited iterations to avoid infinite loops
-            for (u, v), target_length in target_lengths.items():
-                if u in pos and v in pos:
-                    # Current edge vector
-                    edge_vec = pos[v] - pos[u]
-                    current_length = np.linalg.norm(edge_vec)
-                    
-                    if current_length > 0:  # Avoid division by zero
-                        # Scale edge to target length
-                        direction = edge_vec / current_length
-                        new_edge_vec = direction * target_length
-                        
-                        # Move the second node to achieve target length
-                        # (keep first node fixed for stability)
-                        pos[v] = pos[u] + new_edge_vec
-        
-        return pos
-    
-    def _generate_dla_branch(self, start_pos, end_pos, length, branch_id):
-        """Generate a DLA branch between two positions."""
-        # Direction vector from start to end
-        direction = end_pos - start_pos
-        
-        # Generate DLA-style cumulative random walk
-        random_steps = np.cumsum(
-            -1 + self.rand_multiplier * np.random.rand(length, self.n_dim), axis=0
-        )
-        
-        # Scale and orient the random walk to go from start to end
-        if length > 1:
-            # Normalize random walk to unit length, then scale to desired direction
-            random_steps = random_steps / np.linalg.norm(random_steps[-1]) * np.linalg.norm(direction)
-            random_steps = random_steps + direction * np.linspace(0, 1, length).reshape(-1, 1)
-        
-        # Add start position
-        branch = start_pos + random_steps
-        return branch
-        
-    def _visualize_and_save_graph(self):
-        """Create and save two versions of graph topology visualization."""
-        try:
-            import matplotlib.pyplot as plt
-            import networkx as nx
-            import os
-            
-            # Create networkx graph
-            G = nx.DiGraph()
-            
-            # Add all edges
-            for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-                G.add_edge(from_node, to_node, edge_type=edge_type, edge_id=edge_id, length=length)
-            
-            # Use custom semantic layout based on graph structure
-            pos = self._create_semantic_layout(G)
-            
-            # Get colormap for edge coloring (same as embeddings)
-            from manylatents.utils.mappings import cmap_dla_tree
-            
-            # All edges are data edges (simplified approach - no gaps)
-            regular_edges = [(u, v, d) for u, v, d in G.edges(data=True)]
-            
-            # Separate edges into visible and gap edges for different drawing styles
-            visible_edges = []
-            gap_edges = []
-            visible_edge_colors = []
-            visible_edge_labels = {}
-            gap_edge_labels = {}
-            
-            for u, v, d in regular_edges:
-                original_edge_id = d['edge_id']
-                
-                if original_edge_id in self.original_excluded_edges:
-                    # Gap edge: will be drawn as transparent outline
-                    gap_edges.append((u, v))
-                    gap_edge_labels[(u, v)] = f"E{original_edge_id}"  # E prefix for gap edges
-                else:
-                    # Visible edge: use renumbered ID for coloring and labeling
-                    visible_edges.append((u, v))
-                    
-                    if self.edge_renumbering is not None:
-                        display_edge_id = self.edge_renumbering.get(original_edge_id, original_edge_id)
-                    else:
-                        display_edge_id = original_edge_id
-                    
-                    # Map display_edge_id to color index
-                    if isinstance(display_edge_id, str):
-                        color_idx = hash(display_edge_id) % len(cmap_dla_tree) + 1
-                    else:
-                        color_idx = display_edge_id
-                    
-                    color = cmap_dla_tree[color_idx]
-                    visible_edge_colors.append(color)
-                    visible_edge_labels[(u, v)] = f"{display_edge_id}"  # No E prefix for display version
-            
-            os.makedirs(self.save_dir, exist_ok=True)
-            
-            # ===== Display Version (Clean, no node labels) =====
-            plt.figure(figsize=(10, 8))
-            plt.subplots_adjust(top=0.9, bottom=0.1, left=0.1, right=0.9)
-            
-            # Draw visible edges (data branches) with colormap colors
-            if visible_edges:
-                nx.draw_networkx_edges(G, pos, edgelist=visible_edges, 
-                                     edge_color=visible_edge_colors, width=8, alpha=0.9, arrows=False,
-                                     arrowstyle='-', arrowsize=20)
-            
-            # Draw gap edges as faint dashed lines
-            if gap_edges:
-                nx.draw_networkx_edges(G, pos, edgelist=gap_edges, 
-                                     edge_color='lightgray', width=3, alpha=0.4, arrows=False, 
-                                     style='dashed', arrowstyle='-')
-            
-            # Add clean edge labels for visible edges only
-            if visible_edge_labels:
-                nx.draw_networkx_edge_labels(G, pos, visible_edge_labels, font_size=12, 
-                                           font_weight='bold', font_family='sans-serif',
-                                           bbox=dict(boxstyle='round,pad=0.3', 
-                                                    facecolor='white', alpha=0.9, edgecolor='none'))
-            
-            # Clean title for display
-            plt.title("DLA Tree Graph Topology", fontsize=16, fontweight='bold', pad=20)
-            plt.axis('off')
-            
-            # Save display version
-            display_path = os.path.join(self.save_dir, "dla_tree_graph_topology.png")
-            plt.savefig(display_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
-            plt.close()
-            
-            print(f"Display graph visualization saved to: {display_path}")
-            
-            # ===== Debug Version (Detailed, with node and edge labels) =====
-            plt.figure(figsize=(12, 10))
-            plt.subplots_adjust(top=0.9, bottom=0.1, left=0.1, right=0.9)
-            
-            # Draw nodes with labels
-            nx.draw_networkx_nodes(G, pos, node_color='lightblue', node_size=800, alpha=0.8)
-            
-            # Draw visible edges (data branches) with colormap colors
-            if visible_edges:
-                nx.draw_networkx_edges(G, pos, edgelist=visible_edges, 
-                                     edge_color=visible_edge_colors, width=6, alpha=0.8, arrows=True,
-                                     arrowstyle='->', arrowsize=20, connectionstyle='arc3,rad=0.1')
-            
-            # Draw gap edges as dashed outlines
-            if gap_edges:
-                nx.draw_networkx_edges(G, pos, edgelist=gap_edges, 
-                                     edge_color='gray', width=4, alpha=0.5, arrows=True, 
-                                     style='dashed', arrowstyle='->', arrowsize=15,
-                                     connectionstyle='arc3,rad=0.1')
-            
-            # Add node labels (N1, N2, ...)
-            node_labels = {node: f"N{node}" for node in G.nodes()}
-            nx.draw_networkx_labels(G, pos, node_labels, font_size=10, font_weight='bold', 
-                                  font_family='sans-serif')
-            
-            # Add edge labels for visible edges (E1, E2, ...)
-            if visible_edge_labels:
-                nx.draw_networkx_edge_labels(G, pos, visible_edge_labels, font_size=10, 
-                                           font_weight='bold', font_family='sans-serif',
-                                           bbox=dict(boxstyle='round,pad=0.2', 
-                                                    facecolor='yellow', alpha=0.7, edgecolor='black'))
-            
-            # Add edge labels for gap edges (E9, E10, ... in parentheses)
-            if gap_edge_labels:
-                gap_labels_formatted = {edge: f"({label})" for edge, label in gap_edge_labels.items()}
-                nx.draw_networkx_edge_labels(G, pos, gap_labels_formatted, font_size=9, 
-                                           font_color='darkgray', font_family='sans-serif',
-                                           bbox=dict(boxstyle='round,pad=0.2', 
-                                                    facecolor='lightgray', alpha=0.6, edgecolor='gray'))
-            
-            # Detailed title with gap information
-            if self.original_excluded_edges:
-                gap_info = f"Gaps (Excluded): {sorted(self.original_excluded_edges)}"
-                plt.title(f"DLA Tree Graph Topology - DEBUG\n{gap_info}\nSolid edges = Data populations, Dashed edges = Excluded (no data)", 
-                         fontsize=14, pad=20)
-            else:
-                plt.title("DLA Tree Graph Topology - DEBUG\nAll Edges Visible", 
-                         fontsize=14, pad=20)
-            plt.axis('off')
-            
-            # Save debug version
-            debug_path = os.path.join(self.save_dir, "dla_tree_graph_topology_debug.png")
-            plt.savefig(debug_path, dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
-            plt.close()
-            
-            print(f"Debug graph visualization saved to: {debug_path}")
-            
-        except ImportError:
-            print("NetworkX or matplotlib not available for graph visualization")
-
-    def get_gt_dists(self):
-        """
-        Compute geodesic distances as shortest paths over the complete tree graph (including gaps).
-        Returns distances only for the final data points (excluding gap points).
-        """
-        # Compute geodesic distances on complete graph (including gaps)
-        geodesic_dist_complete = shortest_path(csgraph=self.graph.tocsr(), directed=False)
-
-        if self.excluded_edges:
-            # Build mapping from complete graph indices to final data indices
-            all_metadata = []
-            point_idx = 0
-            for from_node, to_node, edge_type, edge_id, length in self.graph_edges:
-                all_metadata.extend([edge_id] * length)
-                point_idx += length
-
-            # Create mask for points that are kept in final data (non-excluded edges)
-            keep_mask = ~np.isin(all_metadata, list(self.excluded_edges))
-
-            # Extract distances only for kept points
-            geodesic_dist_final = geodesic_dist_complete[keep_mask][:, keep_mask]
-
-            return geodesic_dist_final
-        else:
-            # No gaps, return complete distances
+        if include_gaps:
             return geodesic_dist_complete
 
+        # Slice using exact graph-node indices that correspond to dataset.data row order
+        idx = self.graph_indices_for_visible_rows
+        return geodesic_dist_complete[np.ix_(idx, idx)]
+
     def get_graph(self):
-        """
-        Return the precomputed adjacency graph built during data generation.
-        """
+        """Return the precomputed adjacency graph built during data generation."""
         return self.graph
 
 
