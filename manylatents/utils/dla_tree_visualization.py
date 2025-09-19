@@ -63,9 +63,8 @@ class DLATreeGraphVisualizer:
         G = sample_graph
         G_full = G
 
-        # Filter to visible and gap nodes (exclude only junctions)
-        display_nodes = [n for n in G.nodes()
-                        if not G.nodes[n]['is_junction']]
+        # Use all nodes since we no longer have junction nodes
+        display_nodes = list(G.nodes())
         print(f"Showing {len(display_nodes)} nodes from {G.number_of_nodes()} total nodes (includes gap edges)")
         G = G.subgraph(display_nodes)
 
@@ -161,11 +160,10 @@ class DLATreeGraphVisualizer:
         # Print full graph statistics (not subsampled)
         logging.debug(f"Sample Graph Statistics (Full Graph): {G_full.number_of_nodes()} nodes, {G_full.number_of_edges()} edges")
 
-        junction_nodes = [n for n in G_full.nodes() if G_full.nodes[n]['is_junction']]
         gap_nodes = [n for n in G_full.nodes() if G_full.nodes[n]['is_gap']]
         visible_nodes = [n for n in G_full.nodes() if G_full.nodes[n]['is_visible']]
 
-        logging.debug(f"Node types: {len(junction_nodes)} junctions, {len(gap_nodes)} gaps, {len(visible_nodes)} visible")
+        logging.debug(f"Node types: {len(gap_nodes)} gaps, {len(visible_nodes)} visible")
 
         # Check connectivity of full graph
         if nx.is_connected(G_full):
@@ -218,13 +216,20 @@ class DLATreeGraphVisualizer:
                     else:
                         display_edge_id = original_edge_id
 
-                    # Map display_edge_id to color index
+                    # Map display_edge_id to color index with bounds checking
                     if isinstance(display_edge_id, str):
                         color_idx = hash(display_edge_id) % len(cmap_dla_tree) + 1
                     else:
                         color_idx = display_edge_id
 
-                    color = cmap_dla_tree[color_idx]
+                    # Ensure color_idx is within bounds and get color
+                    if color_idx in cmap_dla_tree:
+                        color = cmap_dla_tree[color_idx]
+                    else:
+                        # Fallback to cycling through available colors
+                        fallback_idx = ((color_idx - 1) % len(cmap_dla_tree)) + 1
+                        color = cmap_dla_tree[fallback_idx]
+
                     visible_edge_colors.append(color)
                     visible_edge_labels[(u, v)] = f"{display_edge_id}"  # No E prefix for display version
 

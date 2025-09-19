@@ -707,18 +707,112 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             if hasattr(self, 'sample_graph'):
                 visualizer.visualize_sample_graph(self.sample_graph, save_path="outputs/sample_graph.png")
 
-    def _generate_simplified(self):
+    def _build_complete_structure(self):
         """
-        Simplified DLA tree generation that builds data and graph simultaneously.
-
-        Algorithm:
-        1. Generate all DLA samples in order (including gaps)
-        2. Build adjacency graph as we go (connect consecutive points + node transitions)
-        3. Store indices of visible samples
-        4. Return visible data, complete graph, visible metadata
+        Build the complete DLA tree structure in 3 clear steps:
+        1. Convert config graph to complete sample adjacency matrix
+        1.5. Generate visualizations (PNG plots)
+        2. Generate complete data using DLA branches
+        3. Subset adjacency and data to visible nodes only
         """
         np.random.seed(self.random_state)
 
+        # Step 1: Build complete adjacency matrix from config graph topology
+        self._build_complete_adjacency_matrix()
+
+        # Step 1.5: Generate visualizations now that we have the topology
+        if hasattr(self, 'save_graph_viz') and self.save_graph_viz:
+            from manylatents.utils.dla_tree_visualization import DLATreeGraphVisualizer
+            visualizer = DLATreeGraphVisualizer(
+                graph_edges=self.graph_edges,
+                excluded_edges=self.excluded_edges,
+                original_excluded_edges=self.excluded_edges,
+                save_dir=getattr(self, 'save_dir', 'outputs')
+            )
+            # Create topology-based visualization
+            visualizer.visualize_and_save_graph()
+
+        # Step 2: Generate complete data using DLA branches
+        self._generate_complete_data()
+
+        # Step 3: Subset to visible nodes only
+        self._subset_to_visible_nodes()
+
+    def _build_complete_adjacency_matrix(self):
+        """
+        Step 1: Convert the config graph (edges) to a complete sample-level adjacency matrix.
+        All edge weights are 1 since we only care about topological distance.
+        """
+        # Calculate total number of samples across all edges
+        total_samples = sum(length for _, _, _, length in self.graph_edges)
+
+        # Create adjacency matrix (all weights = 1 for topological distance)
+        import scipy.sparse as sp
+        adj_matrix = sp.lil_matrix((total_samples, total_samples))
+
+        # Track sample ranges for each edge
+        sample_idx = 0
+        edge_sample_ranges = {}  # edge_id -> (start_idx, end_idx)
+        sample_to_edge = {}      # sample_idx -> edge_id
+
+        for from_node, to_node, edge_id, length in self.graph_edges:
+            start_idx = sample_idx
+            end_idx = sample_idx + length
+            edge_sample_ranges[edge_id] = (start_idx, end_idx)
+
+            # Connect consecutive samples within this edge
+            for i in range(start_idx, end_idx - 1):
+                adj_matrix[i, i + 1] = 1.0
+                adj_matrix[i + 1, i] = 1.0  # symmetric
+                sample_to_edge[i] = edge_id
+            sample_to_edge[end_idx - 1] = edge_id  # last sample
+
+            sample_idx = end_idx
+
+        # Connect edges at shared nodes (where edges meet)
+        node_edge_boundaries = {}  # node_id -> list of (edge_id, boundary_sample_idx)
+
+        for from_node, to_node, edge_id, length in self.graph_edges:
+            start_idx, end_idx = edge_sample_ranges[edge_id]
+            first_sample = start_idx
+            last_sample = end_idx - 1
+
+            # Track which samples are at node boundaries
+            if from_node not in node_edge_boundaries:
+                node_edge_boundaries[from_node] = []
+            if to_node not in node_edge_boundaries:
+                node_edge_boundaries[to_node] = []
+
+            node_edge_boundaries[from_node].append((edge_id, first_sample))
+            node_edge_boundaries[to_node].append((edge_id, last_sample))
+
+        # Connect samples at shared nodes (all edges meeting at a node are connected)
+        for node_id, edge_boundaries in node_edge_boundaries.items():
+            if len(edge_boundaries) > 1:
+                # Connect all boundary samples at this node
+                boundary_samples = [sample_idx for _, sample_idx in edge_boundaries]
+                for i in range(len(boundary_samples)):
+                    for j in range(i + 1, len(boundary_samples)):
+                        sample_i, sample_j = boundary_samples[i], boundary_samples[j]
+                        adj_matrix[sample_i, sample_j] = 1.0
+                        adj_matrix[sample_j, sample_i] = 1.0
+
+        # Store complete adjacency matrix and metadata
+        self.adj_matrix_complete = adj_matrix.tocsr()
+        self.edge_sample_ranges = edge_sample_ranges
+        self.sample_to_edge = sample_to_edge
+
+        # Create complete metadata (which edge each sample belongs to)
+        metadata_complete = []
+        for from_node, to_node, edge_id, length in self.graph_edges:
+            metadata_complete.extend([edge_id] * length)
+        self.metadata_complete = np.array(metadata_complete)
+
+    def _generate_complete_data(self):
+        """
+        Step 2: Generate the actual DLA branch data in the SAME ORDER as adjacency matrix.
+        The adjacency matrix was built with samples ordered by self.graph_edges iteration.
+        """
         # Find root node (appears as from_node but never as to_node)
         all_nodes = set()
         for from_node, to_node, _, _ in self.graph_edges:
@@ -727,13 +821,6 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
 
         to_nodes = {to_node for from_node, to_node, _, _ in self.graph_edges}
         root_node = next((node for node in all_nodes if node not in to_nodes), sorted(all_nodes)[0])
-
-        import logging
-
-        # Initialize
-        all_data = []
-        all_metadata = []
-        node_positions = {root_node: np.zeros(self.n_dim)}
 
         # Create orthogonal subspaces for branching nodes
         node_outgoing_edges = {}
@@ -748,7 +835,10 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
                 node_subspaces[node] = self._create_orthogonal_subspaces(
                     n_directions=len(outgoing_edges), n_dim=self.n_dim, node_id=node)
 
-        # Process edges in dependency order
+        # Generate branches in dependency order to get node positions
+        node_positions = {root_node: np.zeros(self.n_dim)}
+        edge_to_branch_data = {}  # edge_id -> branch_data
+
         processed_edges = set()
         iteration = 0
         max_iterations = len(self.graph_edges) * 2
@@ -775,190 +865,67 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
                 branch_data = self._generate_dla_branch_topology_aware(
                     start_pos=start_pos, length=length, edge_id=edge_id, allowed_dims=allowed_dims)
 
-                all_data.append(branch_data)
-                all_metadata.extend([edge_id] * length)
+                edge_to_branch_data[edge_id] = branch_data
                 node_positions[to_node] = branch_data[-1].copy()
                 processed_edges.add((from_node, to_node, edge_id))
                 made_progress = True
 
+        # Now combine data in the SAME ORDER as we built the adjacency matrix
+        all_data = []
+        for from_node, to_node, edge_id, length in self.graph_edges:
+            branch_data = edge_to_branch_data[edge_id]
+            all_data.append(branch_data)
+
         # Combine all data
         M_complete = np.vstack(all_data) if all_data else np.empty((0, self.n_dim))
-        metadata_complete = np.array(all_metadata)
 
-        # Create junction samples and build proper sample graph
-        import networkx as nx
+        # Add noise if specified
+        if self.sigma > 0:
+            M_complete += np.random.normal(0, self.sigma, M_complete.shape)
 
-        # Identify all unique nodes that will need junction samples
-        all_nodes = set()
-        for from_node, to_node, _, _ in self.graph_edges:
-            all_nodes.add(from_node)
-            all_nodes.add(to_node)
+        # Store complete data
+        self.M_complete = M_complete
 
-        # Initialize junction data structures
-        junction_data = []
-        junction_metadata = []
-        nodes_needing_junctions = all_nodes.copy()
+    def _subset_to_visible_nodes(self):
+        """
+        Step 3: Extract only the visible samples (excluding gap edges).
+        """
+        # Store original excluded edges for visualization
+        self.original_excluded_edges = self.excluded_edges.copy()
 
-        # Process edges and create junction samples at actual edge boundaries
-        point_idx = 0
-        edge_boundaries = {}  # node_id -> list of (sample_index, position)
+        # Create mask for visible samples (exclude gap edges)
+        self.visible_mask = ~np.isin(self.metadata_complete, list(self.excluded_edges))
+        self.visible_indices = np.where(self.visible_mask)[0]
 
-        for from_node, to_node, edge_id, length in self.graph_edges:
-            edge_samples = list(range(point_idx, point_idx + length))
-            first_sample_idx = edge_samples[0]
-            last_sample_idx = edge_samples[-1]
-
-            # Record boundary positions for junction creation
-            if from_node not in edge_boundaries:
-                edge_boundaries[from_node] = []
-            if to_node not in edge_boundaries:
-                edge_boundaries[to_node] = []
-
-            edge_boundaries[from_node].append((first_sample_idx, M_complete[first_sample_idx]))
-            edge_boundaries[to_node].append((last_sample_idx, M_complete[last_sample_idx]))
-
-            point_idx += length
-
-        # Combine all data: original samples + junction samples
-        M_with_junctions = np.vstack([M_complete, np.array(junction_data)]) if junction_data else M_complete
-        metadata_with_junctions = np.concatenate([metadata_complete, junction_metadata]) if junction_data else metadata_complete
-
-
-        # Build NetworkX graph where nodes are samples (including junctions)
-        sample_graph = nx.Graph()
-        n_total = M_with_junctions.shape[0]
-
-        # Add all samples as nodes with correct labels
-        for i in range(n_total):
-            is_junction = metadata_with_junctions[i] == 'junction'
-            # Convert to int for comparison with excluded_edges
-            if not is_junction:
-                try:
-                    edge_id_int = int(metadata_with_junctions[i])
-                    is_gap = edge_id_int in self.excluded_edges
-                except (ValueError, TypeError):
-                    is_gap = False
-            else:
-                is_gap = False
-            is_visible = not is_junction and not is_gap
-
-            # Use original edge_id for now, will update with renumbered ID later
-            original_edge_id = metadata_with_junctions[i]
-
-            sample_graph.add_node(i,
-                                pos=M_with_junctions[i],
-                                edge_id=original_edge_id,
-                                is_junction=is_junction,
-                                is_gap=is_gap,
-                                is_visible=is_visible)
-
-        # Connect samples within each edge + connect to junction samples
-        point_idx = 0
-        for from_node, to_node, edge_id, length in self.graph_edges:
-            edge_samples = list(range(point_idx, point_idx + length))
-
-            # Connect consecutive samples within the edge
-            for i in range(len(edge_samples) - 1):
-                curr_idx = edge_samples[i]
-                next_idx = edge_samples[i + 1]
-                # Use unit weights for topological distances
-                sample_graph.add_edge(curr_idx, next_idx,
-                                    weight=1.0,
-                                    edge_type='within_branch',
-                                    branch_id=edge_id)
-
-            # Connect edges directly at their boundaries (no junction samples needed)
-            # This maintains tree connectivity with minimal edge weights
-
-            point_idx += length
-
-        # Connect edges at shared nodes (direct edge-to-edge connections)
-        for node_id in nodes_needing_junctions:
-            if node_id in edge_boundaries and len(edge_boundaries[node_id]) > 1:
-                # Connect all edges that meet at this node
-                boundary_samples = [sample_idx for sample_idx, _ in edge_boundaries[node_id]]
-
-                # Connect all pairs with small weight (e.g., 1.0) to maintain connectivity
-                for i in range(len(boundary_samples)):
-                    for j in range(i + 1, len(boundary_samples)):
-                        sample_i, sample_j = boundary_samples[i], boundary_samples[j]
-                        # Use small fixed weight to avoid large distances
-                        sample_graph.add_edge(sample_i, sample_j,
-                                            weight=1.0,  # Small fixed weight
-                                            edge_type='junction_direct',
-                                            branch_id=0)
-
-
-        # Store the complete sample graph for visualization and ground truth
-        self.sample_graph = sample_graph
-
-
-        # Create adjacency matrix
-        adj_matrix = nx.adjacency_matrix(sample_graph, weight='weight').astype(np.float64)
-
-        # Extract visible data (from original M_complete, not M_with_junctions)
-        original_visible_mask = ~np.isin(metadata_complete, list(self.excluded_edges))
-        original_visible_indices = np.where(original_visible_mask)[0]
-        M_visible = M_complete[original_visible_indices]
-        metadata_visible = metadata_complete[original_visible_indices]
-
-
-        # Store the mapping from final dataset order to M_complete positions
-        # This is crucial for ground truth alignment!
-        final_to_complete_mapping = original_visible_indices.copy()
+        # Extract visible data and metadata
+        M_visible = self.M_complete[self.visible_indices]
+        metadata_visible = self.metadata_complete[self.visible_indices]
 
         # Renumber visible edge labels to be sequential (1, 2, 3, ...)
         if self.excluded_edges:
             unique_visible_edges = sorted(set(metadata_visible))
-            edge_renumbering = {old_id: new_id for new_id, old_id in enumerate(unique_visible_edges, 1)}
-            metadata_visible = np.array([edge_renumbering[old_id] for old_id in metadata_visible])
-            self.edge_renumbering = edge_renumbering
-            self.original_excluded_edges = set(metadata_complete) & self.excluded_edges
+            self.edge_renumbering = {old_id: new_id for new_id, old_id in enumerate(unique_visible_edges, 1)}
+            metadata_visible = np.array([self.edge_renumbering[old_id] for old_id in metadata_visible])
         else:
             self.edge_renumbering = None
-            self.original_excluded_edges = set()
 
-        # --- expose original and renumbered labels consistently ---
-        self.original_metadata = metadata_complete[original_visible_indices]  # original edge_ids (pre-renumber)
-        self.metadata = metadata_visible                                      # renumbered labels 1..K
-
-        if self.excluded_edges:
-            self.edge_renumbering = edge_renumbering                          # {old_id -> new_id}
-            self.inverse_edge_renumbering = {v: k for k, v in edge_renumbering.items()}  # {new_id -> old_id}
-        else:
-            self.edge_renumbering = None
-            self.inverse_edge_renumbering = None
-
-        # Add noise if specified
-        if self.sigma > 0:
-            M_visible += np.random.normal(0, self.sigma, M_visible.shape)
-            M_with_junctions += np.random.normal(0, self.sigma, M_with_junctions.shape)
-
-
-        # Store complete arrays aligned to sample_graph indexing
-        self.M_complete = M_with_junctions           # rows correspond 1:1 to sample_graph node indices
-        self.adj_matrix_complete = adj_matrix        # same index space
-
-        # --- Build consistent mapping from dataset.data row order -> sample_graph node indices ---
-        # visible rows in dataset.data come from M_complete[original_visible_indices]
-        # node indices == row indices of M_with_junctions used to add nodes to sample_graph
-        # (we constructed nodes in that same order), so we can reuse original_visible_indices
-        self.graph_indices_for_visible_rows = final_to_complete_mapping.copy().astype(int)
-
-        # optional sanity check: ensure all mapped nodes are visible nodes
-        visible_nodes = {i for i, d in self.sample_graph.nodes(data=True) if d.get("is_visible", False)}
-        assert set(self.graph_indices_for_visible_rows).issubset(visible_nodes), (
-            "Some dataset rows map to non-visible graph nodes; check visibility mask construction."
-        )
-
-        # Return placeholder adjacency matrix for visible data
-        visible_adj_placeholder = sp.lil_matrix((len(M_visible), len(M_visible)))
-
-        # Store data for testing
+        # Store final dataset
         self.data = M_visible
         self.metadata = metadata_visible
 
-        return M_visible, visible_adj_placeholder, metadata_visible
+    def _generate_simplified(self):
+        """
+        Simplified generation approach that builds complete structure first,
+        then extracts visible subset.
+        """
+        # Generate complete structure with full topology and connectivity
+        self._build_complete_structure()
+
+        # Return the final dataset components
+        # Note: self.data, self.metadata are set in _build_complete_structure
+        import scipy.sparse as sp
+        placeholder_graph = sp.lil_matrix((len(self.data), len(self.data)))
+        return self.data, placeholder_graph, self.metadata
 
     def visualize_sample_graph(self, save_path="debug_outputs/sample_graph.png", max_nodes=500):
         """
@@ -1138,7 +1105,7 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         Compute geodesic distances as shortest paths over the complete tree graph.
 
         Args:
-            include_gaps: If True, return complete matrix including gap/junction samples.
+            include_gaps: If True, return complete matrix including gap samples.
                           If False, return matrix aligned to dataset.data rows only.
         """
         geodesic_dist_complete = shortest_path(
@@ -1148,9 +1115,9 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         if include_gaps:
             return geodesic_dist_complete
 
-        # Slice using exact graph-node indices that correspond to dataset.data row order
-        idx = self.graph_indices_for_visible_rows
-        return geodesic_dist_complete[np.ix_(idx, idx)]
+        # Use visible_indices to extract distances for only the visible samples
+        # This aligns perfectly with dataset.data row order
+        return geodesic_dist_complete[np.ix_(self.visible_indices, self.visible_indices)]
 
     def get_graph(self):
         """Return the precomputed adjacency graph built during data generation."""
