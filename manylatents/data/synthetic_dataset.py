@@ -5,7 +5,6 @@ from torch.utils.data import Dataset
 import graphtools
 import numpy as np
 from sklearn.metrics import pairwise_distances
-from sklearn.datasets import make_blobs
 from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
@@ -634,80 +633,6 @@ class Torus(SyntheticDataset, PrecomputedMixin):
             self.graph = graphtools.Graph(self.data, use_pygsp=True)
         return self.graph
 
-
-class GaussianBlobs(SyntheticDataset):
-    def __init__(
-        self,
-        n_samples=100,
-        n_features=2,
-        centers=None,
-        cluster_std=1.0,
-        center_box=(-10.0, 10.0),
-        random_state=42,
-        return_centers=False,
-    ):
-        """
-        Initialize a Gaussian Blob dataset using sklearn's make_blobs.
-        
-        Parameters:
-        ----------
-        n_samples : int or list of int, default=100
-            Number of samples to generate, or list of samples per center.
-            
-        n_features : int, default=2
-            Number of features for each sample.
-            
-        centers : int, array-like or None, default=None
-            Number of centers to generate, or fixed center locations.
-            
-        cluster_std : float or list of float, default=1.0
-            Standard deviation of the clusters.
-            
-        center_box : tuple of float, default=(-10.0, 10.0)
-            Bounding box for each cluster center when centers are generated at random.
-            
-        random_state : int, default=42
-            Random state for reproducibility.
-            
-        return_centers : bool, default=False
-            Whether to return the centers.
-        """
-        super().__init__()
-        
-        # Convert center_box to tuple if it's a list (for YAML compatibility)
-        if not isinstance(center_box, tuple):
-            center_box = tuple(center_box)
-        
-        # Generate the blob data using sklearn
-        result = make_blobs(
-            n_samples=n_samples,
-            n_features=n_features,
-            centers=centers,
-            cluster_std=cluster_std,
-            center_box=center_box,
-            shuffle=False,
-            random_state=random_state,
-            return_centers=return_centers
-        )
-        
-        if return_centers:
-            self.data, self.metadata, self.centers = result
-        else:
-            self.data, self.metadata = result
-            self.centers = None
-    
-    def get_gt_dists(self):
-        """
-        Compute pairwise Euclidean distances as ground truth distances.
-        """
-        return pairwise_distances(self.data, metric="euclidean")
-    
-    def get_graph(self):
-        """Create a graphtools graph if does not exist."""
-        if self.graph is None:
-            self.graph = graphtools.Graph(self.data, use_pygsp=True)
-        return self.graph
-    
 class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
     def __init__(
         self,
