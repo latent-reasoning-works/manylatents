@@ -3,3 +3,4 @@ geographic_preservation_medians:
   _partial_: True
   use_medians: True
   only_far: False
+  scale_embs: true
