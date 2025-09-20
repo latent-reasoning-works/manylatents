@@ -9,7 +9,7 @@ from sklearn.datasets import make_blobs
 from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Optional, Dict, Tuple
 from .precomputed_mixin import PrecomputedMixin
 from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
@@ -633,6 +633,64 @@ class Torus(SyntheticDataset, PrecomputedMixin):
         if self.graph is None:
             self.graph = graphtools.Graph(self.data, use_pygsp=True)
         return self.graph
+
+class GaussianBlobs(SyntheticDataset):
+    """
+    Gaussian K blobs using sklearn's make_blobs
+    """
+
+    def __init__(
+        self,
+        n_samples: Union[int, List[int]] = 100,
+        n_features: int = 2,
+        centers: Optional[Union[int, np.ndarray, List[List[float]]]] = None,
+        cluster_std: Union[float, List[float]] = 1.0,
+        center_box: Tuple[float, float] = (-10.0, 10.0),
+        random_state: Optional[int] = 42,
+        return_centers: bool = False
+    ):
+        super().__init__()
+
+        # From https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_blobs.html
+        # Ensure center_box is a tuple (Hydra may convert it to list or other sequence types)
+        if not isinstance(center_box, tuple):
+            center_box = tuple(center_box)
+
+        result = make_blobs(
+            n_samples=n_samples,
+            n_features=n_features,
+            centers=centers,
+            cluster_std=cluster_std,
+            center_box=center_box,
+            shuffle=True,  # Always shuffle, no need to expose as parameter
+            random_state=random_state,
+            return_centers=return_centers
+        )
+
+        if return_centers:
+            X, y, self.centers = result
+        else:
+            X, y = result
+            self.centers = None
+
+        # Set data and metadata for SyntheticDataset interface
+        self.data = X
+        self.metadata = y
+
+    def get_gt_dists(self):
+        """Return pairwise Euclidean distances as ground truth."""
+        return pairwise_distances(self.data, metric='euclidean')
+
+    def get_graph(self):
+        """Create a graphtools graph if does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
+    def get_centers(self) -> Optional[np.ndarray]:
+        """Return cluster centers if they were computed."""
+        return self.centers
+
 
 class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
     def __init__(
