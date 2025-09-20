@@ -11,6 +11,7 @@ precomputed_path: null
 mmap_mode: null
 test_split: 0.2
 shuffle_traindata: false
+save_dir: ${hydra:runtime.output_dir}
 
 graph_edges:
   # =========================
