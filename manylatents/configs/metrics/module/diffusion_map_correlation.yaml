@@ -1,0 +1,6 @@
+diffusion_map_correlation:
+  _target_: manylatents.metrics.diffusion_map_correlation.DiffusionMapCorrelation
+  _partial_: True
+  dm_components: 2
+  alpha: 1.0
+  correlation_type: "pearson"
