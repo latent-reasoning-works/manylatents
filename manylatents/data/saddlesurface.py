@@ -13,6 +13,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
+        shuffle_traindata: bool = True,
         n_distributions: int = 100,
         n_points_per_distribution: int = 50,
         noise: float = 0.05,
@@ -73,6 +74,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
         
             
         self.batch_size = batch_size
+        self.shuffle_traindata = shuffle_traindata
         self.test_split = test_split
         self.num_workers = num_workers
 
@@ -135,7 +137,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 

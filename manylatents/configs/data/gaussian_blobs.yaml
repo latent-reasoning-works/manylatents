@@ -8,7 +8,7 @@ n_features: 2
 centers: 5
 cluster_std: 1.0
 center_box: [-10.0, 10.0]
-shuffle: true
+shuffle_traindata: false
 random_state: ${seed}
 return_centers: false
 mode: full
