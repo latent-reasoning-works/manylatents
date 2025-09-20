@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 import graphtools
 import numpy as np
 from sklearn.metrics import pairwise_distances
+from sklearn.datasets import make_blobs
 from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
