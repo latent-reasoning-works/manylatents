@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def preservation_metric(gt_dists, ac_dists, num_dists=50000, only_far=False):
     """
     Spearman correlation between two distance arrays (flattened).
-    Optionally sample for performance, optionally only consider 
+    Optionally sample for performance, optionally only consider
     "far" pairs (above 10th percentile).
     """
     if only_far:
@@ -322,17 +322,57 @@ def compute_quality_metrics(
 
 
 ##############################################################################
-# 6) Single-Value Wrappers (conform to Metric(Protocol))
+# 6) Helper function for embedding scaling
+##############################################################################
+
+def _scale_embedding_dimensions(embeddings: np.ndarray) -> np.ndarray:
+    """
+    Scale each embedding dimension to [0, 1] using min-max normalization.
+
+    This ensures that no single dimension dominates distance calculations
+    due to scale differences (e.g., UMAP dim 1: [-10, 10] vs dim 2: [-1, 1]).
+
+    Parameters
+    ----------
+    embeddings : np.ndarray
+        Input embeddings to rescale
+
+    Returns
+    -------
+    np.ndarray
+        Embeddings with all dimensions scaled to [0, 1]
+    """
+    # Convert to numpy if needed (handle PyTorch tensors)
+    if hasattr(embeddings, 'cpu'):
+        embeddings = embeddings.cpu().numpy()
+    embeddings = np.asarray(embeddings)
+
+    emb_min = embeddings.min(axis=0)
+    emb_max = embeddings.max(axis=0)
+    emb_range = emb_max - emb_min
+
+    # Avoid division by zero for constant dimensions
+    emb_range = np.where(emb_range == 0, 1, emb_range)
+
+    # Min-max normalization: (x - min) / (max - min)
+    scaled_embeddings = (embeddings - emb_min) / emb_range
+
+    return scaled_embeddings
+
+##############################################################################
+# 7) Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
 def GeographicPreservation(embeddings: np.ndarray,
-                           dataset, 
+                           dataset,
                            module: Optional[LatentModule] = None,
+                           scale_embs: bool = True,
                            **kwargs) -> float:
     """
     Minimal wrapper that passes extra keyword arguments to compute_geographic_metric.
     """
-    #module = kwargs.pop('module', None)  # Pop but ignore or handle separately
+    if scale_embs:
+        embeddings = _scale_embedding_dimensions(embeddings)
 
     return compute_geographic_metric(
         ancestry_coords=embeddings,
@@ -343,12 +383,16 @@ def GeographicPreservation(embeddings: np.ndarray,
     )
 
 def AdmixturePreservation(embeddings: np.ndarray,
-                          dataset, 
+                          dataset,
                           module: Optional[LatentModule] = None,
+                          scale_embs: bool = True,
                           **kwargs) -> float:
     """
     Another single-value wrapper returning Spearman correlation.
     """
+    if scale_embs:
+        embeddings = _scale_embedding_dimensions(embeddings)
+
     return compute_continental_admixture_metric_dists(
         ancestry_coords=embeddings,
         admixture_ratios=dataset.admixture_ratios['5'],
@@ -357,13 +401,16 @@ def AdmixturePreservation(embeddings: np.ndarray,
     )
 
 def AdmixturePreservationK(embeddings: np.ndarray,
-                           dataset, 
+                           dataset,
                            module: Optional[LatentModule] = None,
+                           scale_embs: bool = True,
                            **kwargs) -> np.array:
     """
     A vector-value wrapper returning admixture preservation scores for all Ks.
     """
-    
+    if scale_embs:
+        embeddings = _scale_embedding_dimensions(embeddings)
+
     return_vector = np.zeros(len(dataset.admixture_ratios))
     for i, key in enumerate(dataset.admixture_ratios.keys()):
         return_vector[i] = compute_continental_admixture_metric_dists(
@@ -375,24 +422,31 @@ def AdmixturePreservationK(embeddings: np.ndarray,
     return return_vector
 
 def AdmixtureLaplacian(embeddings: np.ndarray,
-                       dataset, 
-                       module: Optional[LatentModule] = None) -> float:
+                       dataset,
+                       module: Optional[LatentModule] = None,
+                       scale_embs: bool = True) -> float:
     """
     Laplacian-based metric -> single float for callback usage.
     """
+    if scale_embs:
+        embeddings = _scale_embedding_dimensions(embeddings)
+
     return compute_continental_admixture_metric_laplacian(
         ancestry_coords=embeddings,
         admixture_ratios=dataset.admixture_ratios
     )
 
-def GroundTruthPreservation(embeddings: np.ndarray, 
-                            dataset, 
+def GroundTruthPreservation(embeddings: np.ndarray,
+                            dataset,
                             module: Optional[LatentModule] = None,
+                            scale_embs: bool = True,
                             **kwargs) -> float:
     """
     Computes preservation of embedding distance versus ground truth distance (on synthetic data)
     Do not pass use_medians as a kwarg
     """
+    if scale_embs:
+        embeddings = _scale_embedding_dimensions(embeddings)
 
     assert hasattr(dataset, 'get_gt_dists')
     gt_dists = dataset.get_gt_dists()
