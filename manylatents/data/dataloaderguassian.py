@@ -12,6 +12,7 @@ class GaussianBlobs(LightningDataModule):
                  batch_size: int = 128,
                  test_split: float = 0.2,
                  num_workers: int = 0,
+                 shuffle_traindata: bool = True,
                  n_samples: Union[int, List[int]] = 100,
                  n_features: int = 2,
                  centers: Optional[Union[int, np.ndarray, List[List[float]]]] = None,
@@ -24,6 +25,7 @@ class GaussianBlobs(LightningDataModule):
         super().__init__()
         
         self.batch_size = batch_size
+        self.shuffle_traindata = shuffle_traindata
         self.test_split = test_split
         self.num_workers = num_workers
 
@@ -84,7 +86,7 @@ class GaussianBlobs(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 

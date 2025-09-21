@@ -13,3 +13,4 @@ rotate_to_dim: 200
 mode: full
 precomputed_path: null
 mmap_mode: null
+shuffle_traindata: false

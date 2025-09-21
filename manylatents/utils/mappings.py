@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+from matplotlib.colors import ListedColormap
 
 # just hard-code it
 
@@ -275,3 +276,17 @@ gray_mapping = {k: '#d3d3d3' for k in cmap_hgdp_aou_intersection}
 race_ethnicity_only_pca_colors.update(gray_mapping)
 race_only_pca_colors.update(gray_mapping)
 ethnicity_only_pca_colors.update(gray_mapping)
+
+# Colorful palette for DLA tree branches (up to 10 branches)
+cmap_dla_tree = {
+    1: '#e41a1c',  # red
+    2: '#377eb8',  # blue  
+    3: '#4daf4a',  # green
+    4: '#984ea3',  # purple
+    5: '#ff7f00',  # orange
+    6: '#ffff33',  # yellow
+    7: '#a65628',  # brown
+    8: '#f781bf',  # pink
+    9: '#999999',  # gray
+    10: '#66c2a5'   # teal
+}

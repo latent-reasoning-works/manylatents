@@ -1,0 +1,50 @@
+defaults:
+  - default
+
+_target_: manylatents.data.dlatree.DLATreeFromGraphDataModule
+
+n_dim: 100
+random_state: ${seed}
+sigma: 0.5
+mode: full
+precomputed_path: null
+mmap_mode: null
+test_split: 0.2
+shuffle_traindata: false
+
+graph_edges:
+  # =========================
+  # Main trunk - Data edges (sequential numbering 1-7)
+  # =========================
+  - [1, 2, 1, 300]      # N1--E1--N2   (Main trunk start)
+  - [2, 3, 2, 300]      # N2--E2--N3   (Trunk continuation)
+  - [8, 13, 3, 300]     # N8--E3--N13  (Trunk segment, keeps samples alive)
+  - [4, 5, 4, 300]      # N4--E4--N5   (Trunk continuation)
+  - [6, 7, 5, 100]      # N6--E5--N7   (Trunk end, subsampled)
+
+  # =========================
+  # Branch A (from N2) - Data edges
+  # =========================
+  - [2, 10, 6, 300]    # N2--E6--N10  (Branch A start)
+  - [11, 12, 7, 100]   # N11--E7--N12 (Branch A end, subsampled)
+
+  # =========================
+  # Branch B (from N6) - Data edge
+  # =========================
+  - [6, 9, 8, 300]     # N6--E8--N9   (Branch B)
+
+  # =========================
+  # Gap edges (excluded from data, numbered 9-12)
+  # =========================
+  - [13, 4, 9, 50]      # N13--E9--N4  (gap, disconnects N4 from N8)
+  - [5, 6, 10, 50]      # N5--E10--N6  (gap in trunk)
+  - [10, 11, 11, 50]   # N10--E11--N11 (gap in Branch A)
+  - [2, 8, 12, 50]      # N2--E12--N8  (cross-link gap)
+
+# =========================
+# Excluded edges (gaps) - now sequential at the end
+# =========================
+excluded_edges: [9, 10, 11, 12]
+
+# Use colorful discrete colormap
+sampling_density_factors: null

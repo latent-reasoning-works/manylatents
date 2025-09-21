@@ -14,10 +14,12 @@ from manylatents.data.hgdp_dataset import HGDPDataset
 from manylatents.data.ukbb_dataset import UKBBDataset
 from manylatents.data.mhi_dataset import MHIDataset
 from manylatents.data.aou_dataset import AOUDataset
+from manylatents.data.synthetic_dataset import DLAtree
 from manylatents.utils.mappings import cmap_pop as cmap_pop_HGDP
 from manylatents.utils.mappings import cmap_ukbb_superpops as cmap_pop_UKBB
 from manylatents.utils.mappings import cmap_mhi_superpops as cmap_pop_MHI
 from manylatents.utils.mappings import race_ethnicity_only_pca_colors as cmap_pop_AOU
+from manylatents.utils.mappings import cmap_dla_tree
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +84,13 @@ class PlotEmbeddings(EmbeddingCallback):
             cmap = cmap_pop_MHI
         elif isinstance(dataset, AOUDataset):
             cmap = cmap_pop_AOU
+        elif isinstance(dataset, DLAtree):
+            # Check if we have more branches than colors in our palette
+            if hasattr(dataset, 'n_branch') and dataset.n_branch > 10:
+                logger.warning(f"DLA tree has {dataset.n_branch} branches but colormap only supports 10. Falling back to viridis.")
+                cmap = "viridis"
+            else:
+                cmap = cmap_dla_tree
         else:
             cmap = "viridis"
         return cmap

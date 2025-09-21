@@ -1,7 +1,7 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-from .synthetic_dataset import DLAtree
+from .synthetic_dataset import DLAtree, DLATreeFromGraph
 from typing import Union, List, Optional, Dict
 
 
@@ -14,6 +14,7 @@ class DLATreeDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
+        shuffle_traindata: bool = True,
         n_branch: int = 20,
         branch_lengths: Union[List[int], int, None] = None, 
         rand_multiplier: float = 2.0,
@@ -85,6 +86,7 @@ class DLATreeDataModule(LightningDataModule):
         
             
         self.batch_size = batch_size
+        self.shuffle_traindata = shuffle_traindata
         self.test_split = test_split
         self.num_workers = num_workers
 
@@ -156,7 +158,7 @@ class DLATreeDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 
@@ -174,6 +176,124 @@ class DLATreeDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
         )
+class DLATreeFromGraphDataModule(LightningDataModule):
+    """
+    PyTorch Lightning DataModule for the DLATreeFromGraph Dataset. 
+    """
+    def __init__(
+        self,
+        batch_size: int = 128,
+        test_split: float = 0.2,
+        num_workers: int = 0,
+        shuffle_traindata: bool = True,
+        graph_edges: list = None,
+        excluded_edges: list = None,
+        n_dim: int = 100,
+        rand_multiplier: float = 2.0,
+        random_state: int = 42,
+        sigma: float = 0.5,
+        save_graph_viz: bool = True,
+        save_dir: str = "outputs",
+        precomputed_path: str = None,
+        mmap_mode: str = None,
+        mode: str = 'full',
+        **kwargs
+    ):
+        """
+        Initialize the DLATreeFromGraphDataModule with configuration parameters.
+        """
+        super().__init__()
+            
+        self.batch_size = batch_size
+        self.shuffle_traindata = shuffle_traindata
+        self.test_split = test_split
+        self.num_workers = num_workers
+
+        # DLATreeFromGraph-specific
+        self.graph_edges = graph_edges or []
+        self.excluded_edges = excluded_edges or []
+        self.n_dim = n_dim
+        self.rand_multiplier = rand_multiplier
+        self.random_state = random_state
+        self.sigma = sigma
+        self.save_graph_viz = save_graph_viz
+        self.save_dir = save_dir
+
+        self.mode = mode
+        self.precomputed_path = precomputed_path
+        self.mmap_mode = mmap_mode
+
+        self.dataset = None
+        self.train_dataset = None
+        self.val_dataset = None
+
+    def prepare_data(self) -> None:
+        """Prepare data for use (e.g., downloading, saving to disk)."""
+        pass
+
+    def setup(self, stage: str = None):
+        if self.mode == "full":
+            self.train_dataset = DLATreeFromGraph(
+                graph_edges=self.graph_edges,
+                excluded_edges=self.excluded_edges,
+                n_dim=self.n_dim,
+                rand_multiplier=self.rand_multiplier,
+                random_state=self.random_state,
+                sigma=self.sigma,
+                save_graph_viz=self.save_graph_viz,
+                save_dir=self.save_dir,
+                precomputed_path=self.precomputed_path,
+                mmap_mode=self.mmap_mode,
+            )
+            self.test_dataset = self.train_dataset
+
+        elif self.mode == 'split':
+            self.dataset = DLATreeFromGraph(
+                graph_edges=self.graph_edges,
+                excluded_edges=self.excluded_edges,
+                n_dim=self.n_dim,
+                rand_multiplier=self.rand_multiplier,
+                random_state=self.random_state,
+                sigma=self.sigma,
+                save_graph_viz=self.save_graph_viz,
+                save_dir=self.save_dir,
+                precomputed_path=self.precomputed_path,
+                mmap_mode=self.mmap_mode,
+            )
+
+            test_size = int(len(self.dataset) * self.test_split)
+            train_size = len(self.dataset) - test_size
+
+            self.train_dataset, self.test_dataset = random_split(
+                self.dataset,
+                [train_size, test_size],
+                generator=torch.Generator().manual_seed(self.random_state),
+            )
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle_traindata,
+            num_workers=self.num_workers,
+        )
+
+    def val_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+        
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
     
 if __name__ == "__main__":
 

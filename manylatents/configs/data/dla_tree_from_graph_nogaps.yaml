@@ -1,0 +1,42 @@
+defaults:
+  - default
+
+_target_: manylatents.data.dlatree.DLATreeFromGraphDataModule
+
+n_dim: 100
+random_state: ${seed}
+sigma: 0.5
+mode: full
+precomputed_path: null
+mmap_mode: null
+test_split: 0.2
+shuffle_traindata: false
+
+graph_edges:
+  # =========================
+  # Main trunk - Data edges (stitched together, no gaps)
+  # =========================
+  - [1, 2, 1, 300]      # N1--E1--N2   (Main trunk start)
+  - [2, 3, 2, 300]      # N2--E2--N3   (Trunk continuation)
+  - [2, 8, 3, 300]      # N2--E3--N8   (stitched: was N8→N13, gap N2→N8, gap N13→N4→N5→N6)
+  - [8, 6, 4, 300]      # N8--E4--N6   (stitched: connects to where gap chain ended)
+  - [6, 7, 5, 100]      # N6--E5--N7   (Trunk end, subsampled)
+
+  # =========================
+  # Branch A (from N2) - Data edges (stitched)
+  # =========================
+  - [2, 10, 6, 300]     # N2--E6--N10  (Branch A start)
+  - [10, 12, 7, 100]    # N10--E7--N12 (stitched: was N10→N11→N12, gap N10→N11 removed)
+
+  # =========================
+  # Branch B (from N6) - Data edge
+  # =========================
+  - [6, 9, 8, 300]      # N6--E8--N9   (Branch B)
+
+# =========================
+# Excluded edges - none in this no-gaps version
+# =========================
+excluded_edges: []
+
+# Use colorful discrete colormap
+sampling_density_factors: null
