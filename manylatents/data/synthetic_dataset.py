@@ -8,8 +8,9 @@ from sklearn.metrics import pairwise_distances
 from sklearn.datasets import make_blobs
 from scipy.stats import special_ortho_group
 import scipy.sparse as sp
+from sklearn.datasets import make_blobs
 from scipy.sparse.csgraph import shortest_path
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Optional, Dict, Tuple
 from .precomputed_mixin import PrecomputedMixin
 from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
@@ -305,6 +306,144 @@ class SaddleSurface(SyntheticDataset):
         return self.graph
 
 
+import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
+
+class GaussianBlobs(SyntheticDataset, PrecomputedMixin):
+    """
+    Gaussian K blobs synthetic dataset that integrates with the synthetic dataset framework.
+    """
+
+    def __init__(self,
+                 n_samples: Union[int, List[int]] = 100,
+                 n_features: int = 2,
+                 centers: Optional[Union[int, np.ndarray, List[List[float]]]] = None,
+                 cluster_std: Union[float, List[float]] = 1.0,
+                 center_box: Tuple[float, float] = (-10.0, 10.0),
+                 shuffle: bool = True,
+                 random_state: Optional[int] = 42,
+                 return_centers: bool = False,
+                 precomputed_path: Optional[str] = None,
+                 mmap_mode: Optional[str] = None):
+        """
+        Initialize a synthetic Gaussian Blobs dataset using sklearn's make_blobs.
+
+        Parameters:
+        ----------
+        n_samples : int or list of int, default=100
+            Number of samples to generate. If int, total samples. If list, samples per center.
+
+        n_features : int, default=2
+            Number of features (dimensionality) for each sample.
+
+        centers : int, array-like or None, default=None
+            Number of centers to generate, or fixed center locations.
+
+        cluster_std : float or list of float, default=1.0
+            Standard deviation of clusters.
+
+        center_box : tuple of float, default=(-10.0, 10.0)
+            Bounding box for randomly generated cluster centers.
+
+        shuffle : bool, default=True
+            Whether to shuffle the samples.
+
+        random_state : int, default=42
+            Random seed for reproducibility.
+
+        return_centers : bool, default=False
+            Whether to return the cluster centers.
+
+        precomputed_path : str, optional
+            Path to precomputed embeddings.
+        
+        mmap_mode : str, optional
+            Memory mapping mode for loading precomputed data.
+        """
+        super().__init__()
+        
+        logger.info("Generating Gaussian blobs")
+
+        # Generate the blob data using sklearn
+        result = make_blobs(
+            n_samples=n_samples,
+            n_features=n_features,
+            centers=centers,
+            cluster_std=cluster_std,
+            center_box=tuple(center_box),
+            shuffle=shuffle,
+            random_state=random_state,
+            return_centers=return_centers
+        )
+
+        if return_centers:
+            self.X, self.y, self.centers = result
+        else:
+            self.X, self.y = result
+            self.centers = None
+
+        # Load precomputed embeddings or use generated data
+        if precomputed_path is not None and os.path.exists(precomputed_path):
+            self.data = self.load_precomputed(precomputed_path, mmap_mode)
+        else:
+            self.data = self.X
+
+        self.metadata = self.y
+
+        # Create DataFrame for compatibility with your existing interface
+        self.FinalData = pd.DataFrame({
+            'sample_id': [f"sample_{i}" for i in range(len(self.X))],
+            'label': self.y
+        }).set_index("sample_id")
+
+    def get_data(self) -> np.ndarray:
+        """Return the feature data."""
+        return self.data
+
+    def get_labels(self) -> np.ndarray:
+        """Return the cluster labels."""
+        return self.metadata
+
+    def get_FinalData(self) -> pd.DataFrame:
+        """Return the DataFrame with sample IDs and labels."""
+        return self.FinalData
+
+    def get_centers(self) -> Optional[np.ndarray]:
+        """Return cluster centers if available."""
+        return self.centers
+
+    def get_gt_dists(self):
+        """
+        Compute ground truth distances between points.
+        
+        For Gaussian blobs, we use Euclidean distance as the ground truth
+        since the data exists in Euclidean space.
+        """
+        return pairwise_distances(self.data, metric="euclidean")
+
+    def get_graph(self):
+        """Create a graphtools graph if it does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
+    def __len__(self):
+        """Return the number of samples."""
+        return len(self.data)
+
+    def __getitem__(self, idx: int):
+        """
+        Get a single sample and its metadata.
+        
+        Returns dict with 'data' and 'metadata' keys for consistency
+        with the base SyntheticDataset class.
+        """
+        x = self.data[idx]
+        y = self.metadata[idx] if self.metadata is not None else -1
+        return {"data": torch.tensor(x, dtype=torch.float32), "metadata": torch.tensor(y, dtype=torch.long)}
+    
 class DLAtree(SyntheticDataset, PrecomputedMixin):
     def __init__(
         self,

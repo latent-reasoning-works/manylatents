@@ -20,6 +20,7 @@ class TorusDataModule(LightningDataModule):
         random_state: int = 42,
         rotate_to_dim: int = 3,
         mode: str = 'split',
+        shuffle_traindata: bool = False,
     ):
         """
         Initialize the TorusDataModule with configuration parameters for data loading

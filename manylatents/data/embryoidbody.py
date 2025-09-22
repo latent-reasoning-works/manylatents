@@ -19,6 +19,7 @@ class EmbryoidBodyDataModule(LightningDataModule):
         precomputed_path: str = None,
         mmap_mode: str = None,
         mode: str = 'full',
+        shuffle_traindata: bool = False,
     ):
         """
         Initialize the EmbryoidBodyDataModule with configuration parameters for data loading
