@@ -280,12 +280,28 @@ def subsample_data_and_dataset(
     return subsampled_ds, subsampled_embeddings
 
 def determine_data_source(loader) -> Tuple[str, str]:
+    """
+    Determine the primary data field to use from the dataloader batch.
+
+    Returns:
+        Tuple of (field_name, description) for the primary data tensor
+    """
     first_batch = next(iter(loader))
+
+    # Check for different data source patterns
     if "precomputed" in first_batch and first_batch["precomputed"] is not None:
         return "precomputed", "using precomputed embeddings"
     elif "raw" in first_batch and first_batch["raw"] is not None:
         return "raw", "using raw data"
     elif "data" in first_batch and first_batch["data"] is not None:
         return "data", "using unified data"
+    elif "embeddings" in first_batch and first_batch["embeddings"] is not None:
+        # New EmbeddingOutputs format from PrecomputedDataset
+        return "embeddings", "using precomputed embeddings from EmbeddingOutputs"
     else:
+        # Try to find any tensor field as fallback
+        for key, value in first_batch.items():
+            if isinstance(value, torch.Tensor) and value.numel() > 0:
+                return key, f"using {key} field as data source"
+
         raise ValueError("No valid data source found in the first batch.")

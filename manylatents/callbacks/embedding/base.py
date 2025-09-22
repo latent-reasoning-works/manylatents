@@ -4,29 +4,45 @@ from typing import Any
 
 import numpy as np
 from torch import Tensor
-from typing_extensions import NotRequired, TypedDict
-
 from manylatents.callbacks.base import BaseCallback
 
 logger = logging.getLogger(__name__)
 
-class EmbeddingOutputs(TypedDict, total=False):
+EmbeddingOutputs = dict[str, Any]
+"""
+Standard data interchange format for manyLatents pipeline.
+
+Required:
+    embeddings (np.ndarray): Primary reduced dimensionality output
+
+Standard optional keys:
+    label: Labels/targets for data samples
+    metadata: Algorithm parameters and info
+    scores: Evaluation metrics
+
+Custom keys are encouraged for algorithm-specific outputs.
+"""
+
+def validate_embedding_outputs(outputs: EmbeddingOutputs) -> EmbeddingOutputs:
     """
-    Defines the minimal output contract for embedding methods.
-    All embedding modules (DR or NN encoders) should return at least an 'embeddings' array,
-    along with optional 'label', 'scores', and 'metadata' entries.
+    Validates that EmbeddingOutputs contains the required 'embeddings' key.
+
+    Args:
+        outputs: Dictionary containing embedding outputs
+
+    Returns:
+        The validated outputs dictionary
+
+    Raises:
+        ValueError: If not a dictionary or missing 'embeddings' key
     """
-    embeddings: np.ndarray
-    """Reduced embeddings from the model, e.g. UMAP, PCA, or an encoder output."""
-    
-    label: NotRequired[Tensor]
-    """Optional labels for the embeddings, if available."""
-    
-    scores: NotRequired[np.ndarray]
-    """Optional scores for the embeddings, if available (e.g. tangent_space values)."""
-    
-    metadata: NotRequired[Any]
-    """Optional metadata to be saved with the embeddings."""
+    if not isinstance(outputs, dict):
+        raise ValueError("EmbeddingOutputs must be a dictionary")
+
+    if "embeddings" not in outputs:
+        raise ValueError("EmbeddingOutputs must contain an 'embeddings' key")
+
+    return outputs
     
 class EmbeddingCallback(BaseCallback, ABC):
     
