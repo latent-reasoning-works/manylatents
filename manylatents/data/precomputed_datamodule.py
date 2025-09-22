@@ -5,7 +5,8 @@ from .precomputed_dataset import PrecomputedDataset
 
 class PrecomputedDataModule(LightningDataModule):
     """
-    A generic DataModule for loading data from a single pre-computed file.
+    DataModule for loading precomputed embeddings from files or directories.
+    Supports both single files and multiple files from SaveEmbeddings.
     """
     def __init__(
         self,

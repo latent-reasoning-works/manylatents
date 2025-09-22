@@ -1,3 +1,7 @@
+import json
+import os
+from pathlib import Path
+
 import torch
 import numpy as np
 import pandas as pd
@@ -8,45 +12,129 @@ logger = logging.getLogger(__name__)
 
 class PrecomputedDataset(Dataset):
     """
-    A generic PyTorch Dataset for loading pre-computed embeddings from CSV or NPY files.
+    PyTorch Dataset for loading precomputed embeddings.
+
+    Supports:
+    - Single files: .csv or .npy (legacy format)
+    - Multiple files: from SaveEmbeddings with save_additional_outputs=True
+
+    Always returns EmbeddingOutputs format in __getitem__.
     """
     def __init__(self, path: str, label_col: str = None):
         """
         Args:
-            path (str): Path to the data file (.csv or .npy).
-            label_col (str, optional): The name of the column containing labels in a CSV file.
-                                       If None, no labels are loaded.
+            path (str): Path to data file (.csv/.npy) or directory with multiple files
+            label_col (str, optional): Column name for labels in CSV files
         """
         self.path = path
         self.label_col = label_col
+        self.embedding_outputs = {}
         self._load_data()
 
     def _load_data(self):
-        logger.info(f"Loading pre-computed data from: {self.path}")
-        if self.path.endswith('.csv'):
-            df = pd.read_csv(self.path)
-            if self.label_col and self.label_col in df.columns:
-                self.labels = torch.tensor(pd.to_numeric(df[self.label_col], errors='coerce').fillna(0).values)
-                self.data = torch.tensor(df.drop(columns=[self.label_col]).values, dtype=torch.float32)
-            else:
-                self.labels = torch.zeros(len(df), dtype=torch.long)
-                self.data = torch.tensor(df.values, dtype=torch.float32)
+        """Load data and convert to EmbeddingOutputs format."""
+        logger.info(f"Loading precomputed data from: {self.path}")
 
-        elif self.path.endswith('.npy'):
-            self.data = torch.tensor(np.load(self.path), dtype=torch.float32)
-            self.labels = torch.zeros(len(self.data), dtype=torch.long)
+        if os.path.isfile(self.path):
+            self._load_single_file()
+        elif os.path.isdir(self.path):
+            self._load_multiple_files()
         else:
-            raise ValueError("Unsupported file format. Please use .csv or .npy.")
-            
-        logger.info(f"Successfully loaded data with shape: {self.data.shape}")
+            raise ValueError(f"Path not found: {self.path}")
+
+        # Ensure we have embeddings
+        if "embeddings" not in self.embedding_outputs:
+            raise ValueError("No embeddings found in data")
+
+        self.data = self.embedding_outputs["embeddings"]
+        logger.info(f"Successfully loaded embeddings with shape: {self.data.shape}")
+
+    def _load_single_file(self):
+        """Load from single .csv or .npy file."""
+        path = Path(self.path)
+
+        if path.suffix == '.csv':
+            df = pd.read_csv(self.path)
+
+            # Extract labels if specified
+            labels = None
+            if self.label_col and self.label_col in df.columns:
+                labels = torch.tensor(pd.to_numeric(df[self.label_col], errors='coerce').fillna(0).values)
+                df = df.drop(columns=[self.label_col])
+
+            # Main embeddings
+            embeddings = torch.tensor(df.values, dtype=torch.float32)
+
+            self.embedding_outputs = {"embeddings": embeddings}
+            if labels is not None:
+                self.embedding_outputs["label"] = labels
+
+        elif path.suffix == '.npy':
+            embeddings = torch.tensor(np.load(self.path), dtype=torch.float32)
+            self.embedding_outputs = {"embeddings": embeddings}
+
+        else:
+            raise ValueError(f"Unsupported file format: {path.suffix}")
+
+    def _load_multiple_files(self):
+        """Load from directory with multiple files from SaveEmbeddings."""
+        path = Path(self.path)
+
+        # Find all relevant files
+        embedding_files = {}
+        for file_path in path.glob("*"):
+            if file_path.is_file():
+                stem = file_path.stem
+                suffix = file_path.suffix
+
+                if suffix == '.npy':
+                    # Load numpy arrays
+                    data = np.load(file_path)
+                    # Extract key from filename (e.g., "embeddings_exp_20250922_cluster_labels" -> "cluster_labels")
+                    if '_' in stem:
+                        key = stem.split('_')[-1] if not stem.endswith('embeddings') else 'embeddings'
+                    else:
+                        key = stem
+                    embedding_files[key] = torch.tensor(data, dtype=torch.float32)
+
+                elif suffix == '.json':
+                    # Load JSON data
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    key = stem.split('_')[-1] if '_' in stem else stem
+                    embedding_files[key] = data
+
+                elif suffix == '.csv':
+                    # Load CSV data
+                    df = pd.read_csv(file_path)
+                    key = stem.split('_')[-1] if '_' in stem else stem
+                    embedding_files[key] = torch.tensor(df.values, dtype=torch.float32)
+
+        self.embedding_outputs = embedding_files
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # The metadata value is a dummy label for compatibility with existing callbacks
-        return {"data": self.data[idx], "metadata": self.labels[idx].item()}
+        """Return sample from EmbeddingOutputs format."""
+        # Build sample dictionary with indexed data
+        sample = {}
+        for key, value in self.embedding_outputs.items():
+            if isinstance(value, torch.Tensor):
+                sample[key] = value[idx]
+            else:
+                # For non-tensor data (metadata, etc.), include as-is
+                sample[key] = value
+
+        # Maintain compatibility - ensure 'data' key points to main embeddings
+        if "data" not in sample and "embeddings" in sample:
+            sample["data"] = sample["embeddings"]
+
+        return sample
 
     def get_labels(self):
         """Returns all labels for compatibility with plotting callbacks."""
-        return self.labels.numpy()
+        if "label" in self.embedding_outputs:
+            labels = self.embedding_outputs["label"]
+            return labels.numpy() if isinstance(labels, torch.Tensor) else labels
+        return np.zeros(len(self.data))
