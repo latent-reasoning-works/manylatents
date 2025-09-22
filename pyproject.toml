@@ -92,7 +92,6 @@ dependencies = [
     "hydra-submitit-launcher>=1.2.0",
     "scanpy>=1.10.3",
     "pyproj>=3.6.1",
-    "magnipy",
 ]
 
 [build-system]
@@ -110,7 +109,6 @@ managed = true
 
 [tool.uv.sources]
 archetypes = { git = "https://github.com/aleixalcacer/archetypes.git" }
-magnipy = { git = "https://github.com/aidos-lab/magnipy.git" }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
