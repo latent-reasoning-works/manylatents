@@ -1,0 +1,6 @@
+diffusion_curvature:
+  _target_: manylatents.metrics.diffusion_curvature.DiffusionCurvature
+  _partial_: True
+  t: 3
+  alpha: 1.0
+  percentile: 5

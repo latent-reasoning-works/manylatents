@@ -1,7 +1,4 @@
 defaults:
   - _self_
-
-_target_: src.metrics.diffusion_curvature.DiffusionCurvature
-t: 3
-alpha: 1.0
-percentile: 5
+  - embedding:
+    - diffusion_curvature

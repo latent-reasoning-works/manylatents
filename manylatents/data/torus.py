@@ -13,6 +13,7 @@ class TorusDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
+        shuffle_traindata: bool = True,
         n_points: int = 5000,
         noise: float = 0.1,
         major_radius: float = 3.0,
@@ -35,6 +36,9 @@ class TorusDataModule(LightningDataModule):
 
         num_workers : int, default=0
             Number of subprocesses to use for data loading in PyTorch's DataLoader.
+
+        shuffle_traindata : bool, default=True
+            Whether to shuffle the training data in the DataLoader.
 
         n_points : int, default=5000
             Total number of points to generate on the torus surface.
@@ -64,6 +68,7 @@ class TorusDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.test_split = test_split
         self.num_workers = num_workers
+        self.shuffle_traindata = shuffle_traindata
 
         # Torus specific
         self.n_points = n_points
@@ -118,7 +123,7 @@ class TorusDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 
