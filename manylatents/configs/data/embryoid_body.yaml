@@ -4,7 +4,7 @@ defaults:
 _target_: manylatents.data.embryoidbody.EmbryoidBodyDataModule
 test_split: 0.2
 random_state: ${seed}
-adata_path: ./data/scRNAseq/EBT_counts.h5ad
+adata_path: ./data/scRNAseq/EBT_2k_hvg.h5ad
 label_key: sample_labels
 precomputed_path: null
 mmap_mode: null

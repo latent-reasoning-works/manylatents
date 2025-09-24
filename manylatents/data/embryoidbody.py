@@ -13,6 +13,7 @@ class EmbryoidBodyDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
+        shuffle_traindata: bool = True,
         random_state: int = 42,
         adata_path: str = None,
         label_key: str = None,
@@ -35,6 +36,9 @@ class EmbryoidBodyDataModule(LightningDataModule):
         num_workers : int, default=0
             Number of subprocesses to use for data loading in PyTorch's DataLoader.
 
+        shuffle_traindata : bool, default=True
+            Whether to shuffle the training data in the DataLoader.
+
         adata_path : str
             Path to the raw .h5ad file containing the full dataset.
 
@@ -55,6 +59,7 @@ class EmbryoidBodyDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.test_split = test_split
         self.num_workers = num_workers
+        self.shuffle_traindata = shuffle_traindata
         self.random_state = random_state
 
         # EmbryoidBody specific parameters
@@ -97,7 +102,7 @@ class EmbryoidBodyDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 
