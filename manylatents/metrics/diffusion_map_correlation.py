@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
-from typing import Literal
+from typing import Literal, Optional
 
 from manylatents.algorithms.latent_module_base import LatentModule
 from manylatents.algorithms.diffusionmap_algorithm import compute_dm
@@ -68,9 +68,9 @@ def diffusion_map_correlation(
 ##############################################################################
 
 def DiffusionMapCorrelation(
-    dataset,
     embeddings: np.ndarray,
-    module: LatentModule,
+    dataset: Optional[object] = None,
+    module: Optional[LatentModule] = None,
     dm_components: int = 2,
     alpha: float = 1.0,
     correlation_type: Literal["pearson", "spearman"] = "pearson"
@@ -78,37 +78,41 @@ def DiffusionMapCorrelation(
     """
     Compute correlation between embeddings and corresponding diffusion map coordinates.
 
-    This metric measures how well each embedding dimension (e.g., PHATE1, PHATE2) correlates
-    with its corresponding diffusion map coordinate (DM1, DM2).
+    This metric measures how well each embedding dimension (e.g., PHATE1, PHATE2)
+    correlates with its corresponding diffusion map coordinate (DM1, DM2).
 
-    Parameters:
-    -----------
-    dataset : object
-        Dataset object (not used but required for Metric protocol)
+    Parameters
+    ----------
     embeddings : np.ndarray
-        Low-dimensional embeddings (n_samples x n_dims)
-    module : LatentModule
-        Module containing kernel_matrix attribute
+        Low-dimensional embeddings of shape (n_samples, n_dims).
+    dataset : object, optional
+        Dataset object (not used directly, but included for Metric protocol compatibility).
+    module : LatentModule, optional
+        Module expected to contain a `kernel_matrix` attribute used to compute
+        diffusion map coordinates.
     dm_components : int, default=2
-        Number of diffusion map components to use
+        Number of diffusion map components to use for correlation.
     alpha : float, default=1.0
-        Diffusion map normalization parameter
-    correlation_type : {"pearson", "spearman"}
-        Type of correlation to compute
+        Diffusion map normalization parameter:
+        - 0   → Graph Laplacian
+        - 0.5 → Fokker–Planck
+        - 1   → Laplace–Beltrami
+    correlation_type : {"pearson", "spearman"}, default="pearson"
+        Correlation type to compute between embedding axes and diffusion map axes.
 
-    Returns:
-    --------
+    Returns
+    -------
     np.ndarray
-        Array of correlations: [corr(embed1, DM1), corr(embed2, DM2), ...]
-        One correlation score per diffusion map coordinate
+        Array of absolute correlation values:
+        [corr(embed1, DM1), corr(embed2, DM2), ...].
+        One correlation score per diffusion map coordinate.
     """
-    kernel_matrix = getattr(module, "kernel_matrix", None)
-    if kernel_matrix is None:
+    if module is None or getattr(module, "kernel_matrix", None) is None:
         warnings.warn(
-            "DiffusionMapCorrelation metric skipped: module has no 'kernel_matrix' attribute.",
+            "DiffusionMapCorrelation metric skipped: missing module.kernel_matrix.",
             RuntimeWarning
         )
-        return np.array([np.nan])
+        return float("nan")
 
     return diffusion_map_correlation(
         embeddings=embeddings,
