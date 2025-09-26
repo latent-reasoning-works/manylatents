@@ -13,7 +13,7 @@ def kernel_matrix_sparsity(embeddings: np.ndarray, kernel_matrix: np.ndarray, th
 
     Parameters:
         embeddings (np.ndarray): Low-dimensional embeddings (currently unused).
-        kernel_matrix (np.ndarray): Kernel or affinity matrix from the DR algorithm.
+        kernel_matrix (np.ndarray): Kernel or affinity matrix from the LatentModule.
         threshold (float): Values below this threshold are considered zero. Default: 1e-10.
 
     Returns:
@@ -42,7 +42,7 @@ def kernel_matrix_density(embeddings: np.ndarray, kernel_matrix: np.ndarray, thr
 
     Parameters:
         embeddings (np.ndarray): Low-dimensional embeddings (currently unused).
-        kernel_matrix (np.ndarray): Kernel or affinity matrix from the DR algorithm.
+        kernel_matrix (np.ndarray): Kernel or affinity matrix from LatentModule.
         threshold (float): Values below this threshold are considered zero. Default: 1e-10.
 
     Returns:
@@ -66,8 +66,8 @@ def KernelMatrixSparsity(dataset, embeddings: np.ndarray, module: LatentModule, 
 
     Parameters:
         dataset: Dataset object (unused but required by metric protocol).
-        embeddings (np.ndarray): Low-dimensional embeddings from the DR algorithm.
-        module (LatentModule): The fitted dimensionality reduction module.
+        embeddings (np.ndarray): Low-dimensional embeddings from LatentModule.
+        module (LatentModule): The fitted LatentModule.
         threshold (float): Values below this threshold are considered zero.
 
     Returns:
@@ -90,8 +90,8 @@ def KernelMatrixDensity(dataset, embeddings: np.ndarray, module: LatentModule, t
 
     Parameters:
         dataset: Dataset object (unused but required by metric protocol).
-        embeddings (np.ndarray): Low-dimensional embeddings from the DR algorithm.
-        module (LatentModule): The fitted dimensionality reduction module.
+        embeddings (np.ndarray): Low-dimensional embeddings from LatentModule.
+        module (LatentModule): The fitted LatentModule.
         threshold (float): Values below this threshold are considered zero.
 
     Returns:
