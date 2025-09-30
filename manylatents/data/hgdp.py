@@ -21,7 +21,7 @@ class HGDPDataModule(LightningDataModule):
         files: dict = None,
         mmap_mode: str = None,
         precomputed_path: str = None,
-        metadata: Optional[pd.DataFrame] = None, 
+        metadata: Optional[pd.DataFrame] = None,
         delimiter: str = ",",
         filter_qc: bool = False,
         filter_related: bool = False,
@@ -29,6 +29,7 @@ class HGDPDataModule(LightningDataModule):
         test_all: bool = False,
         remove_recent_migration: bool = False,
         mode: str = None,
+        shuffle_traindata: bool = True,
     ):
         """
         Initializes the HGDPDataModule with configuration parameters.
@@ -46,14 +47,15 @@ class HGDPDataModule(LightningDataModule):
             balance_filter (Union[bool, float]): subset the predominant class to be this percent of the dataset.
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): Remove recently migrated samples.
-            mode (str): 'split' or 'full' mode. 'split' splits data into train/test, 
+            mode (str): 'split' or 'full' mode. 'split' splits data into train/test,
                         while 'full' uses the same data for both.
+            shuffle_traindata (bool): Whether to shuffle training data in the dataloader.
         """
         super().__init__()
-        
+
         if metadata is not None:
             self.metadata = metadata
-            
+
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.cache_dir = cache_dir
@@ -67,6 +69,7 @@ class HGDPDataModule(LightningDataModule):
         self.test_all = test_all
         self.remove_recent_migration = remove_recent_migration
         self.mode = mode
+        self.shuffle_traindata = shuffle_traindata
 
     def prepare_data(self) -> None:
         """Prepare data for use (e.g., downloading, saving to disk)."""
@@ -127,6 +130,7 @@ class HGDPDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            shuffle=self.shuffle_traindata,
             collate_fn=self._collate_fn
         )
 
