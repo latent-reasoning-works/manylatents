@@ -23,6 +23,7 @@ class PHATEModule(LatentModule):
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
+        random_landmarking: bool = False,
         **kwargs
     ):
         super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
@@ -36,7 +37,8 @@ class PHATEModule(LatentModule):
                            n_pca=n_pca,
                            n_landmark=n_landmark,
                            n_jobs=n_jobs,
-                           verbose=verbose)
+                           verbose=verbose,
+                           random_landmarking=random_landmarking)
 
     def fit(self, x: Tensor) -> None:
         """Fits PHATE on a subset of data."""

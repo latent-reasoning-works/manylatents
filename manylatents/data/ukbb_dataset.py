@@ -168,7 +168,8 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
 
         num_to_subset = int(num_nondominant * balance_filter)
 
-        EUR_subset = np.random.choice(self.metadata[self.metadata['Population'] == 'EUR'].MetadataIDs, 
+        np.random.seed(42)  # Ensure reproducible subsampling
+        EUR_subset = np.random.choice(self.metadata[self.metadata['Population'] == 'EUR'].MetadataIDs,
                              num_to_subset,
                              replace=False)
         #print(f'subsetting EUR from {num_dominant} to {num_to_subset}')
