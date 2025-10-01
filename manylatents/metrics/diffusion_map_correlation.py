@@ -116,7 +116,7 @@ def DiffusionMapCorrelation(
 
     return diffusion_map_correlation(
         embeddings=embeddings,
-        kernel_matrix=kernel_matrix,
+        kernel_matrix=module.kernel_matrix,
         dm_components=dm_components,
         alpha=alpha,
         correlation_type=correlation_type
