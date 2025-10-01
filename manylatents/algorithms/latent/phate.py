@@ -28,17 +28,34 @@ class PHATEModule(LatentModule):
     ):
         super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
-        self.model = PHATE(n_components=n_components, 
-                           random_state=random_state,
-                           knn=knn,
-                           t=t,
-                           decay=decay,
-                           gamma=gamma,
-                           n_pca=n_pca,
-                           n_landmark=n_landmark,
-                           n_jobs=n_jobs,
-                           verbose=verbose,
-                           random_landmarking=random_landmarking)
+
+        # Build PHATE kwargs, checking for parameter support
+        phate_kwargs = {
+            'n_components': n_components,
+            'random_state': random_state,
+            'knn': knn,
+            't': t,
+            'decay': decay,
+            'gamma': gamma,
+            'n_pca': n_pca,
+            'n_landmark': n_landmark,
+            'n_jobs': n_jobs,
+            'verbose': verbose,
+        }
+        
+        # Check if random_landmarking is supported in this PHATE version
+        phate_sig = inspect.signature(PHATE.__init__)
+        if 'random_landmarking' in phate_sig.parameters:
+            phate_kwargs['random_landmarking'] = random_landmarking
+        elif random_landmarking:
+            warnings.warn(
+                f"Parameter 'random_landmarking' is not supported in PHATE version "
+                f"{getattr(PHATE, '__version__', 'unknown')}. Ignoring this parameter. "
+                f"Please upgrade PHATE to use random landmarking.",
+                UserWarning
+            )
+
+        self.model = PHATE(**phate_kwargs)
 
     def fit(self, x: Tensor) -> None:
         """Fits PHATE on a subset of data."""
