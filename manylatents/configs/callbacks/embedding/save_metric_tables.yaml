@@ -1,0 +1,6 @@
+save_metric_tables:
+  _target_: manylatents.callbacks.embedding.save_metric_tables.SaveMetricTables
+  save_dir: ${hydra:runtime.output_dir}
+  experiment_name: ${name}
+  include_sample_index: true
+  include_labels: true
