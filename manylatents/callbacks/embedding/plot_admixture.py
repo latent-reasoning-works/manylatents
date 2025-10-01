@@ -111,18 +111,24 @@ class PlotAdmixture(EmbeddingCallback):
 
         admixture_df = dataset.admixture_ratios[K_str]
 
-        if admixture_df.shape[1] < self.admixture_K:
+        # First column is sample ID, so actual number of components is shape[1] - 1
+        n_components = admixture_df.shape[1] - 1
+
+        if n_components < self.admixture_K:
             logger.warning(
-                f"PlotAdmixture: admixture data has {admixture_df.shape[1]} components, "
-                f"but K={self.admixture_K} was requested. Using {admixture_df.shape[1]} components."
+                f"PlotAdmixture: admixture data has {n_components} components, "
+                f"but K={self.admixture_K} was requested. Using {n_components} components."
             )
-            return True, admixture_df
 
         return True, admixture_df
 
     def _plot_admixture(self, embeddings_2d: np.ndarray, admixture_df: pd.DataFrame) -> str:
         """Create admixture proportion subplot grid."""
-        K = min(self.admixture_K, admixture_df.shape[1])
+        # First column is sample ID, skip it and get only numeric admixture columns
+        # Admixture file format: sample_id, anc1, anc2, ..., ancK, (population, ancestry_group already removed)
+        admixture_numeric = admixture_df.iloc[:, 1:]  # Skip first column (sample ID)
+
+        K = min(self.admixture_K, admixture_numeric.shape[1])
         nrows, ncols = self._get_subplot_layout(K)
 
         # Calculate total figure size
@@ -141,7 +147,7 @@ class PlotAdmixture(EmbeddingCallback):
             ax = axes[idx]
 
             # Get admixture proportions for this component
-            anc_col = admixture_df.iloc[:, idx].values
+            anc_col = admixture_numeric.iloc[:, idx].values
 
             scatter = ax.scatter(
                 embeddings_2d[:, 0],
@@ -154,9 +160,12 @@ class PlotAdmixture(EmbeddingCallback):
                 vmax=1
             )
 
-            ax.set_xlabel('Dim 1', fontsize=11)
-            ax.set_ylabel('Dim 2', fontsize=11)
-            ax.set_title(f'anc{idx+1} proportion', fontsize=13)
+            # Remove axis labels, ticks, and tick labels
+            ax.set_xlabel('')
+            ax.set_ylabel('')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_title(f'Component {idx+1} proportion', fontsize=13)
 
             # Add colorbar
             plt.colorbar(scatter, ax=ax, label='Proportion')
