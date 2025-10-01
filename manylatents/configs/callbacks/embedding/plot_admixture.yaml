@@ -1,0 +1,9 @@
+plot_admixture:
+  _target_: manylatents.callbacks.embedding.plot_admixture.PlotAdmixture
+  save_dir: ${hydra:runtime.output_dir}
+  experiment_name: ${name}
+  admixture_K: 5
+  figsize_per_plot: [4, 4]
+  point_size: 4
+  alpha: 0.4
+  cmap: seismic
