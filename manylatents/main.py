@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any, List
 import hydra
 import lightning
 import torch
-from lightning import LightningModule
+from lightning import LightningModule, LightningDataModule
 from omegaconf import DictConfig, OmegaConf, ListConfig
 
 import wandb
@@ -29,6 +29,78 @@ from manylatents.utils.utils import (
 logger = logging.getLogger(__name__)
 
 # Config registration now happens automatically on import
+
+def execute_step(
+    algorithm: Any,
+    train_tensor: torch.Tensor,
+    test_tensor: torch.Tensor,
+    trainer: lightning.Trainer,
+    cfg: DictConfig,
+    datamodule: Optional[LightningDataModule] = None
+) -> Optional[torch.Tensor]:
+    """
+    Core execution engine for a single algorithm step.
+
+    Args:
+        algorithm: The algorithm instance (LatentModule or LightningModule)
+        train_tensor: Training data tensor
+        test_tensor: Test data tensor
+        trainer: The Lightning trainer instance
+        cfg: The Hydra configuration
+        datamodule: Optional datamodule for LightningModule training/evaluation
+
+    Returns:
+        The computed latent embeddings as a tensor
+    """
+    latents = None
+
+    # --- Compute latents based on algorithm type ---
+    if isinstance(algorithm, LatentModule):
+        # LatentModule: fit/transform pattern
+        algorithm.fit(train_tensor)
+        latents = algorithm.transform(test_tensor)
+        logger.info(f"LatentModule embedding shape: {latents.shape}")
+
+    elif isinstance(algorithm, LightningModule):
+        # LightningModule: training or eval-only
+
+        # Handle eval-only mode with pretrained checkpoint
+        if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
+            logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
+            algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
+
+        # Training phase (if not eval_only)
+        if not cfg.eval_only:
+            logger.info("Running training...")
+            trainer.fit(algorithm, datamodule=datamodule)
+
+        # Model evaluation
+        logger.info("Running model evaluation.")
+        evaluation_result = evaluate(
+            algorithm,
+            cfg=cfg,
+            trainer=trainer,
+            datamodule=datamodule,
+        )
+
+        # Handle evaluation results
+        if isinstance(evaluation_result, tuple):
+            model_metrics, model_error = evaluation_result
+        else:
+            model_metrics, model_error = evaluation_result, None
+
+        logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
+
+        # Extract embeddings from encoder
+        if hasattr(algorithm, "encode"):
+            logger.info("Extracting embeddings using network encoder...")
+            latents = algorithm.encode(test_tensor)
+            latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+            logger.info(f"LightningModule embedding shape: {latents.shape}")
+        else:
+            logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method - skipping")
+
+    return latents
 
 @hydra.main(config_path="../manylatents/configs", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> Dict[str, Any]:
@@ -93,11 +165,11 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
             loggers=loggers,
         )
         
-        logger.info("Starting single algorithm execution...")
-            
-        # --- Single Algorithm Execution ---
+        logger.info("Starting algorithm execution...")
+
+        # --- Algorithm Execution ---
         embeddings: Dict[str, Any] = {}
-        
+
         if cfg.eval_only:
             logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
             embeddings = load_precomputed_embeddings(cfg)
@@ -105,61 +177,23 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
             # Unroll train and test dataloaders to obtain tensors
             train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
             test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
-            
+
             logger.info(
-                f"Running Single Algorithm on {data_source}:\n"
+                f"Running algorithm on {data_source}:\n"
                 f"Train tensor shape: {train_tensor.shape}\n"
                 f"Test tensor shape: {test_tensor.shape}\n"
                 f"Algorithm: {type(algorithm).__name__}"
             )
-            
-            latents = None
-            
-            # --- Compute latents based on algorithm type ---
-            if isinstance(algorithm, LatentModule):
-                # LatentModule: fit/transform pattern
-                algorithm.fit(train_tensor)
-                latents = algorithm.transform(test_tensor)
-                logger.info(f"LatentModule embedding shape: {latents.shape}")
-                
-            elif isinstance(algorithm, LightningModule):
-                # LightningModule: training or eval-only
-        
-                # Handle eval-only mode with pretrained checkpoint
-                if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
-                    logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
-                    algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-                
-                # Training phase (if not eval_only)
-                if not cfg.eval_only:
-                    logger.info("Running training...")
-                    trainer.fit(algorithm, datamodule=datamodule)
-                
-                # Model evaluation
-                logger.info("Running model evaluation.")
-                evaluation_result = evaluate(
-                    algorithm,
-                    cfg=cfg,
-                    trainer=trainer,
-                    datamodule=datamodule,
-                )
-                
-                # Handle evaluation results
-                if isinstance(evaluation_result, tuple):
-                    model_metrics, model_error = evaluation_result
-                else:
-                    model_metrics, model_error = evaluation_result, None
-                    
-                logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
-                
-                # Extract embeddings from encoder
-                if hasattr(algorithm, "encode"):
-                    logger.info("Extracting embeddings using network encoder...")
-                    latents = algorithm.encode(test_tensor)
-                    latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
-                    logger.info(f"LightningModule embedding shape: {latents.shape}")
-                else:
-                    logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method - skipping")
+
+            # Execute the algorithm step
+            latents = execute_step(
+                algorithm=algorithm,
+                train_tensor=train_tensor,
+                test_tensor=test_tensor,
+                trainer=trainer,
+                cfg=cfg,
+                datamodule=datamodule
+            )
             
             # --- Unified embedding wrapping ---
             if latents is not None:

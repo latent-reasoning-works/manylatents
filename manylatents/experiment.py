@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
+import torch
 from lightning import (
     Callback,
     LightningDataModule,
@@ -13,9 +14,9 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from manylatents.callbacks.embedding.base import EmbeddingCallback
-from manylatents.utils.data import subsample_data_and_dataset
+from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import flatten_and_unroll_metrics
-from manylatents.utils.utils import check_or_make_dirs
+from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings
 
 logger = logging.getLogger(__name__)
 
