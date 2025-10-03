@@ -1,0 +1,31 @@
+# @package _global_
+# Simple sequential pipeline: PCA (1000→50) → PHATE (50→2)
+# This demonstrates depth workflow with in-memory chaining
+
+name: pca_phate_pipeline
+
+defaults:
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /metrics: test_metric
+  - override /trainer: default
+
+seed: 42
+project: manylatents_pipeline_test
+
+# Pipeline configuration
+# Each step receives the output of the previous step as input
+pipeline:
+  - name: pca_reduction
+    overrides:
+      algorithms:
+        latent:
+          _target_: manylatents.algorithms.latent.pca.PCA
+          n_components: 50
+
+  - name: phate_embedding
+    overrides:
+      algorithms:
+        latent:
+          _target_: manylatents.algorithms.latent.phate.PHATE
+          n_components: 2

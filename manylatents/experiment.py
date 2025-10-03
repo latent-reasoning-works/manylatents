@@ -3,7 +3,10 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
+import lightning
+import numpy as np
 import torch
+import wandb
 from lightning import (
     Callback,
     LightningDataModule,
@@ -13,10 +16,11 @@ from lightning import (
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
+from manylatents.algorithms.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import flatten_and_unroll_metrics
-from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings
+from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -184,3 +188,388 @@ def evaluate_lightningmodule(
     combined_metrics = {**base_metrics, **custom_metrics}
     error_value = next(iter(combined_metrics.values())) if combined_metrics else None
     return combined_metrics, error_value
+
+
+def execute_step(
+    algorithm: Any,
+    train_tensor: torch.Tensor,
+    test_tensor: torch.Tensor,
+    trainer: lightning.Trainer,
+    cfg: DictConfig,
+    datamodule: Optional[LightningDataModule] = None
+) -> Optional[torch.Tensor]:
+    """
+    Core execution engine for a single algorithm step.
+
+    Args:
+        algorithm: The algorithm instance (LatentModule or LightningModule)
+        train_tensor: Training data tensor
+        test_tensor: Test data tensor
+        trainer: The Lightning trainer instance
+        cfg: The Hydra configuration
+        datamodule: Optional datamodule for LightningModule training/evaluation
+
+    Returns:
+        The computed latent embeddings as a tensor
+    """
+    latents = None
+
+    # --- Compute latents based on algorithm type ---
+    if isinstance(algorithm, LatentModule):
+        # LatentModule: fit/transform pattern
+        algorithm.fit(train_tensor)
+        latents = algorithm.transform(test_tensor)
+        logger.info(f"LatentModule embedding shape: {latents.shape}")
+
+    elif isinstance(algorithm, LightningModule):
+        # LightningModule: training or eval-only
+
+        # Handle eval-only mode with pretrained checkpoint
+        if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
+            logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
+            algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
+
+        # Training phase (if not eval_only)
+        if not cfg.eval_only:
+            logger.info("Running training...")
+            trainer.fit(algorithm, datamodule=datamodule)
+
+        # Model evaluation
+        logger.info("Running model evaluation.")
+        evaluation_result = evaluate(
+            algorithm,
+            cfg=cfg,
+            trainer=trainer,
+            datamodule=datamodule,
+        )
+
+        # Handle evaluation results
+        if isinstance(evaluation_result, tuple):
+            model_metrics, model_error = evaluation_result
+        else:
+            model_metrics, model_error = evaluation_result, None
+
+        logger.info(f"Model evaluation completed. Error: {model_error}, Metrics: {model_metrics}")
+
+        # Extract embeddings from encoder
+        if hasattr(algorithm, "encode"):
+            logger.info("Extracting embeddings using network encoder...")
+            latents = algorithm.encode(test_tensor)
+            latents = latents.detach().cpu().numpy() if isinstance(latents, torch.Tensor) else latents
+            logger.info(f"LightningModule embedding shape: {latents.shape}")
+        else:
+            logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method - skipping")
+
+    return latents
+
+
+def run_algorithm(cfg: DictConfig) -> Dict[str, Any]:
+    """
+    Execute a single algorithm experiment.
+
+    This is the core experiment logic that:
+      - Instantiates datamodule, algorithms, and trainer
+      - Computes embeddings through a unified latent module interface
+      - Runs training and evaluation
+
+    Args:
+        cfg: The Hydra configuration
+
+    Returns:
+        A dictionary with keys: embeddings, label, metadata, scores
+    """
+    setup_logging(debug=cfg.debug)
+    logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
+
+    with wandb.init(
+        project=cfg.project,
+        name=cfg.name,
+        config=OmegaConf.to_container(cfg, resolve=True),
+        mode="disabled" if cfg.debug else "online",
+    ) as run:
+        lightning.seed_everything(cfg.seed, workers=True)
+
+        # --- Data instantiation ---
+        datamodule = instantiate_datamodule(cfg)
+        datamodule.setup()
+        train_loader = datamodule.train_dataloader()
+        test_loader = datamodule.test_dataloader()
+        field_index, data_source = determine_data_source(train_loader)
+
+        # --- Algorithm module ---
+        # Determine which algorithm to instantiate based on configuration
+        if hasattr(cfg.algorithms, 'latent') and cfg.algorithms.latent is not None:
+            algorithm = instantiate_algorithm(cfg.algorithms.latent, datamodule)
+        elif hasattr(cfg.algorithms, 'lightning') and cfg.algorithms.lightning is not None:
+            algorithm = instantiate_algorithm(cfg.algorithms.lightning, datamodule)
+        else:
+            raise ValueError("No algorithm specified in configuration")
+
+        # --- Callbacks ---
+        trainer_cb_cfg   = cfg.trainer.get("callbacks", {})
+        embedding_cb_cfg = cfg.get("callbacks", {}).get("embedding", {})
+
+        lightning_cbs, embedding_cbs = instantiate_callbacks(
+            trainer_cb_cfg,
+            embedding_cb_cfg
+        )
+
+        if not embedding_cbs:
+            logger.info("No embedding callbacks configured; skip embedding‐level hooks.")
+
+        # --- Loggers ---
+        loggers = []
+        if not cfg.debug:
+            for lg_conf in cfg.trainer.get("logger", {}).values():
+                loggers.append(hydra.utils.instantiate(lg_conf))
+
+        # --- Trainer ---
+        trainer = instantiate_trainer(
+            cfg,
+            lightning_callbacks=lightning_cbs,
+            loggers=loggers,
+        )
+
+        logger.info("Starting algorithm execution...")
+
+        # --- Algorithm Execution ---
+        embeddings: Dict[str, Any] = {}
+
+        if cfg.eval_only:
+            logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
+            embeddings = load_precomputed_embeddings(cfg)
+        else:
+            # Unroll train and test dataloaders to obtain tensors
+            train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
+            test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
+
+            logger.info(
+                f"Running algorithm on {data_source}:\n"
+                f"Train tensor shape: {train_tensor.shape}\n"
+                f"Test tensor shape: {test_tensor.shape}\n"
+                f"Algorithm: {type(algorithm).__name__}"
+            )
+
+            # Execute the algorithm step
+            latents = execute_step(
+                algorithm=algorithm,
+                train_tensor=train_tensor,
+                test_tensor=test_tensor,
+                trainer=trainer,
+                cfg=cfg,
+                datamodule=datamodule
+            )
+
+            # --- Unified embedding wrapping ---
+            if latents is not None:
+                embeddings = {
+                    "embeddings": latents,
+                    "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
+                    "metadata": {
+                        "source": "single_algorithm",
+                        "algorithm_type": type(algorithm).__name__,
+                        "data_shape": test_tensor.shape,
+                    },
+                }
+
+                # Evaluate embeddings
+                logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
+                embeddings["scores"] = evaluate(
+                    embeddings,
+                    cfg=cfg,
+                    datamodule=datamodule,
+                    module=algorithm if isinstance(algorithm, LatentModule) else None
+                )
+
+        # --- Callback processing ---
+        if embeddings and embedding_cbs:
+            for cb in embedding_cbs:
+                cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
+
+        logger.info("Experiment complete.")
+
+        if wandb.run:
+            wandb.finish()
+
+        return embeddings
+
+
+def run_pipeline(cfg: DictConfig) -> Dict[str, Any]:
+    """
+    Execute a sequential multi-step pipeline workflow.
+
+    This orchestrator enables depth workflows (sequential chaining) where
+    the output embeddings of step N become the input data for step N+1.
+    Example: PCA (1000→50) → PHATE (50→2)
+
+    Args:
+        cfg: Hydra configuration containing a 'pipeline' key with list of steps
+
+    Returns:
+        Dictionary with keys: embeddings, label, metadata, scores (from final step)
+    """
+    setup_logging(debug=cfg.debug)
+    logger.info("Pipeline Config:\n" + OmegaConf.to_yaml(cfg))
+
+    if not hasattr(cfg, 'pipeline') or cfg.pipeline is None or len(cfg.pipeline) == 0:
+        raise ValueError("No pipeline configuration found. Use run_algorithm() for single runs.")
+
+    with wandb.init(
+        project=cfg.project,
+        name=cfg.name,
+        config=OmegaConf.to_container(cfg, resolve=True),
+        mode="disabled" if cfg.debug else "online",
+    ) as run:
+        lightning.seed_everything(cfg.seed, workers=True)
+
+        # --- One-time setup: Create initial datamodule, trainer, callbacks ---
+        logger.info("Setting up pipeline infrastructure...")
+
+        # Initial datamodule (loads original data)
+        initial_datamodule = instantiate_datamodule(cfg)
+        initial_datamodule.setup()
+
+        # Setup callbacks (shared across all steps)
+        trainer_cb_cfg = cfg.trainer.get("callbacks", {})
+        embedding_cb_cfg = cfg.get("callbacks", {}).get("embedding", {})
+        lightning_cbs, embedding_cbs = instantiate_callbacks(trainer_cb_cfg, embedding_cb_cfg)
+
+        if not embedding_cbs:
+            logger.info("No embedding callbacks configured.")
+
+        # Setup loggers
+        loggers = []
+        if not cfg.debug:
+            for lg_conf in cfg.trainer.get("logger", {}).values():
+                loggers.append(hydra.utils.instantiate(lg_conf))
+
+        # Setup trainer (shared across all steps)
+        trainer = instantiate_trainer(
+            cfg,
+            lightning_callbacks=lightning_cbs,
+            loggers=loggers,
+        )
+
+        # --- Load initial data ---
+        logger.info("Loading initial data from datamodule...")
+        train_loader = initial_datamodule.train_dataloader()
+        test_loader = initial_datamodule.test_dataloader()
+        field_index, data_source = determine_data_source(train_loader)
+
+        initial_train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
+        initial_test_tensor = torch.cat([b[field_index].cpu() for b in test_loader], dim=0)
+
+        logger.info(
+            f"Initial data from {data_source}:\n"
+            f"  Train: {initial_train_tensor.shape}\n"
+            f"  Test: {initial_test_tensor.shape}"
+        )
+
+        # Track current embeddings and datamodule
+        current_train_tensor = initial_train_tensor
+        current_test_tensor = initial_test_tensor
+        current_datamodule = initial_datamodule
+        final_algorithm = None
+
+        # --- Loop through pipeline steps ---
+        logger.info(f"Starting pipeline with {len(cfg.pipeline)} steps...\n")
+
+        for step_idx, step in enumerate(cfg.pipeline):
+            logger.info(f"{'='*60}")
+            logger.info(f"PIPELINE STEP {step_idx + 1}/{len(cfg.pipeline)}")
+            logger.info(f"{'='*60}")
+
+            # Merge step overrides with global config
+            # Need to disable struct mode to allow new keys
+            step_overrides = step.get('overrides', {})
+            OmegaConf.set_struct(cfg, False)
+            step_cfg = OmegaConf.merge(cfg, step_overrides)
+            OmegaConf.set_struct(step_cfg, True)
+
+            step_name = step.get('name', f'step_{step_idx}')
+            logger.info(f"Step name: {step_name}")
+            logger.info(f"Input shape: {current_test_tensor.shape}")
+
+            # Instantiate step-specific algorithm
+            if hasattr(step_cfg.algorithms, 'latent') and step_cfg.algorithms.latent is not None:
+                algorithm = instantiate_algorithm(step_cfg.algorithms.latent, current_datamodule)
+            elif hasattr(step_cfg.algorithms, 'lightning') and step_cfg.algorithms.lightning is not None:
+                algorithm = instantiate_algorithm(step_cfg.algorithms.lightning, current_datamodule)
+            else:
+                raise ValueError(f"No algorithm specified in pipeline step {step_idx + 1}")
+
+            logger.info(f"Algorithm: {type(algorithm).__name__}")
+
+            # Execute the step with current tensors
+            latents = execute_step(
+                algorithm=algorithm,
+                train_tensor=current_train_tensor,
+                test_tensor=current_test_tensor,
+                trainer=trainer,
+                cfg=step_cfg,
+                datamodule=current_datamodule
+            )
+
+            if latents is None:
+                raise RuntimeError(
+                    f"Pipeline step {step_idx + 1} ({step_name}) failed to produce output embeddings"
+                )
+
+            # Convert to tensor for next step
+            if isinstance(latents, np.ndarray):
+                current_test_tensor = torch.from_numpy(latents).float()
+            else:
+                current_test_tensor = latents
+
+            # For sequential pipelines, use same data for train and test in subsequent steps
+            current_train_tensor = current_test_tensor
+
+            # Note: For next steps, we'd ideally create a PrecomputedDataModule from latents
+            # For now, we keep using initial_datamodule (algorithm only needs it for metadata)
+            # Future enhancement: Create in-memory PrecomputedDataModule
+
+            logger.info(f"Step {step_idx + 1} complete. Output shape: {current_test_tensor.shape}\n")
+
+            # Track final algorithm for metadata
+            final_algorithm = algorithm
+
+        # --- Final wrapping: Evaluate and callback on final embeddings ---
+        logger.info("Pipeline execution complete. Preparing final outputs...")
+
+        final_latents = current_test_tensor
+        if isinstance(final_latents, torch.Tensor):
+            final_latents = final_latents.detach().cpu().numpy()
+
+        embeddings = {
+            "embeddings": final_latents,
+            "label": getattr(getattr(initial_datamodule, "test_dataset", None), "get_labels", lambda: None)(),
+            "metadata": {
+                "source": "pipeline",
+                "num_steps": len(cfg.pipeline),
+                "final_algorithm_type": type(final_algorithm).__name__ if final_algorithm else "unknown",
+                "input_shape": initial_test_tensor.shape,
+                "output_shape": final_latents.shape,
+            },
+        }
+
+        # Evaluate final embeddings
+        logger.info("Evaluating final embeddings from pipeline...")
+        embeddings["scores"] = evaluate(
+            embeddings,
+            cfg=cfg,
+            datamodule=initial_datamodule,
+            module=final_algorithm if isinstance(final_algorithm, LatentModule) else None
+        )
+
+        # --- Callback processing ---
+        if embeddings and embedding_cbs:
+            logger.info("Running embedding callbacks...")
+            for cb in embedding_cbs:
+                cb.on_latent_end(dataset=initial_datamodule.test_dataset, embeddings=embeddings)
+
+        logger.info("Pipeline workflow complete.")
+
+        if wandb.run:
+            wandb.finish()
+
+        return embeddings
