@@ -127,9 +127,9 @@ def evaluate_embeddings(
 
     logger.info(f"Reference data shape: {ds.data.shape}")
     logger.info(f"Computing embedding metrics for {ds.data.shape[0]} samples.")
-    
+
     #subsample in case dataset is too large
-    subsample_fraction = cfg.metrics.get("subsample_fraction", None)
+    subsample_fraction = cfg.metrics.get("subsample_fraction", None) if cfg.metrics is not None else None
     if subsample_fraction is not None:
         ds_sub, emb_sub = subsample_data_and_dataset(ds, embeddings, subsample_fraction)
         logger.info(f"Subsampled dataset to {emb_sub.shape[0]} samples.")
