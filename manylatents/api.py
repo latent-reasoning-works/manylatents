@@ -107,7 +107,11 @@ def run(
         # Merge complex overrides (dicts and lists) directly
         for key, value in overrides.items():
             if isinstance(value, (dict, list)):
-                OmegaConf.update(cfg, key, value, merge=True)
+                # If the field is None, set it directly instead of merging
+                if OmegaConf.select(cfg, key) is None:
+                    OmegaConf.update(cfg, key, value, merge=False)
+                else:
+                    OmegaConf.update(cfg, key, value, merge=True)
 
     logger.info("API Configuration:\n" + OmegaConf.to_yaml(cfg))
 
