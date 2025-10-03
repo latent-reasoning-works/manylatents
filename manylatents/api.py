@@ -34,6 +34,8 @@ import torch
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig, OmegaConf
 
+# IMPORTANT: Import configs to register base_config with Hydra ConfigStore
+import manylatents.configs
 from manylatents.experiment import run_algorithm, run_pipeline
 
 logger = logging.getLogger(__name__)
