@@ -137,9 +137,9 @@ def evaluate_embeddings(
         ds_sub, emb_sub = ds, embeddings
 
     module = kwargs.get("module", None)
-    
-    metric_cfgs = flatten_and_unroll_metrics(cfg.metrics)
-    
+
+    metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
+
     results: dict[str, float] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
@@ -176,7 +176,7 @@ def evaluate_lightningmodule(
 
     base_metrics = results[0]
     custom_metrics = {}
-    model_metrics_cfg = cfg.metrics.get("model", {})
+    model_metrics_cfg = cfg.metrics.get("model", {}) if cfg.metrics is not None else {}
 
     for metric_key, metric_params in model_metrics_cfg.items():
         if metric_params.get("enabled", True):
