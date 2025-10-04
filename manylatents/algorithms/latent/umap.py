@@ -55,19 +55,53 @@ class UMAPModule(LatentModule):
         embedding = self.model.fit_transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
-    @property
-    def affinity_matrix(self):
-        """Returns affinity matrix (not sure if this is exactly what is used in UMAP"""
-        if not self._is_fitted:
-            raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
-        row_norms = self.model.graph_.sum(1)
-        return np.asarray(self.model.graph_.todense()/row_norms)
+    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns row-normalized UMAP fuzzy simplicial set (graph_).
 
-    @property
-    def kernel_matrix(self):
-        """Returns kernel matrix (not sure if this is exactly what is used in UMAP"""
+        UMAP's graph represents fuzzy membership strengths. This method
+        returns the row-normalized version to create a proper transition
+        matrix (row-stochastic) for spectral analysis.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+                Note: UMAP graph already has zero diagonal by construction.
+
+        Returns:
+            N×N row-normalized fuzzy simplicial set matrix.
+        """
         if not self._is_fitted:
             raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
-        K_no_diag = np.asarray(self.model.graph_.todense())
-        #K = np.eye(len(K_no_diag)) + K_no_diag
-        return K_no_diag
+
+        A = np.asarray(self.model.graph_.todense())
+        if ignore_diagonal:
+            A = A - np.diag(np.diag(A))
+
+        # Row-normalize to make it a proper transition matrix
+        row_sums = A.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1  # Avoid division by zero
+        A_normalized = A / row_sums
+
+        return A_normalized
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns UMAP kernel matrix (same as graph_ for UMAP).
+
+        For UMAP, the fuzzy simplicial set serves as both the kernel
+        and affinity matrix. The graph already has zero diagonal.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+                Note: UMAP graph already has zero diagonal by construction.
+
+        Returns:
+            N×N kernel matrix (fuzzy simplicial set).
+        """
+        if not self._is_fitted:
+            raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
+
+        K = np.asarray(self.model.graph_.todense())
+        if ignore_diagonal:
+            K = K - np.diag(np.diag(K))
+        return K

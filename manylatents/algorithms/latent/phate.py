@@ -97,16 +97,38 @@ class PHATEModule(LatentModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
-    @property
-    def affinity_matrix(self):
-        """Returns diffusion operator, without diagonal"""
-        diff_op = self.model.diff_op 
-        A = diff_op - np.diag(diff_op)*np.eye(len(diff_op))
-        return A
+    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns diffusion operator.
 
-    @property
-    def kernel_matrix(self):
-        """Returns kernel matrix used to build diffusion operator"""
-        K =  np.asarray(self.model.graph.K.todense())
-        K = K - np.diag(K)*np.eye(len(K))
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N diffusion operator matrix.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
+
+        diff_op = self.model.diff_op
+        if ignore_diagonal:
+            diff_op = diff_op - np.diag(np.diag(diff_op))
+        return diff_op
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns kernel matrix used to build diffusion operator.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N kernel matrix.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
+
+        K = np.asarray(self.model.graph.K.todense())
+        if ignore_diagonal:
+            K = K - np.diag(np.diag(K))
         return K

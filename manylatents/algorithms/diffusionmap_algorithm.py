@@ -13,8 +13,16 @@ def compute_dm(K, alpha=0., verbose=0):
     #d_noalpha = K.sum(1).flatten()
     d_noalpha = K.sum(axis=1)
 
+    # Check for degenerate kernel (zero or near-zero row sums)
+    if np.any(np.abs(d_noalpha) < 1e-10):
+        n = K.shape[0]
+        evecs_right = np.full((n, n), np.nan)
+        evals = np.full(n, np.nan)
+        L = np.full((n, n), np.nan)
+        return evecs_right, evals, L, d_noalpha
+
     # weighted graph Laplacian normalization
-    d = d_noalpha**alpha 
+    d = d_noalpha**alpha
     D = np.diag(d)
     D_inv = np.diag(1/d)
 

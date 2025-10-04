@@ -3,7 +3,7 @@ from torch import Tensor
 from typing import Optional, Union
 import numpy as np
 
-from .diffusionmap_algorithm import DiffusionMap
+from ..diffusionmap_algorithm import DiffusionMap
 from ..latent_module_base import LatentModule
 
 class DiffusionMapModule(LatentModule):
@@ -50,16 +50,45 @@ class DiffusionMapModule(LatentModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
-    @property
-    def affinity_matrix(self):
-        """Returns diffusion operator, without diagonal"""
-        diff_op = self.model.diff_op 
-        A = diff_op - np.diag(diff_op)*np.eye(len(diff_op))
-        return A
+    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns diffusion operator.
 
-    @property
-    def kernel_matrix(self):
-        """Returns kernel matrix used to build diffusion operator"""
-        K =  np.asarray(self.model.graph.K.todense())
-        K = K - np.diag(K)*np.eye(len(K))
+        The diffusion operator is computed during fit and represents the
+        transition matrix of the diffusion process.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N diffusion operator matrix.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
+
+        # Recompute diffusion operator from kernel
+        K = np.asarray(self.model.G.kernel.todense())
+        from ..diffusionmap_algorithm import compute_dm
+        _, _, diff_op, _ = compute_dm(K, alpha=1.0)
+
+        if ignore_diagonal:
+            diff_op = diff_op - np.diag(np.diag(diff_op))
+        return diff_op
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns kernel matrix used to build diffusion operator.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N kernel matrix.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
+
+        K = np.asarray(self.model.G.kernel.todense())
+        if ignore_diagonal:
+            K = K - np.diag(np.diag(K))
         return K
