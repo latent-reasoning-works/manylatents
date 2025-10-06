@@ -523,7 +523,7 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
 
         C = np.array(
             [i for branch_idx, branch_len in enumerate(branch_lengths)
-             for i in [branch_idx] * branch_len]
+             for i in [branch_idx + 1] * branch_len]  # Add 1 to match DLATreeFromGraph labeling
         )
         if mask is not None:
             C = C[mask]
