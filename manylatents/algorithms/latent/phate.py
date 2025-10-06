@@ -7,6 +7,7 @@ from phate import PHATE
 from torch import Tensor
 
 from ..latent_module_base import LatentModule
+from ...utils.kernel_utils import symmetric_diffusion_operator
 
 
 class PHATEModule(LatentModule):
@@ -97,23 +98,34 @@ class PHATEModule(LatentModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
-        Returns diffusion operator.
+        Returns PHATE affinity matrix.
+
+        PHATE's diffusion operator is row-stochastic (asymmetric). This method can return
+        either the diffusion operator or a symmetric diffusion operator version.
 
         Args:
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: If True, return symmetric diffusion operator with guaranteed
+                positive eigenvalues. If False, return row-stochastic diffusion operator. Default False.
 
         Returns:
-            N×N diffusion operator matrix.
+            N×N affinity matrix (diffusion operator if use_symmetric=False, symmetric if True).
         """
         if not self._is_fitted:
             raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
 
-        diff_op = self.model.diff_op
-        if ignore_diagonal:
-            diff_op = diff_op - np.diag(np.diag(diff_op))
-        return diff_op
+        if use_symmetric:
+            # Return symmetric diffusion operator for positive eigenvalue guarantee
+            K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+            return symmetric_diffusion_operator(K)
+        else:
+            # Return row-stochastic diffusion operator (original behavior)
+            diff_op = self.model.diff_op
+            if ignore_diagonal:
+                diff_op = diff_op - np.diag(np.diag(diff_op))
+            return diff_op
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
         """

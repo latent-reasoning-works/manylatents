@@ -8,6 +8,7 @@ from openTSNE.tsne import TSNEEmbedding
 from torch import Tensor
 
 from ..latent_module_base import LatentModule
+from ...utils.kernel_utils import symmetric_diffusion_operator
 
 
 def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
@@ -120,34 +121,41 @@ class TSNEModule(LatentModule):
         embedding_out = self.embedding_train.transform(x_np)
         return torch.tensor(embedding_out, device=x.device, dtype=x.dtype)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
-        Returns row-normalized P matrix (symmetrized affinity matrix from t-SNE).
+        Returns t-SNE affinity matrix.
 
-        openTSNE's P matrix is symmetrized and scaled by 1/(2N), so row sums
-        are not 1. This method row-normalizes P to create a proper transition
-        matrix (row-stochastic) for spectral analysis.
+        openTSNE's P matrix is symmetrized and scaled by 1/(2N). This method can return
+        either a row-stochastic (asymmetric) or symmetric diffusion operator version.
 
         Args:
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
                 Note: P matrix typically has very small diagonal values already.
+            use_symmetric: If True, return symmetric diffusion operator with guaranteed
+                positive eigenvalues. If False, return row-stochastic matrix. Default False.
 
         Returns:
-            N×N row-normalized affinity matrix.
+            N×N affinity matrix (row-normalized if use_symmetric=False, symmetric if True).
         """
         if not self._is_fitted:
             raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
-        P = np.asarray(self.affinities.P.todense())
-        if ignore_diagonal:
-            P = P - np.diag(np.diag(P))
+        if use_symmetric:
+            # Return symmetric diffusion operator for positive eigenvalue guarantee
+            K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+            return symmetric_diffusion_operator(K)
+        else:
+            # Return row-stochastic matrix (original behavior)
+            P = np.asarray(self.affinities.P.todense())
+            if ignore_diagonal:
+                P = P - np.diag(np.diag(P))
 
-        # Row-normalize to make it a proper transition matrix
-        row_sums = P.sum(axis=1, keepdims=True)
-        row_sums[row_sums == 0] = 1  # Avoid division by zero
-        P_normalized = P / row_sums
+            # Row-normalize to make it a proper transition matrix
+            row_sums = P.sum(axis=1, keepdims=True)
+            row_sums[row_sums == 0] = 1  # Avoid division by zero
+            P_normalized = P / row_sums
 
-        return P_normalized
+            return P_normalized
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
         """

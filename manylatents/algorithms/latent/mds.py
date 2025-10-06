@@ -84,7 +84,7 @@ class MDSModule(LatentModule):
         """
         return self.affinity_matrix(ignore_diagonal=ignore_diagonal)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Returns normalized Gram matrix (double-centered squared distance matrix / (n-1)).
 
@@ -98,6 +98,7 @@ class MDSModule(LatentModule):
 
         Args:
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: Ignored for MDS (always symmetric). Default False.
 
         Returns:
             N×N normalized Gram matrix (eigenvalues = variance explained).

@@ -70,7 +70,7 @@ class PCAModule(LatentModule):
 
         return K
 
-    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Returns normalized covariance matrix (Gram matrix / (n-1)).
 
@@ -80,6 +80,7 @@ class PCAModule(LatentModule):
 
         Args:
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: Ignored for PCA (always symmetric). Default False.
 
         Returns:
             N×N normalized covariance matrix (eigenvalues = variance explained).
