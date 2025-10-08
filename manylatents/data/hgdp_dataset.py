@@ -167,15 +167,22 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
         """
         if label_col not in self.metadata.columns:
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
-        
+
         return self.metadata[label_col].values
+
+    def get_sample_ids(self) -> np.ndarray:
+        """
+        Returns sample IDs for the dataset.
+        """
+        return self.metadata['sample_id'].values
     
-    def extract_indices(self, 
+    def extract_indices(self,
                         filter_qc: bool,
                         filter_related: bool,
                         test_all: bool,
                         remove_recent_migration: bool,
-                        balance_filter: bool
+                        balance_filter: bool,
+                        subsample_n: Optional[int] = None
                        ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Extracts fit/transform indices based on metadata filters.
@@ -184,8 +191,9 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
             filter_related (Optional[bool]): Whether to filter related samples.
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): remove recently migrated samples.
+            subsample_n (Optional[int]): If specified, randomly subsample to this many samples after other filters.
         """
-        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration, balance_filter)
+        fit_idx, trans_idx = super().extract_indices(filter_qc, filter_related, test_all, remove_recent_migration, balance_filter, subsample_n)
 
         # First entry is dummy row. So we ignore this!
         fit_idx[0] = False

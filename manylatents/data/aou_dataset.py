@@ -152,6 +152,12 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
             raise ValueError(f"Label column '{label_col}' not found in metadata.")
 
         return self.metadata[label_col].values
+
+    def get_sample_ids(self) -> np.ndarray:
+        """
+        Returns sample IDs for the dataset.
+        """
+        return self.metadata.index.values
     
     def balance_filter(self, balance_filter) -> np.array:
 

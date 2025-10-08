@@ -317,12 +317,22 @@ class PlinkDataset(Dataset):
     def get_labels(self, label_col: str = "Population") -> np.ndarray:
         """
         Abstract method that should return an array of labels for the dataset.
-        
+
         Args:
             label_col (str): Name of the column to use as labels.
-        
+
         Returns:
             np.ndarray: Array of labels.
+        """
+        pass
+
+    @abstractmethod
+    def get_sample_ids(self) -> np.ndarray:
+        """
+        Abstract method that should return an array of sample IDs for the dataset.
+
+        Returns:
+            np.ndarray: Array of sample IDs.
         """
         pass
     
