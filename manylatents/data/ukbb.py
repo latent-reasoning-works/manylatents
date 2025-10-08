@@ -37,6 +37,7 @@ class UKBBDataModule(LightningDataModule):
         remove_recent_migration: bool = False,
         mode: Optional[str] = None,
         shuffle_traindata: bool = True,
+        subsample_n: Optional[int] = None,
     ):
         super().__init__()
 
@@ -57,6 +58,7 @@ class UKBBDataModule(LightningDataModule):
         self.remove_recent_migration = remove_recent_migration
         self.mode = mode or "split"       # default split if caller forgets
         self.shuffle_traindata = shuffle_traindata
+        self.subsample_n = subsample_n
 
     # --------------------------------------------------------------------- #
     # Lightning hooks
@@ -85,6 +87,7 @@ class UKBBDataModule(LightningDataModule):
             include_do_not_know=self.include_do_not_know,
             test_all=self.test_all,
             remove_recent_migration=self.remove_recent_migration,
+            subsample_n=self.subsample_n,
         )
 
         if self.mode == "full":

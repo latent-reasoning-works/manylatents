@@ -31,11 +31,11 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
     PyTorch Dataset for HGDP + 1000 Genomes data.
     Returns both raw data and (optionally) precomputed embeddings.
     """
-    def __init__(self, 
-                 files: Dict[str, str], 
-                 cache_dir: str, 
+    def __init__(self,
+                 files: Dict[str, str],
+                 cache_dir: str,
                  data_split: str = "full",
-                 mmap_mode: Optional[str] = None, 
+                 mmap_mode: Optional[str] = None,
                  precomputed_path: Optional[str] = None,
                  metadata: Optional[pd.DataFrame] = None,
                  delimiter: Optional[str] = ",",
@@ -43,7 +43,8 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                  filter_related: Optional[bool] = False,
                  balance_filter: Union[bool, float] = False,
                  test_all: Optional[bool] = False,
-                 remove_recent_migration: Optional[bool] = False):
+                 remove_recent_migration: Optional[bool] = False,
+                 subsample_n: Optional[int] = None):
         """
         Initializes the HGDP dataset.
         """
@@ -51,8 +52,8 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
         self.filter_related = filter_related
 
         # Load raw data and metadata via the parent class.
-        super().__init__(files=files, 
-                         cache_dir=cache_dir, 
+        super().__init__(files=files,
+                         cache_dir=cache_dir,
                          mmap_mode=mmap_mode,
                          delimiter=delimiter,
                          data_split=data_split,
@@ -61,7 +62,8 @@ class HGDPDataset(PlinkDataset, PrecomputedMixin):
                          filter_related=filter_related,
                          balance_filter=balance_filter,
                          test_all=test_all,
-                         remove_recent_migration=remove_recent_migration)
+                         remove_recent_migration=remove_recent_migration,
+                         subsample_n=subsample_n)
 
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """

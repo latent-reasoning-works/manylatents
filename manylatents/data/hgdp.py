@@ -30,6 +30,7 @@ class HGDPDataModule(LightningDataModule):
         remove_recent_migration: bool = False,
         mode: str = None,
         shuffle_traindata: bool = True,
+        subsample_n: Optional[int] = None,
     ):
         """
         Initializes the HGDPDataModule with configuration parameters.
@@ -70,6 +71,7 @@ class HGDPDataModule(LightningDataModule):
         self.remove_recent_migration = remove_recent_migration
         self.mode = mode
         self.shuffle_traindata = shuffle_traindata
+        self.subsample_n = subsample_n
 
     def prepare_data(self) -> None:
         """Prepare data for use (e.g., downloading, saving to disk)."""
@@ -92,6 +94,7 @@ class HGDPDataModule(LightningDataModule):
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='full',
+                subsample_n=self.subsample_n,
             )
             self.test_dataset = self.train_dataset
 
@@ -108,6 +111,7 @@ class HGDPDataModule(LightningDataModule):
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='train',
+                subsample_n=self.subsample_n,
             )
             self.test_dataset = HGDPDataset(
                 files=self.files,
@@ -121,6 +125,7 @@ class HGDPDataModule(LightningDataModule):
                 test_all=self.test_all,
                 remove_recent_migration=self.remove_recent_migration,
                 data_split='test',
+                subsample_n=self.subsample_n,
             )
         else:
             raise ValueError(f"Invalid mode '{self.mode}'. Use 'full' or 'split'.")
