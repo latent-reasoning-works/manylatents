@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 import torch
 import numpy as np
@@ -9,6 +10,58 @@ from torch.utils.data import Dataset
 import logging
 
 logger = logging.getLogger(__name__)
+
+class InMemoryDataset(Dataset):
+    """
+    PyTorch Dataset for in-memory numpy arrays.
+
+    This dataset wraps a numpy array and returns samples in the EmbeddingOutputs format,
+    ensuring compatibility with the rest of the manyLatents pipeline.
+
+    EmbeddingOutputs format:
+        {
+            "embeddings": tensor,  # Main embeddings data
+            "data": tensor,        # Compatibility alias for embeddings
+            "label": tensor,       # Optional labels
+        }
+    """
+    def __init__(self, data_tensor: torch.Tensor, labels: Optional[torch.Tensor] = None):
+        """
+        Args:
+            data_tensor (torch.Tensor): The embeddings tensor
+            labels (torch.Tensor, optional): Optional labels tensor
+        """
+        self.data = data_tensor
+        self.embedding_outputs = {"embeddings": data_tensor}
+
+        if labels is not None:
+            self.embedding_outputs["label"] = labels
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        """Return sample from EmbeddingOutputs format."""
+        sample = {}
+        for key, value in self.embedding_outputs.items():
+            if isinstance(value, torch.Tensor):
+                sample[key] = value[idx]
+            else:
+                sample[key] = value
+
+        # Maintain compatibility - ensure 'data' key points to main embeddings
+        if "data" not in sample and "embeddings" in sample:
+            sample["data"] = sample["embeddings"]
+
+        return sample
+
+    def get_labels(self):
+        """Returns all labels for compatibility with plotting callbacks."""
+        if "label" in self.embedding_outputs:
+            labels = self.embedding_outputs["label"]
+            return labels.numpy() if isinstance(labels, torch.Tensor) else labels
+        return np.zeros(len(self.data))
+
 
 class PrecomputedDataset(Dataset):
     """

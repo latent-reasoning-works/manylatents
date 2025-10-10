@@ -8,8 +8,9 @@ todo: add descriptive info
 ## What You'll Find Here
 
 - **Getting Started**: Learn how to install and use ManyLatents.
+- **[API Usage Guide](api_usage.md)**: Programmatic API for chaining algorithms and agent workflows.
+- **[Testing Guide](testing.md)**: Testing infrastructure and best practices.
 - **Features**: Explore the key features of the project.
-- **API Reference**: Dive into the technical details.
 - **Contributing**: Find out how to get involved.
 
 ---

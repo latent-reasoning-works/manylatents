@@ -1,16 +1,20 @@
 import torch
+import numpy as np
+from typing import Optional
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-from .precomputed_dataset import PrecomputedDataset
+from .precomputed_dataset import PrecomputedDataset, InMemoryDataset
 
 class PrecomputedDataModule(LightningDataModule):
     """
-    DataModule for loading precomputed embeddings from files or directories.
+    DataModule for loading precomputed embeddings from files or directories,
+    or from in-memory numpy arrays.
     Supports both single files and multiple files from SaveEmbeddings.
     """
     def __init__(
         self,
-        path: str,
+        path: Optional[str] = None,
+        data: Optional[np.ndarray] = None,
         batch_size: int = 128,
         num_workers: int = 0,
         label_col: str = None,
@@ -19,12 +23,30 @@ class PrecomputedDataModule(LightningDataModule):
         seed: int = 42,
     ):
         super().__init__()
-        self.save_hyperparameters()
+        # Ignore 'data' to prevent Lightning from trying to save the whole array in checkpoints
+        self.save_hyperparameters(ignore=['data'])
+
+        if path is None and data is None:
+            raise ValueError("PrecomputedDataModule requires either a 'path' or 'data' argument.")
+        if path is not None and data is not None:
+            raise ValueError("You can only provide 'path' or 'data', not both.")
+
+        # Store the data tensor if provided
+        if data is not None:
+            self.data_tensor = torch.from_numpy(data).float()
+        else:
+            self.data_tensor = None
+
         self.train_dataset = None
         self.test_dataset = None
 
     def setup(self, stage: str = None):
-        full_dataset = PrecomputedDataset(path=self.hparams.path, label_col=self.hparams.label_col)
+        if self.data_tensor is not None:
+            # In-memory data path: use InMemoryDataset for EmbeddingOutputs compatibility
+            full_dataset = InMemoryDataset(self.data_tensor)
+        else:
+            # File-based path: use PrecomputedDataset
+            full_dataset = PrecomputedDataset(path=self.hparams.path, label_col=self.hparams.label_col)
 
         if self.hparams.mode == 'full':
             self.train_dataset = full_dataset

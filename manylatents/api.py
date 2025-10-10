@@ -116,13 +116,27 @@ def run(
     logger.info("API Configuration:\n" + OmegaConf.to_yaml(cfg))
 
     # Handle input_data if provided
-    # TODO: Implement PrecomputedDataModule for input_data support
-    # For now, input_data is not supported in this version
+    # We need to pass this separately because OmegaConf can't serialize numpy arrays
+    input_data_holder = {'data': input_data} if input_data is not None else None
+
     if input_data is not None:
-        logger.warning(
-            "input_data parameter is not yet supported in this version. "
-            "Use pipeline configurations for sequential workflows instead."
-        )
+        logger.info(f"Received input_data with shape: {input_data.shape}. Configuring PrecomputedDataModule.")
+
+        # Dynamically create the config for the precomputed datamodule
+        # WARNING: This manual dict construction is fragile. If PrecomputedDataModule's
+        # signature changes (new required params, different defaults), this code won't
+        # catch it until runtime. A structured config approach would be more robust,
+        # but requires refactoring the config system to use dataclasses.
+        # TODO: Add integration test that validates input_data parameter handling
+        # TODO: Consider migrating to structured configs (see manylatents/configs/)
+        # NOTE: We don't include 'data' in the config because OmegaConf can't serialize numpy arrays
+        data_cfg = {
+            '_target_': 'manylatents.data.precomputed_datamodule.PrecomputedDataModule',
+            'batch_size': cfg.data.get('batch_size', 128) if cfg.data else 128,
+            'num_workers': cfg.data.get('num_workers', 0) if cfg.data else 0,
+            'seed': cfg.seed,
+        }
+        cfg.data = OmegaConf.create(data_cfg)
 
     # Smart routing: mirror main.py logic
     is_pipeline = hasattr(cfg, 'pipeline') and cfg.pipeline is not None and len(cfg.pipeline) > 0
@@ -130,8 +144,8 @@ def run(
     if is_pipeline:
         # Route to pipeline engine
         logger.info("API detected pipeline configuration. Routing to run_pipeline()...")
-        return run_pipeline(cfg)
+        return run_pipeline(cfg, input_data_holder=input_data_holder)
     else:
         # Route to single algorithm engine
         logger.info("API detected single algorithm configuration. Routing to run_algorithm()...")
-        return run_algorithm(cfg)
+        return run_algorithm(cfg, input_data_holder=input_data_holder)

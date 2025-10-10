@@ -24,10 +24,15 @@ from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddi
 
 logger = logging.getLogger(__name__)
 
-def instantiate_datamodule(cfg: DictConfig) -> LightningDataModule:
+def instantiate_datamodule(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> LightningDataModule:
     check_or_make_dirs(cfg.cache_dir)
     logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
     datamodule_cfg = {k: v for k, v in cfg.data.items() if k != "debug"}
+
+    # Inject input_data if provided (can't be in OmegaConf due to numpy array serialization)
+    if input_data_holder is not None and 'data' in input_data_holder:
+        datamodule_cfg['data'] = input_data_holder['data']
+
     dm = hydra.utils.instantiate(datamodule_cfg)
     return dm
 
@@ -263,7 +268,7 @@ def execute_step(
     return latents
 
 
-def run_algorithm(cfg: DictConfig) -> Dict[str, Any]:
+def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> Dict[str, Any]:
     """
     Execute a single algorithm experiment.
 
@@ -290,7 +295,7 @@ def run_algorithm(cfg: DictConfig) -> Dict[str, Any]:
         lightning.seed_everything(cfg.seed, workers=True)
 
         # --- Data instantiation ---
-        datamodule = instantiate_datamodule(cfg)
+        datamodule = instantiate_datamodule(cfg, input_data_holder)
         datamodule.setup()
         train_loader = datamodule.train_dataloader()
         test_loader = datamodule.test_dataloader()
@@ -394,7 +399,7 @@ def run_algorithm(cfg: DictConfig) -> Dict[str, Any]:
         return embeddings
 
 
-def run_pipeline(cfg: DictConfig) -> Dict[str, Any]:
+def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> Dict[str, Any]:
     """
     Execute a sequential multi-step pipeline workflow.
 
@@ -426,7 +431,7 @@ def run_pipeline(cfg: DictConfig) -> Dict[str, Any]:
         logger.info("Setting up pipeline infrastructure...")
 
         # Initial datamodule (loads original data)
-        initial_datamodule = instantiate_datamodule(cfg)
+        initial_datamodule = instantiate_datamodule(cfg, input_data_holder)
         initial_datamodule.setup()
 
         # Setup callbacks (shared across all steps)
