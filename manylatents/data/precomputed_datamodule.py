@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import Optional
+from typing import Optional, Union
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
 from .precomputed_dataset import PrecomputedDataset, InMemoryDataset
@@ -14,7 +14,7 @@ class PrecomputedDataModule(LightningDataModule):
     def __init__(
         self,
         path: Optional[str] = None,
-        data: Optional[np.ndarray] = None,
+        data: Optional[Union[np.ndarray, torch.Tensor]] = None,
         batch_size: int = 128,
         num_workers: int = 0,
         label_col: str = None,
@@ -33,7 +33,12 @@ class PrecomputedDataModule(LightningDataModule):
 
         # Store the data tensor if provided
         if data is not None:
-            self.data_tensor = torch.from_numpy(data).float()
+            if isinstance(data, np.ndarray):
+                self.data_tensor = torch.from_numpy(data).float()
+            elif isinstance(data, torch.Tensor):
+                self.data_tensor = data.float()
+            else:
+                raise TypeError(f"Unsupported data type: {type(data)}. Expected np.ndarray or torch.Tensor.")
         else:
             self.data_tensor = None
 
