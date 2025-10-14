@@ -1,0 +1,18 @@
+# @package _global_
+# Single algorithm experiment WITHOUT metrics
+# For fast embedding generation without evaluation overhead
+
+name: single_algorithm_pca_swissroll_no_metrics
+
+defaults:
+  - override /algorithms/latent: pca
+  - override /data: swissroll
+  - override /callbacks/embedding: default
+  - override /metrics: null
+
+seed: 42
+project: your_project
+
+algorithms:
+  latent:
+    n_components: 2

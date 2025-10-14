@@ -1,0 +1,13 @@
+# @package _global_
+# Null metrics configuration - no metrics will be computed
+# Use this when you only want to generate embeddings without evaluation
+
+# Set all metric groups to null
+defaults:
+  - dataset: null
+  - embedding: null
+  - module: null
+  - _self_
+
+# Ensure metrics is explicitly null at the top level
+# This prevents any metrics from being computed
