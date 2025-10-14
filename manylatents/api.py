@@ -104,6 +104,10 @@ def run(
         # Compose the base configuration
         cfg = compose(config_name="config", overrides=override_list)
 
+        # Allow flexible field additions (disable struct mode)
+        # This enables the API to accept arbitrary config overrides without schema violations
+        OmegaConf.set_struct(cfg, False)
+
         # Merge complex overrides (dicts and lists) directly
         for key, value in overrides.items():
             if isinstance(value, (dict, list)):
