@@ -99,8 +99,8 @@ def run(
                 # Hydra's override parser can't handle "key=None" strings
                 none_keys.append(key)
                 continue
-            elif isinstance(value, dict):
-                # For nested configs, we need to use OmegaConf
+            elif isinstance(value, (dict, DictConfig)):
+                # For nested configs (dict or DictConfig), we need to use OmegaConf
                 # This is handled by directly merging later
                 continue
             elif isinstance(value, list):
@@ -123,7 +123,11 @@ def run(
 
         # Merge complex overrides (dicts and lists) directly
         for key, value in overrides.items():
-            if isinstance(value, (dict, list)):
+            if isinstance(value, (dict, list, DictConfig)):
+                # Convert DictConfig to plain dict for consistent handling
+                if isinstance(value, DictConfig):
+                    value = OmegaConf.to_container(value, resolve=True, throw_on_missing=False)
+
                 # If the field is None, set it directly instead of merging
                 if OmegaConf.select(cfg, key) is None:
                     OmegaConf.update(cfg, key, value, merge=False)
