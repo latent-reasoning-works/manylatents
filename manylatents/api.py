@@ -89,9 +89,17 @@ def run(
     # Initialize Hydra with the config directory
     with initialize_config_dir(config_dir=config_dir, version_base=None):
         # Convert overrides dict to list of strings for Hydra
+        # Separate None values since Hydra can't handle them in override strings
         override_list = []
+        none_keys = []
+
         for key, value in overrides.items():
-            if isinstance(value, dict):
+            if value is None:
+                # Track None values to set them after config composition
+                # Hydra's override parser can't handle "key=None" strings
+                none_keys.append(key)
+                continue
+            elif isinstance(value, dict):
                 # For nested configs, we need to use OmegaConf
                 # This is handled by directly merging later
                 continue
@@ -107,6 +115,11 @@ def run(
         # Allow flexible field additions (disable struct mode)
         # This enables the API to accept arbitrary config overrides without schema violations
         OmegaConf.set_struct(cfg, False)
+
+        # Handle None values by setting them directly in the config
+        # This avoids Hydra's override parser which can't handle None
+        for key in none_keys:
+            OmegaConf.update(cfg, key, None, merge=False)
 
         # Merge complex overrides (dicts and lists) directly
         for key, value in overrides.items():

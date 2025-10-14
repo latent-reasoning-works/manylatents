@@ -242,3 +242,41 @@ def load_precomputed_embeddings(cfg) -> dict:
         "metadata": None,
         "scores": None,
     }
+
+
+def convert_null_strings_to_none(cfg: DictConfig) -> None:
+    """
+    Post-process Hydra config to convert string "_null_" to actual None.
+
+    Hydra's override parser can't handle "key=null" (tries to look up config files).
+    As a workaround, users can specify "key=_null_" and this function converts
+    the string "_null_" to Python None after config composition.
+
+    This allows users to use normal key=value syntax while still disabling configs.
+
+    Args:
+        cfg: Hydra configuration to modify in-place
+
+    Example:
+        # Command line:
+        python -m manylatents.main experiment=single_algorithm metrics=_null_
+
+        # After conversion, cfg.metrics will be None
+    """
+    def _recursive_convert(node):
+        if isinstance(node, DictConfig):
+            for key in list(node.keys()):
+                value = node[key]
+                if isinstance(value, str) and value == "_null_":
+                    # Convert special marker to None
+                    OmegaConf.set_struct(node, False)
+                    node[key] = None
+                elif isinstance(value, (DictConfig, list)):
+                    _recursive_convert(value)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, (DictConfig, dict)):
+                    _recursive_convert(item)
+
+    OmegaConf.set_struct(cfg, False)
+    _recursive_convert(cfg)
