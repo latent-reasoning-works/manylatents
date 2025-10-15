@@ -1,5 +1,35 @@
 # manyLatents TODO
 
+## Pre-Release Checklist
+
+### Add Lightning Module CLI Test
+**Priority**: High (blocking release)
+**Status**: Not started
+
+Add a CLI test for Lightning modules (e.g., autoencoder) to validate training works.
+
+**Implementation**:
+```yaml
+# .github/workflows/build.yml
+- name: Test CLI - Lightning Module
+  run: |
+    source .venv/bin/activate
+    python -m manylatents.main \
+      algorithms/lightning=ae_reconstruction \
+      data=swissroll \
+      metrics=test_metric \
+      callbacks/embedding=minimal \
+      trainer.max_epochs=2 \
+      trainer.fast_dev_run=true
+```
+
+**Why important**:
+- Validates Lightning training loop works
+- Tests neural network path (not just LatentModule)
+- Ensures `fast_dev_run` flag works correctly
+
+---
+
 ## Testing & CI
 
 ### Lightning Module Integration Test

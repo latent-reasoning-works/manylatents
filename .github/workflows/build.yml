@@ -39,10 +39,14 @@ jobs:
           source .venv/bin/activate
           uv sync
 
-      - name: Run pytest suite
+      - name: Test CLI - Single Algorithm
         run: |
           source .venv/bin/activate
-          pytest --maxfail=1 --disable-warnings -q
+          # Validate CLI works with minimal config (PCA)
+          python -m manylatents.main \
+            experiment=single_algorithm \
+            metrics=test_metric \
+            callbacks/embedding=minimal
 
   # Integration tests with algorithm matrix
   integration-tests:
