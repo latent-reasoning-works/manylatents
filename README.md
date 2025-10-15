@@ -95,6 +95,37 @@ Pipeline configurations support:
 - **Per-step overrides**: Custom hyperparameters for each algorithm
 - **Unified interface**: Same main.py entry point as single algorithms
 
+### Python API Usage
+
+For programmatic access and workflow orchestration:
+
+```python
+from manylatents.api import run
+
+# Run with experiment config
+result = run(experiment="single_algorithm", algorithms={"latent": {"n_components": 10}})
+
+# Run with direct config
+result = run(
+    algorithms={"latent": {"_target_": "manylatents.algorithms.latent.pca.PCAModule", "n_components": 2}},
+    data={"_target_": "manylatents.data.swissroll.SwissRollDataModule"},
+    metrics="test_metric"
+)
+
+# Access results
+embeddings = result["embeddings"]  # numpy array
+scores = result["scores"]          # dict of metrics
+metadata = result["metadata"]      # dict of metadata
+```
+
+**Key Features**:
+- 🔗 **In-memory data passing**: Pass numpy arrays between pipeline steps
+- 🚀 **No subprocess overhead**: Direct Python function calls
+- 🎯 **Orchestration-ready**: Designed for integration with manyAgents
+- 📊 **Flexible metrics**: Returns float, tuple, or dict metric values
+
+See [API Documentation](docs/api_usage.md) for complete reference.
+
 ---
 
 ## 🏗️ Architecture
@@ -288,9 +319,9 @@ python -m manylatents.main experiment=multiple_algorithms
 
 # Quick smoke test with minimal data
 python -m manylatents.main \
-  algorithms/latent=noop \
-  data=test_data \
-  debug=true
+  experiment=single_algorithm \
+  metrics=test_metric \
+  callbacks/embedding=minimal
 
 # Test specific combination
 python -m manylatents.main \
@@ -336,14 +367,11 @@ python -m manylatents.main \
 
 ### Code Quality
 ```bash
-# Linting and formatting
+# Run test suite
+pytest
+
+# Linting and formatting (if pre-commit is configured)
 pre-commit run --all-files
-
-# Type checking (if available)
-mypy manylatents/
-
-# Coverage report
-pytest --cov=manylatents --cov-report=html
 ```
 
 ### Project Structure
