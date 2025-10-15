@@ -311,8 +311,8 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             raise ValueError("No algorithm specified in configuration")
 
         # --- Callbacks ---
-        trainer_cb_cfg   = cfg.trainer.get("callbacks", {})
-        embedding_cb_cfg = cfg.get("callbacks", {}).get("embedding")
+        trainer_cb_cfg   = cfg.trainer.get("callbacks")
+        embedding_cb_cfg = cfg.get("callbacks.embedding")
 
         lightning_cbs, embedding_cbs = instantiate_callbacks(
             trainer_cb_cfg,
