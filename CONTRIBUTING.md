@@ -1,6 +1,6 @@
 # Contributing to manyLatents
 
-Thank you for contributing to manyLatents! This document provides guidelines for adding new components and ensuring they work correctly both in the CLI and when orchestrated through manyAgents.
+Thank you for contributing to manyLatents! This document provides guidelines for adding new components and ensuring they integrate correctly with the framework.
 
 ## Table of Contents
 
@@ -8,17 +8,20 @@ Thank you for contributing to manyLatents! This document provides guidelines for
 - [Adding New Metrics](#adding-new-metrics)
 - [Adding New Algorithms](#adding-new-algorithms)
 - [Adding New Datasets](#adding-new-datasets)
+- [Integration Testing via CI](#integration-testing-via-ci)
 - [Code Style](#code-style)
 
 ---
 
 ## Testing Philosophy
 
-manyLatents is designed to work both:
-1. **Standalone** via the CLI (`python -m manylatents.main`)
-2. **Orchestrated** through manyAgents (for multi-tool workflows)
+All contributions must pass automated tests that run on every pull request. The CI pipeline validates:
 
-**When you add a new component, you must test both paths.**
+1. **Standalone CLI functionality** - Your component works via `python -m manylatents.main`
+2. **Integration with existing components** - Your component works with various data/algorithm/metric combinations
+3. **Code quality** - Linting, formatting, and type checking pass
+
+**The feedback loop:** When you open a PR, GitHub Actions automatically runs these tests. Failed tests will block merging until resolved.
 
 ---
 
@@ -92,46 +95,48 @@ your_metric:
 - Does it compare original vs. reduced? → `metrics/embedding/`
 - Does it need algorithm internals? → `metrics/module/`
 
-### Step 3: Test Standalone (manyLatents CLI)
+### Step 3: Test Locally
 
 ```bash
 cd /path/to/manyLatents
 source .venv/bin/activate
 
-# Test your metric in isolation
+# Test your metric with fast test components
 python -m manylatents.main \
-  experiment=single_algorithm \
+  algorithm=latent/pca \
+  data=test_data \
   metrics/embedding=your_metric \
-  debug=true
+  logger=none
 ```
 
 **Verify**:
 - [ ] Metric computes without errors
 - [ ] Scalar value is logged to console
-- [ ] If you returned per-sample values, wandb table is created
+- [ ] If you returned per-sample values, appropriate output is generated
 - [ ] Output looks correct
 
-### Step 4: Test Through manyAgents (Integration Test)
+### Step 4: Add to CI Integration Tests (Required)
 
-**REQUIRED**: Ensure your metric works when called through orchestration.
+Add your metric to the CI test matrix to ensure it's validated on every PR. Edit `.github/workflows/build.yml`:
 
-```bash
-cd /path/to/manyAgents
-source .venv/bin/activate
-uv sync  # Get latest manylatents with your changes
-
-# Run the integration test
-python -m manyagents.main experiment=manylatents_pipeline_with_metrics
+```yaml
+# In the integration-tests job, add a new matrix entry:
+- name: "pca-yourmetric"
+  algorithm: "latent/pca"
+  data: "test_data"              # Use fast test data
+  metrics: "your_metric"
+  timeout: 5
 ```
 
-This test validates:
-- ✅ Config overrides work through the adapter
-- ✅ Metric computes in multi-step pipelines
-- ✅ Results are properly returned to orchestrator
-- ✅ Wandb logging works end-to-end
-- ✅ In-memory data passing between steps
+**Best practices for CI tests:**
+- Use `test_data` and `test_metric` for fastest execution
+- Use `swissroll` for synthetic data tests if needed
+- Keep timeouts realistic (most tests should be < 10 minutes)
 
-**If this fails, your metric is not ready for merge.**
+This ensures:
+- ✅ Your metric runs on every PR
+- ✅ Breaking changes are caught automatically
+- ✅ Integration with different algorithms/datasets is validated
 
 ### Step 5: Add to Composite Configs (Optional)
 
@@ -211,14 +216,14 @@ n_components: 2
 learning_rate: 0.001
 ```
 
-### Step 3: Test Standalone
+### Step 3: Test Locally
 
 ```bash
 python -m manylatents.main \
-  algorithms/latent=your_algorithm \
-  data=swissroll \
+  algorithm=latent/your_algorithm \
+  data=test_data \
   metrics=test_metric \
-  debug=true
+  logger=none
 ```
 
 **Verify**:
@@ -227,16 +232,20 @@ python -m manylatents.main \
 - [ ] Shape is correct (n_samples × n_components)
 - [ ] Metrics compute on embeddings
 
-### Step 4: Test Through manyAgents
+### Step 4: Add to CI Integration Tests (Required)
 
-```bash
-cd /path/to/manyAgents
+Add your algorithm to the CI test matrix in `.github/workflows/build.yml`:
 
-# Create a test workflow or override existing
-python -m manyagents.main \
-  experiment=manylatents_single_algorithm \
-  workflow.steps.0.config.algorithms.latent._target_=manylatents.algorithms.latent.your_algorithm.YourAlgorithmModule
+```yaml
+# In the integration-tests job:
+- name: "youralgorithm-test"
+  algorithm: "latent/your_algorithm"
+  data: "test_data"              # Use fast test data
+  metrics: "test_metric"         # Use fast test metric
+  timeout: 5
 ```
+
+**Note:** Use `test_data` and `test_metric` for fast CI runs. This validates your algorithm automatically on every PR.
 
 ---
 
@@ -279,14 +288,14 @@ batch_size: 32
 data_path: /path/to/data
 ```
 
-### Step 3: Test Standalone
+### Step 3: Test Locally
 
 ```bash
 python -m manylatents.main \
   data=your_dataset \
-  algorithms/latent=pca \
+  algorithm=latent/pca \
   metrics=test_metric \
-  debug=true
+  logger=none
 ```
 
 **Verify**:
@@ -295,45 +304,87 @@ python -m manylatents.main \
 - [ ] Batch shape is correct
 - [ ] Algorithm can process the data
 
-### Step 4: Test Through manyAgents
+### Step 4: Add to CI Integration Tests (Required)
 
-```bash
-cd /path/to/manyAgents
-python -m manyagents.main \
-  experiment=manylatents_single_algorithm \
-  workflow.steps.0.config.data=your_dataset
+Add your dataset to the CI test matrix in `.github/workflows/build.yml`:
+
+```yaml
+# In the integration-tests job:
+- name: "pca-yourdataset"
+  algorithm: "latent/pca"        # Use simple algorithm
+  data: "your_dataset"
+  metrics: "test_metric"         # Use fast test metric
+  timeout: 8
 ```
+
+**Note:** Pair with `latent/pca` and `test_metric` for fast validation. This ensures your dataset loads correctly on every PR.
 
 ---
 
-## Integration Testing Checklist
+## Integration Testing via CI
 
-Before submitting a PR with new components:
+manyLatents uses GitHub Actions to automatically test every pull request. Understanding this system is key to successful contributions.
 
-### 1. Component Works in Isolation
-```bash
-cd /path/to/manyLatents
-python -m manylatents.main <your-test-command>
+### CI Test Jobs
+
+1. **build-and-test** (runs first)
+   - Installs dependencies
+   - Runs basic CLI smoke test
+   - Fast feedback (~2-3 minutes)
+
+2. **integration-tests** (runs after build-and-test passes)
+   - Matrix of algorithm/data/metric combinations
+   - Each combination runs independently
+   - Tests your component with various configurations
+   - Longer runtime (~10-25 minutes total)
+
+### Adding Your Component to CI
+
+When you add a new algorithm, dataset, or metric, **you must add it to the integration test matrix**:
+
+**Edit `.github/workflows/build.yml`:**
+
+```yaml
+integration-tests:
+  strategy:
+    matrix:
+      test-config:
+        # ... existing tests ...
+
+        # Add your new test:
+        - name: "descriptive-test-name"
+          algorithm: "latent/pca"       # Use fast test components
+          data: "test_data"             # test_data or swissroll for speed
+          metrics: "test_metric"        # test_metric for speed
+          timeout: 5                    # Keep realistic and short
 ```
 
-### 2. Component Works Through Orchestration
-```bash
-cd /path/to/manyAgents
-uv lock --upgrade-package manylatents  # Get latest with your changes
-uv sync
-python -m manyagents.main experiment=manylatents_pipeline_with_metrics
-```
+**Recommended test component combinations for speed:**
+- **Fastest**: `latent/pca` + `test_data` + `test_metric` (~2-5 min)
+- **Synthetic**: `latent/pca` + `swissroll` + `test_metric` (~5-8 min)
+- **Neural net**: `lightning/ae_reconstruction` + `test_data` + `test_metric` + `trainer.fast_dev_run=true` (~5-10 min)
 
-### 3. Check Outputs
-- [ ] No errors in console
+**TODO:** Add a Lightning module test to the CI workflow matrix (currently missing). Should include `trainer.fast_dev_run=true` to only run a few batches for fast validation.
+
+### PR Validation Flow
+
+1. **Open PR** → CI automatically runs
+2. **View test results** → Check the "Actions" tab on GitHub
+3. **Fix failures** → Push new commits to trigger re-run
+4. **All green** → PR is ready for review
+
+### Local Pre-submission Checklist
+
+Before opening your PR, verify locally:
+
+- [ ] Component works in isolation (`python -m manylatents.main ...`)
+- [ ] No errors in console output
 - [ ] Output files created in `outputs/`
-- [ ] Wandb logs populated correctly (if not in debug mode)
-- [ ] Metrics/embeddings have correct values and shapes
-
-### 4. Documentation
+- [ ] Correct shapes and values for outputs
+- [ ] Pre-commit hooks pass (`pre-commit run --all-files`)
+- [ ] Added CI test matrix entry in `.github/workflows/build.yml`
 - [ ] Docstrings added to new functions/classes
 - [ ] Config files documented with comments
-- [ ] README updated if adding major feature
 
 ---
 
