@@ -4,6 +4,7 @@ defaults:
   - data: null
   - callbacks: default
   - hydra: default
+  - logger: none  # Use logger=wandb to enable wandb logging
   - algorithms/latent: null
   - algorithms/lightning: null
   - pipeline: null

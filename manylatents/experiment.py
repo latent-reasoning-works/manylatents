@@ -286,117 +286,125 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
 
-    with wandb.init(
-        project=cfg.project,
-        name=cfg.name,
-        config=OmegaConf.to_container(cfg, resolve=True),
-        mode="disabled" if cfg.debug else "online",
-    ) as run:
-        lightning.seed_everything(cfg.seed, workers=True)
+    # Initialize wandb if logger config is provided
+    wandb_run = None
+    if cfg.logger is not None:
+        logger.info(f"Initializing wandb logger: {OmegaConf.to_yaml(cfg.logger)}")
+        wandb_run = hydra.utils.instantiate(
+            cfg.logger,
+            config=OmegaConf.to_container(cfg, resolve=True)
+        )
+    else:
+        logger.info("No logger configured - skipping wandb initialization")
 
-        # --- Data instantiation ---
-        datamodule = instantiate_datamodule(cfg, input_data_holder)
-        datamodule.setup()
-        train_loader = datamodule.train_dataloader()
-        test_loader = datamodule.test_dataloader()
-        field_index, data_source = determine_data_source(train_loader)
+    lightning.seed_everything(cfg.seed, workers=True)
 
-        # --- Algorithm module ---
-        # Determine which algorithm to instantiate based on configuration
-        if hasattr(cfg.algorithms, 'latent') and cfg.algorithms.latent is not None:
-            algorithm = instantiate_algorithm(cfg.algorithms.latent, datamodule)
-        elif hasattr(cfg.algorithms, 'lightning') and cfg.algorithms.lightning is not None:
-            algorithm = instantiate_algorithm(cfg.algorithms.lightning, datamodule)
-        else:
-            raise ValueError("No algorithm specified in configuration")
+    # --- Data instantiation ---
+    datamodule = instantiate_datamodule(cfg, input_data_holder)
+    datamodule.setup()
+    train_loader = datamodule.train_dataloader()
+    test_loader = datamodule.test_dataloader()
+    field_index, data_source = determine_data_source(train_loader)
 
-        # --- Callbacks ---
-        trainer_cb_cfg   = cfg.trainer.get("callbacks")
-        embedding_cb_cfg = cfg.get("callbacks.embedding")
+    # --- Algorithm module ---
+    # Determine which algorithm to instantiate based on configuration
+    if hasattr(cfg.algorithms, 'latent') and cfg.algorithms.latent is not None:
+        algorithm = instantiate_algorithm(cfg.algorithms.latent, datamodule)
+    elif hasattr(cfg.algorithms, 'lightning') and cfg.algorithms.lightning is not None:
+        algorithm = instantiate_algorithm(cfg.algorithms.lightning, datamodule)
+    else:
+        raise ValueError("No algorithm specified in configuration")
 
-        lightning_cbs, embedding_cbs = instantiate_callbacks(
-            trainer_cb_cfg,
-            embedding_cb_cfg
+    # --- Callbacks ---
+    trainer_cb_cfg   = cfg.trainer.get("callbacks")
+    embedding_cb_cfg = cfg.get("callbacks.embedding")
+
+    lightning_cbs, embedding_cbs = instantiate_callbacks(
+        trainer_cb_cfg,
+        embedding_cb_cfg
+    )
+
+    if not embedding_cbs:
+        logger.info("No embedding callbacks configured; skip embedding‐level hooks.")
+
+    # --- Loggers ---
+    # Only instantiate trainer loggers if top-level logger is enabled
+    # This keeps LatentModule and LightningModule logging in sync
+    loggers = []
+    if cfg.logger is not None and not cfg.debug:
+        for lg_conf in cfg.trainer.get("logger", {}).values():
+            loggers.append(hydra.utils.instantiate(lg_conf))
+
+    # --- Trainer ---
+    trainer = instantiate_trainer(
+        cfg,
+        lightning_callbacks=lightning_cbs,
+        loggers=loggers,
+    )
+
+    logger.info("Starting algorithm execution...")
+
+    # --- Algorithm Execution ---
+    embeddings: Dict[str, Any] = {}
+
+    if cfg.eval_only:
+        logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
+        embeddings = load_precomputed_embeddings(cfg)
+    else:
+        # Unroll train and test dataloaders to obtain tensors
+        train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
+        test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
+
+        logger.info(
+            f"Running algorithm on {data_source}:\n"
+            f"Train tensor shape: {train_tensor.shape}\n"
+            f"Test tensor shape: {test_tensor.shape}\n"
+            f"Algorithm: {type(algorithm).__name__}"
         )
 
-        if not embedding_cbs:
-            logger.info("No embedding callbacks configured; skip embedding‐level hooks.")
-
-        # --- Loggers ---
-        loggers = []
-        if not cfg.debug:
-            for lg_conf in cfg.trainer.get("logger", {}).values():
-                loggers.append(hydra.utils.instantiate(lg_conf))
-
-        # --- Trainer ---
-        trainer = instantiate_trainer(
-            cfg,
-            lightning_callbacks=lightning_cbs,
-            loggers=loggers,
+        # Execute the algorithm step
+        latents = execute_step(
+            algorithm=algorithm,
+            train_tensor=train_tensor,
+            test_tensor=test_tensor,
+            trainer=trainer,
+            cfg=cfg,
+            datamodule=datamodule
         )
 
-        logger.info("Starting algorithm execution...")
+        # --- Unified embedding wrapping ---
+        if latents is not None:
+            embeddings = {
+                "embeddings": latents,
+                "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
+                "metadata": {
+                    "source": "single_algorithm",
+                    "algorithm_type": type(algorithm).__name__,
+                    "data_shape": test_tensor.shape,
+                },
+            }
 
-        # --- Algorithm Execution ---
-        embeddings: Dict[str, Any] = {}
-
-        if cfg.eval_only:
-            logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
-            embeddings = load_precomputed_embeddings(cfg)
-        else:
-            # Unroll train and test dataloaders to obtain tensors
-            train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
-            test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
-
-            logger.info(
-                f"Running algorithm on {data_source}:\n"
-                f"Train tensor shape: {train_tensor.shape}\n"
-                f"Test tensor shape: {test_tensor.shape}\n"
-                f"Algorithm: {type(algorithm).__name__}"
-            )
-
-            # Execute the algorithm step
-            latents = execute_step(
-                algorithm=algorithm,
-                train_tensor=train_tensor,
-                test_tensor=test_tensor,
-                trainer=trainer,
+            # Evaluate embeddings
+            logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
+            embeddings["scores"] = evaluate(
+                embeddings,
                 cfg=cfg,
-                datamodule=datamodule
+                datamodule=datamodule,
+                module=algorithm if isinstance(algorithm, LatentModule) else None
             )
 
-            # --- Unified embedding wrapping ---
-            if latents is not None:
-                embeddings = {
-                    "embeddings": latents,
-                    "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
-                    "metadata": {
-                        "source": "single_algorithm",
-                        "algorithm_type": type(algorithm).__name__,
-                        "data_shape": test_tensor.shape,
-                    },
-                }
+    # --- Callback processing ---
+    if embeddings and embedding_cbs:
+        for cb in embedding_cbs:
+            cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
 
-                # Evaluate embeddings
-                logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
-                embeddings["scores"] = evaluate(
-                    embeddings,
-                    cfg=cfg,
-                    datamodule=datamodule,
-                    module=algorithm if isinstance(algorithm, LatentModule) else None
-                )
+    logger.info("Experiment complete.")
 
-        # --- Callback processing ---
-        if embeddings and embedding_cbs:
-            for cb in embedding_cbs:
-                cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
+    # Clean up wandb run if it was initialized
+    if wandb_run is not None:
+        wandb.finish()
 
-        logger.info("Experiment complete.")
-
-        if wandb.run:
-            wandb.finish()
-
-        return embeddings
+    return embeddings
 
 
 def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> Dict[str, Any]:

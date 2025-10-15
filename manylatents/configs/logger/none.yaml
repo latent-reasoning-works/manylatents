@@ -1,0 +1,5 @@
+# @package _global_
+# No wandb logging - wandb.init() will not be called
+# Fastest option for CI/testing - no wandb overhead or authentication
+
+logger: null

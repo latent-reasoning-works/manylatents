@@ -1,0 +1,10 @@
+# @package _global_
+# Full wandb logging - syncs to wandb cloud in real-time
+# Requires authentication (WANDB_API_KEY) and network connection
+
+logger:
+  _target_: wandb.init
+  project: ${project}
+  name: ${name}
+  config: null  # Will be set programmatically in experiment.py
+  mode: online

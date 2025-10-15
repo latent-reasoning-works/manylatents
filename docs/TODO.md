@@ -98,14 +98,80 @@ def test_all_algorithms_can_instantiate():
 
 ## Future Enhancements
 
-### Logging Config Group
-**Priority**: Medium (documented in CLAUDE.md)
+### Domain Extensions Package (`manylatents-domains`)
+**Priority**: Low (future architecture)
 **Status**: Design phase
 
-Replace `debug` flag with proper `logging` config group:
-- `logging=none` - No wandb, fastest
-- `logging=wandb` - Full wandb integration
-- `logging=tensorboard` - TensorBoard support
-- `logging=mlflow` - MLflow support
+**Goal**: Extract domain-specific code into a separate plugin package that houses multiple fields.
 
-This decouples wandb initialization from verbose logging.
+**Proposed structure**:
+```
+manylatents/              # Core framework (algorithms, metrics, base classes)
+manylatents-domains/      # Domain-specific extensions (separate package)
+  ├── genomics/
+  │   ├── datasets/      # HGDP, UKBB, AOU
+  │   ├── metrics/       # Admixture preservation, geographic metrics
+  │   └── preprocessing/
+  ├── singlecell/
+  │   ├── datasets/      # scRNA-seq loaders
+  │   ├── metrics/       # Cell type separation, trajectory metrics
+  │   └── preprocessing/
+  ├── vision/
+  │   ├── datasets/      # ImageNet, CIFAR, custom vision
+  │   ├── metrics/       # Image-specific quality metrics
+  │   └── preprocessing/
+  └── timeseries/
+      ├── datasets/
+      ├── metrics/
+      └── preprocessing/
+```
+
+**Benefits**:
+- ✅ **Lighter core**: manylatents stays focused on DR/ML algorithms
+- ✅ **Optional install**: `pip install manylatents-domains[genomics]` for specific domains
+- ✅ **One plugin repo**: Easier to maintain than per-domain packages
+- ✅ **Community contributions**: Domain experts can add their field
+- ✅ **Scalable**: Add vision, NLP, timeseries, etc. as needed
+
+**Installation**:
+```bash
+# Core only
+pip install manylatents
+
+# With specific domains
+pip install manylatents-domains[genomics]
+pip install manylatents-domains[genomics,vision]
+
+# All domains
+pip install manylatents-domains[all]
+```
+
+**Migration path**:
+1. Keep current code in main for now
+2. When ready, extract to `manylatents-domains`
+3. Maintain compatibility via import redirects
+4. Eventually deprecate domain code in main
+
+**When to do this**:
+- When core becomes bloated with domain dependencies
+- When external contributors want to add new domains
+- Before v2.0 release
+
+---
+
+### Logging Config Group
+**Priority**: Medium (documented in CLAUDE.md)
+**Status**: ✅ COMPLETED (2025-10-15)
+
+Implemented `logger` config group to control wandb initialization:
+- `logger=none` - No wandb, fastest (default for CI)
+- `logger=wandb` - Full wandb integration
+
+**Changes made:**
+- Created `manylatents/configs/logger/` with `none.yaml` and `wandb.yaml`
+- Added `logger: Optional[Any] = None` to Config dataclass
+- Refactored `experiment.py` to conditionally initialize wandb
+- Updated CI workflow to use `logger=none` instead of env vars
+- Documented in CLAUDE.md
+
+This eliminates wandb authentication panics in CI and provides clean config-based control.

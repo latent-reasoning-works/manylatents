@@ -43,12 +43,12 @@ jobs:
         run: |
           source .venv/bin/activate
           # Validate CLI works with minimal config (PCA)
-          # Use dryrun mode - logs locally without syncing
-          export WANDB_MODE=dryrun
+          # Use logger=none to skip wandb initialization entirely
           python -m manylatents.main \
             experiment=single_algorithm \
             metrics=test_metric \
-            callbacks/embedding=minimal
+            callbacks/embedding=minimal \
+            logger=none
 
   # Integration tests with algorithm matrix
   integration-tests:
@@ -123,7 +123,7 @@ jobs:
             algorithm=${{ matrix.test-config.algorithm }} \
             data=${{ matrix.test-config.data }} \
             metrics=${{ matrix.test-config.metrics }} \
-            debug=true \
+            logger=none \
             trainer.max_epochs=1
 
       - name: Upload test outputs

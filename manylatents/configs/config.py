@@ -26,6 +26,9 @@ class Config:
     callbacks: Optional[Any] = None
     """Configuration for callbacks used during training and evaluation."""
 
+    logger: Optional[Any] = None
+    """Configuration for experiment-level logging (e.g., wandb)."""
+
     trainer: Dict[str, Any] = field(default_factory=dict)
     """Trainer configuration (arguments passed to Lightning Trainer)."""
 
