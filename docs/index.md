@@ -9,9 +9,10 @@ todo: add descriptive info
 
 - **Getting Started**: Learn how to install and use ManyLatents.
 - **[API Usage Guide](api_usage.md)**: Programmatic API for chaining algorithms and agent workflows.
+- **[Metrics Architecture](metrics_architecture.md)**: Three-level metrics system design and usage.
 - **[Testing Guide](testing.md)**: Testing infrastructure and best practices.
-- **Features**: Explore the key features of the project.
-- **Contributing**: Find out how to get involved.
+- **[Contributing Guide](../CONTRIBUTING.md)**: Guidelines for adding new metrics, algorithms, and datasets.
+- **[TODO & Future Work](TODO.md)**: Planned enhancements and testing improvements.
 
 ---
 
