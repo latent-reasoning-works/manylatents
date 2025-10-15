@@ -43,6 +43,8 @@ jobs:
         run: |
           source .venv/bin/activate
           # Validate CLI works with minimal config (PCA)
+          # Set wandb to offline mode (no API key needed in CI)
+          export WANDB_MODE=offline
           python -m manylatents.main \
             experiment=single_algorithm \
             metrics=test_metric \
