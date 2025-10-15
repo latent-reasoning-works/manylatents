@@ -1,0 +1,4 @@
+test_metric:
+  _target_: manylatents.metrics.test_metric.TestMetric
+  _partial_: True
+  k: 25

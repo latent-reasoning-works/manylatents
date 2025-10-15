@@ -1,4 +1,17 @@
-test_metric:
-  _target_: manylatents.metrics.test_metric.TestMetric
-  _partial_: True
-  k: 25
+# Test metrics configuration - fast smoke test for all metric groups
+# This configuration tests the full metrics pipeline:
+# - dataset: Metrics on original high-dimensional data
+# - embedding: Metrics on reduced embeddings
+# - module: Metrics on model components (e.g., graph connectivity)
+#
+# All metrics use TestMetric which returns (0.0, zeros_array) instantly,
+# making this ideal for CI/testing and verifying wandb integration.
+
+defaults:
+  - dataset:
+    - test_metric
+  - embedding:
+    - test_metric
+  - module:
+    - test_metric
+  - _self_
