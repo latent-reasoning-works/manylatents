@@ -1,0 +1,6 @@
+# Minimal callbacks - no wandb overhead
+# Use this for fast CI/testing runs
+defaults:
+  - save_embeddings
+  - plot_embeddings
+  - _self_
