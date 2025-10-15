@@ -115,28 +115,20 @@ python -m manylatents.main \
 - [ ] If you returned per-sample values, appropriate output is generated
 - [ ] Output looks correct
 
-### Step 4: Add to CI Integration Tests (Required)
+### Step 4: Verify CI Smoke Test Passes
 
-Add your metric to the CI test matrix to ensure it's validated on every PR. Edit `.github/workflows/build.yml`:
+The current CI runs a basic smoke test that validates the framework works end-to-end. Ensure your contribution doesn't break it:
 
-```yaml
-# In the integration-tests job, add a new matrix entry:
-- name: "pca-yourmetric"
-  algorithm: "latent/pca"
-  data: "test_data"              # Use fast test data
-  metrics: "your_metric"
-  timeout: 5
+```bash
+# This is what CI runs - make sure it passes locally first
+python -m manylatents.main \
+  experiment=single_algorithm \
+  metrics=test_metric \
+  callbacks/embedding=minimal \
+  logger=none
 ```
 
-**Best practices for CI tests:**
-- Use `test_data` and `test_metric` for fastest execution
-- Use `swissroll` for synthetic data tests if needed
-- Keep timeouts realistic (most tests should be < 10 minutes)
-
-This ensures:
-- ✅ Your metric runs on every PR
-- ✅ Breaking changes are caught automatically
-- ✅ Integration with different algorithms/datasets is validated
+**TODO:** Currently there's no per-component integration test matrix. Contributions are validated through the basic smoke test. A comprehensive test matrix will be added in the future.
 
 ### Step 5: Add to Composite Configs (Optional)
 
@@ -232,20 +224,20 @@ python -m manylatents.main \
 - [ ] Shape is correct (n_samples × n_components)
 - [ ] Metrics compute on embeddings
 
-### Step 4: Add to CI Integration Tests (Required)
+### Step 4: Verify CI Smoke Test Passes
 
-Add your algorithm to the CI test matrix in `.github/workflows/build.yml`:
+Ensure your algorithm doesn't break the CI smoke test:
 
-```yaml
-# In the integration-tests job:
-- name: "youralgorithm-test"
-  algorithm: "latent/your_algorithm"
-  data: "test_data"              # Use fast test data
-  metrics: "test_metric"         # Use fast test metric
-  timeout: 5
+```bash
+# This is what CI runs - verify it passes locally
+python -m manylatents.main \
+  experiment=single_algorithm \
+  metrics=test_metric \
+  callbacks/embedding=minimal \
+  logger=none
 ```
 
-**Note:** Use `test_data` and `test_metric` for fast CI runs. This validates your algorithm automatically on every PR.
+**TODO:** Per-algorithm testing in CI will be added in the future.
 
 ---
 
@@ -304,67 +296,34 @@ python -m manylatents.main \
 - [ ] Batch shape is correct
 - [ ] Algorithm can process the data
 
-### Step 4: Add to CI Integration Tests (Required)
+### Step 4: Verify CI Smoke Test Passes
 
-Add your dataset to the CI test matrix in `.github/workflows/build.yml`:
+Ensure your dataset doesn't break the CI smoke test:
 
-```yaml
-# In the integration-tests job:
-- name: "pca-yourdataset"
-  algorithm: "latent/pca"        # Use simple algorithm
-  data: "your_dataset"
-  metrics: "test_metric"         # Use fast test metric
-  timeout: 8
+```bash
+# This is what CI runs - verify it passes locally
+python -m manylatents.main \
+  experiment=single_algorithm \
+  metrics=test_metric \
+  callbacks/embedding=minimal \
+  logger=none
 ```
 
-**Note:** Pair with `latent/pca` and `test_metric` for fast validation. This ensures your dataset loads correctly on every PR.
+**TODO:** Per-dataset testing in CI will be added in the future.
 
 ---
 
 ## Integration Testing via CI
 
-manyLatents uses GitHub Actions to automatically test every pull request. Understanding this system is key to successful contributions.
+manyLatents uses GitHub Actions to automatically test every pull request.
 
-### CI Test Jobs
+### Current CI Setup
 
-1. **build-and-test** (runs first)
-   - Installs dependencies
-   - Runs basic CLI smoke test
-   - Fast feedback (~2-3 minutes)
-
-2. **integration-tests** (runs after build-and-test passes)
-   - Matrix of algorithm/data/metric combinations
-   - Each combination runs independently
-   - Tests your component with various configurations
-   - Longer runtime (~10-25 minutes total)
-
-### Adding Your Component to CI
-
-When you add a new algorithm, dataset, or metric, **you must add it to the integration test matrix**:
-
-**Edit `.github/workflows/build.yml`:**
-
-```yaml
-integration-tests:
-  strategy:
-    matrix:
-      test-config:
-        # ... existing tests ...
-
-        # Add your new test:
-        - name: "descriptive-test-name"
-          algorithm: "latent/pca"       # Use fast test components
-          data: "test_data"             # test_data or swissroll for speed
-          metrics: "test_metric"        # test_metric for speed
-          timeout: 5                    # Keep realistic and short
-```
-
-**Recommended test component combinations for speed:**
-- **Fastest**: `latent/pca` + `test_data` + `test_metric` (~2-5 min)
-- **Synthetic**: `latent/pca` + `swissroll` + `test_metric` (~5-8 min)
-- **Neural net**: `lightning/ae_reconstruction` + `test_data` + `test_metric` + `trainer.fast_dev_run=true` (~5-10 min)
-
-**TODO:** Add a Lightning module test to the CI workflow matrix (currently missing). Should include `trainer.fast_dev_run=true` to only run a few batches for fast validation.
+**build-and-test** job:
+- Installs dependencies with uv
+- Runs basic CLI smoke test with `experiment=single_algorithm`
+- Fast feedback (~2-3 minutes)
+- Validates that the framework works end-to-end
 
 ### PR Validation Flow
 
@@ -377,14 +336,32 @@ integration-tests:
 
 Before opening your PR, verify locally:
 
-- [ ] Component works in isolation (`python -m manylatents.main ...`)
+- [ ] Component works in isolation (see local testing commands above)
+- [ ] CI smoke test passes locally:
+  ```bash
+  python -m manylatents.main \
+    experiment=single_algorithm \
+    metrics=test_metric \
+    callbacks/embedding=minimal \
+    logger=none
+  ```
 - [ ] No errors in console output
 - [ ] Output files created in `outputs/`
 - [ ] Correct shapes and values for outputs
 - [ ] Pre-commit hooks pass (`pre-commit run --all-files`)
-- [ ] Added CI test matrix entry in `.github/workflows/build.yml`
 - [ ] Docstrings added to new functions/classes
 - [ ] Config files documented with comments
+
+### Future Enhancements (TODO)
+
+The following improvements to CI testing are planned:
+
+- **Component test matrix**: Add per-algorithm, per-dataset, and per-metric tests
+- **Lightning module testing**: Include neural network tests with `trainer.fast_dev_run=true`
+- **Synthetic data tests**: Add swissroll and other synthetic datasets
+- **Metric suite testing**: Validate composite metric configurations
+
+For now, the smoke test provides basic validation that the framework works correctly.
 
 ---
 

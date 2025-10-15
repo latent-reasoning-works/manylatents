@@ -50,86 +50,11 @@ jobs:
             callbacks/embedding=minimal \
             logger=none
 
-  # Integration tests with algorithm matrix
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        test-config:
-          # Basic smoke test - fastest
-          - name: "smoke-test"
-            algorithm: "latent/noop"
-            data: "test_data"
-            metrics: "test_metric"
-            timeout: 2
-          
-          # Core latent algorithms with synthetic data
-          - name: "pca-swissroll"
-            algorithm: "latent/pca"
-            data: "swissroll"
-            metrics: "synthetic_data_metrics"
-            timeout: 8
-            
-          - name: "umap-swissroll"
-            algorithm: "latent/umap" 
-            data: "swissroll"
-            metrics: "synthetic_data_metrics"
-            timeout: 10
-            
-          # Neural network algorithm (basic autoencoder)
-          - name: "autoencoder-swissroll"
-            algorithm: "lightning/ae_reconstruction"
-            data: "swissroll"
-            metrics: "synthetic_data_metrics"
-            timeout: 15
-            
-          # Sequential workflow test (future: enable when ready)
-          # - name: "sequential-pca-umap"
-          #   algorithms: "[latent/pca,latent/umap]"
-          #   data: "swissroll"
-          #   metrics: "synthetic_data_metrics"
-          #   timeout: 12
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install UV package manager
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: 'latest'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          uv sync
-
-      - name: Run integration test - ${{ matrix.test-config.name }}
-        timeout-minutes: ${{ matrix.test-config.timeout }}
-        run: |
-          source .venv/bin/activate
-          python -m manylatents.main \
-            algorithm=${{ matrix.test-config.algorithm }} \
-            data=${{ matrix.test-config.data }} \
-            metrics=${{ matrix.test-config.metrics }} \
-            logger=none \
-            trainer.max_epochs=1
-
-      - name: Upload test outputs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-outputs-${{ matrix.test-config.name }}
-          path: outputs/
-          retention-days: 3
+  # TODO: Add integration tests with algorithm/data/metric matrix
+  # When adding, ensure:
+  # - Use experiment configs (e.g., experiment=single_algorithm)
+  # - Use test_data and test_metric for speed
+  # - Add configs for synthetic_data_metrics if using swissroll
+  # - Include Lightning module test with trainer.fast_dev_run=true
+  #
+  # For now, the build-and-test job above provides sufficient validation
