@@ -162,7 +162,8 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
 
         num_to_subset = int(num_nondominant * balance_filter)
 
-        EUR_subset = np.random.choice(self.metadata[self.metadata['SelfReportedRaceEthnicity'] == 'White'].person_id, 
+        np.random.seed(42)  # Ensure reproducible subsampling
+        EUR_subset = np.random.choice(self.metadata[self.metadata['SelfReportedRaceEthnicity'] == 'White'].person_id,
                              num_to_subset,
                              replace=False)
         #print(f'subsetting EUR from {num_dominant} to {num_to_subset}')

@@ -36,6 +36,7 @@ class UKBBDataModule(LightningDataModule):
         test_all: bool = False,
         remove_recent_migration: bool = False,
         mode: Optional[str] = None,
+        shuffle_traindata: bool = True,
     ):
         super().__init__()
 
@@ -55,6 +56,7 @@ class UKBBDataModule(LightningDataModule):
         self.test_all = test_all
         self.remove_recent_migration = remove_recent_migration
         self.mode = mode or "split"       # default split if caller forgets
+        self.shuffle_traindata = shuffle_traindata
 
     # --------------------------------------------------------------------- #
     # Lightning hooks
@@ -102,6 +104,7 @@ class UKBBDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            shuffle=self.shuffle_traindata,
             collate_fn=self._collate_fn,
         )
 

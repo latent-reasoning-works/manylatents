@@ -35,6 +35,7 @@ class AOUDataModule(LightningDataModule):
         include_do_not_know: bool = False,
         test_all: bool = False,
         mode: Optional[str] = None,
+        shuffle_traindata: bool = True,
     ):
         super().__init__()
 
@@ -49,10 +50,11 @@ class AOUDataModule(LightningDataModule):
         self.delimiter = delimiter
         self.filter_qc = filter_qc
         self.filter_related = filter_related
-        self.balance_filter=balance_filter
+        self.balance_filter = balance_filter
         self.include_do_not_know = include_do_not_know
         self.test_all = test_all
         self.mode = mode or "split"       # default split if caller forgets
+        self.shuffle_traindata = shuffle_traindata
 
     # --------------------------------------------------------------------- #
     # Lightning hooks
@@ -99,6 +101,7 @@ class AOUDataModule(LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            shuffle=self.shuffle_traindata,
             collate_fn=self._collate_fn,
         )
 
