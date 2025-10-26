@@ -42,9 +42,11 @@ class PHATEModule(LatentModule):
             'n_landmark': n_landmark,
             'n_jobs': n_jobs,
             'verbose': verbose,
+            'random_landmarking': random_landmarking,
         }
         
         # Check if random_landmarking is supported in this PHATE version
+        # We will remove this check once we upgrade to PHATE 2.0.0
         phate_sig = inspect.signature(PHATE.__init__)
         if 'random_landmarking' in phate_sig.parameters:
             phate_kwargs['random_landmarking'] = random_landmarking
