@@ -1,0 +1,4 @@
+kernel_matrix_sparsity:
+  _target_: manylatents.metrics.kernel_matrix_sparsity.KernelMatrixSparsity
+  _partial_: True
+  threshold: 1e-10
