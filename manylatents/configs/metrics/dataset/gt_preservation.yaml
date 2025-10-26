@@ -2,3 +2,4 @@ gt_preservation:
   _target_: manylatents.metrics.preservation.GroundTruthPreservation
   _partial_: True
   only_far: False
+  scale_embeddings: true
