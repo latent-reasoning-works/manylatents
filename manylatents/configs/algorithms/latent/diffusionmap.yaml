@@ -1,4 +1,4 @@
-_target_: manylatents.algorithms.latent.diffusionmap.DiffusionMapModule
+_target_: manylatents.algorithms.latent.diffusion_map.DiffusionMapModule
 n_components: 2
 random_state: ${seed}
 t: 5

@@ -1,1 +1,16 @@
 # LatentModule algorithms (fit/transform pattern)
+from .pca import PCAModule
+from .tsne import TSNEModule
+from .umap import UMAPModule
+from .phate import PHATEModule
+from .diffusion_map import DiffusionMapModule
+from .multi_dimensional_scaling import MDSModule
+
+__all__ = [
+    "PCAModule",
+    "TSNEModule", 
+    "UMAPModule",
+    "PHATEModule",
+    "DiffusionMapModule",
+    "MDSModule",
+]
