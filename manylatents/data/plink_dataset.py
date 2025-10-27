@@ -63,7 +63,7 @@ class PlinkDataset(Dataset):
         self.delimiter = delimiter
         self.admixture_path = files.get('admixture', None)
         admixture_K_str = files.get('admixture_K', '')
-        self.admixture_ks = admixture_K_str.split(',') if len(admixture_K_str) > 0 else None
+        self.admixture_ks = admixture_K_str.split(',') if (admixture_K_str is not None and len(admixture_K_str) > 0) else None
 
         # Step 1: Load metadata
         if files is not None and "plink" in files:
