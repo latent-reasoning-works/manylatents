@@ -18,11 +18,11 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
     PyTorch Dataset for AoU data.
     Returns both raw data and (optionally) precomputed embeddings.
     """
-    def __init__(self, 
-                 files: Dict[str, str], 
-                 cache_dir: str, 
+    def __init__(self,
+                 files: Dict[str, str],
+                 cache_dir: str,
                  data_split: str = "full",
-                 mmap_mode: Optional[str] = None, 
+                 mmap_mode: Optional[str] = None,
                  precomputed_path: Optional[str] = None,
                  metadata: Optional[pd.DataFrame] = None,
                  delimiter: Optional[str] = ",",
@@ -30,7 +30,8 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
                  filter_related: Optional[bool] = False,
                  balance_filter: Union[bool, float] = False,
                  include_do_not_know: bool = False,
-                 test_all: Optional[bool] = False):
+                 test_all: Optional[bool] = False,
+                 subsample_n: Optional[int] = None):
         """
         Initializes the AOU dataset.
         """
@@ -39,8 +40,8 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
         self.include_do_not_know  = include_do_not_know
 
         # Load raw data and metadata via the parent class.
-        super().__init__(files=files, 
-                         cache_dir=cache_dir, 
+        super().__init__(files=files,
+                         cache_dir=cache_dir,
                          mmap_mode=mmap_mode,
                          delimiter=delimiter,
                          data_split=data_split,
@@ -48,7 +49,8 @@ class AOUDataset(PlinkDataset, PrecomputedMixin):
                          filter_qc=filter_qc,
                          filter_related=filter_related,
                          balance_filter=balance_filter,
-                         test_all=test_all)
+                         test_all=test_all,
+                         subsample_n=subsample_n)
 
     def extract_geographic_preservation_indices(self) -> np.ndarray:
         """

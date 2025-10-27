@@ -36,6 +36,7 @@ class AOUDataModule(LightningDataModule):
         test_all: bool = False,
         mode: Optional[str] = None,
         shuffle_traindata: bool = True,
+        subsample_n: Optional[int] = None,
     ):
         super().__init__()
 
@@ -55,6 +56,7 @@ class AOUDataModule(LightningDataModule):
         self.test_all = test_all
         self.mode = mode or "split"       # default split if caller forgets
         self.shuffle_traindata = shuffle_traindata
+        self.subsample_n = subsample_n
 
     # --------------------------------------------------------------------- #
     # Lightning hooks
@@ -81,7 +83,8 @@ class AOUDataModule(LightningDataModule):
             filter_related=self.filter_related,
             balance_filter=self.balance_filter,
             include_do_not_know=self.include_do_not_know,
-            test_all=self.test_all
+            test_all=self.test_all,
+            subsample_n=self.subsample_n
         )
 
         if self.mode == "full":

@@ -21,9 +21,9 @@ class PlinkDataset(Dataset):
     
     _valid_splits = {"train", "test", "full"}
 
-    def __init__(self, 
-                 cache_dir: str,  
-                 files: Dict[str, str] = None, 
+    def __init__(self,
+                 cache_dir: str,
+                 files: Dict[str, str] = None,
                  metadata: Optional[pd.DataFrame] = None,
                  mmap_mode: Optional[str] = None,
                  precomputed_path: Optional[str] = None,
@@ -34,6 +34,7 @@ class PlinkDataset(Dataset):
                  test_all: Optional[bool] = False,
                  remove_recent_migration: Optional[bool] = False,
                  data_split: str = None,
+                 subsample_n: Optional[int] = None,
                  ) -> None:
         """
         Initializes the PLINK dataset.
@@ -50,6 +51,7 @@ class PlinkDataset(Dataset):
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): remove recently migrated samples.
             data_split (str): Data split to use ('train', 'test', or 'full').
+            subsample_n (Optional[int]): If specified, randomly subsample to this many samples after other filters.
         """
         super().__init__()
         
@@ -58,9 +60,10 @@ class PlinkDataset(Dataset):
         
         self.data_split = data_split
         self.filenames = files
-        self.cache_dir = cache_dir 
+        self.cache_dir = cache_dir
         self.mmap_mode = mmap_mode
         self.delimiter = delimiter
+        self.subsample_n = subsample_n
         self.admixture_path = files.get('admixture', None)
         admixture_K_str = files.get('admixture_K', '')
         self.admixture_ks = admixture_K_str.split(',') if (admixture_K_str is not None and len(admixture_K_str) > 0) else None
@@ -95,7 +98,8 @@ class PlinkDataset(Dataset):
                                                             filter_related,
                                                             test_all,
                                                             remove_recent_migration,
-                                                            balance_filter)
+                                                            balance_filter,
+                                                            subsample_n)
 
         self.split_indices = {
             'train': np.where(self.fit_idx)[0],
@@ -179,12 +183,13 @@ class PlinkDataset(Dataset):
 
         return sliced
 
-    def extract_indices(self, 
+    def extract_indices(self,
                         filter_qc: bool,
                         filter_related: bool,
                         test_all: bool,
                         remove_recent_migration: bool,
-                        balance_filter: Union[bool, float]
+                        balance_filter: Union[bool, float],
+                        subsample_n: Optional[int] = None
                        ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Extracts fit/transform indices based on metadata filters.
@@ -194,6 +199,7 @@ class PlinkDataset(Dataset):
             test_all (Optional[bool]): Whether to use all samples for testing.
             remove_recent_migration (Optional[bool]): remove recently migrated samples.
             balance_filter (Union[bool, float]): subset the predominant class to be this percent of the dataset.
+            subsample_n (Optional[int]): If specified, randomly subsample to this many samples after other filters.
         """
         if filter_qc:
             filtered_indices = self.qc_filter_indices
@@ -225,7 +231,32 @@ class PlinkDataset(Dataset):
             fit_idx = related_indices & filtered_indices & recent_migrant_filter & balanced_set
             #trans_idx = (~related_indices) & filtered_indices & recent_migrant_filter & balanced_set
             trans_idx = filtered_indices & recent_migrant_filter & balanced_set
-            
+
+        # Apply random subsampling if requested
+        if subsample_n is not None:
+            # Get indices where trans_idx is True
+            trans_indices = np.where(trans_idx)[0]
+
+            if len(trans_indices) > subsample_n:
+                # Set seed for reproducibility (same subsample for train and test)
+                rng = np.random.RandomState(42)
+                selected_indices = rng.choice(trans_indices, size=subsample_n, replace=False)
+
+                # Create new boolean mask
+                subsampled_mask = np.zeros(len(self.metadata), dtype=bool)
+                subsampled_mask[selected_indices] = True
+
+                # Apply subsample to both fit and trans
+                fit_idx = fit_idx & subsampled_mask
+                trans_idx = trans_idx & subsampled_mask
+
+                logger.info(f"Subsampled from {len(trans_indices)} to {subsample_n} points")
+            else:
+                logger.warning(
+                    f"subsample_n={subsample_n} requested but only {len(trans_indices)} "
+                    f"samples available after filtering. Using all available samples."
+                )
+
         logger.info(f"Fitting {fit_idx.sum()} points. Transforming {trans_idx.sum()} points")
 
         return fit_idx, trans_idx
