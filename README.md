@@ -23,7 +23,8 @@
 - **Traditional DR methods**: PCA, t-SNE, PHATE, UMAP
 - **Neural architectures**: Autoencoders, VAEs, and custom networks  
 - **Sequential workflows**: Chain multiple algorithms (e.g., PCA → neural network → final embedding)
-- **Diverse datasets**: Genomic data (HGDP, UKBB), single-cell data, synthetic manifolds
+- **Diverse datasets**: Single-cell data, synthetic manifolds
+- **Extensions**: [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) for genomics datasets
 
 ### ✨ Key Features
 
@@ -234,10 +235,10 @@ pipeline:
 - 📊 **Unified Tracking** - Single W&B experiment across all pipeline steps
 
 ### Datasets
-- 🧬 **Genomic**: HGDP, All of Us (AOU), UK Biobank (UKBB)
 - 🔬 **Single-cell**: Embryoid body, custom scRNA-seq data
 - 📐 **Synthetic**: Swiss roll, saddle surface, custom manifolds
 - 🧪 **Test data**: Built-in synthetic datasets for validation
+- 🧬 **Genomics**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) extension (HGDP, AOU, UKBB)
 
 ---
 
@@ -350,15 +351,15 @@ See [Testing Documentation](docs/testing.md) for detailed information.
 - **Fractal Dimension**: Intrinsic dimensionality estimation
 
 ### Dataset-Specific Metrics
-- **Genomic data**: Geographic preservation, admixture analysis
 - **Single-cell**: Cell type separation, trajectory preservation
 - **Synthetic**: Ground-truth manifold recovery
+- **Genomic data**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) (geographic preservation, admixture analysis)
 
 ### Usage
 ```bash
 python -m manylatents.main \
-  experiment=hgdp_pca \
-  metrics=genomic_metrics
+  experiment=single_algorithm \
+  metrics=synthetic_data_metrics
 ```
 
 ---

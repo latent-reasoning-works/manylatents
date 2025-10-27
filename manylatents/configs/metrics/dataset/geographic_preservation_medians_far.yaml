@@ -1,5 +1,0 @@
-geographic_preservation_medians_far:
-  _target_: manylatents.metrics.preservation.GeographicPreservation
-  _partial_: True
-  use_medians: True
-  only_far: True
