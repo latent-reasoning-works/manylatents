@@ -161,6 +161,12 @@ class UKBBDataset(PlinkDataset, PrecomputedMixin):
 
         return self.metadata[label_col].values
 
+    def get_sample_ids(self) -> np.ndarray:
+        """
+        Returns sample IDs for the dataset.
+        """
+        return self.metadata['sample_id'].values
+
     def balance_filter(self, balance_filter) -> np.array:
 
         num_dominant = self.metadata[(self.metadata['Population'] == 'EUR')].shape[0]

@@ -12,8 +12,9 @@ def sample_id(embeddings: np.ndarray,
     Fetches sample IDs (for downstream analysis)
     """
 
-    if hasattr(dataset, 'metadata') and 'sample_id' in dataset.metadata:
-        sample_ids = dataset.metadata['sample_id']
-        return sample_ids
+    if hasattr(dataset, 'get_sample_ids'):
+        return dataset.get_sample_ids()
     else:
-        return None
+        # Return array of indices as sample IDs when not available
+        logger.warning("Sample IDs not found in dataset (no get_sample_ids method). Using numeric indices instead.")
+        return np.arange(len(embeddings))
