@@ -58,3 +58,86 @@ jobs:
   # - Include Lightning module test with trainer.fast_dev_run=true
   #
   # For now, the build-and-test job above provides sufficient validation
+
+  # Integration test with manylatents-omics namespace package
+  test-omics-integration:
+    name: Test manylatents-omics Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout manylatents (core)
+        uses: actions/checkout@v4
+        with:
+          path: manylatents
+
+      - name: Checkout manylatents-omics
+        uses: actions/checkout@v4
+        with:
+          repository: latent-reasoning-works/manylatents-omics
+          path: manylatents-omics
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install UV package manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: 'latest'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install manylatents core
+        working-directory: manylatents
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install -e . --no-deps
+
+      - name: Install manylatents-omics
+        working-directory: manylatents
+        run: |
+          source .venv/bin/activate
+          uv pip install -e ../manylatents-omics --no-deps
+
+      - name: Test namespace package integration
+        working-directory: manylatents
+        run: |
+          source .venv/bin/activate
+          python << 'EOF'
+          print("=" * 60)
+          print("Testing manylatents-omics namespace integration")
+          print("=" * 60)
+          
+          # Test core imports
+          print("\n1. Testing core manylatents...")
+          from manylatents.data.synthetic_dataset import SwissRoll
+          from manylatents.algorithms.latent.pca import PCAModule
+          print("   ✅ Core imports work")
+          
+          # Test omics namespace
+          print("\n2. Testing manylatents.omics namespace...")
+          import manylatents.omics
+          assert hasattr(manylatents.omics, 'data'), "omics.data not found"
+          assert hasattr(manylatents.omics, 'metrics'), "omics.metrics not found"
+          print("   ✅ Omics namespace structure verified")
+          
+          # Test specific omics imports
+          print("\n3. Testing specific omics imports...")
+          from manylatents.omics.data import PlinkDataset
+          from manylatents.omics.metrics import GeographicPreservation
+          print("   ✅ Omics imports work")
+          
+          # Verify both packages coexist
+          print("\n4. Verifying namespace paths...")
+          import manylatents
+          print(f"   Core path: {manylatents.__path__}")
+          print(f"   Omics path: {manylatents.omics.__path__}")
+          print("   ✅ Namespace packages coexist")
+          
+          print("\n" + "=" * 60)
+          print("✅ All integration tests passed!")
+          print("=" * 60)
+          EOF

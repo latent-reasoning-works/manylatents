@@ -21,8 +21,6 @@ class SwissRollDataModule(LightningDataModule):
         width: float = 10.0,
         random_state: int = 42,
         rotate_to_dim: int = 3,
-        precomputed_path: str = None,
-        mmap_mode: str = None,
         mode: str = 'full',
     ):
         """
@@ -62,13 +60,6 @@ class SwissRollDataModule(LightningDataModule):
             Target dimension for rotation. Rotation is only applied if this value is greater than 3.
             The default of 3 keeps the Swiss roll in 3D space.
 
-        precomputed_path : str, optional
-            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
-            If None, a new dataset will be generated.
-        
-        mmap_mode : str, optional
-            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
-
         mode : str, default='full'
             Mode for dataset train/test seperation. 
             If 'full', the entire dataset is used as both training and test set (unsplit).
@@ -92,8 +83,6 @@ class SwissRollDataModule(LightningDataModule):
         self.rotate_to_dim = rotate_to_dim
 
         self.mode = mode
-        self.precomputed_path = precomputed_path
-        self.mmap_mode = mmap_mode
 
         self.dataset = None
         self.train_dataset = None
@@ -113,8 +102,6 @@ class SwissRollDataModule(LightningDataModule):
                 width=self.width,
                 random_state=self.random_state,
                 rotate_to_dim=self.rotate_to_dim,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
             self.test_dataset = self.train_dataset
 
@@ -127,8 +114,6 @@ class SwissRollDataModule(LightningDataModule):
                 width=self.width,
                 random_state=self.random_state,
                 rotate_to_dim=self.rotate_to_dim,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
@@ -178,8 +163,6 @@ if __name__ == "__main__":
         width=5.0,
         random_state=123,
         rotate_to_dim=5,
-        precomputed_path=None,
-        mmap_mode=None,
         mode='split',
     )
 
