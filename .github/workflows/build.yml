@@ -76,7 +76,6 @@ jobs:
         with:
           repository: latent-reasoning-works/manylatents-omics
           path: manylatents-omics
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
