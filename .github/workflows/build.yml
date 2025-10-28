@@ -67,6 +67,15 @@ jobs:
     timeout-minutes: 10
     
     steps:
+      - name: Check if token is available
+        run: |
+          if [ -z "${{ secrets.LRW_CI_TOKEN }}" ]; then
+            echo "::error::LRW_CI_TOKEN secret is not available"
+            echo "Please ensure the organization secret is enabled for this repository"
+            exit 1
+          fi
+          echo "Token is available"
+      
       - name: Checkout manylatents (core)
         uses: actions/checkout@v4
         with:
