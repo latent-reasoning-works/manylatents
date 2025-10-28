@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 def KNNPreservation(
     embeddings: np.ndarray,

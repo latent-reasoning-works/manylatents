@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 from typing import Optional
 import warnings
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 def diffusion_curvature(P: np.ndarray, t: int = 3, percentile: float = 5) -> np.ndarray:
     """

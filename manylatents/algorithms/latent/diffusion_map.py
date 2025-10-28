@@ -15,7 +15,7 @@ from torch import Tensor
 from typing import Optional, Union
 import logging
 
-from ..latent_module_base import LatentModule
+from .latent_module_base import LatentModule
 
 logger = logging.getLogger(__name__)
 

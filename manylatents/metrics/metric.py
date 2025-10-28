@@ -2,7 +2,7 @@ from typing import Optional, Protocol, Union, Any
 
 import numpy as np
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 class Metric(Protocol):

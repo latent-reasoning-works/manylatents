@@ -3,7 +3,7 @@ import numpy as np
 from scipy.stats import pearsonr, spearmanr
 from typing import Literal, Optional
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.algorithms.latent.diffusion_map import compute_dm
 
 

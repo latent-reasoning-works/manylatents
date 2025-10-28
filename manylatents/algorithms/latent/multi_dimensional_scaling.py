@@ -20,7 +20,7 @@ from torch import Tensor
 from typing import Optional, Union
 from deprecated import deprecated
 
-from ..latent_module_base import LatentModule
+from .latent_module_base import LatentModule
 import logging
 logger = logging.getLogger(__name__)
 import scprep

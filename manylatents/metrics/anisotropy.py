@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 import torch
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 def Anisotropy(

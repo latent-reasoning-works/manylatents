@@ -16,7 +16,7 @@ from lightning import (
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import flatten_and_unroll_metrics

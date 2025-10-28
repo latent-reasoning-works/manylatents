@@ -7,7 +7,7 @@ from openTSNE.affinity import PerplexityBasedNN
 from openTSNE.tsne import TSNEEmbedding
 from torch import Tensor
 
-from ..latent_module_base import LatentModule
+from .latent_module_base import LatentModule
 
 
 def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:

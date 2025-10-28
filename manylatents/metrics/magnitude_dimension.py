@@ -2,7 +2,7 @@
 import numpy as np
 from typing import Optional, Any
 from magnipy.magnipy import Magnipy
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 def MagnitudeDimension(
     embeddings: np.ndarray, 
