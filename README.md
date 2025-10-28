@@ -43,7 +43,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/manylatents.git
+git clone https://github.com/latent-reasoning-works/manylatents.git
 cd manylatents
 
 # Install with uv (recommended)
@@ -67,7 +67,7 @@ manylatents supports domain-specific extensions that add specialized data loader
   uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
   ```
 
-See [EXTENSIONS.md](EXTENSIONS.md) for full documentation on installing and using extensions.
+See [docs/extensions.md](docs/extensions.md) for full documentation on installing and using extensions.
 
 ### Single Algorithm Usage
 
