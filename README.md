@@ -23,8 +23,8 @@
 - **Traditional DR methods**: PCA, t-SNE, PHATE, UMAP
 - **Neural architectures**: Autoencoders, VAEs, and custom networks  
 - **Sequential workflows**: Chain multiple algorithms (e.g., PCA → neural network → final embedding)
-- **Diverse datasets**: Single-cell data, synthetic manifolds
-- **Extensions**: [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) for genomics datasets
+- **Diverse datasets**: Single-cell data, synthetic manifolds, genetics data (with extensions)
+- **🧬 Extensions**: Domain-specific packages like [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) for genomics
 
 ### ✨ Key Features
 
@@ -52,7 +52,22 @@ source .venv/bin/activate
 
 # Or with pip
 pip install -e .
+
+# Optional: Install extensions for domain-specific functionality
+# See EXTENSIONS.md for details
+uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git  # Genomics support
 ```
+
+### Extensions
+
+manylatents supports domain-specific extensions that add specialized data loaders, metrics, and algorithms:
+
+- **🧬 [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics)**: Genetics and population genetics support
+  ```bash
+  uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+  ```
+
+See [EXTENSIONS.md](EXTENSIONS.md) for full documentation on installing and using extensions.
 
 ### Single Algorithm Usage
 

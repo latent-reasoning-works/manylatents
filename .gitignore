@@ -41,6 +41,10 @@ wandb/
 # Pipeline orchestrator runs
 pipeline_runs/
 
+# Extensions directory (keep README, ignore cloned extensions unless submodules)
+extensions/*
+!extensions/README.md
+
 ## recommendations from the Mila research project template:
 # Distribution / packaging
 .Python
