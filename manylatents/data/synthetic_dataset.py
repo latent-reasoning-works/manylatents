@@ -1,4 +1,3 @@
-import os
 import logging
 import torch
 from torch.utils.data import Dataset
@@ -10,7 +9,10 @@ from scipy.stats import special_ortho_group
 import scipy.sparse as sp
 from scipy.sparse.csgraph import shortest_path
 from typing import Union, List, Optional, Dict, Tuple
-from .precomputed_mixin import PrecomputedMixin
+# DEPRECATED: PrecomputedMixin was removed. Use PrecomputedDataModule instead.
+# PrecomputedMixin was originally intended to load pre-generated synthetic data,
+# but synthetic datasets are fast to generate on-the-fly. For loading saved
+# embeddings/outputs from previous runs, use PrecomputedDataModule.
 from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
 
@@ -62,7 +64,7 @@ class SyntheticDataset(Dataset):
         pass
 
 
-class SwissRoll(SyntheticDataset, PrecomputedMixin):
+class SwissRoll(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
@@ -72,8 +74,6 @@ class SwissRoll(SyntheticDataset, PrecomputedMixin):
         width=10.0,
         random_state=42,
         rotate_to_dim=3,
-        precomputed_path=None,
-        mmap_mode=None,
     ):
         """
         Initialize a synthetic Swiss Roll dataset with parameters to control 
@@ -107,13 +107,6 @@ class SwissRoll(SyntheticDataset, PrecomputedMixin):
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
             For visualization purposes, the default of 3 means no rotation is applied.
-
-        precomputed_path : str, optional
-            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
-            If None, a new dataset will be generated.
-        
-        mmap_mode : str, optional
-            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
         np.random.seed(random_state)
@@ -139,13 +132,11 @@ class SwissRoll(SyntheticDataset, PrecomputedMixin):
         X = np.stack((xs, ys, zs))  # shape (3, 5000)
         noise_term = noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
         X = X + noise_term
-        # load precomputed embeddings or generated data
-        if precomputed_path is not None and os.path.exists(precomputed_path):
-            self.data = self.load_precomputed(precomputed_path, mmap_mode)
-        else:   
-            self.data = X.T  # shape (5000, 3)
-            if rotate_to_dim > 3:
-                self.data = self.rotate_to_dim(rotate_to_dim)
+        
+        # Generate data
+        self.data = X.T  # shape (5000, 3)
+        if rotate_to_dim > 3:
+            self.data = self.rotate_to_dim(rotate_to_dim)
 
         self.ts = np.squeeze(ts)  # (5000,)
         self.metadata = np.repeat(
@@ -305,7 +296,7 @@ class SaddleSurface(SyntheticDataset):
         return self.graph
 
 
-class DLAtree(SyntheticDataset, PrecomputedMixin):
+class DLAtree(SyntheticDataset):
     def __init__(
         self,
         n_dim: int = 3,
@@ -317,10 +308,7 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
         sigma: float = 4,
         disconnect_branches: Optional[List[int]] = [5,15],  # Branch indices to disconnect
         sampling_density_factors: Optional[Dict[int, float]] = None,  # Reduce density of certain branches
-        precomputed_path: Optional[str] = None,
-        mmap_mode: Optional[str] = None,
     ):
-
         """
         Generate a Diffusion-Limited Aggregation (DLA) tree with optional branch disconnections.
 
@@ -352,13 +340,6 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
 
         sampling_density_factors : dict of int to float or None, optional
             Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
-        
-        precomputed_path : str, optional
-            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
-            If None, a new dataset will be generated.
-        
-        mmap_mode : str, optional
-            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
         # Generate the DLA data
@@ -373,11 +354,8 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
             disconnect_branches=disconnect_branches or [],
             sampling_density_factors=sampling_density_factors,
         )
-        # Load precomputed embeddings or generated data
-        if precomputed_path is not None and os.path.exists(precomputed_path):
-            self.data = self.load_precomputed(precomputed_path, mmap_mode)
-        else:
-            self.data = data  # noisy data
+        
+        self.data = data  # noisy data
         self.data_gt = data_gt  # ground truth tree
         self.metadata = metadata
         self.n_dim = n_dim
@@ -531,7 +509,7 @@ class DLAtree(SyntheticDataset, PrecomputedMixin):
         return M, M_gt, C
 
 
-class Torus(SyntheticDataset, PrecomputedMixin):
+class Torus(SyntheticDataset):
     def __init__(
         self,
         n_points=5000,
@@ -540,8 +518,6 @@ class Torus(SyntheticDataset, PrecomputedMixin):
         minor_radius=1.0,
         random_state=42,
         rotate_to_dim=3,
-        precomputed_path=None,
-        mmap_mode=None,
     ):
         """
         Initialize a synthetic Torus dataset with uniformly distributed points.
@@ -566,12 +542,6 @@ class Torus(SyntheticDataset, PrecomputedMixin):
         rotate_to_dim : int, default=3
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
-
-        precomputed_path : str, optional
-            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
-        
-        mmap_mode : str, optional
-            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
         """
         super().__init__()
         np.random.seed(random_state)
@@ -596,13 +566,10 @@ class Torus(SyntheticDataset, PrecomputedMixin):
         self.major_radius = major_radius
         self.minor_radius = minor_radius
         
-        # Load precomputed embeddings or use generated data
-        if precomputed_path is not None and os.path.exists(precomputed_path):
-            self.data = self.load_precomputed(precomputed_path, mmap_mode)
-        else:
-            self.data = X
-            if rotate_to_dim > 3:
-                self.data = self.rotate_to_dim(rotate_to_dim)
+        # Use generated data
+        self.data = X
+        if rotate_to_dim > 3:
+            self.data = self.rotate_to_dim(rotate_to_dim)
 
         # Create simple metadata
         self.metadata = np.zeros(n_points, dtype=int)
@@ -692,7 +659,7 @@ class GaussianBlobs(SyntheticDataset):
         return self.centers
 
 
-class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
+class DLATreeFromGraph(SyntheticDataset):
     def __init__(
         self,
         graph_edges,  # List of (from_node, to_node, edge_id, length)
@@ -702,8 +669,6 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         sigma: float = 0.5,
         save_graph_viz: bool = True,
         save_dir: str = "outputs",
-        precomputed_path: Optional[str] = None,
-        mmap_mode: Optional[str] = None,
         # Gap functionality: simply exclude these edge_ids from data generation
         excluded_edges: Optional[List] = None,
     ):
@@ -753,31 +718,6 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
             These edges are skipped during data generation but shown as dashed lines
             in the debug visualization. Useful for simulating missing populations
             or discontinuities in the tree.
-            
-        precomputed_path : str, optional
-            Path to precomputed embeddings. If provided, loads data instead of generating.
-            
-        mmap_mode : str, optional
-            Memory mapping mode for loading precomputed data.
-        
-        Algorithm Details:
-        ------------------
-        1. **Graph Parsing**: Build adjacency structure from graph_edges
-        2. **Root Detection**: Find root node (appears in from_node but not to_node)
-        3. **Sequential Generation**: For each edge in order:
-           - Generate DLA random walk with specified length
-           - Assign edge_id as population label
-           - Connect to previous branch endpoints
-        4. **Gap Application**: Remove samples from excluded edges
-        5. **Label Renumbering**: Create sequential labels (1,2,3...) for remaining populations
-        6. **Noise Addition**: Add Gaussian noise with specified sigma
-        
-        Output Data Structure:
-        ----------------------
-        - data: High-dimensional point cloud (n_samples, n_dim)
-        - metadata: Population labels for each sample (renumbered to be sequential)
-        - edge_renumbering: Mapping from original edge_ids to new sequential ids
-        - original_excluded_edges: Set of edge_ids that were excluded
         
         Visualization:
         --------------
@@ -835,14 +775,8 @@ class DLATreeFromGraph(SyntheticDataset, PrecomputedMixin):
         # Generate the data using simplified approach
         data, graph, metadata = self._generate_simplified()
         
-        # Load precomputed or use generated data
-        if precomputed_path is not None and os.path.exists(precomputed_path):
-            self.data = self.load_precomputed(precomputed_path, mmap_mode)
-        else:
-            self.data = data
-
+        self.data = data
         self.graph = graph
-
         self.metadata = metadata
         
         # Generate and save visualization
