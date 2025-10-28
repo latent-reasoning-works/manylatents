@@ -60,6 +60,7 @@ jobs:
   # For now, the build-and-test job above provides sufficient validation
 
   # Integration test with manylatents-omics namespace package
+  # Note: Requires LRW_CI_TOKEN secret to access private manylatents-omics repo
   test-omics-integration:
     name: Test manylatents-omics Integration
     runs-on: ubuntu-latest
