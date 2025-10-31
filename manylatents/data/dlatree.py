@@ -114,6 +114,8 @@ class DLATreeDataModule(LightningDataModule):
         pass
 
     def setup(self, stage: str = None):
+        # Note: precomputed_path and mmap_mode are kept in __init__ for backwards compatibility
+        # with existing configs, but are not passed to Dataset (deprecated - synthetic data is fast)
         if self.mode == "full":
             self.train_dataset = DLAtree(
                 n_dim=self.n_dim,
@@ -125,8 +127,6 @@ class DLATreeDataModule(LightningDataModule):
                 sigma=self.sigma,
                 disconnect_branches=self.disconnect_branches,
                 sampling_density_factors=self.sampling_density_factors,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
             self.test_dataset = self.train_dataset
 
@@ -141,8 +141,6 @@ class DLATreeDataModule(LightningDataModule):
                 sigma=self.sigma,
                 disconnect_branches=self.disconnect_branches,
                 sampling_density_factors=self.sampling_density_factors,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
@@ -232,6 +230,8 @@ class DLATreeFromGraphDataModule(LightningDataModule):
         pass
 
     def setup(self, stage: str = None):
+        # Note: precomputed_path and mmap_mode are kept in __init__ for backwards compatibility
+        # with existing configs, but are not passed to Dataset (deprecated - synthetic data is fast)
         if self.mode == "full":
             self.train_dataset = DLATreeFromGraph(
                 graph_edges=self.graph_edges,
@@ -242,8 +242,6 @@ class DLATreeFromGraphDataModule(LightningDataModule):
                 sigma=self.sigma,
                 save_graph_viz=self.save_graph_viz,
                 save_dir=self.save_dir,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
             self.test_dataset = self.train_dataset
 
@@ -257,8 +255,6 @@ class DLATreeFromGraphDataModule(LightningDataModule):
                 sigma=self.sigma,
                 save_graph_viz=self.save_graph_viz,
                 save_dir=self.save_dir,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
