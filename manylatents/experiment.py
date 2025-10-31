@@ -317,7 +317,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
 
     # --- Callbacks ---
     trainer_cb_cfg   = cfg.trainer.get("callbacks")
-    embedding_cb_cfg = cfg.get("callbacks.embedding")
+    embedding_cb_cfg = cfg.callbacks.get("embedding") if hasattr(cfg, "callbacks") else None
 
     lightning_cbs, embedding_cbs = instantiate_callbacks(
         trainer_cb_cfg,
