@@ -16,8 +16,6 @@ class EmbryoidBodyDataModule(LightningDataModule):
         random_state: int = 42,
         adata_path: str = None,
         label_key: str = None,
-        precomputed_path: str = None,
-        mmap_mode: str = None,
         mode: str = 'full',
     ):
         """
@@ -41,9 +39,6 @@ class EmbryoidBodyDataModule(LightningDataModule):
         label_key : str, default="cell_type"
             Key in adata.obs used to retrieve cell type or condition labels.
 
-        precomputed_path : str or None, optional
-            Optional path to a precomputed .h5ad file. If provided and exists, this file is used instead of adata_path.
-
         mode : str, default='full'
             Mode for dataset train/test seperation. 
             If 'full', the entire dataset is used as both training and test set (unsplit).
@@ -60,8 +55,6 @@ class EmbryoidBodyDataModule(LightningDataModule):
         # EmbryoidBody specific parameters
         self.adata_path = adata_path
         self.label_key = label_key
-        self.precomputed_path = precomputed_path
-        self.mmap_mode = mmap_mode
 
         self.mode = mode
 
@@ -75,15 +68,13 @@ class EmbryoidBodyDataModule(LightningDataModule):
 
     def setup(self, stage: str = None):
         if self.mode == "full":
-            self.train_dataset = EmbryoidBody(adata_path=self.adata_path, 
-                                              label_key=self.label_key, 
-                                              precomputed_path=self.precomputed_path)
+            self.train_dataset = EmbryoidBody(adata_path=self.adata_path,
+                                              label_key=self.label_key)
             self.test_dataset = self.train_dataset
 
         elif self.mode == 'split':
-            self.dataset = EmbryoidBody(adata_path=self.adata_path, 
-                                        label_key=self.label_key, 
-                                        precomputed_path=self.precomputed_path)
+            self.dataset = EmbryoidBody(adata_path=self.adata_path,
+                                        label_key=self.label_key)
             test_size = int(len(self.dataset) * self.test_split)
             train_size = len(self.dataset) - test_size
 
@@ -124,8 +115,6 @@ if __name__ == "__main__":
     EB = EmbryoidBodyDataModule(
         adata_path="./data/scRNAseq/EBT_counts.h5ad",
         label_key="sample_labels",
-        precomputed_path=None,
-        mmap_mode=None,
         batch_size=32,
         test_split=0.2,
         num_workers=4,
