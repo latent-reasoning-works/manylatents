@@ -10,15 +10,7 @@ from matplotlib.colors import ListedColormap
 
 import wandb
 from manylatents.callbacks.embedding.base import EmbeddingCallback
-from manylatents.data.hgdp_dataset import HGDPDataset
-from manylatents.data.ukbb_dataset import UKBBDataset
-from manylatents.data.mhi_dataset import MHIDataset
-from manylatents.data.aou_dataset import AOUDataset
 from manylatents.data.synthetic_dataset import DLAtree
-from manylatents.utils.mappings import cmap_pop as cmap_pop_HGDP
-from manylatents.utils.mappings import cmap_ukbb_superpops as cmap_pop_UKBB
-from manylatents.utils.mappings import cmap_mhi_superpops as cmap_pop_MHI
-from manylatents.utils.mappings import race_ethnicity_only_pca_colors as cmap_pop_AOU
 from manylatents.utils.mappings import cmap_dla_tree
 
 logger = logging.getLogger(__name__)
@@ -71,20 +63,13 @@ class PlotEmbeddings(EmbeddingCallback):
         )
 
     def _get_colormap(self, dataset: any) -> any:
+        """Get colormap for plotting. Override this method in subclasses for dataset-specific colormaps."""
         if self.color_by_score == "tangent_space":
             # Define discrete colors for the two categories (adjust colors as needed)
             return ListedColormap(["#1f77b4", "#ff7f0e"])
         if self.color_by_score is not None:
             return "viridis"
-        if isinstance(dataset, HGDPDataset):
-            cmap = cmap_pop_HGDP
-        elif isinstance(dataset, UKBBDataset):
-            cmap = cmap_pop_UKBB
-        elif isinstance(dataset, MHIDataset):
-            cmap = cmap_pop_MHI
-        elif isinstance(dataset, AOUDataset):
-            cmap = cmap_pop_AOU
-        elif isinstance(dataset, DLAtree):
+        if isinstance(dataset, DLAtree):
             # Check if we have more branches than colors in our palette
             if hasattr(dataset, 'n_branch') and dataset.n_branch > 10:
                 logger.warning(f"DLA tree has {dataset.n_branch} branches but colormap only supports 10. Falling back to viridis.")
