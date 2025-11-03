@@ -24,8 +24,6 @@ class DLATreeDataModule(LightningDataModule):
         n_dim: int = 3,
         disconnect_branches: Optional[List[int]] = [5,15],
         sampling_density_factors: Optional[Dict[int, float]] = None,
-        precomputed_path: str = None,
-        mmap_mode: str = None,
         mode: str = 'full',
     ):
         """
@@ -69,13 +67,6 @@ class DLATreeDataModule(LightningDataModule):
 
         sampling_density_factors : dict of int to float or None, optional
             Dictionary mapping branch index to sampling reduction factor (e.g., 0.5 keeps 50% of points).
-        
-        precomputed_path : str, optional
-            Path to precomputed embeddings. If provided, the embeddings will be loaded from this path.
-            If None, a new dataset will be generated.
-        
-        mmap_mode : str, optional
-            Memory mapping mode for loading the dataset. If None, the dataset will be loaded into memory.
 
         mode : str, default='full'
             Mode for dataset train/test seperation. 
@@ -102,8 +93,6 @@ class DLATreeDataModule(LightningDataModule):
         self.sampling_density_factors = sampling_density_factors
 
         self.mode = mode
-        self.precomputed_path = precomputed_path
-        self.mmap_mode = mmap_mode
 
         self.dataset = None
         self.train_dataset = None
@@ -125,8 +114,6 @@ class DLATreeDataModule(LightningDataModule):
                 sigma=self.sigma,
                 disconnect_branches=self.disconnect_branches,
                 sampling_density_factors=self.sampling_density_factors,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
             self.test_dataset = self.train_dataset
 
@@ -141,8 +128,6 @@ class DLATreeDataModule(LightningDataModule):
                 sigma=self.sigma,
                 disconnect_branches=self.disconnect_branches,
                 sampling_density_factors=self.sampling_density_factors,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
@@ -194,8 +179,6 @@ class DLATreeFromGraphDataModule(LightningDataModule):
         sigma: float = 0.5,
         save_graph_viz: bool = True,
         save_dir: str = "outputs",
-        precomputed_path: str = None,
-        mmap_mode: str = None,
         mode: str = 'full',
         **kwargs
     ):
@@ -220,8 +203,6 @@ class DLATreeFromGraphDataModule(LightningDataModule):
         self.save_dir = save_dir
 
         self.mode = mode
-        self.precomputed_path = precomputed_path
-        self.mmap_mode = mmap_mode
 
         self.dataset = None
         self.train_dataset = None
@@ -242,8 +223,6 @@ class DLATreeFromGraphDataModule(LightningDataModule):
                 sigma=self.sigma,
                 save_graph_viz=self.save_graph_viz,
                 save_dir=self.save_dir,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
             self.test_dataset = self.train_dataset
 
@@ -257,8 +236,6 @@ class DLATreeFromGraphDataModule(LightningDataModule):
                 sigma=self.sigma,
                 save_graph_viz=self.save_graph_viz,
                 save_dir=self.save_dir,
-                precomputed_path=self.precomputed_path,
-                mmap_mode=self.mmap_mode,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
