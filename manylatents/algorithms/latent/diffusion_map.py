@@ -474,7 +474,6 @@ class DiffusionMapModule(LatentModule):
 
         # Recompute diffusion operator from kernel
         K = np.asarray(self.model.G.kernel.todense())
-        from ..diffusionmap_algorithm import compute_dm
         _, _, diff_op, _ = compute_dm(K, alpha=1.0)
 
         if ignore_diagonal:

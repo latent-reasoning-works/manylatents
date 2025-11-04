@@ -1,6 +1,6 @@
 import warnings
 import numpy as np
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 def affinity_spectrum(affinity_matrix: np.ndarray, top_k: int = 25) -> np.ndarray:

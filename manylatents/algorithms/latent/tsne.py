@@ -8,7 +8,7 @@ from openTSNE.tsne import TSNEEmbedding
 from torch import Tensor
 
 from .latent_module_base import LatentModule
-from ..utils.kernel_utils import symmetric_diffusion_operator
+from ...utils.kernel_utils import symmetric_diffusion_operator
 
 
 def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:

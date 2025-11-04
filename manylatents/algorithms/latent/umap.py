@@ -7,7 +7,7 @@ from torch import Tensor
 from umap import UMAP
 
 from .latent_module_base import LatentModule
-from ..utils.kernel_utils import symmetric_diffusion_operator
+from ...utils.kernel_utils import symmetric_diffusion_operator
 
 
 class UMAPModule(LatentModule):
