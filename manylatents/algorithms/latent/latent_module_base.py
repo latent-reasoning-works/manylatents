@@ -49,7 +49,7 @@ class LatentModule(ABC):
             "This may be because the algorithm does not use a kernel-based approach."
         )
 
-    def affinity_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Return the affinity matrix (normalized transition matrix) used by the algorithm.
 
@@ -59,6 +59,10 @@ class LatentModule(ABC):
 
         Args:
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: If True, return a symmetric version of the affinity matrix
+                          (if available). For methods like diffusion maps, this returns
+                          the symmetric diffusion operator with guaranteed positive
+                          eigenvalues. Default False.
 
         Returns:
             N×N numpy array representing the affinity matrix.
