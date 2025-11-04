@@ -46,6 +46,7 @@ class MultidimensionalScaling():
         self.verbose=verbose
 
         self.embedding = None
+        self.distance_matrix = None  # Store computed distance matrix
 
     # Fast classical MDS using random svd
     @deprecated(version="1.0.0", reason="Use phate.mds.classic instead")
@@ -228,10 +229,11 @@ class MultidimensionalScaling():
             )
 
         # MDS embeddings, each gives a different output.
-        X_dist = squareform(pdist(X, self.distance_metric))
+        # Compute and store distance matrix (only computed once)
+        self.distance_matrix = squareform(pdist(X, self.distance_metric))
 
         # initialize all by CMDS
-        Y_classic = self.classic(X_dist)
+        Y_classic = self.classic(self.distance_matrix)
         if self.how == "classic":
             self.embedding = Y_classic
             return Y_classic
@@ -240,20 +242,20 @@ class MultidimensionalScaling():
         if self.solver == "sgd":
             try:
                 # use sgd2 if it is available
-                Y = self.sgd(X_dist, init=Y_classic)
+                Y = self.sgd(self.distance_matrix, init=Y_classic)
                 if np.any(~np.isfinite(Y)):
                     logger.warning("Using SMACOF because SGD returned NaN")
                     raise NotImplementedError
             except NotImplementedError:
                 # sgd2 currently only supports n_components==2
                 Y = self.smacof(
-                    X_dist,
+                    self.distance_matrix,
                     init=Y_classic,
                     metric=True,
                 )
         elif self.solver == "smacof":
             Y = self.smacof(
-                X_dist, init=Y_classic, metric=True
+                self.distance_matrix, init=Y_classic, metric=True
             )
         else:
             raise RuntimeError
@@ -264,7 +266,7 @@ class MultidimensionalScaling():
             return Y
 
         # nonmetric is slowest
-        Y = self.smacof(X_dist, init=Y, metric=False)
+        Y = self.smacof(self.distance_matrix, init=Y, metric=False)
         # re-orient to classic
         _, Y, _ = scipy.spatial.procrustes(Y_classic, Y)
         self.embedding = Y
@@ -288,7 +290,7 @@ class MDSModule(LatentModule):
     ):
         super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
-        self.model = MultidimensionalScaling(ndim=n_components, 
+        self.model = MultidimensionalScaling(ndim=n_components,
                                             seed=random_state,
                                             how=how,
                                             solver=solver,
@@ -301,6 +303,8 @@ class MDSModule(LatentModule):
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
+
+        # embed_MDS will compute and store distance matrix in self.model.distance_matrix
         emb = self.model.embed_MDS(x_np[:n_fit])
         self._is_fitted = True
 
@@ -315,7 +319,10 @@ class MDSModule(LatentModule):
     def fit_transform(self, x: Tensor) -> Tensor:
         """Fit and then transform on same data."""
         x_np = x.detach().cpu().numpy()
+
+        # embed_MDS will compute and store distance matrix in self.model.distance_matrix
         embedding = self.model.embed_MDS(x_np)
+        self._is_fitted = True
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
@@ -359,11 +366,11 @@ class MDSModule(LatentModule):
         if not self._is_fitted:
             raise RuntimeError("MDS model is not fitted yet. Call `fit` first.")
 
-        if self._distance_matrix is None:
+        if self.model.distance_matrix is None:
             raise RuntimeError("Distance matrix not available. This should not happen.")
 
         # Compute Gram matrix following classical MDS procedure
-        D_squared = self._distance_matrix ** 2
+        D_squared = self.model.distance_matrix ** 2
 
         # Double-center: G = -0.5 * H * D^2 * H where H = I - (1/n)*11'
         n = D_squared.shape[0]

@@ -41,7 +41,7 @@ def diffusion_map_correlation(
     embeddings_subset = embeddings[:, :n_components]
 
     # Compute diffusion map coordinates
-    evecs_right, evals, _, _ = compute_dm(kernel_matrix, alpha=alpha)
+    evecs_right, evals, _, _, _ = compute_dm(kernel_matrix, alpha=alpha)
 
     # Get diffusion map coordinates (skip first eigenvector which is constant)
     # Use t=1 for standard diffusion coordinates
@@ -118,7 +118,7 @@ def DiffusionMapCorrelation(
     # Skip for specific algorithm types where this metric is not appropriate
     module_name = module.__class__.__name__
     skip_modules = {
-        "PCAModule": "Gram matrix not appropriate for diffusion maps",
+        "PCAModule": "Gram matrix not appropriate as kernel matrix",
         "MDSModule": "Distance-based method without appropriate kernel matrix",
         "DiffusionMapModule": "Would be trivially 1.0 (diffusion maps vs diffusion maps)"
     }
