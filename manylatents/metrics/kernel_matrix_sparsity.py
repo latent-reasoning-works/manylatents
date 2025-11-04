@@ -1,6 +1,6 @@
 import warnings
 import numpy as np
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 def kernel_matrix_sparsity(embeddings: np.ndarray, kernel_matrix: np.ndarray, threshold: float = 1e-10) -> float:

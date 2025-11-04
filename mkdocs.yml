@@ -4,4 +4,8 @@ theme:
 
 nav:
   - Home: index.md
+  - Extensions: extensions.md
   - Testing: testing.md
+  - Architecture:
+    - Metrics: metrics_architecture.md
+    - API Usage: api_usage.md

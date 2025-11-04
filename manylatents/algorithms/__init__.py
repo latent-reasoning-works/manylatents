@@ -5,7 +5,7 @@ import inspect
 from .latent.pca import PCAModule
 from .latent.phate import PHATEModule
 from .latent.tsne import TSNEModule
-from .latent_module_base import LatentModule
+from .latent.latent_module_base import LatentModule
 
 algorithm_store = store(group="algorithm")
 

@@ -1,6 +1,6 @@
 from torch import Tensor
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 class NoOpModule(LatentModule):

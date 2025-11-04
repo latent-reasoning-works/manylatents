@@ -1,4 +1,4 @@
-_target_: manylatents.algorithms.latent.mds.MDSModule
+_target_: manylatents.algorithms.latent.multi_dimensional_scaling.MDSModule
 ndim: 2
 seed: ${seed}
 how: metric   #  choose from ['classic', 'metric', 'nonmetric']

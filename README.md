@@ -23,7 +23,8 @@
 - **Traditional DR methods**: PCA, t-SNE, PHATE, UMAP
 - **Neural architectures**: Autoencoders, VAEs, and custom networks  
 - **Sequential workflows**: Chain multiple algorithms (e.g., PCA → neural network → final embedding)
-- **Diverse datasets**: Genomic data (HGDP, UKBB), single-cell data, synthetic manifolds
+- **Diverse datasets**: Single-cell data, synthetic manifolds, genetics data (with extensions)
+- **🧬 Extensions**: Domain-specific packages like [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) for genomics
 
 ### ✨ Key Features
 
@@ -42,7 +43,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/manylatents.git
+git clone https://github.com/latent-reasoning-works/manylatents.git
 cd manylatents
 
 # Install with uv (recommended)
@@ -51,7 +52,22 @@ source .venv/bin/activate
 
 # Or with pip
 pip install -e .
+
+# Optional: Install extensions for domain-specific functionality
+# See EXTENSIONS.md for details
+uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git  # Genomics support
 ```
+
+### Extensions
+
+manylatents supports domain-specific extensions that add specialized data loaders, metrics, and algorithms:
+
+- **🧬 [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics)**: Genetics and population genetics support
+  ```bash
+  uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+  ```
+
+See [docs/extensions.md](docs/extensions.md) for full documentation on installing and using extensions.
 
 ### Single Algorithm Usage
 
@@ -234,10 +250,10 @@ pipeline:
 - 📊 **Unified Tracking** - Single W&B experiment across all pipeline steps
 
 ### Datasets
-- 🧬 **Genomic**: HGDP, All of Us (AOU), UK Biobank (UKBB)
 - 🔬 **Single-cell**: Embryoid body, custom scRNA-seq data
 - 📐 **Synthetic**: Swiss roll, saddle surface, custom manifolds
 - 🧪 **Test data**: Built-in synthetic datasets for validation
+- 🧬 **Genomics**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) extension (HGDP, AOU, UKBB)
 
 ---
 
@@ -350,15 +366,15 @@ See [Testing Documentation](docs/testing.md) for detailed information.
 - **Fractal Dimension**: Intrinsic dimensionality estimation
 
 ### Dataset-Specific Metrics
-- **Genomic data**: Geographic preservation, admixture analysis
 - **Single-cell**: Cell type separation, trajectory preservation
 - **Synthetic**: Ground-truth manifold recovery
+- **Genomic data**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) (geographic preservation, admixture analysis)
 
 ### Usage
 ```bash
 python -m manylatents.main \
-  experiment=hgdp_pca \
-  metrics=genomic_metrics
+  experiment=single_algorithm \
+  metrics=synthetic_data_metrics
 ```
 
 ---

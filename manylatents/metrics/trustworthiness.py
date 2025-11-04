@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from sklearn.manifold import trustworthiness as sk_trustworthiness
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 def Trustworthiness(embeddings: np.ndarray, 

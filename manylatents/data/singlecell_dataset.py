@@ -2,9 +2,8 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 from typing import Optional
-from .precomputed_mixin import PrecomputedMixin
+# DEPRECATED: PrecomputedMixin removed. Use PrecomputedDataModule for loading saved embeddings.
 import scanpy as sc
-import os
 
 
 class SinglecellDataset(Dataset):
@@ -15,8 +14,6 @@ class SinglecellDataset(Dataset):
     def __init__(self,
                  adata_path: str = None,
                  label_key: str = None,
-                 precomputed_path: Optional[str] = None,
-                 mmap_mode: Optional[str] = None,
                 ): 
         """
         Initializes the single-cell dataset.
@@ -31,10 +28,7 @@ class SinglecellDataset(Dataset):
             If None, assigns all-zero dummy labels.
         """
         adata = sc.read_h5ad(adata_path)
-        if precomputed_path is not None and os.path.exists(precomputed_path):
-            self.data = self.load_precomputed(precomputed_path, mmap_mode)
-        else: 
-            self.data = torch.tensor(adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X, dtype=torch.float32)
+        self.data = torch.tensor(adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X, dtype=torch.float32)
 
         if self.data is None:
             raise ValueError("No data source found: either AnnData or precomputed embeddings are missing.")  
@@ -59,7 +53,7 @@ class SinglecellDataset(Dataset):
         return self.data
 
 
-class EmbryoidBody(SinglecellDataset, PrecomputedMixin):
+class EmbryoidBody(SinglecellDataset):
     def __init__(
         self,
         adata_path: str,

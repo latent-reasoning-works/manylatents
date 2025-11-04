@@ -4,7 +4,7 @@ import torch
 from sklearn.decomposition import PCA
 from torch import Tensor
 
-from ..latent_module_base import LatentModule
+from .latent_module_base import LatentModule
 
 
 class PCAModule(LatentModule):

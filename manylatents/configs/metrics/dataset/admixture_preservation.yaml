@@ -1,3 +1,0 @@
-admixture_preservation:
-  _target_: manylatents.metrics.preservation.AdmixturePreservation
-  _partial_: True

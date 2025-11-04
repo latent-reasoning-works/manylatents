@@ -1,6 +1,0 @@
-geographic_preservation_medians:
-  _target_: manylatents.metrics.preservation.GeographicPreservation
-  _partial_: True
-  use_medians: True
-  only_far: False
-  scale_embeddings: true

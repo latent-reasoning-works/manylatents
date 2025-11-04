@@ -58,3 +58,9 @@ jobs:
   # - Include Lightning module test with trainer.fast_dev_run=true
   #
   # For now, the build-and-test job above provides sufficient validation
+
+  # Note on namespace package integration testing:
+  # CI cannot test with the private manylatents-omics repo due to free org plan limitations.
+  # Instead, namespace integration is tested locally using a mock package.
+  # See: python tests/test_namespace_integration.py
+  # This validates that the namespace package architecture works correctly.

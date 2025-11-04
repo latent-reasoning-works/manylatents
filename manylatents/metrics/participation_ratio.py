@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from sklearn.neighbors import NearestNeighbors
 
-from manylatents.algorithms.latent_module_base import LatentModule
+from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 logger = logging.getLogger(__name__)
 
