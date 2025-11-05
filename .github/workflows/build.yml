@@ -16,7 +16,7 @@ jobs:
   build-and-test:
     name: Build & Unit Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     
     steps:
       - name: Checkout repository
@@ -50,14 +50,28 @@ jobs:
             callbacks/embedding=minimal \
             logger=none
 
-  # TODO: Add integration tests with algorithm/data/metric matrix
-  # When adding, ensure:
-  # - Use experiment configs (e.g., experiment=single_algorithm)
-  # - Use test_data and test_metric for speed
-  # - Add configs for synthetic_data_metrics if using swissroll
-  # - Include Lightning module test with trainer.fast_dev_run=true
+      - name: Check for LatentModule changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            latent:
+              - 'manylatents/algorithms/latent/**'
+              - 'manylatents/configs/algorithms/latent/**'
+
+      - name: Smoke Test All LatentModule Algorithms
+        if: steps.filter.outputs.latent == 'true'
+        run: |
+          source .venv/bin/activate
+          # Dynamically discover and test all LatentModule configs
+          # Ensures new algorithms added in PRs are automatically validated
+          chmod +x .github/workflows/scripts/test_latent_algorithms.sh
+          .github/workflows/scripts/test_latent_algorithms.sh
+
+  # TODO: Add comprehensive integration tests with algorithm/data/metric matrix
+  # TODO: Add Lightning module tests with trainer.fast_dev_run=true
   #
-  # For now, the build-and-test job above provides sufficient validation
+  # Current coverage: All LatentModule algorithms with minimal smoke tests
 
   # Note on namespace package integration testing:
   # CI cannot test with the private manylatents-omics repo due to free org plan limitations.
