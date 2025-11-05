@@ -847,7 +847,7 @@ wheels = [
 
 [[package]]
 name = "graphtools"
-version = "1.5.3"
+version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecated" },
@@ -858,9 +858,9 @@ dependencies = [
     { name = "scipy" },
     { name = "tasklogger" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/cd/d1115be4cbd5cad8b1da4c4d92a6c35dd263d0f9b5eea47ed3d8d19674c7/graphtools-1.5.3.tar.gz", hash = "sha256:b35ae2974d24c507fe01b110d10b1d8c949e20bc49ff9d7d04f94849f9795907", size = 55733 }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/e5/44da85efc1548f5e815f09a03b63f12d25537bdddb3b2a0dfd78b9c7842c/graphtools-2.1.0.tar.gz", hash = "sha256:ffeeb042b927422c990233e51fb7fe0afb42c4345ec1ca1d8926d9a0e6bd0fe8", size = 72044 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/d4/83d43ec3f3c1921d81fea68f3ecc9acf7a979a930402713774be56f95a23/graphtools-1.5.3-py3-none-any.whl", hash = "sha256:bb4477e98e8aa0dcd11ffd61b224853862f5fb1172db8a92d87a48e57436c11b", size = 45363 },
+    { url = "https://files.pythonhosted.org/packages/a1/2b/55ce4d4d1e0baa9e9c87bec30302a4bafb289475181e500d3f20d045cdc7/graphtools-2.1.0-py3-none-any.whl", hash = "sha256:90bf7f4804c9cc3df15af8b47fca12363f9aa4513ca5d83c318d65424c67be48", size = 50116 },
 ]
 
 [[package]]
@@ -1472,7 +1472,7 @@ requires-dist = [
     { name = "executing", specifier = "==2.0.1" },
     { name = "fonttools", specifier = "==4.51.0" },
     { name = "future", specifier = "==1.0.0" },
-    { name = "graphtools", specifier = "==1.5.3" },
+    { name = "graphtools", specifier = ">=2.0.0" },
     { name = "gsutil", specifier = ">=5.33" },
     { name = "h5py", specifier = "==3.10.0" },
     { name = "heatgeo", specifier = ">=0.0.1" },
@@ -1499,7 +1499,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "parso", specifier = "==0.8.4" },
     { name = "pexpect", specifier = "==4.9.0" },
-    { name = "phate", specifier = "==1.0.11" },
+    { name = "phate", specifier = ">=2.0.0" },
     { name = "pillow", specifier = "==10.2.0" },
     { name = "platformdirs", specifier = "==4.2.0" },
     { name = "prompt-toolkit", specifier = "==3.0.43" },
@@ -2275,7 +2275,7 @@ wheels = [
 
 [[package]]
 name = "phate"
-version = "1.0.11"
+version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "deprecated" },
@@ -2283,15 +2283,13 @@ dependencies = [
     { name = "graphtools" },
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "s-gd2" },
     { name = "scikit-learn" },
     { name = "scipy" },
-    { name = "scprep" },
     { name = "tasklogger" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/1a/423539b13ab54f5ca81d09e0c16a5a48ad801cfec5b5e7259a3fa03928a8/phate-1.0.11.tar.gz", hash = "sha256:10162e9edd09ce5d0e667b0767e96eed6bda5ee877667202ffff0a578ab5076d", size = 23512 }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/1d/29bf3537a26f9d8adb54190a5f4edc480cd8899a66422f1d0ef55f2a53b7/phate-2.0.0.tar.gz", hash = "sha256:4605f33b8ca625e8fe9b6a9552a7113f60f86afd816ba9495559494f1e1b2e26", size = 46577 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/04/7e/85ea7d79b1150b08edcf5aac5bc6b601074f2b5cc43e8f3936b10d6e3b0a/phate-1.0.11-py3-none-any.whl", hash = "sha256:5b20755a0068b99725c36723cf292ff0674fd679fd24217d95f0b12f86e57642", size = 23261 },
+    { url = "https://files.pythonhosted.org/packages/32/7f/ab3e73eac07a3d7f0dae6f81028744f2702512cb5a1376870e6de95b7450/phate-2.0.0-py3-none-any.whl", hash = "sha256:d0ca74b188d5397be78a5be11322ca0841738b73f3e27986a6f8eb7e799d2d73", size = 52909 },
 ]
 
 [[package]]
