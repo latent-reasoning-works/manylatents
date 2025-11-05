@@ -8,17 +8,50 @@ Our testing pipeline ensures code quality and validates algorithm functionality 
 
 ## GitHub Actions Pipeline
 
-### Two-Phase Testing
+### Three-Phase Testing
 
-1. **Build & Unit Tests** (10 min): Fast validation of code quality and unit tests
-2. **Integration Tests** (25 min): Matrix testing of algorithm combinations with real data
+1. **Build & Unit Tests** (20 min): Fast validation of code quality and unit tests
+2. **LatentModule Smoke Tests** (conditional): Automatic testing of all DR algorithms when configs change
+3. **Integration Tests** (25 min): Matrix testing of algorithm combinations with real data
 
 ### Current Test Matrix
 
-#### Smoke Tests
+#### LatentModule Smoke Tests (Conditional)
+
+**Purpose**: Automatically test all LatentModule algorithms when configs change
+
+**Triggers on changes to**:
+- `manylatents/algorithms/latent/**`
+- `manylatents/configs/algorithms/latent/**`
+
+**Script**: `.github/workflows/scripts/test_latent_algorithms.sh`
+
+**What it does**:
+- Dynamically discovers all algorithm configs in `manylatents/configs/algorithms/latent/`
+- Runs quick instantiation test for each algorithm
+- Uses minimal test data (swissroll: 10 distributions × 20 points)
+- Currently tests: `aa`, `diffusionmap`, `mds`, `noop`, `pca`, `phate`, `tsne`, `umap`
+
+**What it validates**:
+- ✅ Algorithm config is valid YAML
+- ✅ Algorithm class can be instantiated via Hydra
+- ✅ Algorithm can fit and transform data
+- ✅ Full pipeline completes without errors
+
+**What it does NOT test**:
+- ❌ Mathematical correctness (covered by unit tests)
+- ❌ Lightning modules (future work)
+- ❌ Comprehensive data/metric combinations (covered by integration tests)
+
+**Run locally**:
+```bash
+.github/workflows/scripts/test_latent_algorithms.sh
+```
+
+#### Basic Smoke Tests
 - **smoke-test**: Basic functionality validation
   - Algorithm: `latent/noop`
-  - Data: `test_data` 
+  - Data: `test_data`
   - Timeout: 2 minutes
 
 #### Traditional Dimensionality Reduction
