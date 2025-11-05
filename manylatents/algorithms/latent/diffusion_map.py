@@ -28,8 +28,17 @@ def compute_dm(K, alpha=0., verbose=0):
     #d_noalpha = K.sum(1).flatten()
     d_noalpha = K.sum(axis=1)
 
+    # Check for degenerate kernel (zero or near-zero row sums)
+    if np.any(np.abs(d_noalpha) < 1e-10):
+        n = K.shape[0]
+        evecs_right = np.full((n, n), np.nan)
+        evals = np.full(n, np.nan)
+        L = np.full((n, n), np.nan)
+        S = np.full((n, n), np.nan)
+        return evecs_right, evals, L, d_noalpha, S
+
     # weighted graph Laplacian normalization
-    d = d_noalpha**alpha 
+    d = d_noalpha**alpha
     D = np.diag(d)
     D_inv = np.diag(1/d)
 
@@ -43,12 +52,14 @@ def compute_dm(K, alpha=0., verbose=0):
 
     L = D_inv_alpha@K_alpha # anisotropic transition kernel (AKA diffusion operator)
 
-    # build symmetric matrix
+    # Build symmetric diffusion operator (conjugate to L)
+    # S and L are similar matrices: S = D_sqrt_inv_alpha @ L @ D_sqrt_alpha
+    # They share the same eigenvalues but S is symmetric and has orthogonal eigenvectors
     D_sqrt_inv_alpha = np.diag(1/np.sqrt(d_alpha))
     D_sqrt_alpha = np.diag(np.sqrt(d_alpha))
     S = D_sqrt_inv_alpha@K_alpha@D_sqrt_inv_alpha
 
-    # spectral decomposition of S
+    # spectral decomposition of S (symmetric version)
     # IMPORTANT NOTE:
     # In theory you could run np.linalg.eig(L),
     # BUT this returns non-orthogonal eigenvectors!
@@ -108,9 +119,12 @@ def compute_dm(K, alpha=0., verbose=0):
             print("evals/evecs dont exactly match with diffusion operator. Proceed with caution!")
 
     #diffusion_coords = evecs_right@np.diag(evals)
-    
-    # return eigenvectors and eigenvalues instead so that we can compute DMs for different t's
-    return evecs_right, evals, L, d_noalpha
+
+    # Return eigenvectors and eigenvalues instead so that we can compute DMs for different t's
+    # Also return S (symmetric diffusion operator) for affinity spectrum analysis
+    # Note: S and L are similar matrices (conjugates). S = D_sqrt_inv_alpha @ L @ D_sqrt_alpha
+    # They share the same eigenvalues, but S is symmetric with orthogonal eigenvectors
+    return evecs_right, evals, L, d_noalpha, S
 
 
 def matrix_is_equivalent(ref, new):
@@ -232,7 +246,7 @@ class DiffusionMap():
 
         K = self.G.kernel
         K = np.array(K.todense())
-        self.evecs_right, self.evals, _, _ = compute_dm(K, 1)
+        self.evecs_right, self.evals, _, _, sym_diff_op = compute_dm(K, 1)
         self.X = X
         
         
@@ -448,16 +462,53 @@ class DiffusionMapModule(LatentModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
 
-    @property
-    def affinity_matrix(self):
-        """Returns diffusion operator, without diagonal"""
-        diff_op = self.model.diff_op 
-        A = diff_op - np.diag(diff_op)*np.eye(len(diff_op))
-        return A
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+        """
+        Returns diffusion operator.
 
-    @property
-    def kernel_matrix(self):
-        """Returns kernel matrix used to build diffusion operator"""
-        K =  np.asarray(self.model.graph.K.todense())
-        K = K - np.diag(K)*np.eye(len(K))
+        The diffusion operator is computed during fit and represents the
+        transition matrix of the diffusion process.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: If True, return symmetric diffusion operator (matrix S).
+                          Default False returns row-stochastic diffusion operator.
+
+        Returns:
+            N×N diffusion operator matrix (row-stochastic if use_symmetric=False,
+            symmetric if use_symmetric=True).
+        """
+        if not self._is_fitted:
+            raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
+
+        # Recompute diffusion operator from kernel
+        K = np.asarray(self.model.G.kernel.todense())
+        _, _, diff_op, _, sym_diff_op = compute_dm(K, alpha=1.0)
+
+        if use_symmetric:
+            result = sym_diff_op
+        else:
+            result = diff_op
+
+        if ignore_diagonal:
+            result = result - np.diag(np.diag(result))
+
+        return result
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns kernel matrix used to build diffusion operator.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N kernel matrix.
+        """
+        if not self._is_fitted:
+            raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
+
+        K = np.asarray(self.model.G.kernel.todense())
+        if ignore_diagonal:
+            K = K - np.diag(np.diag(K))
         return K

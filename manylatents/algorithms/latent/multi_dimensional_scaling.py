@@ -46,6 +46,7 @@ class MultidimensionalScaling():
         self.verbose=verbose
 
         self.embedding = None
+        self.distance_matrix = None  # Store computed distance matrix
 
     # Fast classical MDS using random svd
     @deprecated(version="1.0.0", reason="Use phate.mds.classic instead")
@@ -228,10 +229,11 @@ class MultidimensionalScaling():
             )
 
         # MDS embeddings, each gives a different output.
-        X_dist = squareform(pdist(X, self.distance_metric))
+        # Compute and store distance matrix (only computed once)
+        self.distance_matrix = squareform(pdist(X, self.distance_metric))
 
         # initialize all by CMDS
-        Y_classic = self.classic(X_dist)
+        Y_classic = self.classic(self.distance_matrix)
         if self.how == "classic":
             self.embedding = Y_classic
             return Y_classic
@@ -240,20 +242,20 @@ class MultidimensionalScaling():
         if self.solver == "sgd":
             try:
                 # use sgd2 if it is available
-                Y = self.sgd(X_dist, init=Y_classic)
+                Y = self.sgd(self.distance_matrix, init=Y_classic)
                 if np.any(~np.isfinite(Y)):
                     logger.warning("Using SMACOF because SGD returned NaN")
                     raise NotImplementedError
             except NotImplementedError:
                 # sgd2 currently only supports n_components==2
                 Y = self.smacof(
-                    X_dist,
+                    self.distance_matrix,
                     init=Y_classic,
                     metric=True,
                 )
         elif self.solver == "smacof":
             Y = self.smacof(
-                X_dist, init=Y_classic, metric=True
+                self.distance_matrix, init=Y_classic, metric=True
             )
         else:
             raise RuntimeError
@@ -264,7 +266,7 @@ class MultidimensionalScaling():
             return Y
 
         # nonmetric is slowest
-        Y = self.smacof(X_dist, init=Y, metric=False)
+        Y = self.smacof(self.distance_matrix, init=Y, metric=False)
         # re-orient to classic
         _, Y, _ = scipy.spatial.procrustes(Y_classic, Y)
         self.embedding = Y
@@ -288,7 +290,7 @@ class MDSModule(LatentModule):
     ):
         super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
-        self.model = MultidimensionalScaling(ndim=n_components, 
+        self.model = MultidimensionalScaling(ndim=n_components,
                                             seed=random_state,
                                             how=how,
                                             solver=solver,
@@ -301,6 +303,8 @@ class MDSModule(LatentModule):
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
+
+        # embed_MDS will compute and store distance matrix in self.model.distance_matrix
         emb = self.model.embed_MDS(x_np[:n_fit])
         self._is_fitted = True
 
@@ -315,5 +319,71 @@ class MDSModule(LatentModule):
     def fit_transform(self, x: Tensor) -> Tensor:
         """Fit and then transform on same data."""
         x_np = x.detach().cpu().numpy()
+
+        # embed_MDS will compute and store distance matrix in self.model.distance_matrix
         embedding = self.model.embed_MDS(x_np)
+        self._is_fitted = True
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns Gram matrix (same as affinity_matrix for MDS).
+
+        MDS doesn't have a meaningful kernel matrix in the same sense as methods
+        like UMAP or PHATE. The distance matrix is not appropriate for metrics
+        that expect similarity/affinity matrices. Instead, we return the Gram
+        matrix, which is what classical MDS actually uses internally.
+
+        For the raw distance matrix, access self._distance_matrix directly.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N normalized Gram matrix (same as affinity_matrix).
+        """
+        return self.affinity_matrix(ignore_diagonal=ignore_diagonal)
+
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+        """
+        Returns normalized Gram matrix (double-centered squared distance matrix / (n-1)).
+
+        For MDS, the appropriate "affinity" is the Gram matrix that classical MDS
+        uses internally, normalized by (n-1) so eigenvalues represent variance.
+        This is computed as G = -0.5 * H * D^2 * H' / (n-1) where H is
+        the centering matrix and D is the distance matrix.
+
+        The eigenvalues of this normalized Gram matrix represent the variance
+        structure that MDS preserves, analogous to PCA's variance spectrum.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: Ignored for MDS (always symmetric). Default False.
+
+        Returns:
+            N×N normalized Gram matrix (eigenvalues = variance explained).
+        """
+        if not self._is_fitted:
+            raise RuntimeError("MDS model is not fitted yet. Call `fit` first.")
+
+        if self.model.distance_matrix is None:
+            raise RuntimeError("Distance matrix not available. This should not happen.")
+
+        # Compute Gram matrix following classical MDS procedure
+        D_squared = self.model.distance_matrix ** 2
+
+        # Double-center: G = -0.5 * H * D^2 * H where H = I - (1/n)*11'
+        n = D_squared.shape[0]
+        row_means = D_squared.mean(axis=1, keepdims=True)
+        col_means = D_squared.mean(axis=0, keepdims=True)
+        grand_mean = D_squared.mean()
+
+        G = -0.5 * (D_squared - row_means - col_means + grand_mean)
+
+        # Normalize by (n-1) to get variance scale
+        G = G / (n - 1)
+
+        if ignore_diagonal:
+            G = G - np.diag(np.diag(G))
+
+        return G

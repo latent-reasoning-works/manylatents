@@ -3,17 +3,15 @@ import numpy as np
 import networkx as nx
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 
-def connected_components(embeddings: np.ndarray, kernel_matrix: np.ndarray) -> list:
+def connected_components(kernel_matrix: np.ndarray) -> np.ndarray:
     """
-    Compute the number of connected components of graph of affinity matrix / kernel matrix.
+    Compute the sizes of connected components from a kernel/affinity matrix.
 
     Parameters:
-      - dataset: An object with an attribute 'original_data' (the high-dimensional data).
-      - embeddings: A numpy array representing the low-dimensional embeddings.
-      - kernel_matrix: The kernel matrix of dimensionality reduction algorithm.
+      - kernel_matrix: The kernel or affinity matrix representing graph connectivity.
 
     Returns:
-      - A list of each connected components .
+      - Array of component sizes, sorted in descending order.
     """
     graph = nx.from_numpy_array(kernel_matrix)  # Convert adjacency matrix to a graph
     component_sizes = np.sort(np.array([len(k) for k in nx.connected_components(graph)]))[::-1]
@@ -24,13 +22,26 @@ def connected_components(embeddings: np.ndarray, kernel_matrix: np.ndarray) -> l
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule) -> np.ndarray:
-    kernel_matrix = getattr(module, "kernel_matrix", None)
-    if kernel_matrix is None:
+def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule, ignore_diagonal: bool = False) -> np.ndarray:
+    """
+    Compute connected components from the module's kernel matrix.
+
+    Args:
+        dataset: Dataset object (unused).
+        embeddings: Low-dimensional embeddings (unused).
+        module: LatentModule instance with kernel_matrix method.
+        ignore_diagonal: Whether to ignore diagonal when getting kernel matrix.
+
+    Returns:
+        Array of component sizes, or [nan] if kernel matrix not available.
+    """
+    try:
+        kernel_mat = module.kernel_matrix(ignore_diagonal=ignore_diagonal)
+    except (NotImplementedError, AttributeError):
         warnings.warn(
-            "ConnectedComponents metric skipped: module has no 'kernel_matrix' attribute.",
+            f"ConnectedComponents metric skipped: {module.__class__.__name__} does not expose a kernel_matrix.",
             RuntimeWarning
         )
         return np.array([np.nan])
 
-    return connected_components(embeddings=embeddings, kernel_matrix=kernel_matrix)
+    return connected_components(kernel_matrix=kernel_mat)

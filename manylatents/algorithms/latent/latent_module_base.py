@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import numpy as np
 
 from torch import Tensor
 
@@ -24,3 +25,53 @@ class LatentModule(ABC):
     def fit_transform(self, x: Tensor) -> Tensor:
         self.fit(x)
         return self.transform(x)
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Return the kernel matrix (similarity matrix) used by the algorithm.
+
+        The kernel matrix is a symmetric N×N matrix where entry (i,j) represents
+        the similarity between samples i and j. This is the raw kernel before
+        any normalization is applied.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N numpy array representing the kernel matrix.
+
+        Raises:
+            NotImplementedError: If the algorithm does not expose a kernel matrix.
+            RuntimeError: If called before fitting the model.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not expose a kernel_matrix. "
+            "This may be because the algorithm does not use a kernel-based approach."
+        )
+
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+        """
+        Return the affinity matrix (normalized transition matrix) used by the algorithm.
+
+        The affinity matrix is derived from the kernel matrix through normalization
+        (e.g., row normalization, diffusion normalization). It often represents
+        transition probabilities or diffusion operators.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+            use_symmetric: If True, return a symmetric version of the affinity matrix
+                          (if available). For methods like diffusion maps, this returns
+                          the symmetric diffusion operator with guaranteed positive
+                          eigenvalues. Default False.
+
+        Returns:
+            N×N numpy array representing the affinity matrix.
+
+        Raises:
+            NotImplementedError: If the algorithm does not expose an affinity matrix.
+            RuntimeError: If called before fitting the model.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not expose an affinity_matrix. "
+            "This may be because the algorithm does not use a kernel-based approach."
+        )

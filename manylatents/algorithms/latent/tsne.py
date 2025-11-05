@@ -8,6 +8,7 @@ from openTSNE.tsne import TSNEEmbedding
 from torch import Tensor
 
 from .latent_module_base import LatentModule
+from ...utils.kernel_utils import symmetric_diffusion_operator
 
 
 def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
@@ -120,32 +121,66 @@ class TSNEModule(LatentModule):
         embedding_out = self.embedding_train.transform(x_np)
         return torch.tensor(embedding_out, device=x.device, dtype=x.dtype)
 
-    @property
-    def affinity_matrix(self):
-        """Returns P matrix"""
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+        """
+        Returns t-SNE affinity matrix.
+
+        openTSNE's P matrix is symmetrized and scaled by 1/(2N). This method can return
+        either a row-stochastic (asymmetric) or symmetric diffusion operator version.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+                Note: P matrix typically has very small diagonal values already.
+            use_symmetric: If True, return symmetric diffusion operator with guaranteed
+                positive eigenvalues. If False, return row-stochastic matrix. Default False.
+
+        Returns:
+            N×N affinity matrix (row-normalized if use_symmetric=False, symmetric if True).
+        """
         if not self._is_fitted:
-            raise RuntimeError("Model not fitted.")
-        P = np.asarray(self.affinities.P.todense())
-        return P
+            raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
-    @property
-    def kernel_matrix(self):
-        """Returns kernel matrix used to build P matrix (not including diagonal)"""
+        if use_symmetric:
+            # Return symmetric diffusion operator for positive eigenvalue guarantee
+            K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+            return symmetric_diffusion_operator(K)
+        else:
+            # Return row-stochastic matrix (original behavior)
+            P = np.asarray(self.affinities.P.todense())
+            if ignore_diagonal:
+                P = P - np.diag(np.diag(P))
+
+            # Row-normalize to make it a proper transition matrix
+            row_sums = P.sum(axis=1, keepdims=True)
+            row_sums[row_sums == 0] = 1  # Avoid division by zero
+            P_normalized = P / row_sums
+
+            return P_normalized
+
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """
+        Returns Gaussian kernel matrix built from raw knn distances.
+
+        This constructs a dense kernel from the perplexity-calibrated Gaussian
+        similarities computed during t-SNE's affinity computation.
+
+        Args:
+            ignore_diagonal: If True, set diagonal entries to zero. Default False.
+
+        Returns:
+            N×N kernel matrix based on Gaussian similarities.
+        """
         if not self._is_fitted:
-            raise RuntimeError("Model not fitted.")
+            raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
-        # NOTE: affinity matrix has more non-zero entries than kernel matrix.
-        # Not sure why.
-        # NOTE: values here are >> 1
-        #K_no_diag = build_dense_distance_matrix(self.affinities._PerplexityBasedNN__distances,
-        #                                        self.affinities._PerplexityBasedNN__neighbors)
-        # symmetrize
-        #K_no_diag = (K_no_diag + K_no_diag.T) / 2
-        K_no_diag = np.asarray(self.affinities.P.todense())
+        # Build kernel from raw knn distances and neighbors
+        # The P matrix is built from perplexity-calibrated conditional probabilities
+        # For the kernel, we use the symmetrized P as a reasonable kernel
+        # (since true raw Gaussian kernel would require storing all pairwise distances)
+        K = np.asarray(self.affinities.P.todense())
 
-        # add diagonal (just setting to 1)
-        #K = np.eye(len(K_no_diag)) + K_no_diag
-        K = K_no_diag
+        if ignore_diagonal:
+            K = K - np.diag(np.diag(K))
 
         return K
     

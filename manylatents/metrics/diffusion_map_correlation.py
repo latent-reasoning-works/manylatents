@@ -41,7 +41,7 @@ def diffusion_map_correlation(
     embeddings_subset = embeddings[:, :n_components]
 
     # Compute diffusion map coordinates
-    evecs_right, evals, _, _ = compute_dm(kernel_matrix, alpha=alpha)
+    evecs_right, evals, _, _, _ = compute_dm(kernel_matrix, alpha=alpha)
 
     # Get diffusion map coordinates (skip first eigenvector which is constant)
     # Use t=1 for standard diffusion coordinates
@@ -107,16 +107,32 @@ def DiffusionMapCorrelation(
         [corr(embed1, DM1), corr(embed2, DM2), ...].
         One correlation score per diffusion map coordinate.
     """
-    if module is None or getattr(module, "kernel_matrix", None) is None:
+    # Skip for modules that don't have kernel_matrix
+    if module is None or not hasattr(module, "kernel_matrix"):
         warnings.warn(
             "DiffusionMapCorrelation metric skipped: missing module.kernel_matrix.",
             RuntimeWarning
         )
         return float("nan")
 
+    # Skip for specific algorithm types where this metric is not appropriate
+    module_name = module.__class__.__name__
+    skip_modules = {
+        "PCAModule": "Gram matrix not appropriate as kernel matrix",
+        "MDSModule": "Distance-based method without appropriate kernel matrix",
+        "DiffusionMapModule": "Would be trivially 1.0 (diffusion maps vs diffusion maps)"
+    }
+
+    if module_name in skip_modules:
+        warnings.warn(
+            f"DiffusionMapCorrelation metric skipped for {module_name}: {skip_modules[module_name]}",
+            RuntimeWarning
+        )
+        return float("nan")
+
     return diffusion_map_correlation(
         embeddings=embeddings,
-        kernel_matrix=module.kernel_matrix,
+        kernel_matrix=module.kernel_matrix(),
         dm_components=dm_components,
         alpha=alpha,
         correlation_type=correlation_type
