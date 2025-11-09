@@ -1,7 +1,7 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-from .synthetic_dataset import SwissRoll
+from .synthetic_dataset import SwissRoll, SwissRollGap
 
 class SwissRollDataModule(LightningDataModule):
     """
@@ -22,6 +22,9 @@ class SwissRollDataModule(LightningDataModule):
         random_state: int = 42,
         rotate_to_dim: int = 3,
         mode: str = 'full',
+        use_gap: bool = False,
+        n_gaps: int = 3,
+        gap_fraction: float = 0.12,
     ):
         """
         Initialize the SwissRollDataModule with configuration parameters for data loading
@@ -83,6 +86,11 @@ class SwissRollDataModule(LightningDataModule):
         self.rotate_to_dim = rotate_to_dim
 
         self.mode = mode
+        # If True, use the SwissRollGap variation (manifold with large gaps)
+        self.use_gap = use_gap
+        # Parameters controlling the gaps when use_gap=True
+        self.n_gaps = n_gaps
+        self.gap_fraction = gap_fraction
 
         self.dataset = None
         self.train_dataset = None
@@ -94,27 +102,53 @@ class SwissRollDataModule(LightningDataModule):
 
     def setup(self, stage: str = None):
         if self.mode == "full":
-            self.train_dataset = SwissRoll(
-                n_distributions=self.n_distributions,
-                n_points_per_distribution=self.n_points_per_distribution,
-                noise=self.noise,
-                manifold_noise=self.manifold_noise,
-                width=self.width,
-                random_state=self.random_state,
-                rotate_to_dim=self.rotate_to_dim,
-            )
+            if self.use_gap:
+                self.train_dataset = SwissRollGap(
+                    n_distributions=self.n_distributions,
+                    n_points_per_distribution=self.n_points_per_distribution,
+                    noise=self.noise,
+                    manifold_noise=self.manifold_noise,
+                    width=self.width,
+                    random_state=self.random_state,
+                    rotate_to_dim=self.rotate_to_dim,
+                    n_gaps=self.n_gaps,
+                    gap_fraction=self.gap_fraction,
+                )
+            else:
+                self.train_dataset = SwissRoll(
+                    n_distributions=self.n_distributions,
+                    n_points_per_distribution=self.n_points_per_distribution,
+                    noise=self.noise,
+                    manifold_noise=self.manifold_noise,
+                    width=self.width,
+                    random_state=self.random_state,
+                    rotate_to_dim=self.rotate_to_dim,
+                )
             self.test_dataset = self.train_dataset
 
         elif self.mode == 'split':
-            self.dataset = SwissRoll(
-                n_distributions=self.n_distributions,
-                n_points_per_distribution=self.n_points_per_distribution,
-                noise=self.noise,
-                manifold_noise=self.manifold_noise,
-                width=self.width,
-                random_state=self.random_state,
-                rotate_to_dim=self.rotate_to_dim,
-            )
+            if self.use_gap:
+                self.dataset = SwissRollGap(
+                    n_distributions=self.n_distributions,
+                    n_points_per_distribution=self.n_points_per_distribution,
+                    noise=self.noise,
+                    manifold_noise=self.manifold_noise,
+                    width=self.width,
+                    random_state=self.random_state,
+                    rotate_to_dim=self.rotate_to_dim,
+                    n_gaps=self.n_gaps,
+                    gap_fraction=self.gap_fraction,
+                )
+            else:
+                self.dataset = SwissRoll(
+                    n_distributions=self.n_distributions,
+                    n_points_per_distribution=self.n_points_per_distribution,
+                    noise=self.noise,
+                    manifold_noise=self.manifold_noise,
+                    width=self.width,
+                    random_state=self.random_state,
+                    rotate_to_dim=self.rotate_to_dim,
+                )
 
             test_size = int(len(self.dataset) * self.test_split)
             train_size = len(self.dataset) - test_size
@@ -149,10 +183,10 @@ class SwissRollDataModule(LightningDataModule):
         )
     
 if __name__ == "__main__":
+    from .synthetic_dataset import SwissRoll, SwissRollGap
+    # for testing only: python -m manylatents.data.swissroll
 
-    from synthetic_dataset import SwissRoll
-
-    # Initialize DataModule
+    print("Testing SwissRollDataModule with SwissRoll (no gaps):")
     sr = SwissRollDataModule(
         batch_size=64,
         test_split=0.2,
@@ -164,22 +198,46 @@ if __name__ == "__main__":
         random_state=123,
         rotate_to_dim=5,
         mode='split',
+        use_gap=False,
     )
-
-    # Setup datasets
     sr.setup()
-
-    # Load one batch from train and val
     train_loader = sr.train_dataloader()
     val_loader = sr.val_dataloader()
-
     train_batch = next(iter(train_loader))
     val_batch = next(iter(val_loader))
+    print("SwissRoll train batch x shape:", train_batch['data'].shape)
+    print("SwissRoll train batch y shape:", train_batch['metadata'].shape)
+    print("SwissRoll val batch x shape:", val_batch['data'].shape)
+    print("SwissRoll val batch y shape:", val_batch['metadata'].shape)
 
-    print("Train batch:")
-    print("  x shape:", train_batch['data'].shape)
-    print("  y shape:", train_batch['metadata'].shape)
+    print("\nTesting SwissRollDataModule with SwissRollGap (gaps enabled):")
+    sr_gap = SwissRollDataModule(
+        batch_size=64,
+        test_split=0.2,
+        n_distributions=10,
+        n_points_per_distribution=30,
+        noise=0.05,
+        manifold_noise=0.05,
+        width=5.0,
+        random_state=123,
+        rotate_to_dim=5,
+        precomputed_path=None,
+        mmap_mode=None,
+        mode='split',
+        use_gap=True,
+        n_gaps=2,
+        gap_fraction=0.2,
+    )
+    sr_gap.setup()
+    train_loader_gap = sr_gap.train_dataloader()
+    val_loader_gap = sr_gap.val_dataloader()
+    train_batch_gap = next(iter(train_loader_gap))
+    val_batch_gap = next(iter(val_loader_gap))
+    print("SwissRollGap train batch x shape:", train_batch_gap['data'].shape)
+    print("SwissRollGap train batch y shape:", train_batch_gap['metadata'].shape)
+    print("SwissRollGap val batch x shape:", val_batch_gap['data'].shape)
+    print("SwissRollGap val batch y shape:", val_batch_gap['metadata'].shape)
 
-    print("Validation batch:")
-    print("  x shape:", val_batch['data'].shape)
-    print("  y shape:", val_batch['metadata'].shape)
+    # Print summary of gap effect
+    print("\nSwissRoll total points:", len(sr.train_dataset))
+    print("SwissRollGap total points:", len(sr_gap.train_dataset))
