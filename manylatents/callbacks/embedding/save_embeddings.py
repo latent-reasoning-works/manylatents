@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +13,26 @@ from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_emb
 from manylatents.utils.utils import save_embeddings
 
 logger = logging.getLogger(__name__)
+
+# Import LoggingContext if Geomancer is available
+try:
+    # Add Geomancer to path if running in multi-repo setup
+    geomancer_path = Path(__file__).resolve().parents[4] / "Geomancer"
+    if geomancer_path.exists() and str(geomancer_path) not in sys.path:
+        sys.path.insert(0, str(geomancer_path))
+    from geomancy.logging_context import LoggingContext
+    GEOMANCER_AVAILABLE = True
+except ImportError:
+    GEOMANCER_AVAILABLE = False
+    logger.debug("LoggingContext not available - running in standalone mode")
+
+# Import atomic_writer
+try:
+    from manylatents.callbacks.embedding.atomic_writer import write_embedding_outputs_atomic
+    ATOMIC_WRITER_AVAILABLE = True
+except ImportError:
+    ATOMIC_WRITER_AVAILABLE = False
+    logger.debug("atomic_writer not available")
 
 class SaveEmbeddings(EmbeddingCallback):
     def __init__(self,
@@ -232,8 +253,22 @@ class SaveEmbeddings(EmbeddingCallback):
         return save_path
 
     def on_latent_end(self, dataset: any, embeddings: dict) -> str:
+        # Save to default location (backward compatibility)
         self.save_embeddings(embeddings)
         self.register_output("saved_embeddings", self.save_path)
+
+        # If running under Geomancer orchestration, also write to shared metrics directory
+        if GEOMANCER_AVAILABLE and ATOMIC_WRITER_AVAILABLE:
+            try:
+                step_dir = LoggingContext.get_step_dir(create=True)
+                if step_dir:
+                    logger.info(f"Writing to shared metrics directory: {step_dir}")
+                    write_embedding_outputs_atomic(embeddings, step_dir / "outputs.json")
+                    LoggingContext.write_completion_marker(step_dir)
+                    logger.info(f"Successfully wrote EmbeddingOutputs to {step_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to write to shared metrics directory: {e}")
+                # Continue - don't fail the whole callback if shared logging fails
 
         # Optionally save metric tables
         if self.save_metric_tables:
