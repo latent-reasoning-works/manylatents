@@ -130,9 +130,18 @@ def DiffusionMapCorrelation(
         )
         return float("nan")
 
+    try:
+        kernel_matrix = module.kernel_matrix()
+    except (NotImplementedError, AttributeError):
+        warnings.warn(
+            f"DiffusionMapCorrelation metric skipped: {module_name} does not expose a kernel_matrix.",
+            RuntimeWarning
+        )
+        return float("nan")
+
     return diffusion_map_correlation(
         embeddings=embeddings,
-        kernel_matrix=module.kernel_matrix(),
+        kernel_matrix=kernel_matrix,
         dm_components=dm_components,
         alpha=alpha,
         correlation_type=correlation_type
