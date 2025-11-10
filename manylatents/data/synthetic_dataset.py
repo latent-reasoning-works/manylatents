@@ -155,18 +155,173 @@ class SwissRoll(SyntheticDataset):
         )  # (1, 100)
 
     def get_gt_dists(self):
-        u_t = self._unroll_t(self.ts)  # (1, 5000)
-        true_coords = np.concatenate(
-            (u_t, self.ys[None, ...])
-        ).T  # (5000, 2) This is a 2D space
-        geodesic_dist = pairwise_distances(true_coords, metric="euclidean") # (5000,5000)
-        return geodesic_dist
+        """Return ground-truth geodesic distances for the swiss-roll.
+
+        This returns exact Euclidean distances computed on the 2D unrolled
+        manifold coordinates (unrolled t, y). 
+        """
+        if getattr(self, "ts", None) is None:
+            raise RuntimeError("ground-truth t coordinates are not available")
+
+        # unrolled t coordinate as in _unroll_t
+        u_t = self._unroll_t(self.ts)  # shape (1, N)
+        true_coords = np.concatenate((u_t, self.ys[None, ...])).T  # shape (N, 2)
+
+        return pairwise_distances(true_coords, metric="euclidean")
 
     def get_graph(self):
         """Create a graphtools graph if does not exist."""
         if self.graph is None:
             self.graph = graphtools.Graph(self.data, use_pygsp=True)
         return self.graph
+
+
+class SwissRollGap(SyntheticDataset):
+    """
+    SwissRoll dataset variation that contains large gaps in the manifold.
+
+    This class wraps the external generator `generate_swissroll_gap` and
+    exposes the same interface as `SwissRoll` (data, metadata, get_gt_dists,
+    get_graph) so it can be used interchangeably by data modules and tests.
+    """
+
+    @staticmethod
+    def generate_swissroll_gap(
+        n_distributions: int = 100,
+        n_points_per_distribution: int = 50,
+        noise: float = 0.1,
+        manifold_noise: float = 0.1,
+        width: float = 10.0,
+        random_state: int = 42,
+        rotate_to_dim: int = 3,
+        n_gaps: int = 3,
+        gap_fraction: float = 0.12,
+    ):
+        """Create a swiss-roll like point cloud with gaps between some blobs.
+
+        This implementation mirrors the original `SwissRoll` parameterization
+        so that ground-truth geodesic distances can be computed on the same
+        2D "unrolled" coordinate space (unrolled t, y).
+
+        Returns:
+            M: noisy observations (N, D)
+            M_gt: ground-truth manifold coords used for geodesic dist (N, 2)
+            C: integer labels per-sample (N,)
+        """
+        rng = np.random.default_rng(random_state)
+
+        # Base means along the t (manifold) coordinate similar to SwissRoll
+        base_means = 3 * np.pi / 2 * (1 + 2 * rng.random(n_distributions))
+
+        # Sort means so gaps are applied consistently along the manifold
+        base_means = np.sort(base_means)
+
+        # Compute gap size in t-units (fraction of the overall span)
+        if n_gaps > 0 and gap_fraction > 0.0:
+            span = base_means[-1] - base_means[0]
+            single_gap = gap_fraction * span
+            # choose gap insertion indices (between 1 and n_distributions-1)
+            gap_idxs = []
+            if n_gaps >= n_distributions:
+                # too many gaps requested; cap to reasonable number
+                n_gaps = max(0, n_distributions - 1)
+            if n_gaps > 0:
+                gap_idxs = sorted(rng.choice(np.arange(1, n_distributions), size=n_gaps, replace=False))
+
+            # apply cumulative shifts after each selected gap index
+            shifted = base_means.copy()
+            total_shift = 0.0
+            for gi in gap_idxs:
+                total_shift += single_gap
+                shifted[gi:] += single_gap
+        else:
+            shifted = base_means.copy()
+
+        # y means across blobs
+        mean_y = width * rng.uniform(size=n_distributions)
+
+        # For each distribution, sample local manifold noise and flatten to point-level
+        t_samples = (manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution)) + shifted[:, None]).reshape(-1)
+        y_samples = (width * manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution)) + mean_y[:, None]).reshape(-1)
+
+        # 3D manifold coords (clean)
+        x = t_samples * np.cos(t_samples)
+        z = t_samples * np.sin(t_samples)
+        M_gt_cart = np.vstack([x, y_samples, z]).T  # (N,3)
+
+        # Optionally rotate to higher dim but keep M_gt for geodesic in 2D unrolled space
+        if rotate_to_dim is not None and rotate_to_dim > 3:
+            rot = special_ortho_group.rvs(rotate_to_dim)[:3]
+            M_obs = M_gt_cart.dot(rot)
+        else:
+            M_obs = M_gt_cart.copy()
+
+        # add observation noise
+        obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        M = M_obs + obs_noise
+
+        # Compute unrolled t coordinate exactly as in SwissRoll._unroll_t
+        t_flat = t_samples.flatten()
+        u_t = 0.5 * ((np.sqrt(t_flat ** 2 + 1) * t_flat) + np.arcsinh(t_flat))
+        # ground-truth 2D coords used for geodesic distances
+        M_gt_2d = np.vstack([u_t, y_samples]).T
+
+        # labels: each original distribution gets a label (0..n_distributions-1)
+        labels = np.repeat(np.arange(n_distributions), n_points_per_distribution)
+
+        return M, M_gt_2d, labels
+
+    def __init__(
+        self,
+        n_distributions=100,
+        n_points_per_distribution=50,
+        noise=0.1,
+        manifold_noise=0.1,
+        width=10.0,
+        random_state=42,
+        rotate_to_dim=3,
+        n_gaps: int = 3,
+        gap_fraction: float = 0.12,
+    ):
+        super().__init__()
+
+        # Generate the swissroll with gaps (returns noisy obs, ground-truth coords, labels)
+        M, M_gt, C = self.generate_swissroll_gap(
+            n_distributions=n_distributions,
+            n_points_per_distribution=n_points_per_distribution,
+            noise=noise,
+            manifold_noise=manifold_noise,
+            width=width,
+            random_state=random_state,
+            rotate_to_dim=rotate_to_dim,
+            n_gaps=n_gaps,
+            gap_fraction=gap_fraction,
+        )
+
+        self.data = M
+
+        # Keep ground-truth coordinates and labels accessible
+        self.data_gt = M_gt
+        self.metadata = C
+
+
+    def get_gt_dists(self):
+        """Return ground-truth geodesic distances for the swiss-roll-with-gaps.
+
+        This returns exact Euclidean distances computed on the 2D unrolled
+        manifold coordinates stored in `self.data_gt` (unrolled t, y).
+        """
+        if getattr(self, "data_gt", None) is None:
+            raise RuntimeError("ground-truth coordinates are not available")
+
+        return pairwise_distances(self.data_gt, metric="euclidean")
+
+    def get_graph(self):
+        """Create a graphtools graph if does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+    
     
 
 class SaddleSurface(SyntheticDataset):
@@ -1214,11 +1369,13 @@ class DLATreeFromGraph(SyntheticDataset):
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "gaussian_blobs" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
+    data_name = "swiss_roll_gap" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
-
+    elif data_name == "swiss_roll_gap":
+        dataset = SwissRollGap(n_distributions=10, n_points_per_distribution=100, width=10.0, noise=0.2, manifold_noise=0.2, random_state=42, rotate_to_dim=50,
+                               n_gaps=3, gap_fraction=0.5) 
     elif data_name == "saddle_surface":
         dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
     elif data_name == "dla_tree":
@@ -1235,7 +1392,7 @@ if __name__ == "__main__":
     print("Data shape:", dataset.data.shape)
     print("Labels shape:", dataset.metadata.shape)
     
-    if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "torus":
+    if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "torus" or data_name == "swiss_roll_gap":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
@@ -1252,7 +1409,6 @@ if __name__ == "__main__":
         phate_data = phate_operator.fit_transform(data)
         plt.figure(figsize=(8, 6))
         plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
-
     plt.savefig(f"{data_name}.png", bbox_inches='tight') 
 
     
