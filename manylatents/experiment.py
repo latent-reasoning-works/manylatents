@@ -24,6 +24,44 @@ from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddi
 
 logger = logging.getLogger(__name__)
 
+
+def should_disable_wandb(cfg: DictConfig) -> bool:
+    """
+    Determine if WandB should be disabled based on configuration.
+
+    WandB is disabled when:
+    1. logger is explicitly set to None (orchestrated by parent like Geomancer)
+    2. debug mode is True (fast testing/CI)
+    3. WANDB_MODE environment variable is set to 'disabled'
+
+    This ensures consistent behavior across run_algorithm() and run_pipeline().
+
+    Args:
+        cfg: Hydra configuration
+
+    Returns:
+        True if WandB should be disabled, False otherwise
+    """
+    import os
+
+    # Check explicit logger=None (orchestrated mode)
+    if cfg.logger is None:
+        logger.info("WandB disabled: logger=None (orchestrated by parent)")
+        return True
+
+    # Check debug mode
+    if cfg.debug:
+        logger.info("WandB disabled: debug=True")
+        return True
+
+    # Check environment variable (allows external override)
+    if os.environ.get('WANDB_MODE', '').lower() == 'disabled':
+        logger.info("WandB disabled: WANDB_MODE=disabled")
+        return True
+
+    return False
+
+
 def instantiate_datamodule(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> LightningDataModule:
     check_or_make_dirs(cfg.cache_dir)
     logger.info(f"Cache directory ensured at: {cfg.cache_dir}")
@@ -286,16 +324,18 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     setup_logging(debug=cfg.debug)
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
 
-    # Initialize wandb if logger config is provided
+    # Initialize wandb if logger config is provided and not disabled
     wandb_run = None
-    if cfg.logger is not None:
+    wandb_disabled = should_disable_wandb(cfg)
+
+    if not wandb_disabled and cfg.logger is not None:
         logger.info(f"Initializing wandb logger: {OmegaConf.to_yaml(cfg.logger)}")
         wandb_run = hydra.utils.instantiate(
             cfg.logger,
             config=OmegaConf.to_container(cfg, resolve=True)
         )
     else:
-        logger.info("No logger configured - skipping wandb initialization")
+        logger.info("WandB logging disabled - skipping wandb initialization")
 
     lightning.seed_everything(cfg.seed, workers=True)
 
@@ -330,10 +370,14 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     # --- Loggers ---
     # Only instantiate trainer loggers if top-level logger is enabled
     # This keeps LatentModule and LightningModule logging in sync
+    # Use the centralized should_disable_wandb() check for consistency
     loggers = []
-    if cfg.logger is not None and not cfg.debug:
+    if not wandb_disabled and cfg.logger is not None:
         for lg_conf in cfg.trainer.get("logger", {}).values():
             loggers.append(hydra.utils.instantiate(lg_conf))
+        logger.info(f"Trainer loggers enabled: {len(loggers)} logger(s)")
+    else:
+        logger.info("Trainer loggers disabled (WandB disabled)")
 
     # --- Trainer ---
     trainer = instantiate_trainer(
@@ -394,9 +438,19 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             )
 
     # --- Callback processing ---
+    callback_outputs = {}
     if embeddings and embedding_cbs:
         for cb in embedding_cbs:
-            cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
+            cb_result = cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
+            # Merge callback outputs into the main callback_outputs dict
+            if isinstance(cb_result, dict):
+                callback_outputs.update(cb_result)
+                logger.info(f"Callback {cb.__class__.__name__} returned: {list(cb_result.keys())}")
+
+    # Add callback outputs to embeddings dict if any were generated
+    if callback_outputs:
+        embeddings['callback_outputs'] = callback_outputs
+        logger.info(f"Added callback outputs to embeddings: {list(callback_outputs.keys())}")
 
     logger.info("Experiment complete.")
 
@@ -427,12 +481,30 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
     if not hasattr(cfg, 'pipeline') or cfg.pipeline is None or len(cfg.pipeline) == 0:
         raise ValueError("No pipeline configuration found. Use run_algorithm() for single runs.")
 
-    with wandb.init(
-        project=cfg.project,
-        name=cfg.name,
-        config=OmegaConf.to_container(cfg, resolve=True),
-        mode="disabled" if cfg.debug else "online",
-    ) as run:
+    # Determine if WandB should be disabled using centralized check
+    wandb_disabled = should_disable_wandb(cfg)
+
+    # Initialize WandB based on configuration (respects logger=None, debug=True, and WANDB_MODE)
+    if wandb_disabled:
+        # Use disabled mode - wandb.init() will return a no-op run
+        logger.info("Initializing WandB in disabled mode")
+        wandb_context = wandb.init(
+            project=cfg.project,
+            name=cfg.name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+            mode="disabled",
+        )
+    else:
+        # Normal WandB initialization
+        logger.info("Initializing WandB in online mode")
+        wandb_context = wandb.init(
+            project=cfg.project,
+            name=cfg.name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+            mode="online",
+        )
+
+    with wandb_context as run:
         lightning.seed_everything(cfg.seed, workers=True)
 
         # --- One-time setup: Create initial datamodule, trainer, callbacks ---
@@ -450,11 +522,14 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         if not embedding_cbs:
             logger.info("No embedding callbacks configured.")
 
-        # Setup loggers
+        # Setup loggers (use same logic as run_algorithm for consistency)
         loggers = []
-        if not cfg.debug:
+        if not wandb_disabled and cfg.logger is not None:
             for lg_conf in cfg.trainer.get("logger", {}).values():
                 loggers.append(hydra.utils.instantiate(lg_conf))
+            logger.info(f"Trainer loggers enabled: {len(loggers)} logger(s)")
+        else:
+            logger.info("Trainer loggers disabled (WandB disabled)")
 
         # Setup trainer (shared across all steps)
         trainer = instantiate_trainer(
@@ -575,10 +650,20 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         )
 
         # --- Callback processing ---
+        callback_outputs = {}
         if embeddings and embedding_cbs:
             logger.info("Running embedding callbacks...")
             for cb in embedding_cbs:
-                cb.on_latent_end(dataset=initial_datamodule.test_dataset, embeddings=embeddings)
+                cb_result = cb.on_latent_end(dataset=initial_datamodule.test_dataset, embeddings=embeddings)
+                # Merge callback outputs into the main callback_outputs dict
+                if isinstance(cb_result, dict):
+                    callback_outputs.update(cb_result)
+                    logger.info(f"Callback {cb.__class__.__name__} returned: {list(cb_result.keys())}")
+
+        # Add callback outputs to embeddings dict if any were generated
+        if callback_outputs:
+            embeddings['callback_outputs'] = callback_outputs
+            logger.info(f"Added callback outputs to embeddings: {list(callback_outputs.keys())}")
 
         logger.info("Pipeline workflow complete.")
 
