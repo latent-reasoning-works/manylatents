@@ -80,6 +80,9 @@ pip-delete-this-directory.txt
 profile_default/
 ipython_config.py
 
+# DS_Store
+.DS_Store
+**/.DS_Store
 # pdm
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
 #pdm.lock

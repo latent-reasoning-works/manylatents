@@ -250,7 +250,7 @@ pipeline:
 - 📊 **Unified Tracking** - Single W&B experiment across all pipeline steps
 
 ### Datasets
-- 🔬 **Single-cell**: Embryoid body, custom scRNA-seq data
+- 🔬 **Single-cell**: Anndata, scRNA-seq data in h5ad format
 - 📐 **Synthetic**: Swiss roll, saddle surface, custom manifolds
 - 🧪 **Test data**: Built-in synthetic datasets for validation
 - 🧬 **Genomics**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) extension (HGDP, AOU, UKBB)

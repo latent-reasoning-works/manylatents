@@ -1,11 +1,12 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
-from .singlecell_dataset import EmbryoidBody
+from .anndata_dataset import AnnDataset
 
-class EmbryoidBodyDataModule(LightningDataModule):
+class AnnDataModule(LightningDataModule):
     """
-    PyTorch Lightning DataModule for the SwissRoll Dataset. 
+    PyTorch Lightning DataModule that handles Anndata (.h5ad) files.
+    This module is useful when dealing with single-cell RNA-seq datasets stored in Anndata format.
     """
 
     def __init__(
@@ -14,12 +15,13 @@ class EmbryoidBodyDataModule(LightningDataModule):
         test_split: float = 0.2,
         num_workers: int = 0,
         random_state: int = 42,
+        shuffle_traindata: bool = False,
         adata_path: str = None,
         label_key: str = None,
         mode: str = 'full',
     ):
         """
-        Initialize the EmbryoidBodyDataModule with configuration parameters for data loading
+        Initialize the AnnDataModule with configuration parameters for data loading
         and synthetic data generation.
 
         Parameters
@@ -32,6 +34,12 @@ class EmbryoidBodyDataModule(LightningDataModule):
 
         num_workers : int, default=0
             Number of subprocesses to use for data loading in PyTorch's DataLoader.
+
+        random_state : int, default=42
+            Random seed for reproducibility when splitting datasets.
+        
+        shuffle_traindata : bool, default=True
+            Whether to shuffle the training data in the DataLoader.
 
         adata_path : str
             Path to the raw .h5ad file containing the full dataset.
@@ -51,8 +59,9 @@ class EmbryoidBodyDataModule(LightningDataModule):
         self.test_split = test_split
         self.num_workers = num_workers
         self.random_state = random_state
+        self.shuffle_traindata = shuffle_traindata
 
-        # EmbryoidBody specific parameters
+        # AnnDataset specific parameters
         self.adata_path = adata_path
         self.label_key = label_key
 
@@ -66,14 +75,14 @@ class EmbryoidBodyDataModule(LightningDataModule):
         """Prepare data for use (e.g., downloading, saving to disk)."""
         pass
 
-    def setup(self, stage: str = None):
+    def setup(self):
         if self.mode == "full":
-            self.train_dataset = EmbryoidBody(adata_path=self.adata_path,
+            self.train_dataset = AnnDataset(adata_path=self.adata_path,
                                               label_key=self.label_key)
             self.test_dataset = self.train_dataset
 
         elif self.mode == 'split':
-            self.dataset = EmbryoidBody(adata_path=self.adata_path,
+            self.dataset = AnnDataset(adata_path=self.adata_path,
                                         label_key=self.label_key)
             test_size = int(len(self.dataset) * self.test_split)
             train_size = len(self.dataset) - test_size
@@ -88,7 +97,7 @@ class EmbryoidBodyDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 
@@ -109,10 +118,10 @@ class EmbryoidBodyDataModule(LightningDataModule):
     
 if __name__ == "__main__":
 
-    from singlecell_dataset import EmbryoidBody
+    from .anndata_dataset import AnnDataset
 
     # Initialize DataModule
-    EB = EmbryoidBodyDataModule(
+    EB = AnnDataModule(
         adata_path="./data/scRNAseq/EBT_counts.h5ad",
         label_key="sample_labels",
         batch_size=32,
