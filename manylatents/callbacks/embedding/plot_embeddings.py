@@ -28,7 +28,9 @@ class PlotEmbeddings(EmbeddingCallback):
         y_label: str = "Dim 2",
         title: str = "Dimensionality Reduction Plot",
         apply_norm: bool = False,    ## EXPERIMENTAL, NOT INCONSISTENT IN TSA CASE
-        alpha: float = 0.8          
+        alpha: float = 0.8,
+        log_key: str = "embedding_plot",  # Key for WandB logging, can be customized for step-aware logging
+        enable_wandb_upload: bool = True  # Whether to upload to WandB (if available)
     ):
         super().__init__()
         """
@@ -44,6 +46,8 @@ class PlotEmbeddings(EmbeddingCallback):
             title (str): Title for the plot.
             apply_norm (bool): Whether to apply dynamic normalization to the color array.
             alpha (float): Transparency of the points (0 = completely transparent, 1 = opaque).
+            log_key (str): Key for WandB logging. Can be customized for step-aware logging (e.g., "step_0/PCA/plot").
+            enable_wandb_upload (bool): Whether to upload to WandB when available. Set to False for offline mode.
         """
         self.save_dir = save_dir
         self.experiment_name = experiment_name
@@ -56,11 +60,15 @@ class PlotEmbeddings(EmbeddingCallback):
         self.title = title
         self.apply_norm = apply_norm
         self.alpha = alpha
+        self.log_key = log_key
+        self.enable_wandb_upload = enable_wandb_upload
 
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(
             f"PlotEmbeddings initialized with directory: {self.save_dir} and experiment name: {self.experiment_name}"
         )
+        if not enable_wandb_upload:
+            logger.info("WandB upload disabled - running in offline mode")
 
     def _get_colormap(self, dataset: any) -> any:
         """Get colormap for plotting. Override this method in subclasses for dataset-specific colormaps."""
@@ -175,14 +183,22 @@ class PlotEmbeddings(EmbeddingCallback):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
         self.save_path = os.path.join(self.save_dir, filename)
-        
+
         os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
         plt.savefig(self.save_path, bbox_inches="tight")
         plt.close()
-        
+
         logger.info(f"Saved 2D embeddings plot to {self.save_path}")
-        if wandb.run is not None:
-            wandb.log({"embedding_plot": wandb.Image(self.save_path)})
+
+        # Only upload to WandB if enabled and WandB run is active
+        if self.enable_wandb_upload and wandb.run is not None:
+            wandb.log({self.log_key: wandb.Image(self.save_path)})
+            logger.info(f"Uploaded plot to WandB with key: {self.log_key}")
+        elif not self.enable_wandb_upload:
+            logger.info("WandB upload skipped (offline mode)")
+        else:
+            logger.info("WandB upload skipped (no active run)")
+
         return self.save_path
 
     def on_latent_end(self, dataset: any, embeddings: dict) -> str:

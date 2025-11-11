@@ -438,9 +438,19 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             )
 
     # --- Callback processing ---
+    callback_outputs = {}
     if embeddings and embedding_cbs:
         for cb in embedding_cbs:
-            cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
+            cb_result = cb.on_latent_end(dataset=datamodule.test_dataset, embeddings=embeddings)
+            # Merge callback outputs into the main callback_outputs dict
+            if isinstance(cb_result, dict):
+                callback_outputs.update(cb_result)
+                logger.info(f"Callback {cb.__class__.__name__} returned: {list(cb_result.keys())}")
+
+    # Add callback outputs to embeddings dict if any were generated
+    if callback_outputs:
+        embeddings['callback_outputs'] = callback_outputs
+        logger.info(f"Added callback outputs to embeddings: {list(callback_outputs.keys())}")
 
     logger.info("Experiment complete.")
 
@@ -640,10 +650,20 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         )
 
         # --- Callback processing ---
+        callback_outputs = {}
         if embeddings and embedding_cbs:
             logger.info("Running embedding callbacks...")
             for cb in embedding_cbs:
-                cb.on_latent_end(dataset=initial_datamodule.test_dataset, embeddings=embeddings)
+                cb_result = cb.on_latent_end(dataset=initial_datamodule.test_dataset, embeddings=embeddings)
+                # Merge callback outputs into the main callback_outputs dict
+                if isinstance(cb_result, dict):
+                    callback_outputs.update(cb_result)
+                    logger.info(f"Callback {cb.__class__.__name__} returned: {list(cb_result.keys())}")
+
+        # Add callback outputs to embeddings dict if any were generated
+        if callback_outputs:
+            embeddings['callback_outputs'] = callback_outputs
+            logger.info(f"Added callback outputs to embeddings: {list(callback_outputs.keys())}")
 
         logger.info("Pipeline workflow complete.")
 
