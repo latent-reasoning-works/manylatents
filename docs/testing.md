@@ -123,7 +123,7 @@ Examples for specialized algorithm-dataset combinations:
 # Single-cell data validation
 - name: "phate-singlecell"
   algorithm: "latent/phate"
-  data: "embryoidbody"
+  data: "anndata"
   metrics: "singlecell_metrics"
   timeout: 15
 ```
