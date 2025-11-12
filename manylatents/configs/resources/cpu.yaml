@@ -1,2 +1,19 @@
-defaults:
-  - override /launcher: cpu_job
+# @package _global_
+
+# CPU resource configuration
+# Copy to your project's configs/resources/ and customize
+
+hydra:
+  mode: MULTIRUN
+  launcher:
+    # CPU resources
+    cpus_per_task: 4
+    gpus_per_task: 0
+    array_parallelism: 64  # Higher for CPU jobs
+
+    # Additional SLURM parameters
+    additional_parameters:
+      time: "04:00:00"  # 4 hours (HH:MM:SS)
+      nodes: 1
+      mem: 16G
+      ntasks_per_node: 1

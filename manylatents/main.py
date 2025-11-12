@@ -21,6 +21,9 @@ from omegaconf import DictConfig
 import manylatents.configs
 from manylatents.experiment import run_algorithm, run_pipeline
 
+# Import shop to register custom Hydra launchers
+import shop  # noqa: F401
+
 
 @hydra.main(config_path="../manylatents/configs", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> Dict[str, Any]:

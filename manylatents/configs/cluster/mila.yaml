@@ -1,0 +1,49 @@
+# @package _global_
+
+# Mila cluster configuration (when already on the cluster)
+# Use this when running from a login node or interactive session
+# For remote submission from local machine, use mila_remote.yaml
+
+defaults:
+  - override /hydra/launcher: submitit_slurm
+
+hydra:
+  mode: MULTIRUN
+  run:
+    dir: logs/${name}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: logs/${name}/multiruns/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+  launcher:
+    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+
+    # Resource parameters (override with resources config group)
+    timeout_min: 240  # 4 hours
+    cpus_per_task: 4
+    gpus_per_task: 0
+    tasks_per_node: 1
+    mem_gb: 16
+    nodes: 1
+
+    # SLURM configuration
+    partition: "main"  # Options: main, long, unkillable
+    account: null  # Auto-detected
+    qos: null
+    comment: "LRW experiment"
+
+    # Signal handling
+    signal_delay_s: 120
+    max_num_timeout: 0
+
+    # Array job settings
+    array_parallelism: 256
+
+    # Setup commands (run before each job)
+    setup:
+      - export WANDB_CACHE_DIR=$SCRATCH/.wandb_cache
+      - export WANDB_CONFIG_DIR=$SCRATCH/.config/wandb
+      - export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+      - export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK
+      - echo "Starting job on $(hostname)"
+      - echo "SLURM_JOB_ID $SLURM_JOB_ID"

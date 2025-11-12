@@ -1,2 +1,19 @@
-defaults:
-  - override /launcher: gpu_job
+# @package _global_
+
+# GPU resource configuration
+# Copy to your project's configs/resources/ and customize
+
+hydra:
+  mode: MULTIRUN
+  launcher:
+    # GPU resources
+    cpus_per_task: 4
+    gpus_per_task: 1
+    array_parallelism: 16  # Lower for GPU jobs
+
+    # Additional SLURM parameters
+    additional_parameters:
+      time: "1-00:00:00"  # 24 hours (D-HH:MM:SS)
+      nodes: 1
+      mem: 32G
+      ntasks_per_node: 1

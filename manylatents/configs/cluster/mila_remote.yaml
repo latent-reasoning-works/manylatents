@@ -1,0 +1,64 @@
+# @package _global_
+
+# Remote Mila cluster configuration (via SSH)
+# Use this when launching FROM YOUR LOCAL MACHINE to submit jobs remotely
+
+defaults:
+  - override /hydra/launcher: custom
+
+hydra:
+  mode: MULTIRUN
+  run:
+    dir: logs/${name}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: logs/${name}/multiruns/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+  launcher:
+    # Shop's RemoteSlurmLauncher
+    _target_: shop.hydra.launchers.RemoteSlurmLauncher
+
+    # SSH connection
+    ssh_hostname: login.server.mila.quebec
+    ssh_username: ${oc.env:USER}
+    ssh_key_file: ~/.ssh/id_rsa
+    ssh_port: 22
+
+    # Resource parameters (override with resources config group)
+    cpus_per_task: 4
+    gpus_per_task: 0
+    mem: "16G"
+    time_limit: "04:00:00"
+    partition: "main"
+    tasks_per_node: 1
+    nodes: 1
+
+    # Optional SLURM parameters
+    constraint: null
+    exclude: null
+    account: null  # Auto-detected
+    qos: null
+
+    # Remote environment
+    remote_dir: $SCRATCH/${oc.env:PROJECT_NAME,my-project}
+    conda_env: ${oc.env:CONDA_ENV,base}
+
+    # Setup commands (run before each job)
+    setup_commands:
+      - echo "Starting remote job on $(hostname)"
+      - echo "SLURM_JOB_ID $SLURM_JOB_ID"
+
+    # Job configuration
+    array_parallelism: 256
+    timeout_min: null  # Computed from time_limit
+    log_folder: ${hydra.sweep.dir}/.submitit/%j
+
+# WandB configuration for remote sweeps
+wandb:
+  group: ${oc.env:SLURM_ARRAY_JOB_ID,remote_sweep_${now:%Y%m%d_%H%M%S}}
+  id: ${oc.env:SLURM_JOB_ID,local}_${oc.env:SLURM_ARRAY_TASK_ID,0}
+  name: task_${oc.env:SLURM_ARRAY_TASK_ID,0}
+  mode: ${oc.env:WANDB_MODE,online}
+  tags:
+    - remote_sweep
+    - mila_cluster

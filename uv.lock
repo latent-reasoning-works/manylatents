@@ -1441,6 +1441,7 @@ dependencies = [
     { name = "scipy" },
     { name = "scprep" },
     { name = "seaborn" },
+    { name = "shop" },
     { name = "six" },
     { name = "stack-data" },
     { name = "tasklogger" },
@@ -1526,6 +1527,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.8,<1.15" },
     { name = "scprep", specifier = "==1.1.0" },
     { name = "seaborn", specifier = "==0.13.2" },
+    { name = "shop", git = "https://github.com/latent-reasoning-works/shop.git" },
     { name = "six", specifier = "==1.16.0" },
     { name = "stack-data", specifier = "==0.6.3" },
     { name = "tasklogger", specifier = "==1.2.0" },
@@ -3205,6 +3207,17 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486 },
+]
+
+[[package]]
+name = "shop"
+version = "0.1.0"
+source = { git = "https://github.com/latent-reasoning-works/shop.git#76dfd9662ddf8845b25cbba710e331a001ec46f9" }
+dependencies = [
+    { name = "hydra-core" },
+    { name = "hydra-submitit-launcher" },
+    { name = "omegaconf" },
+    { name = "submitit" },
 ]
 
 [[package]]

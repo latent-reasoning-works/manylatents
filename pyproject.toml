@@ -92,6 +92,7 @@ dependencies = [
     "hydra-submitit-launcher>=1.2.0",
     "scanpy>=1.10.3",
     "pyproj>=3.6.1",
+    "shop",
 ]
 
 [build-system]
@@ -109,6 +110,7 @@ managed = true
 
 [tool.uv.sources]
 archetypes = { git = "https://github.com/aleixalcacer/archetypes.git" }
+shop = { git = "https://github.com/latent-reasoning-works/shop.git" }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
