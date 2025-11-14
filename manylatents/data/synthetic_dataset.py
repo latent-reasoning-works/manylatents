@@ -68,7 +68,7 @@ class SwissRoll(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
-        n_points_per_distribution=50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise=0.1,
         manifold_noise=0.1,
         width=10.0,
@@ -118,19 +118,52 @@ class SwissRoll(SyntheticDataset):
         # mean_y has shape (1, n_distributions) when width=1
         self.mean_y = width * rng.uniform(size=(1, n_distributions))
 
-        # t_noise.shape: (n_distributions, n_points_per_distribution)
-        t_noise = manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution))
+        # Normalize n_points_per_distribution into an array of counts per distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            counts = np.array(n_points_per_distribution, dtype=int)
+            if counts.shape[0] != n_distributions:
+                raise ValueError(
+                    f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                )
+            if np.any(counts < 0):
+                raise ValueError("n_points_per_distribution contains negative values")
+        elif isinstance(n_points_per_distribution, int):
+            counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
+        else:
+            try:
+                counts = np.array(n_points_per_distribution, dtype=int)
+                if counts.shape[0] != n_distributions:
+                    raise ValueError(
+                        f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                    )
+            except Exception:
+                raise ValueError("n_points_per_distribution must be an int or a sequence of ints")
 
-        # y_noise.shape: (n_distributions, n_points_per_distribution)
-        y_noise = width * manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution))
-        ts = np.reshape(t_noise + self.mean_t.T, -1)  # shape (5000,)
-        ys = np.reshape(y_noise + self.mean_y.T, -1)  # shape (5000,)
+        # Derive per-distribution scaling factors from counts (map into [0.5, 2.5])
+        if counts.size == 0:
+            scaling_factors = np.array([])
+        elif counts.min() == counts.max():
+            scaling_factors = np.ones_like(counts, dtype=float)
+        else:
+            scaling_factors = np.interp(counts, (counts.min(), counts.max()), (0.5, 2.5))
+
+        # For each distribution, sample local manifold noise with scaling and flatten to point-level
+        t_list = [manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + self.mean_t.flatten()[i] for i in range(n_distributions)]
+        y_list = [width * manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + self.mean_y.flatten()[i] for i in range(n_distributions)]
+
+        if len(t_list) > 0:
+            ts = np.concatenate(t_list)
+            ys = np.concatenate(y_list)
+        else:
+            ts = np.array([])
+            ys = np.array([])
         self.ys = ys
 
         xs = ts * np.cos(ts)
         zs = ts * np.sin(ts)
-        X = np.stack((xs, ys, zs))  # shape (3, 5000)
-        noise_term = noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
+        X = np.stack((xs, ys, zs))  # shape (3, N)
+        N = ts.size
+        noise_term = noise * rng.normal(size=(3, N))
         X = X + noise_term
         
         # Generate data
@@ -138,15 +171,9 @@ class SwissRoll(SyntheticDataset):
         if rotate_to_dim > 3:
             self.data = self.rotate_to_dim(rotate_to_dim)
 
-        self.ts = np.squeeze(ts)  # (5000,)
-        self.metadata = np.repeat(
-            np.eye(n_distributions), n_points_per_distribution, axis=0
-        )
-        
-        self.metadata = np.repeat(
-            np.eye(n_distributions), n_points_per_distribution, axis=0
-        )
-        self.metadata = np.argmax(self.metadata,-1)
+        self.ts = np.squeeze(ts)
+        # labels per-sample
+        self.metadata = np.repeat(np.arange(n_distributions), counts)
 
     def _unroll_t(self, t):
         t = t.flatten()  # (100,)
@@ -188,7 +215,7 @@ class SwissRollGap(SyntheticDataset):
     @staticmethod
     def generate_swissroll_gap(
         n_distributions: int = 100,
-        n_points_per_distribution: int = 50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise: float = 0.1,
         manifold_noise: float = 0.1,
         width: float = 10.0,
@@ -240,9 +267,48 @@ class SwissRollGap(SyntheticDataset):
         # y means across blobs
         mean_y = width * rng.uniform(size=n_distributions)
 
+        # Normalize n_points_per_distribution into an array of counts per distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            counts = np.array(n_points_per_distribution, dtype=int)
+            if counts.shape[0] != n_distributions:
+                raise ValueError(
+                    f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                )
+            if np.any(counts < 0):
+                raise ValueError("n_points_per_distribution contains negative values")
+        elif isinstance(n_points_per_distribution, int):
+            counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
+        else:
+            # Try to coerce to array-like
+            try:
+                counts = np.array(n_points_per_distribution, dtype=int)
+                if counts.shape[0] != n_distributions:
+                    raise ValueError(
+                        f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                    )
+            except Exception:
+                raise ValueError("n_points_per_distribution must be an int or a sequence of ints")
+
+        # Derive a per-distribution scaling factor from counts so that
+        # larger blobs get slightly larger local manifold noise (but bounded).
+        # Map counts linearly into [0.5, 1.5] (min->0.5, max->1.5).
+        if counts.size == 0:
+            scaling_factors = np.array([])
+        elif counts.min() == counts.max():
+            scaling_factors = np.ones_like(counts, dtype=float)
+        else:
+            scaling_factors = np.interp(counts, (counts.min(), counts.max()), (0.5, 2.5))
+
         # For each distribution, sample local manifold noise and flatten to point-level
-        t_samples = (manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution)) + shifted[:, None]).reshape(-1)
-        y_samples = (width * manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution)) + mean_y[:, None]).reshape(-1)
+        t_list = [manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + shifted[i] for i in range(n_distributions)]
+        y_list = [width * manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + mean_y[i] for i in range(n_distributions)]
+
+        if len(t_list) > 0:
+            t_samples = np.concatenate(t_list)
+            y_samples = np.concatenate(y_list)
+        else:
+            t_samples = np.array([])
+            y_samples = np.array([])
 
         # 3D manifold coords (clean)
         x = t_samples * np.cos(t_samples)
@@ -256,8 +322,16 @@ class SwissRollGap(SyntheticDataset):
         else:
             M_obs = M_gt_cart.copy()
 
-        # add observation noise
-        obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        # add observation noise scaled per-sample according to blob size
+        # build labels per-sample so we can broadcast per-distribution scaling
+        labels = np.repeat(np.arange(n_distributions), counts)
+        if labels.size != M_obs.shape[0]:
+            # defensive: fall back to uniform noise if something went wrong
+            obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        else:
+            # scale observation noise by the same scaling_factors (range ~0.5-1.5)
+            per_sample_scale = noise * scaling_factors[labels][:, None]
+            obs_noise = rng.normal(loc=0.0, scale=per_sample_scale, size=M_obs.shape)
         M = M_obs + obs_noise
 
         # Compute unrolled t coordinate exactly as in SwissRoll._unroll_t
@@ -267,7 +341,7 @@ class SwissRollGap(SyntheticDataset):
         M_gt_2d = np.vstack([u_t, y_samples]).T
 
         # labels: each original distribution gets a label (0..n_distributions-1)
-        labels = np.repeat(np.arange(n_distributions), n_points_per_distribution)
+        labels = np.repeat(np.arange(n_distributions), counts)
 
         return M, M_gt_2d, labels
 
@@ -1369,12 +1443,16 @@ class DLATreeFromGraph(SyntheticDataset):
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "swiss_roll_gap" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
+    data_name = "swiss_roll" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
-        dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
+        dataset = SwissRoll(n_distributions=10, 
+                            n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
+                            width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
     elif data_name == "swiss_roll_gap":
-        dataset = SwissRollGap(n_distributions=10, n_points_per_distribution=100, width=10.0, noise=0.2, manifold_noise=0.2, random_state=42, rotate_to_dim=50,
+        dataset = SwissRollGap(n_distributions=10, 
+                               n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
+                               width=10.0, noise=0.1, manifold_noise=0.2, random_state=42, rotate_to_dim=50,
                                n_gaps=3, gap_fraction=0.5) 
     elif data_name == "saddle_surface":
         dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
