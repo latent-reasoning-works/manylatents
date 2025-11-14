@@ -163,17 +163,29 @@ class SwissRoll(SyntheticDataset):
         zs = ts * np.sin(ts)
         X = np.stack((xs, ys, zs))  # shape (3, N)
         N = ts.size
-        noise_term = noise * rng.normal(size=(3, N))
-        X = X + noise_term
-        
-        # Generate data
-        self.data = X.T  # shape (5000, 3)
+
+        # Build observation-level data (N, 3) before adding noise
+        M_obs = X.T.copy()  # shape (N, 3)
+
+        # labels per-sample (used to scale observation noise)
+        labels = np.repeat(np.arange(n_distributions), counts)
+        if labels.size != N:
+            # defensive fallback: uniform observation noise
+            obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        else:
+            per_sample_scale = noise * scaling_factors[labels][:, None]
+            obs_noise = rng.normal(loc=0.0, scale=per_sample_scale, size=M_obs.shape)
+
+        M_obs = M_obs + obs_noise
+
+        # Assign data and optionally rotate
+        self.data = M_obs
         if rotate_to_dim > 3:
             self.data = self.rotate_to_dim(rotate_to_dim)
 
         self.ts = np.squeeze(ts)
-        # labels per-sample
-        self.metadata = np.repeat(np.arange(n_distributions), counts)
+        # labels per-sample (metadata)
+        self.metadata = labels
 
     def _unroll_t(self, t):
         t = t.flatten()  # (100,)
@@ -1448,7 +1460,7 @@ if __name__ == "__main__":
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=10, 
                             n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
-                            width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
+                            width=10.0, noise=0.1, manifold_noise=0.1, random_state=42, rotate_to_dim=5)
     elif data_name == "swiss_roll_gap":
         dataset = SwissRollGap(n_distributions=10, 
                                n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
