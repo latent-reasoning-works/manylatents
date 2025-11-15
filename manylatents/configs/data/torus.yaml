@@ -12,3 +12,4 @@ rotate_to_dim: 100
 n_clusters: 16   # n_clusters must be a perfect square (e.g., 9, 16, 25, etc.)
 n_gaps: 0
 mode: full
+shuffle_traindata: false

@@ -13,6 +13,7 @@ class TorusDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
+        shuffle_traindata: bool = True,
         n_points: int = 1000,
         noise: float = 0.1,
         major_radius: float = 5.0,
@@ -73,6 +74,7 @@ class TorusDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.test_split = test_split
         self.num_workers = num_workers
+        self.shuffle_traindata = shuffle_traindata
 
         # Torus specific
         self.n_points = n_points
@@ -133,7 +135,7 @@ class TorusDataModule(LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=self.shuffle_traindata,
             num_workers=self.num_workers,
         )
 
