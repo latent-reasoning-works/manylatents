@@ -19,6 +19,8 @@ class TorusDataModule(LightningDataModule):
         minor_radius: float = 1.0,
         random_state: int = 42,
         rotate_to_dim: int = 3,
+        n_clusters: int = 10,
+        n_gaps: int = 0,
         mode: str = 'split',
     ):
         """
@@ -54,6 +56,12 @@ class TorusDataModule(LightningDataModule):
         rotate_to_dim : int, default=3
             Target dimension for rotation. Rotation is only applied if this value is greater than 3.
 
+        n_clusters : int, default=10
+            Number of clusters to divide the torus into after gaps are introduced.
+
+        n_gaps : int, default=0
+            Number of gaps to introduce in the torus.
+
         mode : str, default='split'
             Mode for dataset train/test separation. 
             If 'full', the entire dataset is used as both training and test set (unsplit).
@@ -72,6 +80,8 @@ class TorusDataModule(LightningDataModule):
         self.minor_radius = minor_radius
         self.random_state = random_state
         self.rotate_to_dim = rotate_to_dim
+        self.n_clusters = n_clusters
+        self.n_gaps = n_gaps
 
         self.mode = mode
 
@@ -92,6 +102,8 @@ class TorusDataModule(LightningDataModule):
                 minor_radius=self.minor_radius,
                 random_state=self.random_state,
                 rotate_to_dim=self.rotate_to_dim,
+                n_clusters=self.n_clusters,
+                n_gaps=self.n_gaps,
             )
             self.test_dataset = self.train_dataset
 
@@ -103,6 +115,8 @@ class TorusDataModule(LightningDataModule):
                 minor_radius=self.minor_radius,
                 random_state=self.random_state,
                 rotate_to_dim=self.rotate_to_dim,
+                n_clusters=self.n_clusters,
+                n_gaps=self.n_gaps,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
@@ -150,6 +164,8 @@ if __name__ == "__main__":
         minor_radius=1.0,
         random_state=123,
         rotate_to_dim=5,
+        n_clusters=10,
+        n_gaps=2,
     )
 
     # Setup datasets

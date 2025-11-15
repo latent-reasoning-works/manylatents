@@ -673,6 +673,8 @@ class Torus(SyntheticDataset):
         minor_radius=1.0,
         random_state=42,
         rotate_to_dim=3,
+        n_clusters=10,
+        n_gaps=0,
     ):
         """
         Initialize a synthetic Torus dataset with uniformly distributed points.
@@ -680,7 +682,7 @@ class Torus(SyntheticDataset):
         Parameters:
         ----------
         n_points : int, default=5000
-            Total number of points to generate on the torus surface.
+            Total number of points to generate on the torus surface after gaps are introduced.
 
         noise : float, default=0.1
             Standard deviation of isotropic Gaussian noise added to each data point.
@@ -697,37 +699,68 @@ class Torus(SyntheticDataset):
         rotate_to_dim : int, default=3
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
+
+        n_clusters : int, default=10
+            Number of clusters to divide the torus into after gaps are introduced.
+
+        n_gaps : int, default=0
+            Number of gaps to introduce in the torus.
         """
         super().__init__()
         np.random.seed(random_state)
         rng = np.random.default_rng(random_state)
 
-        # Generate uniformly distributed angles
-        self.theta_all = 2 * np.pi * rng.random(n_points)  # [0, 2π]
-        self.phi_all = 2 * np.pi * rng.random(n_points)    # [0, 2π]
-        
+        # Calculate the total number of points needed before removing gaps
+        points_per_cluster = n_points // n_clusters
+        total_clusters = n_clusters + n_gaps
+        total_points = points_per_cluster * total_clusters
+
+        # Generate uniformly distributed angles for the total points
+        self.theta_all = 2 * np.pi * rng.random(total_points)  # [0, 2π]
+        self.phi_all = 2 * np.pi * rng.random(total_points)    # [0, 2π]
+
         # Convert to Cartesian coordinates
         x = (major_radius + minor_radius * np.cos(self.phi_all)) * np.cos(self.theta_all)
         y = (major_radius + minor_radius * np.cos(self.phi_all)) * np.sin(self.theta_all)
         z = minor_radius * np.sin(self.phi_all)
-        
-        X = np.stack((x, y, z), axis=-1)  # shape (n_points, 3)
-        
+
+        X = np.stack((x, y, z))  # shape (3, N)
+        X = X.T  # Transpose to shape (N, 3) for proper 3D representation
+
         # Add global noise
         noise_term = noise * rng.normal(size=X.shape)
         X = X + noise_term
-        
-        # Store parameters
-        self.major_radius = major_radius
-        self.minor_radius = minor_radius
-        
-        # Use generated data
-        self.data = X
+
+        # Assign clusters based on angular coordinates
+        theta_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)) + 1)
+        phi_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)) + 1)
+        theta_labels = np.digitize(self.theta_all, theta_bins) - 1
+        phi_labels = np.digitize(self.phi_all, phi_bins) - 1
+        self.metadata = (theta_labels * len(phi_bins) + phi_labels).astype(int)
+
+        # Ensure exactly total_clusters
+        unique_clusters = np.unique(self.metadata)
+        if len(unique_clusters) > total_clusters:
+            cluster_map = {old: new for new, old in enumerate(unique_clusters[:total_clusters])}
+            self.metadata = np.array([cluster_map[label] if label in cluster_map else -1 for label in self.metadata])
+
+        # Remove entire clusters to introduce gaps
+        if n_gaps > 0:
+            clusters_to_remove = rng.choice(unique_clusters, size=n_gaps, replace=False)
+            gap_mask = ~np.isin(self.metadata, clusters_to_remove)
+            X = X[gap_mask]
+            self.metadata = self.metadata[gap_mask]
+            self.theta_all = self.theta_all[gap_mask]
+            self.phi_all = self.phi_all[gap_mask]
+
+        # Set the data to the 3D torus and rotate if needed
+        self.data = X  # 3D torus
         if rotate_to_dim > 3:
             self.data = self.rotate_to_dim(rotate_to_dim)
 
-        # Create simple metadata
-        self.metadata = np.zeros(n_points, dtype=int)
+        # Store major and minor radii as attributes for later use
+        self.major_radius = major_radius
+        self.minor_radius = minor_radius
 
     def get_gt_dists(self):
         """
@@ -1364,12 +1397,11 @@ class DLATreeFromGraph(SyntheticDataset):
     def get_graph(self):
         """Return the precomputed adjacency graph built during data generation."""
         return self.graph
-
-
+    
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "swiss_roll_gap" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
+    data_name = "torus" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
@@ -1381,17 +1413,17 @@ if __name__ == "__main__":
     elif data_name == "dla_tree":
         dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
     elif data_name == "torus":
-        dataset = Torus(n_points=500, noise=0.05, major_radius=3.0, minor_radius=1.0, random_state=42, rotate_to_dim=5)
+        dataset = Torus(n_points=1000, noise=0.05, major_radius=5.0, minor_radius=1.0, random_state=42, rotate_to_dim=100, n_clusters=12, n_gaps=2)
     elif data_name == "gaussian_blobs":
         dataset = GaussianBlobs(n_samples=500, n_features=2, centers=5, cluster_std=1.0, random_state=42)
-    
+
     data = dataset.data
     labels = dataset.metadata
     gt_distance = dataset.get_gt_dists()
     g = dataset.get_graph()
     print("Data shape:", dataset.data.shape)
     print("Labels shape:", dataset.metadata.shape)
-    
+
     if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "torus" or data_name == "swiss_roll_gap":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
@@ -1409,6 +1441,6 @@ if __name__ == "__main__":
         phate_data = phate_operator.fit_transform(data)
         plt.figure(figsize=(8, 6))
         plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
-    plt.savefig(f"{data_name}.png", bbox_inches='tight') 
+    plt.savefig(f"{data_name}.png", bbox_inches='tight')
 
-    
+
