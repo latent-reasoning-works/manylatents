@@ -13,13 +13,13 @@ class TorusDataModule(LightningDataModule):
         batch_size: int = 128,
         test_split: float = 0.2,
         num_workers: int = 0,
-        n_points: int = 5000,
+        n_points: int = 1000,
         noise: float = 0.1,
-        major_radius: float = 3.0,
+        major_radius: float = 5.0,
         minor_radius: float = 1.0,
         random_state: int = 42,
-        rotate_to_dim: int = 3,
-        n_clusters: int = 10,
+        rotate_to_dim: int = 100,
+        n_clusters: int = 16,
         n_gaps: int = 0,
         mode: str = 'split',
     ):
@@ -38,13 +38,13 @@ class TorusDataModule(LightningDataModule):
         num_workers : int, default=0
             Number of subprocesses to use for data loading in PyTorch's DataLoader.
 
-        n_points : int, default=5000
+        n_points : int, default=1000
             Total number of points to generate on the torus surface.
 
         noise : float, default=0.1
             Standard deviation of isotropic Gaussian noise added to each data point.
 
-        major_radius : float, default=3.0
+        major_radius : float, default=5.0
             Major radius of the torus (distance from center to tube center).
 
         minor_radius : float, default=1.0
@@ -53,11 +53,12 @@ class TorusDataModule(LightningDataModule):
         random_state : int, default=42
             Seed for the random number generator to ensure reproducibility.
 
-        rotate_to_dim : int, default=3
+        rotate_to_dim : int, default=100
             Target dimension for rotation. Rotation is only applied if this value is greater than 3.
 
-        n_clusters : int, default=10
-            Number of clusters to divide the torus into after gaps are introduced.
+        n_clusters : int, default=16
+            Number of clusters to divide the torus into before gaps are introduced. 
+            n_clusters must be a perfect square (e.g., 9, 16, 25, etc.) 
 
         n_gaps : int, default=0
             Number of gaps to introduce in the torus.

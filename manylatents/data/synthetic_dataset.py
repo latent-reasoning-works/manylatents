@@ -710,9 +710,13 @@ class Torus(SyntheticDataset):
         np.random.seed(random_state)
         rng = np.random.default_rng(random_state)
 
+        # make sure n_cluster is a perfect square
+        if int(np.sqrt(n_clusters)) ** 2 != n_clusters:
+            raise ValueError("n_clusters must be a perfect square (e.g., 4, 9, 16, ...)")
+
         # Calculate the total number of points needed before removing gaps
         points_per_cluster = n_points // n_clusters
-        total_clusters = n_clusters + n_gaps
+        total_clusters = n_clusters
         total_points = points_per_cluster * total_clusters
 
         # Generate uniformly distributed angles for the total points
@@ -732,21 +736,28 @@ class Torus(SyntheticDataset):
         X = X + noise_term
 
         # Assign clusters based on angular coordinates
-        theta_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)) + 1)
-        phi_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)) + 1)
-        theta_labels = np.digitize(self.theta_all, theta_bins) - 1
-        phi_labels = np.digitize(self.phi_all, phi_bins) - 1
-        self.metadata = (theta_labels * len(phi_bins) + phi_labels).astype(int)
+        theta_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)), endpoint=False)
+        phi_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)), endpoint=False)
 
-        # Ensure exactly total_clusters
-        unique_clusters = np.unique(self.metadata)
-        if len(unique_clusters) > total_clusters:
-            cluster_map = {old: new for new, old in enumerate(unique_clusters[:total_clusters])}
-            self.metadata = np.array([cluster_map[label] if label in cluster_map else -1 for label in self.metadata])
+        # Ensure the last bin edge is inclusive
+        theta_bins = np.append(theta_bins, 2 * np.pi)
+        phi_bins = np.append(phi_bins, 2 * np.pi)
+
+        # Digitize theta and phi to assign bin indices
+        theta_labels = np.digitize(self.theta_all, theta_bins, right=False) - 1
+        phi_labels = np.digitize(self.phi_all, phi_bins, right=False) - 1
+
+        # Combine theta and phi labels to create unique cluster IDs
+        raw_metadata = (theta_labels * len(phi_bins[:-1]) + phi_labels).astype(int)
+
+        # Remap labels to ensure contiguous cluster IDs from 0 to total_clusters - 1
+        unique_labels = np.unique(raw_metadata)
+        label_map = {old: new for new, old in enumerate(unique_labels)}
+        self.metadata = np.array([label_map[label] for label in raw_metadata])
 
         # Remove entire clusters to introduce gaps
         if n_gaps > 0:
-            clusters_to_remove = rng.choice(unique_clusters, size=n_gaps, replace=False)
+            clusters_to_remove = rng.choice(unique_labels, size=n_gaps, replace=False)
             gap_mask = ~np.isin(self.metadata, clusters_to_remove)
             X = X[gap_mask]
             self.metadata = self.metadata[gap_mask]
@@ -1413,7 +1424,7 @@ if __name__ == "__main__":
     elif data_name == "dla_tree":
         dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
     elif data_name == "torus":
-        dataset = Torus(n_points=1000, noise=0.05, major_radius=5.0, minor_radius=1.0, random_state=42, rotate_to_dim=100, n_clusters=12, n_gaps=2)
+        dataset = Torus(n_points=1000, noise=0.05, major_radius=5.0, minor_radius=1.0, random_state=42, rotate_to_dim=4, n_clusters=16, n_gaps=2)
     elif data_name == "gaussian_blobs":
         dataset = GaussianBlobs(n_samples=500, n_features=2, centers=5, cluster_std=1.0, random_state=42)
 
