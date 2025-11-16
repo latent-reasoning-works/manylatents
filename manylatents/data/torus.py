@@ -84,7 +84,7 @@ class TorusDataModule(LightningDataModule):
         self.random_state = random_state
         self.rotate_to_dim = rotate_to_dim
         self.n_clusters = n_clusters
-        self.n_gaps = n_gaps
+        self.n_gaps = int(n_gaps)
 
         self.mode = mode
 
