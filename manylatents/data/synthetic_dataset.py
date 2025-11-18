@@ -715,7 +715,7 @@ class Torus(SyntheticDataset):
             raise ValueError("n_clusters must be a perfect square (e.g., 4, 9, 16, ...)")
 
         # Calculate the total number of points needed before removing gaps
-        points_per_cluster = n_points // n_clusters
+        points_per_cluster = n_points // (n_clusters - n_gaps)
         total_clusters = n_clusters
         total_points = points_per_cluster * total_clusters
 
