@@ -13,3 +13,6 @@ random_state: ${seed}
 rotate_to_dim: 5
 mode: full
 shuffle_traindata: false
+use_gap: false
+n_gaps: 0
+gap_fraction: 0.12

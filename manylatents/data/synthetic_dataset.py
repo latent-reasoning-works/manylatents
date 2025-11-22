@@ -13,7 +13,7 @@ from typing import Union, List, Optional, Dict, Tuple
 # PrecomputedMixin was originally intended to load pre-generated synthetic data,
 # but synthetic datasets are fast to generate on-the-fly. For loading saved
 # embeddings/outputs from previous runs, use PrecomputedDataModule.
-from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
+# from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
 
 class SyntheticDataset(Dataset):
@@ -184,8 +184,13 @@ class SwissRoll(SyntheticDataset):
             self.data = self.rotate_to_dim(rotate_to_dim)
 
         self.ts = np.squeeze(ts)
-        # labels per-sample (metadata)
-        self.metadata = labels
+        # Adjust metadata assignment to handle list input for n_points_per_distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            self.metadata = np.concatenate([
+                np.full(count, i) for i, count in enumerate(self.counts)
+            ])
+        else:
+            self.metadata = np.repeat(np.arange(self.n_distributions), self.counts)
 
     def _unroll_t(self, t):
         t = t.flatten()  # (100,)
@@ -286,8 +291,6 @@ class SwissRollGap(SyntheticDataset):
                 raise ValueError(
                     f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
                 )
-            if np.any(counts < 0):
-                raise ValueError("n_points_per_distribution contains negative values")
         elif isinstance(n_points_per_distribution, int):
             counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
         else:
@@ -360,7 +363,7 @@ class SwissRollGap(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
-        n_points_per_distribution=50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise=0.1,
         manifold_noise=0.1,
         width=10.0,
@@ -414,13 +417,16 @@ class SaddleSurface(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
-        n_points_per_distribution=50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise=0.1,
         manifold_noise=0.1,
         a=1.0,
         b=1.0,
         random_state=42,
         rotate_to_dim=3,
+        n_gaps: int = 0,
+        gap_fraction: float = 0.1,
+        use_gap: bool = False,
     ):
         """
         Initialize a synthetic Saddle Surface dataset with tunable parameters for geometry and noise.
@@ -431,7 +437,8 @@ class SaddleSurface(SyntheticDataset):
             Number of independent Gaussian distributions sampled across the saddle surface manifold.
 
         n_points_per_distribution : int, default=50
-            Number of data points drawn from each Gaussian distribution.
+            Number of data points drawn from each Gaussian distribution. Can also be an
+            array-like to specify per-distribution counts.
 
         noise : float, default=0.1
             Global isotropic Gaussian noise added to all data points.
@@ -452,19 +459,31 @@ class SaddleSurface(SyntheticDataset):
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
             For visualization purposes, the default of 3 means no rotation is applied.
+
+        n_gaps : int, default=0
+            Number of gaps to insert along the u-coordinate of the saddle surface. Only applied when
+            ``use_gap`` is True.
+
+        gap_fraction : float, default=0.1
+            Fraction of the total u-span used to size each gap when ``use_gap`` is True.
+
+        use_gap : bool, default=False
+            If True, gap parameters are applied to create regions of the manifold without samples.
         """
         super().__init__()
         np.random.seed(random_state)
         self.n_distributions = n_distributions
-        self.n_points_per_distribution = n_points_per_distribution
+        self.counts = self._normalize_counts(n_points_per_distribution, n_distributions)
         self.noise = noise
         self.manifold_noise = manifold_noise
         self.a = a
         self.b = b
         self.random_state = random_state
+        self.n_gaps = n_gaps
+        self.gap_fraction = gap_fraction
+        self.use_gap = use_gap
 
-        self.u_centers = np.random.uniform(-2, 2, n_distributions)
-        self.v_centers = np.random.uniform(-2, 2, n_distributions)
+        self.u_centers, self.v_centers = self._initialize_centers()
 
         self.u_samples = []
         self.v_samples = []
@@ -477,23 +496,70 @@ class SaddleSurface(SyntheticDataset):
         self.data = self._apply_noise(self.data)
         self.gt_points = gt_points
 
-        self.metadata = np.repeat(
-            np.eye(self.n_distributions), self.n_points_per_distribution, axis=0
-        )
-        self.metadata = np.argmax(self.metadata,-1)
+        # Adjust metadata assignment to handle list input for n_points_per_distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            self.metadata = np.concatenate([
+                np.full(count, i) for i, count in enumerate(self.counts)
+            ])
+        else:
+            self.metadata = np.repeat(np.arange(self.n_distributions), self.counts)
+
+    def _normalize_counts(self, n_points_per_distribution, n_distributions):
+        """Normalize n_points_per_distribution into an integer array per distribution."""
+        # Validate that n_distributions matches the length of n_points_per_distribution if it's a list
+        if isinstance(n_points_per_distribution, int):
+            counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
+        else: # it's a list/array/omegaconf.listconfig.ListConfig
+            if len(n_points_per_distribution) != n_distributions:
+                raise ValueError(
+                    f"n_distributions ({n_distributions}) must equal the length of n_points_per_distribution ({len(n_points_per_distribution)})."
+                )
+            counts = np.array(n_points_per_distribution, dtype=int)
+        return counts
+
+    def _initialize_centers(self):
+        """Sample u/v centers and optionally insert gaps along the u-axis, ensuring uniqueness."""
+        u_centers = np.random.uniform(-2, 2, self.n_distributions)
+        v_centers = np.random.uniform(-2, 2, self.n_distributions)
+
+        # Ensure uniqueness of u_centers and v_centers
+        u_centers = np.unique(u_centers)
+        while len(u_centers) < self.n_distributions:
+            new_u = np.random.uniform(-2, 2, self.n_distributions - len(u_centers))
+            u_centers = np.unique(np.concatenate([u_centers, new_u]))
+
+        v_centers = np.unique(v_centers)
+        while len(v_centers) < self.n_distributions:
+            new_v = np.random.uniform(-2, 2, self.n_distributions - len(v_centers))
+            v_centers = np.unique(np.concatenate([v_centers, new_v]))
+
+        if (
+            self.use_gap
+            and self.n_gaps > 0
+            and self.gap_fraction > 0
+            and self.n_distributions > 1
+        ):
+            gap_size = self.gap_fraction * (u_centers.max() - u_centers.min())
+            gap_indices = np.random.choice(
+                self.n_distributions, self.n_gaps, replace=False
+            )  # Randomly select indices for gaps
+            for idx in gap_indices:
+                u_centers[idx] += gap_size
+
+        return u_centers, v_centers
 
     def _generate_gaussian_blobs(self):
         """Generate Gaussian blobs in the parameter space of the saddle surface."""
         for i in range(self.n_distributions):
-            u_blob = np.random.normal(
-                self.u_centers[i], self.manifold_noise, self.n_points_per_distribution
-            )
-            v_blob = np.random.normal(
-                self.v_centers[i], self.manifold_noise, self.n_points_per_distribution
-            )
-            self.u_samples.append(u_blob)
-            self.v_samples.append(v_blob)
-            self.point_sets.append(self._saddle_to_cartesian(u_blob, v_blob))
+            u_samples = self.manifold_noise * np.random.normal(size=(self.counts[i],)) + self.u_centers[i]
+            v_samples = self.manifold_noise * np.random.normal(size=(self.counts[i],)) + self.v_centers[i]
+
+            self.u_samples.append(u_samples)
+            self.v_samples.append(v_samples)
+
+            cartesian_points = self._saddle_to_cartesian(u_samples, v_samples)
+            self.point_sets.append(cartesian_points)
+
         X = np.concatenate(self.point_sets)
         return X
 
@@ -516,24 +582,23 @@ class SaddleSurface(SyntheticDataset):
         distances = np.zeros((num_points, num_points))
 
         for i in range(num_points):
-            for j in range(i + 1, num_points):
+            for j in range(num_points):
                 distances[i, j] = self._surface_geodesic_distance(points[i], points[j])
-                distances[j, i] = distances[i, j]
 
         return distances
 
     def _surface_geodesic_distance(self, p1, p2):
         """Approximate the geodesic distance between two points on the saddle surface."""
-        u1, v1 = p1[0], p1[1]
-        u2, v2 = p2[0], p2[1]
+        u1, v1 = p1[:2]
+        u2, v2 = p2[:2]
         distance = np.sqrt((u2 - u1) ** 2 + (v2 - v1) ** 2)
 
         return distance
-    
+
     def get_graph(self):
         """Create a graphtools graph if does not exist."""
         if self.graph is None:
-            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+            self.graph = graphtools.Graph(self.data, knn=10, decay=None)
         return self.graph
 
 
@@ -1498,7 +1563,7 @@ class DLATreeFromGraph(SyntheticDataset):
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "torus" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
+    data_name = "saddle_surface" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
         dataset = SwissRoll(n_distributions=10, 
@@ -1510,7 +1575,9 @@ if __name__ == "__main__":
                                width=10.0, noise=0.1, manifold_noise=0.2, random_state=42, rotate_to_dim=50,
                                n_gaps=3, gap_fraction=0.5) 
     elif data_name == "saddle_surface":
-        dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
+        dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
+                                noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=50, 
+                                n_gaps = 3, gap_fraction = 0.1, use_gap = True)
     elif data_name == "dla_tree":
         dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
     elif data_name == "torus":
@@ -1525,10 +1592,15 @@ if __name__ == "__main__":
     print("Data shape:", dataset.data.shape)
     print("Labels shape:", dataset.metadata.shape)
 
-    if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "torus" or data_name == "swiss_roll_gap":
+    if data_name == "swiss_roll" or data_name == "torus" or data_name == "swiss_roll_gap":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
+    elif data_name == "saddle_surface":
+        gt_data = dataset.gt_points
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(gt_data[:,0], gt_data[:,1], gt_data[:,2], c=labels, cmap='tab20')
     elif data_name == "gaussian_blobs":
         plt.figure(figsize=(8, 6))
         plt.scatter(data[:, 0], data[:, 1], c=labels, cmap='tab20', s=10)
@@ -1543,5 +1615,3 @@ if __name__ == "__main__":
         plt.figure(figsize=(8, 6))
         plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
     plt.savefig(f"{data_name}.png", bbox_inches='tight')
-
-
