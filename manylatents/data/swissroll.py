@@ -1,6 +1,7 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
+from typing import Union, List
 from .synthetic_dataset import SwissRoll, SwissRollGap
 
 class SwissRollDataModule(LightningDataModule):
@@ -15,7 +16,7 @@ class SwissRollDataModule(LightningDataModule):
         num_workers: int = 0,
         shuffle_traindata: bool = True,
         n_distributions: int = 100,
-        n_points_per_distribution: int = 50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise: float = 0.1,
         manifold_noise: float = 0.1,
         width: float = 10.0,
@@ -44,8 +45,9 @@ class SwissRollDataModule(LightningDataModule):
         n_distributions : int, default=100
             Number of independent Gaussian distributions along the Swiss roll manifold.
 
-        n_points_per_distribution : int, default=50
-            Number of samples drawn from each Gaussian distribution.
+        n_points_per_distribution : int or list, default=50
+            If int: number of samples drawn from each Gaussian distribution (equal-sized blobs).
+            If list/sequence: per-distribution counts; length must equal `n_distributions`.
 
         noise : float, default=0.1
             Global Gaussian noise added to all data points for variability.
@@ -103,6 +105,7 @@ class SwissRollDataModule(LightningDataModule):
     def setup(self, stage: str = None):
         if self.mode == "full":
             if self.use_gap:
+                # SwissRollGap accepts per-distribution counts (list) or an int
                 self.train_dataset = SwissRollGap(
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,
@@ -115,6 +118,7 @@ class SwissRollDataModule(LightningDataModule):
                     gap_fraction=self.gap_fraction,
                 )
             else:
+                # SwissRoll accepts either an int or a per-distribution list/array.
                 self.train_dataset = SwissRoll(
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,
@@ -140,6 +144,7 @@ class SwissRollDataModule(LightningDataModule):
                     gap_fraction=self.gap_fraction,
                 )
             else:
+                # SwissRoll accepts either an int or a per-distribution list/array.
                 self.dataset = SwissRoll(
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,

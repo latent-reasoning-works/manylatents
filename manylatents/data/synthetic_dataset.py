@@ -13,7 +13,7 @@ from typing import Union, List, Optional, Dict, Tuple
 # PrecomputedMixin was originally intended to load pre-generated synthetic data,
 # but synthetic datasets are fast to generate on-the-fly. For loading saved
 # embeddings/outputs from previous runs, use PrecomputedDataModule.
-from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
+# from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
 
 class SyntheticDataset(Dataset):
@@ -68,7 +68,7 @@ class SwissRoll(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
-        n_points_per_distribution=50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise=0.1,
         manifold_noise=0.1,
         width=10.0,
@@ -118,35 +118,79 @@ class SwissRoll(SyntheticDataset):
         # mean_y has shape (1, n_distributions) when width=1
         self.mean_y = width * rng.uniform(size=(1, n_distributions))
 
-        # t_noise.shape: (n_distributions, n_points_per_distribution)
-        t_noise = manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution))
+        # Normalize n_points_per_distribution into an array of counts per distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            counts = np.array(n_points_per_distribution, dtype=int)
+            if counts.shape[0] != n_distributions:
+                raise ValueError(
+                    f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                )
+            if np.any(counts < 0):
+                raise ValueError("n_points_per_distribution contains negative values")
+        elif isinstance(n_points_per_distribution, int):
+            counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
+        else:
+            try:
+                counts = np.array(n_points_per_distribution, dtype=int)
+                if counts.shape[0] != n_distributions:
+                    raise ValueError(
+                        f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                    )
+            except Exception:
+                raise ValueError("n_points_per_distribution must be an int or a sequence of ints")
 
-        # y_noise.shape: (n_distributions, n_points_per_distribution)
-        y_noise = width * manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution))
-        ts = np.reshape(t_noise + self.mean_t.T, -1)  # shape (5000,)
-        ys = np.reshape(y_noise + self.mean_y.T, -1)  # shape (5000,)
+        # Derive per-distribution scaling factors from counts (map into [0.5, 2.5])
+        if counts.size == 0:
+            scaling_factors = np.array([])
+        elif counts.min() == counts.max():
+            scaling_factors = np.ones_like(counts, dtype=float)
+        else:
+            scaling_factors = np.interp(counts, (counts.min(), counts.max()), (0.5, 2.5))
+
+        # For each distribution, sample local manifold noise with scaling and flatten to point-level
+        t_list = [manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + self.mean_t.flatten()[i] for i in range(n_distributions)]
+        y_list = [width * manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + self.mean_y.flatten()[i] for i in range(n_distributions)]
+
+        if len(t_list) > 0:
+            ts = np.concatenate(t_list)
+            ys = np.concatenate(y_list)
+        else:
+            ts = np.array([])
+            ys = np.array([])
         self.ys = ys
 
         xs = ts * np.cos(ts)
         zs = ts * np.sin(ts)
-        X = np.stack((xs, ys, zs))  # shape (3, 5000)
-        noise_term = noise * rng.normal(size=(3, n_distributions * n_points_per_distribution))
-        X = X + noise_term
-        
-        # Generate data
-        self.data = X.T  # shape (5000, 3)
+        X = np.stack((xs, ys, zs))  # shape (3, N)
+        N = ts.size
+
+        # Build observation-level data (N, 3) before adding noise
+        M_obs = X.T.copy()  # shape (N, 3)
+
+        # labels per-sample (used to scale observation noise)
+        labels = np.repeat(np.arange(n_distributions), counts)
+        if labels.size != N:
+            # defensive fallback: uniform observation noise
+            obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        else:
+            per_sample_scale = noise * scaling_factors[labels][:, None]
+            obs_noise = rng.normal(loc=0.0, scale=per_sample_scale, size=M_obs.shape)
+
+        M_obs = M_obs + obs_noise
+
+        # Assign data and optionally rotate
+        self.data = M_obs
         if rotate_to_dim > 3:
             self.data = self.rotate_to_dim(rotate_to_dim)
 
-        self.ts = np.squeeze(ts)  # (5000,)
-        self.metadata = np.repeat(
-            np.eye(n_distributions), n_points_per_distribution, axis=0
-        )
-        
-        self.metadata = np.repeat(
-            np.eye(n_distributions), n_points_per_distribution, axis=0
-        )
-        self.metadata = np.argmax(self.metadata,-1)
+        self.ts = np.squeeze(ts)
+        # Adjust metadata assignment to handle list input for n_points_per_distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            self.metadata = np.concatenate([
+                np.full(count, i) for i, count in enumerate(self.counts)
+            ])
+        else:
+            self.metadata = np.repeat(np.arange(self.n_distributions), self.counts)
 
     def _unroll_t(self, t):
         t = t.flatten()  # (100,)
@@ -188,7 +232,7 @@ class SwissRollGap(SyntheticDataset):
     @staticmethod
     def generate_swissroll_gap(
         n_distributions: int = 100,
-        n_points_per_distribution: int = 50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise: float = 0.1,
         manifold_noise: float = 0.1,
         width: float = 10.0,
@@ -240,9 +284,46 @@ class SwissRollGap(SyntheticDataset):
         # y means across blobs
         mean_y = width * rng.uniform(size=n_distributions)
 
+        # Normalize n_points_per_distribution into an array of counts per distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            counts = np.array(n_points_per_distribution, dtype=int)
+            if counts.shape[0] != n_distributions:
+                raise ValueError(
+                    f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                )
+        elif isinstance(n_points_per_distribution, int):
+            counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
+        else:
+            # Try to coerce to array-like
+            try:
+                counts = np.array(n_points_per_distribution, dtype=int)
+                if counts.shape[0] != n_distributions:
+                    raise ValueError(
+                        f"Length of n_points_per_distribution ({counts.shape[0]}) must equal n_distributions ({n_distributions})"
+                    )
+            except Exception:
+                raise ValueError("n_points_per_distribution must be an int or a sequence of ints")
+
+        # Derive a per-distribution scaling factor from counts so that
+        # larger blobs get slightly larger local manifold noise (but bounded).
+        # Map counts linearly into [0.5, 1.5] (min->0.5, max->1.5).
+        if counts.size == 0:
+            scaling_factors = np.array([])
+        elif counts.min() == counts.max():
+            scaling_factors = np.ones_like(counts, dtype=float)
+        else:
+            scaling_factors = np.interp(counts, (counts.min(), counts.max()), (0.5, 2.5))
+
         # For each distribution, sample local manifold noise and flatten to point-level
-        t_samples = (manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution)) + shifted[:, None]).reshape(-1)
-        y_samples = (width * manifold_noise * rng.normal(size=(n_distributions, n_points_per_distribution)) + mean_y[:, None]).reshape(-1)
+        t_list = [manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + shifted[i] for i in range(n_distributions)]
+        y_list = [width * manifold_noise * scaling_factors[i] * rng.normal(size=(counts[i],)) + mean_y[i] for i in range(n_distributions)]
+
+        if len(t_list) > 0:
+            t_samples = np.concatenate(t_list)
+            y_samples = np.concatenate(y_list)
+        else:
+            t_samples = np.array([])
+            y_samples = np.array([])
 
         # 3D manifold coords (clean)
         x = t_samples * np.cos(t_samples)
@@ -256,8 +337,16 @@ class SwissRollGap(SyntheticDataset):
         else:
             M_obs = M_gt_cart.copy()
 
-        # add observation noise
-        obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        # add observation noise scaled per-sample according to blob size
+        # build labels per-sample so we can broadcast per-distribution scaling
+        labels = np.repeat(np.arange(n_distributions), counts)
+        if labels.size != M_obs.shape[0]:
+            # defensive: fall back to uniform noise if something went wrong
+            obs_noise = rng.normal(loc=0.0, scale=noise, size=M_obs.shape)
+        else:
+            # scale observation noise by the same scaling_factors (range ~0.5-1.5)
+            per_sample_scale = noise * scaling_factors[labels][:, None]
+            obs_noise = rng.normal(loc=0.0, scale=per_sample_scale, size=M_obs.shape)
         M = M_obs + obs_noise
 
         # Compute unrolled t coordinate exactly as in SwissRoll._unroll_t
@@ -267,14 +356,14 @@ class SwissRollGap(SyntheticDataset):
         M_gt_2d = np.vstack([u_t, y_samples]).T
 
         # labels: each original distribution gets a label (0..n_distributions-1)
-        labels = np.repeat(np.arange(n_distributions), n_points_per_distribution)
+        labels = np.repeat(np.arange(n_distributions), counts)
 
         return M, M_gt_2d, labels
 
     def __init__(
         self,
         n_distributions=100,
-        n_points_per_distribution=50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise=0.1,
         manifold_noise=0.1,
         width=10.0,
@@ -328,13 +417,16 @@ class SaddleSurface(SyntheticDataset):
     def __init__(
         self,
         n_distributions=100,
-        n_points_per_distribution=50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise=0.1,
         manifold_noise=0.1,
         a=1.0,
         b=1.0,
         random_state=42,
         rotate_to_dim=3,
+        n_gaps: int = 0,
+        gap_fraction: float = 0.1,
+        use_gap: bool = False,
     ):
         """
         Initialize a synthetic Saddle Surface dataset with tunable parameters for geometry and noise.
@@ -345,7 +437,8 @@ class SaddleSurface(SyntheticDataset):
             Number of independent Gaussian distributions sampled across the saddle surface manifold.
 
         n_points_per_distribution : int, default=50
-            Number of data points drawn from each Gaussian distribution.
+            Number of data points drawn from each Gaussian distribution. Can also be an
+            array-like to specify per-distribution counts.
 
         noise : float, default=0.1
             Global isotropic Gaussian noise added to all data points.
@@ -366,19 +459,31 @@ class SaddleSurface(SyntheticDataset):
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
             For visualization purposes, the default of 3 means no rotation is applied.
+
+        n_gaps : int, default=0
+            Number of gaps to insert along the u-coordinate of the saddle surface. Only applied when
+            ``use_gap`` is True.
+
+        gap_fraction : float, default=0.1
+            Fraction of the total u-span used to size each gap when ``use_gap`` is True.
+
+        use_gap : bool, default=False
+            If True, gap parameters are applied to create regions of the manifold without samples.
         """
         super().__init__()
         np.random.seed(random_state)
         self.n_distributions = n_distributions
-        self.n_points_per_distribution = n_points_per_distribution
+        self.counts = self._normalize_counts(n_points_per_distribution, n_distributions)
         self.noise = noise
         self.manifold_noise = manifold_noise
         self.a = a
         self.b = b
         self.random_state = random_state
+        self.n_gaps = n_gaps
+        self.gap_fraction = gap_fraction
+        self.use_gap = use_gap
 
-        self.u_centers = np.random.uniform(-2, 2, n_distributions)
-        self.v_centers = np.random.uniform(-2, 2, n_distributions)
+        self.u_centers, self.v_centers = self._initialize_centers()
 
         self.u_samples = []
         self.v_samples = []
@@ -391,23 +496,70 @@ class SaddleSurface(SyntheticDataset):
         self.data = self._apply_noise(self.data)
         self.gt_points = gt_points
 
-        self.metadata = np.repeat(
-            np.eye(self.n_distributions), self.n_points_per_distribution, axis=0
-        )
-        self.metadata = np.argmax(self.metadata,-1)
+        # Adjust metadata assignment to handle list input for n_points_per_distribution
+        if isinstance(n_points_per_distribution, (list, tuple, np.ndarray)):
+            self.metadata = np.concatenate([
+                np.full(count, i) for i, count in enumerate(self.counts)
+            ])
+        else:
+            self.metadata = np.repeat(np.arange(self.n_distributions), self.counts)
+
+    def _normalize_counts(self, n_points_per_distribution, n_distributions):
+        """Normalize n_points_per_distribution into an integer array per distribution."""
+        # Validate that n_distributions matches the length of n_points_per_distribution if it's a list
+        if isinstance(n_points_per_distribution, int):
+            counts = np.full(n_distributions, n_points_per_distribution, dtype=int)
+        else: # it's a list/array/omegaconf.listconfig.ListConfig
+            if len(n_points_per_distribution) != n_distributions:
+                raise ValueError(
+                    f"n_distributions ({n_distributions}) must equal the length of n_points_per_distribution ({len(n_points_per_distribution)})."
+                )
+            counts = np.array(n_points_per_distribution, dtype=int)
+        return counts
+
+    def _initialize_centers(self):
+        """Sample u/v centers and optionally insert gaps along the u-axis, ensuring uniqueness."""
+        u_centers = np.random.uniform(-2, 2, self.n_distributions)
+        v_centers = np.random.uniform(-2, 2, self.n_distributions)
+
+        # Ensure uniqueness of u_centers and v_centers
+        u_centers = np.unique(u_centers)
+        while len(u_centers) < self.n_distributions:
+            new_u = np.random.uniform(-2, 2, self.n_distributions - len(u_centers))
+            u_centers = np.unique(np.concatenate([u_centers, new_u]))
+
+        v_centers = np.unique(v_centers)
+        while len(v_centers) < self.n_distributions:
+            new_v = np.random.uniform(-2, 2, self.n_distributions - len(v_centers))
+            v_centers = np.unique(np.concatenate([v_centers, new_v]))
+
+        if (
+            self.use_gap
+            and self.n_gaps > 0
+            and self.gap_fraction > 0
+            and self.n_distributions > 1
+        ):
+            gap_size = self.gap_fraction * (u_centers.max() - u_centers.min())
+            gap_indices = np.random.choice(
+                self.n_distributions, self.n_gaps, replace=False
+            )  # Randomly select indices for gaps
+            for idx in gap_indices:
+                u_centers[idx] += gap_size
+
+        return u_centers, v_centers
 
     def _generate_gaussian_blobs(self):
         """Generate Gaussian blobs in the parameter space of the saddle surface."""
         for i in range(self.n_distributions):
-            u_blob = np.random.normal(
-                self.u_centers[i], self.manifold_noise, self.n_points_per_distribution
-            )
-            v_blob = np.random.normal(
-                self.v_centers[i], self.manifold_noise, self.n_points_per_distribution
-            )
-            self.u_samples.append(u_blob)
-            self.v_samples.append(v_blob)
-            self.point_sets.append(self._saddle_to_cartesian(u_blob, v_blob))
+            u_samples = self.manifold_noise * np.random.normal(size=(self.counts[i],)) + self.u_centers[i]
+            v_samples = self.manifold_noise * np.random.normal(size=(self.counts[i],)) + self.v_centers[i]
+
+            self.u_samples.append(u_samples)
+            self.v_samples.append(v_samples)
+
+            cartesian_points = self._saddle_to_cartesian(u_samples, v_samples)
+            self.point_sets.append(cartesian_points)
+
         X = np.concatenate(self.point_sets)
         return X
 
@@ -430,24 +582,23 @@ class SaddleSurface(SyntheticDataset):
         distances = np.zeros((num_points, num_points))
 
         for i in range(num_points):
-            for j in range(i + 1, num_points):
+            for j in range(num_points):
                 distances[i, j] = self._surface_geodesic_distance(points[i], points[j])
-                distances[j, i] = distances[i, j]
 
         return distances
 
     def _surface_geodesic_distance(self, p1, p2):
         """Approximate the geodesic distance between two points on the saddle surface."""
-        u1, v1 = p1[0], p1[1]
-        u2, v2 = p2[0], p2[1]
+        u1, v1 = p1[:2]
+        u2, v2 = p2[:2]
         distance = np.sqrt((u2 - u1) ** 2 + (v2 - v1) ** 2)
 
         return distance
-    
+
     def get_graph(self):
         """Create a graphtools graph if does not exist."""
         if self.graph is None:
-            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+            self.graph = graphtools.Graph(self.data, knn=10, decay=None)
         return self.graph
 
 
@@ -673,6 +824,8 @@ class Torus(SyntheticDataset):
         minor_radius=1.0,
         random_state=42,
         rotate_to_dim=3,
+        n_clusters=10,
+        n_gaps=0,
     ):
         """
         Initialize a synthetic Torus dataset with uniformly distributed points.
@@ -680,7 +833,7 @@ class Torus(SyntheticDataset):
         Parameters:
         ----------
         n_points : int, default=5000
-            Total number of points to generate on the torus surface.
+            Total number of points to generate on the torus surface after gaps are introduced.
 
         noise : float, default=0.1
             Standard deviation of isotropic Gaussian noise added to each data point.
@@ -697,37 +850,79 @@ class Torus(SyntheticDataset):
         rotate_to_dim : int, default=3
             The higher dimensionality of the space to which the manifold is rotated.
             Rotation is only applied when this value is greater than 3.
+
+        n_clusters : int, default=10
+            Number of clusters to divide the torus into after gaps are introduced.
+
+        n_gaps : int, default=0
+            Number of gaps to introduce in the torus.
         """
         super().__init__()
         np.random.seed(random_state)
         rng = np.random.default_rng(random_state)
 
-        # Generate uniformly distributed angles
-        self.theta_all = 2 * np.pi * rng.random(n_points)  # [0, 2π]
-        self.phi_all = 2 * np.pi * rng.random(n_points)    # [0, 2π]
-        
+        # make sure n_cluster is a perfect square
+        if int(np.sqrt(n_clusters)) ** 2 != n_clusters:
+            raise ValueError("n_clusters must be a perfect square (e.g., 4, 9, 16, ...)")
+
+        # Calculate the total number of points needed before removing gaps
+        points_per_cluster = n_points // (n_clusters - n_gaps)
+        total_clusters = n_clusters
+        total_points = points_per_cluster * total_clusters
+
+        # Generate uniformly distributed angles for the total points
+        self.theta_all = 2 * np.pi * rng.random(total_points)  # [0, 2π]
+        self.phi_all = 2 * np.pi * rng.random(total_points)    # [0, 2π]
+
         # Convert to Cartesian coordinates
         x = (major_radius + minor_radius * np.cos(self.phi_all)) * np.cos(self.theta_all)
         y = (major_radius + minor_radius * np.cos(self.phi_all)) * np.sin(self.theta_all)
         z = minor_radius * np.sin(self.phi_all)
-        
-        X = np.stack((x, y, z), axis=-1)  # shape (n_points, 3)
-        
+
+        X = np.stack((x, y, z))  # shape (3, N)
+        X = X.T  # Transpose to shape (N, 3) for proper 3D representation
+
         # Add global noise
         noise_term = noise * rng.normal(size=X.shape)
         X = X + noise_term
-        
-        # Store parameters
-        self.major_radius = major_radius
-        self.minor_radius = minor_radius
-        
-        # Use generated data
-        self.data = X
+
+        # Assign clusters based on angular coordinates
+        theta_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)), endpoint=False)
+        phi_bins = np.linspace(0, 2 * np.pi, int(np.sqrt(total_clusters)), endpoint=False)
+
+        # Ensure the last bin edge is inclusive
+        theta_bins = np.append(theta_bins, 2 * np.pi)
+        phi_bins = np.append(phi_bins, 2 * np.pi)
+
+        # Digitize theta and phi to assign bin indices
+        theta_labels = np.digitize(self.theta_all, theta_bins, right=False) - 1
+        phi_labels = np.digitize(self.phi_all, phi_bins, right=False) - 1
+
+        # Combine theta and phi labels to create unique cluster IDs
+        raw_metadata = (theta_labels * len(phi_bins[:-1]) + phi_labels).astype(int)
+
+        # Remap labels to ensure contiguous cluster IDs from 0 to total_clusters - 1
+        unique_labels = np.unique(raw_metadata)
+        label_map = {old: new for new, old in enumerate(unique_labels)}
+        self.metadata = np.array([label_map[label] for label in raw_metadata])
+
+        # Remove entire clusters to introduce gaps
+        if n_gaps > 0:
+            clusters_to_remove = rng.choice(unique_labels, size=n_gaps, replace=False)
+            gap_mask = ~np.isin(self.metadata, clusters_to_remove)
+            X = X[gap_mask]
+            self.metadata = self.metadata[gap_mask]
+            self.theta_all = self.theta_all[gap_mask]
+            self.phi_all = self.phi_all[gap_mask]
+
+        # Set the data to the 3D torus and rotate if needed
+        self.data = X  # 3D torus
         if rotate_to_dim > 3:
             self.data = self.rotate_to_dim(rotate_to_dim)
 
-        # Create simple metadata
-        self.metadata = np.zeros(n_points, dtype=int)
+        # Store major and minor radii as attributes for later use
+        self.major_radius = major_radius
+        self.minor_radius = minor_radius
 
     def get_gt_dists(self):
         """
@@ -1364,38 +1559,48 @@ class DLATreeFromGraph(SyntheticDataset):
     def get_graph(self):
         """Return the precomputed adjacency graph built during data generation."""
         return self.graph
-
-
+    
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt
-    data_name = "swiss_roll_gap" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
+    data_name = "saddle_surface" # "swiss_roll" or "saddle_surface" or "dla_tree" or "torus" or "gaussian_blobs"
 
     if data_name == "swiss_roll":
-        dataset = SwissRoll(n_distributions=10, n_points_per_distribution=50, width=10.0, noise=0.05, manifold_noise=0.05, random_state=42, rotate_to_dim=5)
+        dataset = SwissRoll(n_distributions=10, 
+                            n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
+                            width=10.0, noise=0.1, manifold_noise=0.1, random_state=42, rotate_to_dim=5)
     elif data_name == "swiss_roll_gap":
-        dataset = SwissRollGap(n_distributions=10, n_points_per_distribution=100, width=10.0, noise=0.2, manifold_noise=0.2, random_state=42, rotate_to_dim=50,
+        dataset = SwissRollGap(n_distributions=10, 
+                               n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
+                               width=10.0, noise=0.1, manifold_noise=0.2, random_state=42, rotate_to_dim=50,
                                n_gaps=3, gap_fraction=0.5) 
     elif data_name == "saddle_surface":
-        dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=50, noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=5)
+        dataset = SaddleSurface(n_distributions=10, n_points_per_distribution=[500,100,30,100,100,70,100,100,50,100], 
+                                noise=0.05, manifold_noise=0.2, a=1.0, b=1.0, random_state=42, rotate_to_dim=50, 
+                                n_gaps = 3, gap_fraction = 0.1, use_gap = True)
     elif data_name == "dla_tree":
         dataset = DLAtree(n_dim=5, n_branch=5, branch_lengths=100, rand_multiplier=1.0, gap_multiplier=0.0, random_state=37, sigma=0.0, disconnect_branches=[], sampling_density_factors=None)
     elif data_name == "torus":
-        dataset = Torus(n_points=500, noise=0.05, major_radius=3.0, minor_radius=1.0, random_state=42, rotate_to_dim=5)
+        dataset = Torus(n_points=1000, noise=0.05, major_radius=5.0, minor_radius=1.0, random_state=42, rotate_to_dim=4, n_clusters=16, n_gaps=2)
     elif data_name == "gaussian_blobs":
         dataset = GaussianBlobs(n_samples=500, n_features=2, centers=5, cluster_std=1.0, random_state=42)
-    
+
     data = dataset.data
     labels = dataset.metadata
     gt_distance = dataset.get_gt_dists()
     g = dataset.get_graph()
     print("Data shape:", dataset.data.shape)
     print("Labels shape:", dataset.metadata.shape)
-    
-    if data_name == "swiss_roll" or data_name == "saddle_surface" or data_name == "torus" or data_name == "swiss_roll_gap":
+
+    if data_name == "swiss_roll" or data_name == "torus" or data_name == "swiss_roll_gap":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(data[:,0], data[:,1], data[:,2], c=labels, cmap='tab20')
+    elif data_name == "saddle_surface":
+        gt_data = dataset.gt_points
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(gt_data[:,0], gt_data[:,1], gt_data[:,2], c=labels, cmap='tab20')
     elif data_name == "gaussian_blobs":
         plt.figure(figsize=(8, 6))
         plt.scatter(data[:, 0], data[:, 1], c=labels, cmap='tab20', s=10)
@@ -1409,6 +1614,4 @@ if __name__ == "__main__":
         phate_data = phate_operator.fit_transform(data)
         plt.figure(figsize=(8, 6))
         plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
-    plt.savefig(f"{data_name}.png", bbox_inches='tight') 
-
-    
+    plt.savefig(f"{data_name}.png", bbox_inches='tight')

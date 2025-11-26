@@ -1,11 +1,12 @@
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
+from typing import Union, List
 from .synthetic_dataset import SaddleSurface
 
 class SaddleSurfaceDataModule(LightningDataModule):
     """
-    PyTorch Lightning DataModule for the SwissRoll Dataset. 
+    PyTorch Lightning DataModule for the SaddleSurface Dataset.
     """
 
     def __init__(
@@ -15,15 +16,17 @@ class SaddleSurfaceDataModule(LightningDataModule):
         num_workers: int = 0,
         shuffle_traindata: bool = True,
         n_distributions: int = 100,
-        n_points_per_distribution: int = 50,
+        n_points_per_distribution: Union[int, List[int]] = 50,
         noise: float = 0.05,
         manifold_noise: float = 0.05,
         a: float = 1.0,
         b: float = 1.0,
         random_state: int = 42,
         rotate_to_dim: int = 3,
-        # parameters to match hgdp.py
         mode: str = 'split',
+        use_gap: bool = False,
+        n_gaps: int = 3,
+        gap_fraction: float = 0.12,
     ):
         """
         Initialize the SaddleSurfaceDataModule with configuration parameters for data loading
@@ -41,7 +44,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
             Number of subprocesses to use for data loading in PyTorch's DataLoader.
 
         n_distributions : int, default=100
-            Number of independent Gaussian distributions along the Swiss roll manifold.
+            Number of independent Gaussian distributions along the Saddle surface manifold.
 
         n_points_per_distribution : int, default=50
             Number of samples drawn from each Gaussian distribution.
@@ -63,16 +66,24 @@ class SaddleSurfaceDataModule(LightningDataModule):
 
         rotate_to_dim : int, default=3
             Target dimension for rotation. Rotation is only applied if this value is greater than 3.
-            The default of 3 keeps the Swiss roll in 3D space.
+            The default of 3 keeps the Saddle surface in 3D space.
 
-        mode : str, default='full'
-            Mode for dataset train/test seperation. 
+        mode : str, default='split'
+            Mode for dataset train/test separation. 
             If 'full', the entire dataset is used as both training and test set (unsplit).
             If 'split', the dataset is randomly split into training and test subsets based on `test_split`.
+
+        use_gap : bool, default=False
+            Whether to introduce gaps in the manifold.
+
+        n_gaps : int, default=3
+            Number of gaps to introduce in the manifold.
+
+        gap_fraction : float, default=0.12
+            Fraction of the manifold to be removed as gaps.
         """
         super().__init__()
-        
-            
+
         self.batch_size = batch_size
         self.shuffle_traindata = shuffle_traindata
         self.test_split = test_split
@@ -89,6 +100,9 @@ class SaddleSurfaceDataModule(LightningDataModule):
         self.rotate_to_dim = rotate_to_dim
 
         self.mode = mode
+        self.use_gap = use_gap
+        self.n_gaps = n_gaps
+        self.gap_fraction = gap_fraction
 
         self.dataset = None
         self.train_dataset = None
@@ -109,6 +123,9 @@ class SaddleSurfaceDataModule(LightningDataModule):
                 b=self.b,
                 random_state=self.random_state,
                 rotate_to_dim=self.rotate_to_dim,
+                use_gap=self.use_gap,
+                n_gaps=self.n_gaps,
+                gap_fraction=self.gap_fraction,
             )
             self.test_dataset = self.train_dataset
 
@@ -122,6 +139,9 @@ class SaddleSurfaceDataModule(LightningDataModule):
                 b=self.b,
                 random_state=self.random_state,
                 rotate_to_dim=self.rotate_to_dim,
+                use_gap=self.use_gap,
+                n_gaps=self.n_gaps,
+                gap_fraction=self.gap_fraction,
             )
 
             test_size = int(len(self.dataset) * self.test_split)
@@ -148,6 +168,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
         )
+
     def test_dataloader(self) -> DataLoader:
         return DataLoader(
             self.test_dataset,
@@ -170,6 +191,9 @@ if __name__ == "__main__":
                 b=1.0,
                 random_state=123,
                 rotate_to_dim=5,
+                use_gap=True,
+                n_gaps= 3,
+                gap_fraction = 0.12
             )
 
     # Setup datasets
