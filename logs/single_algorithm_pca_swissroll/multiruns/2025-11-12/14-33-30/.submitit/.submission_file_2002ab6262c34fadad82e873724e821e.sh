@@ -1,0 +1,1 @@
+/network/scratch/c/cesar.valdez/manyLatents/logs/single_algorithm_pca_swissroll/multiruns/2025-11-12/14-33-30/.submitit/8101047/8101047_submission.sh

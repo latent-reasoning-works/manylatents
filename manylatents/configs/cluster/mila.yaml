@@ -16,8 +16,6 @@ hydra:
     subdir: ${hydra.job.num}
 
   launcher:
-    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
-
     # Resource parameters (override with resources config group)
     timeout_min: 240  # 4 hours
     cpus_per_task: 4

@@ -1,0 +1,284 @@
+hydra:
+  run:
+    dir: logs/${name}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: logs/${name}/multiruns/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  launcher:
+    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+    timeout_min: 240
+    cpus_per_task: 4
+    gpus_per_node: null
+    tasks_per_node: 1
+    mem_gb: 16
+    nodes: 1
+    name: ${hydra.job.name}
+    stderr_to_stdout: false
+    _target_: hydra_plugins.hydra_submitit_launcher.submitit_launcher.SlurmLauncher
+    partition: main
+    qos: null
+    comment: LRW experiment
+    constraint: null
+    exclude: null
+    gres: null
+    cpus_per_gpu: null
+    gpus_per_task: 0
+    mem_per_gpu: null
+    mem_per_cpu: null
+    account: null
+    signal_delay_s: 120
+    max_num_timeout: 0
+    additional_parameters:
+      time: 04:00:00
+      nodes: 1
+      mem: 16G
+      ntasks_per_node: 1
+    array_parallelism: 1
+    setup:
+    - export WANDB_CACHE_DIR=$SCRATCH/.wandb_cache
+    - export WANDB_CONFIG_DIR=$SCRATCH/.config/wandb
+    - export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    - export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    - echo "Starting job on $(hostname)"
+    - echo "SLURM_JOB_ID $SLURM_JOB_ID"
+  sweeper:
+    _target_: hydra._internal.core_plugins.basic_sweeper.BasicSweeper
+    max_batch_size: null
+    params: null
+  help:
+    app_name: ${hydra.job.name}
+    header: '${hydra.help.app_name} is powered by Hydra.
+
+      '
+    footer: 'Powered by Hydra (https://hydra.cc)
+
+      Use --hydra-help to view Hydra specific help
+
+      '
+    template: '${hydra.help.header}
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (group=option)
+
+
+      $APP_CONFIG_GROUPS
+
+
+      == Config ==
+
+      Override anything in the config (foo.bar=value)
+
+
+      $CONFIG
+
+
+      ${hydra.help.footer}
+
+      '
+  hydra_help:
+    template: 'Hydra (${hydra.runtime.version})
+
+      See https://hydra.cc for more info.
+
+
+      == Flags ==
+
+      $FLAGS_HELP
+
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (For example, append hydra/job_logging=disabled
+      to command line)
+
+
+      $HYDRA_CONFIG_GROUPS
+
+
+      Use ''--cfg hydra'' to Show the Hydra config.
+
+      '
+    hydra_help: ???
+  hydra_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][HYDRA] %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+    root:
+      level: INFO
+      handlers:
+      - console
+    loggers:
+      logging_example:
+        level: DEBUG
+    disable_existing_loggers: false
+  job_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+      file:
+        class: logging.FileHandler
+        formatter: simple
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+    root:
+      level: INFO
+      handlers:
+      - console
+      - file
+    disable_existing_loggers: false
+  env: {}
+  mode: MULTIRUN
+  searchpath: []
+  callbacks: {}
+  output_subdir: .hydra
+  overrides:
+    hydra:
+    - hydra.launcher.array_parallelism=1
+    task:
+    - experiment=single_algorithm
+    - cluster=mila
+    - resources=cpu
+  job:
+    name: main
+    chdir: null
+    override_dirname: cluster=mila,experiment=single_algorithm,resources=cpu
+    id: ???
+    num: ???
+    config_name: config
+    env_set: {}
+    env_copy: []
+    config:
+      override_dirname:
+        kv_sep: '='
+        item_sep: ','
+        exclude_keys: []
+  runtime:
+    version: 1.3.2
+    version_base: '1.3'
+    cwd: /network/scratch/c/cesar.valdez/manyLatents
+    config_sources:
+    - path: hydra.conf
+      schema: pkg
+      provider: hydra
+    - path: /network/scratch/c/cesar.valdez/manyLatents/manylatents/configs
+      schema: file
+      provider: main
+    - path: ''
+      schema: structured
+      provider: schema
+    output_dir: ???
+    choices:
+      resources: cpu
+      cluster: mila
+      experiment: single_algorithm
+      trainer: null
+      metrics/dataset: null
+      metrics/module: null
+      metrics/embedding: null
+      metrics: test_metric
+      pipeline: null
+      algorithms/lightning: null
+      algorithms/latent: pca
+      logger: none
+      hydra: default
+      callbacks: default
+      callbacks/embedding: default
+      callbacks/trainer: null
+      data: swissroll
+      hydra/env: default
+      hydra/callbacks: null
+      hydra/job_logging: default
+      hydra/hydra_logging: default
+      hydra/hydra_help: default
+      hydra/help: default
+      hydra/sweeper: basic
+      hydra/launcher: submitit_slurm
+      hydra/output: default
+  verbose: false
+algorithms:
+  latent:
+    _target_: manylatents.algorithms.latent.pca.PCAModule
+    n_components: 2
+    random_state: ${seed}
+pipeline: []
+data:
+  batch_size: 128
+  num_workers: 1
+  shuffle_traindata: false
+  _target_: manylatents.data.swissroll.SwissRollDataModule
+  test_split: 0.2
+  n_distributions: 10
+  n_points_per_distribution: 100
+  noise: 0.2
+  manifold_noise: 0.2
+  width: 10.0
+  random_state: ${seed}
+  rotate_to_dim: 100
+  mode: full
+  use_gap: false
+  n_gaps: 3
+  gap_fraction: 0.3
+callbacks:
+  embedding:
+    save_embeddings:
+      _target_: manylatents.callbacks.embedding.save_embeddings.SaveEmbeddings
+      save_dir: ${hydra:runtime.output_dir}
+      save_format: csv
+      experiment_name: ${name}
+      save_metric_tables: false
+    plot_embeddings:
+      _target_: manylatents.callbacks.embedding.plot_embeddings.PlotEmbeddings
+      save_dir: ${hydra:runtime.output_dir}
+      experiment_name: ${name}.png
+      figsize:
+      - 8
+      - 6
+      label_col: Population
+      legend: false
+      color_by_score: null
+    wandb_log_scores:
+      _target_: manylatents.callbacks.embedding.wandb_log_scores.WandbLogScores
+      log_summary: true
+      log_table: true
+      log_k_curve_table: true
+      include_labels: false
+logger: null
+trainer: {}
+metrics:
+  dataset:
+    test_metric:
+      _target_: manylatents.metrics.test_metric.TestMetric
+      _partial_: true
+      k: 25
+  embedding:
+    test_metric:
+      _target_: manylatents.metrics.test_metric.TestMetric
+      _partial_: true
+      k: 25
+  module:
+    test_metric:
+      _target_: manylatents.metrics.test_metric.TestMetric
+      _partial_: true
+      k: 25
+log_level: info
+seed: 42
+debug: false
+verbose: false
+cache_dir: outputs/cache
+ckpt_dir: outputs/ckpt
+name: single_algorithm_pca_swissroll
+project: your_project
+eval_only: false
+pretrained_ckpt: null
