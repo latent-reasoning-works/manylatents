@@ -1,7 +1,6 @@
 import logging
 
 import numpy as np
-import torch
 from ripser import ripser
 
 logger = logging.getLogger(__name__)
@@ -28,11 +27,6 @@ def PersistentHomology(embeddings: np.ndarray,
     Returns:
       - Number of persistent features (float).
     """
-    # Convert to numpy if necessary
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-        logger.info(f"PersistentHomology: Converted embeddings to numpy with shape {embeddings.shape}")
-    
     diagrams = ripser(embeddings)['dgms']
     features = diagrams[homology_dim]
     persistence = features[:, 1] - features[:, 0]

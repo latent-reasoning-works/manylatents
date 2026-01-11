@@ -1,7 +1,6 @@
 import logging
 
 import numpy as np
-import torch
 from scipy.stats import linregress
 
 logger = logging.getLogger(__name__)
@@ -18,14 +17,6 @@ def FractalDimension(dataset, embeddings: np.ndarray, n_box_sizes: int = 10) -> 
     Returns:
       - Estimated fractal dimension as a float.
     """
-    # Log type and shape of embeddings
-    logger.info(f"FractalDimension: Received embeddings of type {type(embeddings)} and shape {getattr(embeddings, 'shape', 'N/A')}")
-    
-    # Convert torch tensors to numpy array if needed.
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-        logger.info(f"FractalDimension: Converted embeddings to numpy array with shape {embeddings.shape}")
-    
     # Compute minimum and maximum along each feature axis.
     try:
         mins = np.min(embeddings, axis=0)

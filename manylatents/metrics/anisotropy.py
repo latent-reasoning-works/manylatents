@@ -1,7 +1,6 @@
 from typing import Optional
 
 import numpy as np
-import torch
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 
@@ -16,9 +15,6 @@ def Anisotropy(
     to the sum of all singular values of embeddings.
     Values closer to 1 indicate more anisotropy.
     """
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-
     # Center embeddings
     centered_embeddings = embeddings - np.mean(embeddings, axis=0)
 
