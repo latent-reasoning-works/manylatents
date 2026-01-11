@@ -23,7 +23,7 @@ The genetics and population genetics extension for `manylatents`.
 Install directly from GitHub:
 
 ```bash
-pip install git+https://github.com/latent-reasoning-works/manylatents-omics.git
+uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
 ```
 
 ### Interactive Setup
@@ -49,7 +49,7 @@ For development or customization:
 git clone https://github.com/latent-reasoning-works/manylatents-omics.git
 
 # Install in editable mode
-pip install -e manylatents-omics
+uv add -e manylatents-omics
 ```
 
 ### Using Git Submodules
@@ -61,7 +61,7 @@ For contributors working on both core and extensions:
 git submodule add https://github.com/latent-reasoning-works/manylatents-omics.git extensions/manylatents-omics
 
 # Install from submodule
-pip install -e extensions/manylatents-omics
+uv add -e extensions/manylatents-omics
 ```
 
 ## Using Extensions
@@ -237,7 +237,7 @@ Submit a PR to add your extension to:
 
 **Solution**: Install the extension:
 ```bash
-pip install git+https://github.com/latent-reasoning-works/manylatents-omics.git
+uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
 ```
 
 ### Import Conflicts
@@ -266,7 +266,7 @@ git clone https://TOKEN@github.com/latent-reasoning-works/manylatents-omics.git
 ## Best Practices
 
 1. **Install only what you need**: Extensions are optional - only install those you'll use
-2. **Keep extensions updated**: Run `pip install --upgrade git+https://...` periodically
+2. **Keep extensions updated**: Run `uv add --upgrade git+https://...` periodically
 3. **Check compatibility**: Some extensions may require specific core versions
 4. **Use virtual environments**: Keep extension sets isolated per project
 5. **Document dependencies**: If your workflow uses extensions, note them in your README

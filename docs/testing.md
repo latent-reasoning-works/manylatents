@@ -80,14 +80,14 @@ You can run any of the matrix configurations locally:
 ```bash
 # Smoke test
 python -m manylatents.main \
-  algorithm=latent/noop \
+  algorithms/latent=noop \
   data=test_data \
   metrics=test_metric \
   debug=true
 
 # PCA + SwissRoll  
 python -m manylatents.main \
-  algorithm=latent/pca \
+  algorithms/latent=pca \
   data=swissroll \
   metrics=synthetic_data_metrics \
   debug=true \
@@ -95,7 +95,7 @@ python -m manylatents.main \
 
 # Autoencoder + SwissRoll
 python -m manylatents.main \
-  algorithm=lightning/ae_reconstruction \
+  algorithms/lightning=ae_reconstruction \
   data=swissroll \
   metrics=synthetic_data_metrics \
   debug=true \
@@ -126,19 +126,6 @@ To add a new algorithm to the CI matrix, edit `.github/workflows/build.yml`:
   data: "test_dataset"
   metrics: "appropriate_metrics"
   timeout: 5  # minutes
-```
-
-### Sequential Workflow Testing
-
-When ready, enable sequential algorithm testing:
-
-```yaml
-# Uncomment in build.yml
-- name: "sequential-pca-umap"
-  algorithms: "[latent/pca,latent/umap]"
-  data: "swissroll"
-  metrics: "synthetic_data_metrics"
-  timeout: 12
 ```
 
 ### Dataset-Specific Testing

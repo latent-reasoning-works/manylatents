@@ -37,7 +37,7 @@ python -m manylatents.main experiment=my_experiment
 
 ### Via Python API
 
-When using the programmatic API (e.g., from manyAgents), you can pass `metrics=None`:
+When using the programmatic API, you can pass `metrics=None`:
 
 ```python
 from manylatents.api import run
@@ -117,19 +117,16 @@ When `metrics=null`, the experiment will:
 python -m manylatents.main experiment=single_algorithm_no_metrics
 ```
 
-### Example 2: API Usage from manyAgents
+### Example 2: API Usage
 
 ```python
-# In manyAgents workflow
 from manylatents.api import run
 
 # Fast embedding step without evaluation overhead
-embeddings = run(
+result = run(
     data="swissroll",
-    algorithm="pca",
-    n_components=50,
-    metrics=None,  # Skip metrics computation
-    project="manyagents_pipeline"
+    algorithms={'latent': 'pca'},
+    metrics=None  # Skip metrics computation
 )
 ```
 

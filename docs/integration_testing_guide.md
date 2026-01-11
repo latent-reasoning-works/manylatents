@@ -8,10 +8,10 @@ This guide shows how to verify that the namespace integration works in a real wo
 
 ```bash
 # Install manylatents core package
-pip install -e /path/to/manylatents --no-deps
+uv add -e /path/to/manylatents --no-deps
 
 # Install mock manylatents-omics locally
-pip install -e /path/to/manylatents/tests/mock_omics_package --no-deps
+uv add -e /path/to/manylatents/tests/mock_omics_package --no-deps
 
 # Verify imports work
 python3 << 'EOF'
@@ -227,10 +227,10 @@ print(f"Ready to compute: {geo_metric.name}")
 **Solution**:
 ```bash
 # Install the mock package for testing
-pip install -e ./tests/mock_omics_package --no-deps
+uv add -e ./tests/mock_omics_package --no-deps
 
 # Or install the real package if you have access
-pip install -e /path/to/manylatents-omics --no-deps
+uv add -e /path/to/manylatents-omics --no-deps
 ```
 
 ### Issue: "ImportError: cannot import name 'PlinkDataset'"

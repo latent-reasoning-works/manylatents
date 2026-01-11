@@ -1,6 +1,6 @@
 # API Usage Guide
 
-The manyLatents programmatic API enables agent-driven workflows and in-memory data chaining, allowing you to compose dimensionality reduction pipelines programmatically.
+The ManyLatents programmatic API enables workflow integration and in-memory data chaining.
 
 ## Quick Start
 
@@ -13,22 +13,16 @@ result = run(
     algorithms={'latent': {'_target_': 'manylatents.algorithms.latent.pca.PCAModule', 'n_components': 10}}
 )
 
-embeddings = result['embeddings']
+embeddings = result['embeddings']  # numpy array
+scores = result['scores']          # dict of metrics
 ```
 
 ## Chained Workflows
 
-The API supports chaining multiple algorithms by passing the output of one as input to another:
+Chain multiple algorithms by passing the output of one as input to another:
 
 ```python
-import numpy as np
-import torch
-
-def ensure_numpy(arr):
-    """Helper to convert tensor to numpy."""
-    if isinstance(arr, torch.Tensor):
-        return arr.detach().cpu().numpy()
-    return arr
+from manylatents.api import run
 
 # Step 1: Initial dimensionality reduction
 result1 = run(
@@ -38,12 +32,14 @@ result1 = run(
 
 # Step 2: Chain to another algorithm
 result2 = run(
-    input_data=ensure_numpy(result1['embeddings']),
+    input_data=result1['embeddings'],
     algorithms={'latent': {'_target_': 'manylatents.algorithms.latent.umap.UMAPModule', 'n_components': 2}}
 )
 
-final_embeddings = ensure_numpy(result2['embeddings'])
+final_embeddings = result2['embeddings']
 ```
+
+Note: Embeddings are automatically converted to numpy arrays by the evaluation system.
 
 ## Available Algorithms
 
@@ -68,7 +64,7 @@ Execute a dimensionality reduction algorithm.
 **Returns:**
 
 Dictionary with keys:
-- `embeddings`: Computed embeddings (torch.Tensor or np.ndarray)
+- `embeddings`: Computed embeddings (numpy array)
 - `label`: Labels from dataset (if available)
 - `metadata`: Run metadata dictionary
 - `scores`: Evaluation metrics (if enabled)
@@ -80,11 +76,12 @@ Dictionary with keys:
 result = run(data='swissroll', algorithms={'latent': 'pca'})
 
 # Using in-memory data
+import numpy as np
 my_data = np.random.randn(1000, 100).astype(np.float32)
 result = run(input_data=my_data, algorithms={'latent': 'pca'})
 
 # Chaining algorithms
-result2 = run(input_data=ensure_numpy(result['embeddings']), algorithms={'latent': 'umap'})
+result2 = run(input_data=result['embeddings'], algorithms={'latent': 'umap'})
 ```
 
 ## Advanced Usage
@@ -101,10 +98,6 @@ result = run(
             'n_neighbors': 15,
             'min_dist': 0.1
         }
-    },
-    data={
-        'batch_size': 256,
-        'num_workers': 4
     }
 )
 ```
@@ -123,21 +116,14 @@ result = run(data='swissroll', algorithms={'latent': 'pca'}, metrics=None)
 
 - **Input**: numpy.ndarray with dtype `float32` or `float64`
 - **Shape**: `(n_samples, n_features)`
-- **Output**: May be torch.Tensor or numpy.ndarray (use `ensure_numpy()` helper for consistency)
+- **Output**: numpy array (tensor conversion is handled automatically)
 
 ## Multi-Step Example
 
 ```python
 from manylatents.api import run
-import numpy as np
-import torch
 
-def ensure_numpy(arr):
-    if isinstance(arr, torch.Tensor):
-        return arr.detach().cpu().numpy()
-    return arr
-
-# Progressive dimensionality reduction pipeline
+# Progressive dimensionality reduction
 steps = [
     ('PCA 100D', 'manylatents.algorithms.latent.pca.PCAModule', 100),
     ('PCA 50D', 'manylatents.algorithms.latent.pca.PCAModule', 50),
@@ -145,18 +131,20 @@ steps = [
 ]
 
 # Initial data
-current_data = run(data='swissroll', algorithms={'latent': {'_target_': steps[0][1], 'n_components': steps[0][2]}})
+current_data = run(
+    data='swissroll',
+    algorithms={'latent': {'_target_': steps[0][1], 'n_components': steps[0][2]}}
+)
 
 # Chain subsequent steps
 for name, target, n_comp in steps[1:]:
     print(f"Running {name}...")
     current_data = run(
-        input_data=ensure_numpy(current_data['embeddings']),
+        input_data=current_data['embeddings'],
         algorithms={'latent': {'_target_': target, 'n_components': n_comp}}
     )
 
-final_embeddings = ensure_numpy(current_data['embeddings'])
-print(f"Final shape: {final_embeddings.shape}")
+print(f"Final shape: {current_data['embeddings'].shape}")
 ```
 
 ## Implementation Details
@@ -164,7 +152,7 @@ print(f"Final shape: {final_embeddings.shape}")
 The in-memory data pipeline uses:
 - `PrecomputedDataModule`: Accepts `data` parameter for numpy arrays
 - `InMemoryDataset`: Wraps arrays in EmbeddingOutputs format
-- Compatible with all manyLatents metrics, callbacks, and visualizations
+- Compatible with all ManyLatents metrics, callbacks, and visualizations
 
 ## Troubleshooting
 
@@ -174,19 +162,7 @@ The in-memory data pipeline uses:
 
 Provide either `data='dataset_name'` OR `input_data=array`, not both or neither.
 
-**Tensor/NumPy Conversion**
-
-Use the helper function:
-
-```python
-def ensure_numpy(arr):
-    if isinstance(arr, torch.Tensor):
-        return arr.detach().cpu().numpy()
-    return arr
-```
-
 ## See Also
 
 - [Testing Guide](testing.md)
-- Configuration system documentation (coming soon)
-- Algorithm-specific parameters (coming soon)
+- [Metrics Architecture](metrics_architecture.md)

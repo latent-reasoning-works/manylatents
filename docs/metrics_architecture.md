@@ -143,23 +143,18 @@ This allows:
 ### Example Workflow
 
 ```python
-# Beginning of pipeline
+# Beginning of run
 dataset_metrics = compute_metrics(data, cfg.metrics.dataset)
 # → Runs once, caches results
 
-# After PCA
-pca_embeddings = pca.transform(data)
-embedding_metrics = compute_metrics(pca_embeddings, cfg.metrics.embedding)
-# → Compares data vs. pca_embeddings
+# After dimensionality reduction
+embeddings = algorithm.transform(data)
+embedding_metrics = compute_metrics(embeddings, cfg.metrics.embedding)
+# → Compares data vs. embeddings
 
-# After UMAP (in multi-step pipeline)
-umap_embeddings = umap.transform(pca_embeddings)
-embedding_metrics = compute_metrics(umap_embeddings, cfg.metrics.embedding)
-# → Compares pca_embeddings vs. umap_embeddings
-
-# Model-specific analysis
-module_metrics = compute_metrics(umap.graph_, cfg.metrics.module)
-# → Analyzes UMAP's learned kNN graph
+# Model-specific analysis (e.g., for UMAP)
+module_metrics = compute_metrics(algorithm.graph_, cfg.metrics.module)
+# → Analyzes algorithm's learned kNN graph
 ```
 
 ---
