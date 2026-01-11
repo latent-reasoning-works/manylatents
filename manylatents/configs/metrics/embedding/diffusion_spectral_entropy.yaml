@@ -1,0 +1,5 @@
+diffusion_spectral_entropy:
+  _target_: manylatents.metrics.diffusion_spectral_entropy.DiffusionSpectralEntropy
+  _partial_: True
+  t: 1
+  gaussian_kernel_sigma: 10
