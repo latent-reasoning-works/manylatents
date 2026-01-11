@@ -4,11 +4,13 @@
 
 **"One geometry, learned through many latents"**
 
+**Part of the [Latent Reasoning Works](https://github.com/latent-reasoning-works) ecosystem**
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Hydra](https://img.shields.io/badge/Config-Hydra-blue)](https://hydra.cc/)
 [![Lightning](https://img.shields.io/badge/Framework-PyTorch%20Lightning-792ee5)](https://lightning.ai/)
-[![Docs](https://img.shields.io/badge/docs-MkDocs-blue)](https://squidfunk.github.io/mkdocs-material/)
+[![uv](https://img.shields.io/badge/Package-uv-DE5FE9)](https://docs.astral.sh/uv/)
 
 *A unified framework for dimensionality reduction and neural network analysis on diverse datasets*
 
@@ -21,8 +23,7 @@
 **ManyLatents** is a comprehensive framework that bridges traditional dimensionality reduction techniques with modern neural networks. Built on **PyTorch Lightning** and **Hydra**, it provides a unified interface for:
 
 - **Traditional DR methods**: PCA, t-SNE, PHATE, UMAP
-- **Neural architectures**: Autoencoders, VAEs, and custom networks  
-- **Sequential workflows**: Chain multiple algorithms (e.g., PCA → neural network → final embedding)
+- **Neural architectures**: Autoencoders, VAEs, and custom networks
 - **Diverse datasets**: Single-cell data, synthetic manifolds, genetics data (with extensions)
 - **🧬 Extensions**: Domain-specific packages like [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) for genomics
 
@@ -31,9 +32,9 @@
 - 🔧 **Modular Architecture**: Unified `LatentModule` interface for all algorithms
 - ⚡ **Lightning Integration**: Seamless neural network training with PyTorch Lightning
 - 🎛️ **Hydra Configuration**: Flexible, composable experiment configurations
-- 🔄 **Sequential Pipelines**: Chain multiple algorithms (e.g., PCA → Autoencoder → final embedding)
-- 📊 **Rich Evaluation**: Comprehensive metrics for embedding quality
-- 🧪 **Extensive Testing**: Matrix testing across algorithm-dataset combinations
+- 📊 **Rich Evaluation**: 23+ metrics for embedding quality assessment
+- 🔌 **Python API**: Programmatic access for orchestration and workflow integration
+- 🖥️ **SLURM Support**: Multi-cluster job submission via [shop](https://github.com/latent-reasoning-works/shop)
 
 ---
 
@@ -46,16 +47,24 @@
 git clone https://github.com/latent-reasoning-works/manylatents.git
 cd manylatents
 
-# Install with uv (recommended)
+# Install with uv
 uv sync
 source .venv/bin/activate
 
-# Or with pip
-pip install -e .
-
 # Optional: Install extensions for domain-specific functionality
-# See EXTENSIONS.md for details
 uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git  # Genomics support
+```
+
+### SLURM Cluster Support (Optional)
+
+For multi-cluster job submission via [shop](https://github.com/latent-reasoning-works/shop):
+
+```bash
+# Install with SLURM support
+uv sync --extra slurm
+
+# Submit to cluster
+python -m manylatents.main experiment=single_algorithm hydra/launcher=slurm_cluster
 ```
 
 ### Extensions
@@ -88,29 +97,6 @@ python -m manylatents.main \
   trainer.max_epochs=50
 ```
 
-### Sequential Pipeline Usage
-
-For multi-step sequential workflows, use pipeline configurations from the `pipeline/` folder:
-
-```bash
-# Run a sequential pipeline (PCA → Autoencoder)
-python -m manylatents.main experiment=multiple_algorithms
-
-# The pipeline will:
-# 1. Run PCA on input data
-# 2. Pass PCA output to autoencoder
-# 3. Generate final embedding
-# 4. Track progress with W&B logging
-```
-
-**Note**: Pipeline configurations are located in `manylatents/configs/experiment/pipeline/` for chainable multi-algorithm workflows.
-
-Pipeline configurations support:
-- **Sequential processing**: Each algorithm receives output from previous step
-- **Mixed algorithms**: Combine traditional DR with neural networks
-- **Per-step overrides**: Custom hyperparameters for each algorithm
-- **Unified interface**: Same main.py entry point as single algorithms
-
 ### Python API Usage
 
 For programmatic access and workflow orchestration:
@@ -132,12 +118,14 @@ result = run(
 embeddings = result["embeddings"]  # numpy array
 scores = result["scores"]          # dict of metrics
 metadata = result["metadata"]      # dict of metadata
+
+# Chain algorithms by passing embeddings
+result2 = run(input_data=result["embeddings"], algorithms={"latent": "phate"})
 ```
 
 **Key Features**:
-- 🔗 **In-memory data passing**: Pass numpy arrays between pipeline steps
+- 🔗 **In-memory data passing**: Pass numpy arrays between calls
 - 🚀 **No subprocess overhead**: Direct Python function calls
-- 🎯 **Orchestration-ready**: Designed for integration with manyAgents
 - 📊 **Flexible metrics**: Returns float, tuple, or dict metric values
 
 See [API Documentation](docs/api_usage.md) for complete reference.
@@ -167,67 +155,6 @@ manylatents/
 
 - **`LatentModule`**: Traditional DR with `fit()`/`transform()` interface
 - **`LightningModule`**: Neural networks with full training loops
-- **Sequential workflows**: Chain multiple algorithms automatically
-
----
-
-## 🔄 Pipeline Workflows
-
-### Sequential Pipeline Architecture
-
-The unified pipeline system enables complex multi-step workflows through the main interface:
-
-```bash
-# Basic pipeline syntax
-python -m manylatents.main experiment=<pipeline_name>
-
-# Example: PCA followed by autoencoder
-python -m manylatents.main experiment=multiple_algorithms
-```
-
-### Pipeline Configuration
-
-Define pipelines in YAML with sequential algorithm execution:
-
-```yaml
-# manylatents/configs/experiment/pipeline/my_pipeline.yaml
-name: my_custom_pipeline
-
-defaults:
-  - _self_
-  - override /data: swissroll
-  - override /callbacks/embedding: default
-  - override /trainer: default
-
-pipeline:
-  - experiment: pipeline_step_latent    # Step 1: Traditional DR method
-    overrides:
-      - algorithms/latent=pca
-      - algorithms.latent.n_components=50
-  - experiment: pipeline_step_lightning # Step 2: Neural network
-    overrides:
-      - algorithms/lightning=ae_reconstruction
-      - algorithms.lightning.network.latent_dim=2
-      - algorithms.lightning.network.input_dim=50
-```
-
-### Pipeline Features
-
-- **🔗 Automatic chaining**: Each algorithm receives output from previous step
-- **📊 W&B integration**: Unified experiment tracking across all steps  
-- **🎛️ Per-step configuration**: Custom hyperparameters for each algorithm
-- **📁 Output management**: Organized intermediate results tracking
-- **🔄 Mixed workflows**: Combine traditional DR methods with neural networks
-- **⚡ Unified interface**: Same main.py entry point as single algorithms
-
-### Pipeline vs Single Algorithm
-
-| Feature | Single Algorithm | Pipeline |
-|---------|------------------|----------|
-| **Entry point** | `python -m manylatents.main` | `python -m manylatents.main` |
-| **Configuration** | `algorithms/latent=pca` | `experiment=multiple_algorithms` |
-| **Data flow** | Single input/output | Sequential algorithm chaining |
-| **Use case** | Single DR method | Multi-step workflows |
 
 ---
 
@@ -243,11 +170,6 @@ pipeline:
 - ✅ **Autoencoder** - Reconstruction-based dimensionality reduction
 - ✅ **VAE** - Variational Autoencoder (coming soon)
 - ✅ **Custom architectures** - Extensible neural network support
-
-### Sequential Pipelines
-- 🔗 **Algorithm Chaining** - Connect traditional DR methods with neural networks
-- ⚙️ **Per-Step Configuration** - Custom hyperparameters for each pipeline stage
-- 📊 **Unified Tracking** - Single W&B experiment across all pipeline steps
 
 ### Datasets
 - 🔬 **Single-cell**: Anndata, scRNA-seq data in h5ad format
@@ -330,9 +252,6 @@ pytest
 # Test single algorithm
 python -m manylatents.main experiment=single_algorithm
 
-# Test pipeline workflow
-python -m manylatents.main experiment=multiple_algorithms
-
 # Quick smoke test with minimal data
 python -m manylatents.main \
   experiment=single_algorithm \
@@ -351,7 +270,7 @@ Our CI runs comprehensive testing across algorithm-dataset combinations:
 - **Smoke tests**: Basic functionality validation
 - **Traditional DR**: PCA, UMAP on synthetic data
 - **Neural networks**: Autoencoder training validation
-- **Integration tests**: Full pipeline testing
+- **Integration tests**: End-to-end testing
 
 See [Testing Documentation](docs/testing.md) for detailed information.
 
@@ -359,11 +278,40 @@ See [Testing Documentation](docs/testing.md) for detailed information.
 
 ## 📊 Evaluation & Metrics
 
-### Embedding Quality Metrics
-- **Trustworthiness**: Preservation of local neighborhoods
-- **Continuity**: Smooth embedding properties  
-- **Participation Ratio**: Effective dimensionality
-- **Fractal Dimension**: Intrinsic dimensionality estimation
+### Embedding Quality Metrics (23+ available)
+
+**Neighborhood Preservation:**
+- **Trustworthiness**: Local neighborhood preservation in embedding
+- **Continuity**: Reverse trustworthiness (embedding → original space)
+- **k-NN Preservation**: k-nearest neighbor graph preservation
+
+**Dimensionality Analysis:**
+- **Local Intrinsic Dimensionality (LID)**: Per-point dimensionality estimation
+- **Participation Ratio**: Effective dimensionality via eigenvalue analysis
+- **Fractal Dimension**: Box-counting dimension estimation
+- **Tangent Space Approximation**: Local manifold dimension
+
+**Topological & Geometric:**
+- **Persistent Homology**: Topological feature counting via ripser
+- **Diffusion Spectral Entropy**: Spectral complexity measure
+- **Diffusion Curvature**: Local curvature estimation
+- **Reeb Graph**: Topological skeleton analysis
+- **Anisotropy**: Embedding uniformity measure
+
+### Sampling Strategies
+
+For large datasets, pluggable sampling strategies reduce computation:
+
+```python
+# In config
+metrics:
+  sampling:
+    _target_: manylatents.utils.sampling.RandomSampling
+    fraction: 0.1
+    seed: 42
+```
+
+Available strategies: `RandomSampling`, `StratifiedSampling`, `FarthestPointSampling`, `FixedIndexSampling`
 
 ### Dataset-Specific Metrics
 - **Single-cell**: Cell type separation, trajectory preservation
@@ -419,12 +367,24 @@ We welcome contributions! Please:
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-username/manylatents.git
+git clone https://github.com/latent-reasoning-works/manylatents.git
 cd manylatents
 uv sync
 source .venv/bin/activate
 pre-commit install
 ```
+
+---
+
+## 🌐 LRW Ecosystem
+
+ManyLatents is part of the **Latent Reasoning Works** suite of tools:
+
+| Project | Description |
+|---------|-------------|
+| [manylatents](https://github.com/latent-reasoning-works/manylatents) | Core DR framework (this repo) |
+| [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) | Genomics & population genetics extensions |
+| [shop](https://github.com/latent-reasoning-works/shop) | Multi-cluster SLURM job management |
 
 ---
 
@@ -446,6 +406,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **🚀 Ready to explore the latent space? Get started with ManyLatents!**
 
-[📖 Documentation](docs/) • [🐛 Issues](https://github.com/username/manylatents/issues) • [💬 Discussions](https://github.com/username/manylatents/discussions)
+[📖 Documentation](docs/) • [🐛 Issues](https://github.com/latent-reasoning-works/manylatents/issues) • [💬 Discussions](https://github.com/latent-reasoning-works/manylatents/discussions)
 
 </div>
