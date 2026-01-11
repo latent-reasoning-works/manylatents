@@ -112,6 +112,7 @@ class SwissRoll(SyntheticDataset):
         np.random.seed(random_state)
         rng = np.random.default_rng(random_state)
 
+        self.n_distributions = n_distributions
         self.mean_t = 3 * np.pi / 2 * (1 + 2 * rng.random((1, n_distributions)))
         # ground truth coordinate euclidean in (y,t) is geo on 3d
 
@@ -138,6 +139,8 @@ class SwissRoll(SyntheticDataset):
                     )
             except Exception:
                 raise ValueError("n_points_per_distribution must be an int or a sequence of ints")
+
+        self.counts = counts
 
         # Derive per-distribution scaling factors from counts (map into [0.5, 2.5])
         if counts.size == 0:
