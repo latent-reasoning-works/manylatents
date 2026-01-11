@@ -1,5 +1,0 @@
-defaults:
-  - _self_
-
-_target_: src.metrics.reeb_graph.ReebGraphNodesEdges
-n_bins: 10

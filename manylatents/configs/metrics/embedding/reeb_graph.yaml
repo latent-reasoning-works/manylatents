@@ -1,0 +1,4 @@
+reeb_graph:
+  _target_: manylatents.metrics.reeb_graph.ReebGraphNodesEdges
+  _partial_: True
+  n_bins: 10
