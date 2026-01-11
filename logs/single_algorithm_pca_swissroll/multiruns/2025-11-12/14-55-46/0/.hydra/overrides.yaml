@@ -1,4 +1,0 @@
-- experiment=single_algorithm
-- cluster=mila
-- resources=gpu
-- logger=wandb
