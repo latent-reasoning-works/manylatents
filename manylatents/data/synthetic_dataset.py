@@ -13,7 +13,7 @@ from typing import Union, List, Optional, Dict, Tuple
 # PrecomputedMixin was originally intended to load pre-generated synthetic data,
 # but synthetic datasets are fast to generate on-the-fly. For loading saved
 # embeddings/outputs from previous runs, use PrecomputedDataModule.
-# from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
+from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
 
 class SyntheticDataset(Dataset):
