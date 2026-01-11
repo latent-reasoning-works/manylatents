@@ -1,9 +1,0 @@
-defaults:
-  - default
-
-_target_: manylatents.data.anndata.AnnDataModule
-test_split: 0.2
-random_state: ${seed}
-shuffle_traindata: false
-adata_path: ./data/scRNAseq/EBT_counts.h5ad
-label_key: sample_labels
