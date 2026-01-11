@@ -1,0 +1,7 @@
+# Farthest point sampling - maximizes coverage of embedding space
+# Usage: metrics.sampling=sampling/farthest_point
+# Note: O(n*k) complexity, slower than random for large datasets
+sampling:
+  _target_: manylatents.utils.sampling.FarthestPointSampling
+  seed: 42
+  fraction: 0.1

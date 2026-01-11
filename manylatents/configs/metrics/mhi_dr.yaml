@@ -8,4 +8,3 @@ defaults:
   # - tangent_space
 # - module:
 #   - connected_components
-subsample_fraction: null

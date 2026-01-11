@@ -16,4 +16,3 @@ defaults:
 - module:
   - connected_components
   - affinity_spectrum
-subsample_fraction: null

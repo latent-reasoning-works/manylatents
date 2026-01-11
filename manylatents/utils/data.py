@@ -246,37 +246,47 @@ def cache_result(cache_path: str, compute_func, *args, **kwargs):
         return result
     
 def subsample_data_and_dataset(
-    ds, embeddings: np.ndarray, fraction: float
+    ds, embeddings: np.ndarray, fraction: float, seed: int = 42
 ) -> Tuple[object, np.ndarray]:
     """
-    Subsamples the embeddings and creates a shallow copy of the dataset
-    with its metadata fields (like latitude, longitude, population_label) subsampled.
-    Assumes that the dataset exposes its metadata as properties that are Pandas Series.
-    
+    DEPRECATED: Use sampling strategies directly instead.
+
+    This function is deprecated. Use the new sampling interface:
+
+        from manylatents.utils.sampling import RandomSampling
+        sampler = RandomSampling(seed=42)
+        emb_sub, ds_sub, indices = sampler.sample(embeddings, ds, fraction=0.1)
+
+    For stratified sampling:
+
+        from manylatents.utils.sampling import StratifiedSampling
+        sampler = StratifiedSampling(stratify_by='population_label')
+        emb_sub, ds_sub, indices = sampler.sample(embeddings, ds, fraction=0.1)
+
+    Args:
+        ds: Dataset object with metadata attributes.
+        embeddings: Embedding array to sample from.
+        fraction: Fraction of samples to take (0.0 to 1.0).
+        seed: Random seed for reproducibility.
+
     Returns:
-        A tuple of (subsampled_dataset, subsampled_embeddings)
+        A tuple of (subsampled_dataset, subsampled_embeddings).
     """
-    num_samples = int(embeddings.shape[0] * fraction)
-    logger.info(f"Subsampling from {embeddings.shape[0]} to {num_samples} samples.")
-    
-    indices = np.random.choice(embeddings.shape[0], num_samples, replace=False)
-    subsampled_embeddings = embeddings[indices]
-    logger.info(f"Subsampled embeddings shape: {subsampled_embeddings.shape}")
-    
-    # Create a shallow copy of the dataset (you can also implement a .subset() method on ds)
-    subsampled_ds = deepcopy(ds)
-    
-    # Update the metadata properties (assuming these attributes are Pandas Series)
-    if hasattr(ds, "latitude"):
-        subsampled_ds._latitude = ds.latitude.iloc[indices]
-        logger.info(f"Subsampled latitude shape: {subsampled_ds._latitude.shape}")
-    if hasattr(ds, "longitude"):
-        subsampled_ds._longitude = ds.longitude.iloc[indices]
-        logger.info(f"Subsampled longitude shape: {subsampled_ds._longitude.shape}")
-    if hasattr(ds, "population_label"):
-        subsampled_ds._population_label = ds.population_label.iloc[indices]
-        logger.info(f"Subsampled population_label shape: {subsampled_ds._population_label.shape}")
-    
+    import warnings
+    warnings.warn(
+        "subsample_data_and_dataset is deprecated. Use sampling strategies directly: "
+        "from manylatents.utils.sampling import RandomSampling",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
+    from manylatents.utils.sampling import RandomSampling
+
+    sampler = RandomSampling(seed=seed)
+    subsampled_embeddings, subsampled_ds, _ = sampler.sample(
+        embeddings, ds, fraction=fraction
+    )
+
     return subsampled_ds, subsampled_embeddings
 
 def determine_data_source(loader) -> Tuple[str, str]:

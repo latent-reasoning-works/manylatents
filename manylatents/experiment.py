@@ -171,13 +171,14 @@ def evaluate_embeddings(
     logger.info(f"Reference data shape: {ds.data.shape}")
     logger.info(f"Computing embedding metrics for {ds.data.shape[0]} samples.")
 
-    #subsample in case dataset is too large
-    subsample_fraction = cfg.metrics.get("subsample_fraction", None) if cfg.metrics is not None else None
-    if subsample_fraction is not None:
-        ds_sub, emb_sub = subsample_data_and_dataset(ds, embeddings, subsample_fraction)
-        logger.info(f"Subsampled dataset to {emb_sub.shape[0]} samples.")
-    else:
-        ds_sub, emb_sub = ds, embeddings
+    # Subsample for large datasets using pluggable sampling strategies
+    ds_sub, emb_sub = ds, embeddings
+    if cfg.metrics is not None:
+        sampling_cfg = cfg.metrics.get("sampling", None)
+        if sampling_cfg is not None:
+            sampler = hydra.utils.instantiate(sampling_cfg)
+            emb_sub, ds_sub, _ = sampler.sample(embeddings, ds)
+            logger.info(f"Sampled to {emb_sub.shape[0]} samples using {type(sampler).__name__}")
 
     module = kwargs.get("module", None)
 

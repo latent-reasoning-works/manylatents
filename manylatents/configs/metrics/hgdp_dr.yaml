@@ -8,4 +8,3 @@ defaults:
   - knn_preservation
 - module:
   - connected_components
-subsample_fraction: null

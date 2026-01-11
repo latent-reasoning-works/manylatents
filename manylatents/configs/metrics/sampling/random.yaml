@@ -1,0 +1,6 @@
+# Random sampling without replacement
+# Usage: metrics.sampling=sampling/random
+sampling:
+  _target_: manylatents.utils.sampling.RandomSampling
+  seed: 42
+  fraction: 0.1
