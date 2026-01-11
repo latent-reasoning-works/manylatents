@@ -21,8 +21,11 @@ from omegaconf import DictConfig
 import manylatents.configs
 from manylatents.experiment import run_algorithm, run_pipeline
 
-# Import shop to register custom Hydra launchers
-import shop  # noqa: F401
+# Import shop to register custom Hydra launchers (optional - for SLURM job submission)
+try:
+    import shop  # noqa: F401
+except ImportError:
+    pass  # shop not installed - SLURM launchers won't be available
 
 
 @hydra.main(config_path="../manylatents/configs", config_name="config", version_base=None)

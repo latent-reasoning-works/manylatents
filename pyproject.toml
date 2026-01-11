@@ -92,8 +92,11 @@ dependencies = [
     "hydra-submitit-launcher>=1.2.0",
     "scanpy>=1.10.3",
     "pyproj>=3.6.1",
-    "shop",
 ]
+
+[project.optional-dependencies]
+# SLURM job submission support (requires private repo access)
+slurm = ["shop"]
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
