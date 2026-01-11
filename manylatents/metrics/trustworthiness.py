@@ -1,7 +1,6 @@
 from typing import Optional
 
 import numpy as np
-import torch
 from sklearn.manifold import trustworthiness as sk_trustworthiness
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
@@ -24,9 +23,6 @@ def Trustworthiness(embeddings: np.ndarray,
     Returns:
       - A float representing the trustworthiness score.
     """
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-        
     return sk_trustworthiness(
         X=dataset.data, 
         X_embedded=embeddings, 

@@ -1,7 +1,6 @@
 import logging
 
 import numpy as np
-import torch
 from sklearn.neighbors import NearestNeighbors
 
 logger = logging.getLogger(__name__)
@@ -22,10 +21,6 @@ def LocalIntrinsicDimensionality(embeddings: np.ndarray,
     Returns:
       - A float representing the mean LID.
     """
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-        logger.info(f"LocalIntrinsicDimensionality: Converted embeddings to numpy with shape {embeddings.shape}")
-    
     nbrs = NearestNeighbors(n_neighbors=k + 1).fit(embeddings)
     distances, _ = nbrs.kneighbors(embeddings)
     distances = distances[:, 1:]  # Exclude the self-distance.

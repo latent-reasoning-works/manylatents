@@ -1,7 +1,6 @@
 from typing import Optional, Tuple, Union
 
 import numpy as np
-import torch
 from sklearn.metrics import pairwise_distances
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
@@ -32,9 +31,6 @@ def Continuity(embeddings: np.ndarray,
     - continuity_score: mean continuity (scalar)
     - (optional) pointwise_continuity: array of shape (n_samples,)
     """
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-        
     X_high = dataset.data
     X_low = embeddings
     n = X_high.shape[0]

@@ -74,9 +74,6 @@ def _scale_embedding_dimensions(embeddings: np.ndarray) -> np.ndarray:
     np.ndarray
         Embeddings with all dimensions scaled to [0, 1]
     """
-    # Convert to numpy if needed (handle PyTorch tensors)
-    if hasattr(embeddings, 'cpu'):
-        embeddings = embeddings.cpu().numpy()
     embeddings = np.asarray(embeddings)
 
     emb_min = embeddings.min(axis=0)

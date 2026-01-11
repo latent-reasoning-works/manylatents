@@ -159,7 +159,12 @@ def evaluate_embeddings(
         return {}
 
     embeddings = EmbeddingOutputs.get("embeddings")
- 
+
+    # Ensure embeddings are numpy arrays (metrics and sampling require numpy)
+    if torch.is_tensor(embeddings):
+        embeddings = embeddings.cpu().numpy()
+        logger.debug(f"Converted embeddings from tensor to numpy: {embeddings.shape}")
+
     # Handle different datamodule types - some store mode directly, others in hparams
     mode = getattr(datamodule, 'mode', None) or getattr(datamodule.hparams, 'mode', 'full')
     

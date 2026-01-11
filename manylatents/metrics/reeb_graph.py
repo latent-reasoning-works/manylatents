@@ -2,8 +2,6 @@ import logging
 from typing import Optional, Dict, List
 
 import numpy as np
-import torch
-
 import networkx as nx
 from ripser import ripser
 from sklearn.metrics import pairwise_distances
@@ -119,9 +117,6 @@ def ReebGraphNodesEdges(
     Returns:
       dict with keys 'nodes' and 'edges'.
     """
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-
     drg = DecoratedReebGraph(data=embeddings, function=embeddings[:, 0])
     drg.fit_Reeb(n_bins=n_bins)
 

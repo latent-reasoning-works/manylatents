@@ -2,7 +2,6 @@ import logging
 from typing import Optional, Union
 
 import numpy as np
-import torch
 from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
@@ -21,10 +20,6 @@ def TangentSpaceApproximation(embeddings: np.ndarray,
     If return_per_sample is False (default), returns the average local dimension (float).
     If return_per_sample is True, returns an array of local dimensions, one per observation.
     """
-    if torch.is_tensor(embeddings):
-        embeddings = embeddings.cpu().numpy()
-        logger.info(f"TangentSpaceApproximation: Converted embeddings to numpy with shape {embeddings.shape}")
-
     nbrs = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(embeddings)
     _, indices = nbrs.kneighbors(embeddings)
     dims = []
