@@ -6,8 +6,17 @@ from typing import Optional
 
 
 def exact_eigvals(K: np.ndarray) -> np.ndarray:
-    """Compute exact eigenvalues of symmetric matrix K."""
-    return np.linalg.eigvalsh(K)
+    """Compute exact eigenvalues with symmetry safety check.
+
+    Uses eigvalsh for symmetric matrices (more stable, real eigenvalues)
+    and eigvals for general matrices.
+    """
+    if np.allclose(K, K.T, rtol=1e-5, atol=1e-8):
+        # Symmetric matrix - use eigvalsh (faster, guaranteed real)
+        return np.linalg.eigvalsh(K)
+    else:
+        # General matrix - use eigvals
+        return np.linalg.eigvals(K)
 
 
 def approx_eigvals(K: np.ndarray, num_moments: int = 50) -> np.ndarray:
@@ -266,16 +275,43 @@ def DiffusionSpectralEntropy(
                            (don't decay to 0). This sidesteps threshold-picking by relying
                            on asymptotic behavior. The numerical_floor is just to filter
                            floating-point noise, not a methodological parameter.
+        "eigenvalue_count_full": Same as eigenvalue_count but returns dict with spectrum
+                                for debugging/logging (e.g., WandB histogram).
+        "eigenvalue_count_sweep": Sweep across multiple t values efficiently.
+                                 Computes eigenvalues once, then powers to each t.
+                                 Returns dict with counts for each t value.
+                                 Pass t_high as a list: [10, 50, 100, 200, 500]
     """
-    if output_mode == "eigenvalue_count":
+    if output_mode in ("eigenvalue_count", "eigenvalue_count_full", "eigenvalue_count_sweep"):
         # Compute diffusion matrix and eigenvalues (reuse existing functions)
         K = compute_diffusion_matrix(embeddings, sigma=gaussian_kernel_sigma)
         eigvals = exact_eigvals(K)
         eigvals = np.abs(eigvals)
-        # Power to HIGH t - asymptotic behavior
+
+        if output_mode == "eigenvalue_count_sweep":
+            # Sweep across multiple t values efficiently
+            # Returns flat keys for WandB logging compatibility
+            t_values = t_high if isinstance(t_high, (list, tuple)) else [t_high]
+            results = {"raw_eigvals": eigvals}
+            for t_val in t_values:
+                eigvals_powered = eigvals ** t_val
+                count = float(np.sum(eigvals_powered > numerical_floor))
+                # Flat keys: count_t10, count_t50, spectrum_t10, spectrum_t50, ...
+                results[f"count_t{t_val}"] = count
+                results[f"spectrum_t{t_val}"] = eigvals_powered
+            return results
+
+        # Single t_high value
         eigvals_powered = eigvals ** t_high
-        # Count eigenvalues above numerical noise floor
-        return float(np.sum(eigvals_powered > numerical_floor))
+        count = float(np.sum(eigvals_powered > numerical_floor))
+
+        if output_mode == "eigenvalue_count_full":
+            return {
+                "count": count,
+                "spectrum": eigvals_powered,
+                "above_floor": eigvals_powered[eigvals_powered > numerical_floor],
+            }
+        return count
 
     # Default: return entropy
     return diffusion_spectral_entropy(embeddings, t=t, gaussian_kernel_sigma=gaussian_kernel_sigma)
