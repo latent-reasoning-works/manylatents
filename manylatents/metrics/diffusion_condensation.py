@@ -25,10 +25,11 @@ def run_condensation(
     scale: float = 1.025,
     granularity: float = 0.1,
     max_iterations: int = 500,
+    n_subsample: int = 1000,
 ) -> tuple[list[int], np.ndarray]:
     """Run condensation loop, returning component counts per scale and gradient."""
     # Compute condensation params from subsampled distances
-    n_sub = min(1000, X.shape[0])
+    n_sub = min(n_subsample, X.shape[0])
     X_sub = X[np.random.choice(X.shape[0], n_sub, replace=False)] if X.shape[0] > n_sub else X
     dists = pdist(X_sub)
     if len(dists) == 0:
@@ -130,12 +131,17 @@ def DiffusionCondensation(
     knn: int = 5,
     decay: int = 40,
     n_pca: Optional[int] = 50,
+    n_subsample: int = 1000,
     output_mode: str = "stable",
 ) -> Union[int, dict[str, Any]]:
     """
     Compute component stability via diffusion condensation.
 
     Can be applied to any embedding to measure stable connected components (beta_0).
+
+    Parameters:
+        n_subsample: Max samples for distance computation (default 1000).
+                     Increase for larger datasets if resolution matters.
     """
     if embeddings.shape[0] < 2:
         logger.warning("DiffusionCondensation: Too few points")
@@ -146,7 +152,7 @@ def DiffusionCondensation(
         X = PCA(n_components=n_pca).fit_transform(X)
 
     P = build_diffusion_operator(X, knn=knn, decay=decay)
-    n_components, gradient = run_condensation(X, P, scale=scale, granularity=granularity)
+    n_components, gradient = run_condensation(X, P, scale=scale, granularity=granularity, n_subsample=n_subsample)
     stable_scales, n_stable = find_stable_scales(n_components, gradient)
 
     logger.info(f"DiffusionCondensation: {len(n_components)} scales, {n_stable} stable components")

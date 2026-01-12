@@ -19,24 +19,23 @@ def exact_eigvals(K: np.ndarray) -> np.ndarray:
         return np.linalg.eigvals(K)
 
 
-def approx_eigvals(K: np.ndarray, num_moments: int = 50) -> np.ndarray:
+def approx_eigvals(K: np.ndarray, exact_threshold: int = 1000) -> np.ndarray:
     """
-    Approximate eigenvalues using stochastic trace estimation.
+    Approximate eigenvalues using sparse eigensolver for large matrices.
 
-    Note: This is a simple approximation. For production use, consider
-    using scipy.sparse.linalg.eigsh for large matrices.
+    Parameters:
+        K: Input matrix
+        exact_threshold: Use exact eigvals for matrices smaller than this (default 1000)
+
+    For matrices above threshold, uses scipy.sparse.linalg.eigsh for top-k eigenvalues.
     """
-    # For small matrices, just use exact computation
-    if K.shape[0] < 1000:
+    if K.shape[0] < exact_threshold:
         return exact_eigvals(K)
 
-    # For larger matrices, use top-k eigenvalues via power iteration approximation
-    # This is a simplified version - full Chebyshev would require more infrastructure
     try:
         from scipy.sparse.linalg import eigsh
         k = min(100, K.shape[0] - 2)
-        eigvals = eigsh(K, k=k, which='LM', return_eigenvectors=False)
-        return eigvals
+        return eigsh(K, k=k, which='LM', return_eigenvectors=False)
     except Exception:
         return exact_eigvals(K)
 
@@ -254,6 +253,8 @@ def DiffusionSpectralEntropy(
     output_mode: str = "entropy",
     t_high: int = 100,
     numerical_floor: float = 1e-6,
+    max_N: int = 10000,
+    random_seed: int = 0,
 ) -> float:
     """
     Wrapper for diffusion_spectral_entropy.
@@ -267,6 +268,8 @@ def DiffusionSpectralEntropy(
         output_mode: "entropy" (default) or "eigenvalue_count"
         t_high: High diffusion time for asymptotic eigenvalue counting
         numerical_floor: Numerical noise floor for eigenvalue counting (not methodological)
+        max_N: Max samples for eigenvalue computation (default 10000). Subsample if larger.
+        random_seed: Seed for reproducible subsampling
 
     output_mode options:
         "entropy": Return DSE value using parameter t
@@ -282,9 +285,16 @@ def DiffusionSpectralEntropy(
                                  Returns dict with counts for each t value.
                                  Pass t_high as a list: [10, 50, 100, 200, 500]
     """
+    # Subsample if too large (O(n²) memory for diffusion matrix)
+    X = embeddings
+    if max_N is not None and len(X) > max_N:
+        random.seed(random_seed)
+        rand_inds = np.array(random.sample(range(len(X)), k=max_N))
+        X = X[rand_inds, :]
+
     if output_mode in ("eigenvalue_count", "eigenvalue_count_full", "eigenvalue_count_sweep"):
         # Compute diffusion matrix and eigenvalues (reuse existing functions)
-        K = compute_diffusion_matrix(embeddings, sigma=gaussian_kernel_sigma)
+        K = compute_diffusion_matrix(X, sigma=gaussian_kernel_sigma)
         eigvals = exact_eigvals(K)
         eigvals = np.abs(eigvals)
 
@@ -313,5 +323,5 @@ def DiffusionSpectralEntropy(
             }
         return count
 
-    # Default: return entropy
-    return diffusion_spectral_entropy(embeddings, t=t, gaussian_kernel_sigma=gaussian_kernel_sigma)
+    # Default: return entropy (pass max_N to internal function for consistency)
+    return diffusion_spectral_entropy(embeddings, t=t, gaussian_kernel_sigma=gaussian_kernel_sigma, max_N=max_N, random_seed=random_seed)
