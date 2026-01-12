@@ -241,9 +241,41 @@ def DiffusionSpectralEntropy(
     dataset: Optional[object] = None,
     module: Optional[object] = None,
     t: int = 3,
-    gaussian_kernel_sigma: float = 10
+    gaussian_kernel_sigma: float = 10,
+    output_mode: str = "entropy",
+    t_high: int = 100,
+    numerical_floor: float = 1e-6,
 ) -> float:
     """
     Wrapper for diffusion_spectral_entropy.
+
+    Parameters:
+        embeddings: Input data array
+        dataset: Provided for protocol compliance (unused)
+        module: Provided for protocol compliance (unused)
+        t: Diffusion time for entropy mode
+        gaussian_kernel_sigma: Bandwidth of Gaussian kernel
+        output_mode: "entropy" (default) or "eigenvalue_count"
+        t_high: High diffusion time for asymptotic eigenvalue counting
+        numerical_floor: Numerical noise floor for eigenvalue counting (not methodological)
+
+    output_mode options:
+        "entropy": Return DSE value using parameter t
+        "eigenvalue_count": Return count of eigenvalues that persist at high diffusion time.
+                           At high t, only eigenvalues for disconnected components persist
+                           (don't decay to 0). This sidesteps threshold-picking by relying
+                           on asymptotic behavior. The numerical_floor is just to filter
+                           floating-point noise, not a methodological parameter.
     """
+    if output_mode == "eigenvalue_count":
+        # Compute diffusion matrix and eigenvalues (reuse existing functions)
+        K = compute_diffusion_matrix(embeddings, sigma=gaussian_kernel_sigma)
+        eigvals = exact_eigvals(K)
+        eigvals = np.abs(eigvals)
+        # Power to HIGH t - asymptotic behavior
+        eigvals_powered = eigvals ** t_high
+        # Count eigenvalues above numerical noise floor
+        return float(np.sum(eigvals_powered > numerical_floor))
+
+    # Default: return entropy
     return diffusion_spectral_entropy(embeddings, t=t, gaussian_kernel_sigma=gaussian_kernel_sigma)
