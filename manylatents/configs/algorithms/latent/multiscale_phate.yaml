@@ -1,0 +1,11 @@
+_target_: manylatents.algorithms.latent.multiscale_phate.MultiscalePHATEModule
+n_components: 2
+scale: 1.025
+granularity: 0.1
+landmarks: 2000
+knn: 5
+decay: 40
+gamma: 1.0
+n_pca: null
+n_jobs: 1
+random_state: ${seed}
