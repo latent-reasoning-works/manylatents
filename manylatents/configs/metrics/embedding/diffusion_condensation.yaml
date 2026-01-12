@@ -1,0 +1,9 @@
+diffusion_condensation:
+  _target_: manylatents.metrics.diffusion_condensation.DiffusionCondensation
+  _partial_: True
+  scale: 1.025
+  granularity: 0.1
+  knn: 5
+  decay: 40
+  n_pca: 50
+  output_mode: "stable"
