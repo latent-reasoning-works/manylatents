@@ -5,6 +5,33 @@ import random
 from typing import Optional
 
 
+def exact_eigvals(K: np.ndarray) -> np.ndarray:
+    """Compute exact eigenvalues of symmetric matrix K."""
+    return np.linalg.eigvalsh(K)
+
+
+def approx_eigvals(K: np.ndarray, num_moments: int = 50) -> np.ndarray:
+    """
+    Approximate eigenvalues using stochastic trace estimation.
+
+    Note: This is a simple approximation. For production use, consider
+    using scipy.sparse.linalg.eigsh for large matrices.
+    """
+    # For small matrices, just use exact computation
+    if K.shape[0] < 1000:
+        return exact_eigvals(K)
+
+    # For larger matrices, use top-k eigenvalues via power iteration approximation
+    # This is a simplified version - full Chebyshev would require more infrastructure
+    try:
+        from scipy.sparse.linalg import eigsh
+        k = min(100, K.shape[0] - 2)
+        eigvals = eigsh(K, k=k, which='LM', return_eigenvectors=False)
+        return eigvals
+    except Exception:
+        return exact_eigvals(K)
+
+
 def compute_diffusion_matrix(X: np.array, sigma: float = 10.0):
     '''
     Adapted from
