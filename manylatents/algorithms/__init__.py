@@ -6,6 +6,7 @@ from .latent.pca import PCAModule
 from .latent.phate import PHATEModule
 from .latent.tsne import TSNEModule
 from .latent.latent_module_base import LatentModule
+from .encoder.base import FoundationEncoder
 
 algorithm_store = store(group="algorithm")
 
