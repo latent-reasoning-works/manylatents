@@ -98,6 +98,8 @@ dependencies = [
 [project.optional-dependencies]
 # SLURM job submission support (requires private repo access)
 slurm = ["shop"]
+# Central dogma foundation model encoders (ESM3, Orthrus, Evo2)
+dogma = ["manylatents-omics[dogma]"]
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
@@ -114,6 +116,7 @@ managed = true
 
 [tool.uv.sources]
 archetypes = { git = "https://github.com/aleixalcacer/archetypes.git" }
+manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
 
 # shop is optional - install with: uv sync --extra slurm
 # shop = { git = "https://github.com/latent-reasoning-works/shop.git" }

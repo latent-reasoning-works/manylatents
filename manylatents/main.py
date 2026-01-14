@@ -4,12 +4,16 @@ Smart CLI router for both single-algorithm and multi-step pipeline experiments.
 This entry point automatically detects the configuration type and routes to
 the appropriate execution engine.
 
-Usage:
-    # Single algorithm (automatically detected)
-    python -m manylatents.main data=swissroll algorithms/latent=pca
+Usage (standalone):
+    python -m manylatents.main --config-path=manylatents/configs --config-name=config data=swissroll
 
-    # Pipeline (automatically detected from pipeline key in config)
-    python -m manylatents.main experiment=my_pipeline_config
+Usage (via experimentStash):
+    # experimentStash provides --config-path automatically
+    python scripts/run_experiment manylatents <experiment_name>
+
+Note:
+    config_path=None allows CLI override for experimentStash compatibility.
+    See experimentStash/CLAUDE.md for the tool contract.
 """
 
 from typing import Dict, Any
@@ -28,7 +32,7 @@ except ImportError:
     pass  # shop not installed - SLURM launchers won't be available
 
 
-@hydra.main(config_path="../manylatents/configs", config_name="config", version_base=None)
+@hydra.main(config_path=None, config_name=None, version_base=None)
 def main(cfg: DictConfig) -> Dict[str, Any]:
     """
     Smart CLI router that automatically detects and executes the appropriate mode.
