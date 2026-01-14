@@ -17,6 +17,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.algorithms.encoder import FoundationEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import flatten_and_unroll_metrics
@@ -264,7 +265,14 @@ def execute_step(
     latents = None
 
     # --- Compute latents based on algorithm type ---
-    if isinstance(algorithm, LatentModule):
+    if isinstance(algorithm, FoundationEncoder):
+        # FoundationEncoder: pretrained, uses datamodule for sequences
+        # Tensors are ignored - sequences come from datamodule.get_sequences()
+        algorithm.fit(None)
+        latents = algorithm.transform(None)
+        logger.info(f"FoundationEncoder embedding shape: {latents.shape}")
+
+    elif isinstance(algorithm, LatentModule):
         # LatentModule: fit/transform pattern
         algorithm.fit(train_tensor)
         latents = algorithm.transform(test_tensor)
@@ -400,6 +408,39 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     if cfg.eval_only:
         logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
         embeddings = load_precomputed_embeddings(cfg)
+    elif isinstance(algorithm, FoundationEncoder):
+        # FoundationEncoder: skip tensor unrolling, uses datamodule directly
+        logger.info(f"Running FoundationEncoder: {type(algorithm).__name__}")
+        latents = execute_step(
+            algorithm=algorithm,
+            train_tensor=None,
+            test_tensor=None,
+            trainer=trainer,
+            cfg=cfg,
+            datamodule=datamodule
+        )
+
+        # Embedding wrapping for FoundationEncoder
+        if latents is not None:
+            embeddings = {
+                "embeddings": latents,
+                "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
+                "metadata": {
+                    "source": "foundation_encoder",
+                    "algorithm_type": type(algorithm).__name__,
+                    "encoder_name": getattr(algorithm, "name", type(algorithm).__name__),
+                },
+            }
+
+            # Evaluate embeddings if metrics configured
+            if cfg.get("metrics") is not None:
+                logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
+                embeddings["scores"] = evaluate(
+                    embeddings,
+                    cfg=cfg,
+                    datamodule=datamodule,
+                    module=algorithm
+                )
     else:
         # Unroll train and test dataloaders to obtain tensors
         train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)

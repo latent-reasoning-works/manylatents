@@ -76,6 +76,42 @@ def test_all_algorithms_can_instantiate():
 
 ---
 
+## Architecture
+
+### Full Non-Lightning Inference Mode
+**Priority**: Low (future consideration)
+**Status**: Not started
+
+Currently, `FoundationEncoder` (from `manylatents-omics`) uses a workaround: it inherits from `LatentModule` with `fit()` as no-op and `transform()` calling `datamodule.get_sequences()`. This works but has limitations:
+
+**Current workaround** (`manylatents/algorithms/encoder/base.py`):
+```python
+class FoundationEncoder(LatentModule):
+    def fit(self, x: Tensor) -> None:
+        self._is_fitted = True  # no-op
+
+    def transform(self, x: Tensor) -> Tensor:
+        sequences = self.datamodule.get_sequences()  # ignores x
+        return self.encode_batch(sequences)
+```
+
+**Limitations**:
+- The `x` tensor parameter is ignored (sequences come from datamodule)
+- `experiment.py` requires special-casing to skip tensor unrolling for FoundationEncoder
+- Doesn't fit cleanly into the fit/transform paradigm (nothing to fit)
+
+**Potential solution**: Add a dedicated `inference` algorithm mode alongside `latent` and `lightning`:
+- No fit step, just encode
+- Direct datamodule → encoder → embeddings pipeline
+- Cleaner separation from dimensionality reduction algorithms
+
+**References**:
+- Extension implementation: `manylatents-omics/manylatents/dogma/encoders/`
+- SequenceDataModule: `manylatents-omics/manylatents/dogma/data/sequence_dataset.py`
+- Experiment special-casing: `manylatents/experiment.py` (FoundationEncoder branch)
+
+---
+
 ## Completed
 
 ### Logging Config Group
