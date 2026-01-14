@@ -25,11 +25,15 @@ from omegaconf import DictConfig
 import manylatents.configs
 from manylatents.experiment import run_algorithm, run_pipeline
 
-# Import shop to register custom Hydra launchers (optional - for SLURM job submission)
+# Import shop utilities (optional - for SLURM job submission and dynamic config discovery)
 try:
     import shop  # noqa: F401
+    # Register DynamicSearchPathPlugin to discover pkg:// configs via HYDRA_SEARCH_PACKAGES env var
+    # This enables experimentStash to specify search packages without hardcoding them here
+    from shop.hydra import register_dynamic_search_path
+    register_dynamic_search_path()
 except ImportError:
-    pass  # shop not installed - SLURM launchers won't be available
+    pass  # shop not installed - SLURM launchers and dynamic search path won't be available
 
 
 @hydra.main(config_path=None, config_name=None, version_base=None)
