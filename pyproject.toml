@@ -98,7 +98,7 @@ dependencies = [
 # SLURM job submission support (requires private repo access)
 slurm = ["shop"]
 # Central dogma foundation model encoders (ESM3, Orthrus, Evo2)
-dogma = ["manylatents-omics[dogma]"]
+# dogma = ["manylatents-omics[dogma]"]  # TODO: re-enable after fixing circular dependency
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
@@ -114,7 +114,6 @@ packages = ["manylatents"]
 managed = true
 
 [tool.uv.sources]
-archetypes = { git = "https://github.com/aleixalcacer/archetypes.git" }
 manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
 
 # shop is optional - install with: uv sync --extra slurm
@@ -131,7 +130,7 @@ requires-dist = ["numpy>=1.25"]
 
 [[tool.uv.dependency-metadata]]
 name = "archetypes"
-version = "0.6.2"
+version = "0.11.1"
 requires-dist = ["scipy>=1.8,<1.15"]
 
 [[tool.uv.dependency-metadata]]
