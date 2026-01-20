@@ -1,8 +1,0 @@
-- cluster=mila
-- data=embryoid_body
-- algorithms/latent=pca
-- algorithms.latent.n_components=50
-- metrics/embedding=diffusion_condensation
-- name=dc_baseline
-- logger=wandb
-- project=geomancy-topology
