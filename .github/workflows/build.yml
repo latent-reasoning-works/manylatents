@@ -26,7 +26,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install UV package manager
         uses: astral-sh/setup-uv@v5
@@ -45,7 +45,10 @@ jobs:
           source .venv/bin/activate
           # Validate CLI works with minimal config (PCA)
           # Use logger=none to skip wandb initialization entirely
+          # Note: --config-path required since shop (SearchPathPlugin) not installed in CI
           python -m manylatents.main \
+            --config-path=manylatents/configs \
+            --config-name=base_config \
             experiment=single_algorithm \
             metrics=test_metric \
             callbacks/embedding=minimal \
