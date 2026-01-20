@@ -22,9 +22,8 @@ from deprecated import deprecated
 
 from .latent_module_base import LatentModule
 import logging
+import warnings
 logger = logging.getLogger(__name__)
-import scprep
-import s_gd2
 
 
 class MultidimensionalScaling():
@@ -82,35 +81,19 @@ class MultidimensionalScaling():
         return Y
 
 
-    @scprep.utils._with_pkg(pkg="s_gd2", min_version="1.3")
+    @deprecated(version="1.0.0", reason="s_gd2 package removed. Use solver='smacof' instead.")
     def sgd(self, D, init=None):
-        """Metric MDS using stochastic gradient descent
+        """Metric MDS using stochastic gradient descent (DEPRECATED).
 
-        Parameters
-        ----------
-        D : array-like, shape=[n_samples, n_samples]
-            pairwise distances
-
-        n_components : int, optional (default: 2)
-            number of dimensions in which to embed `D`
-
-        random_state : int or None, optional (default: None)
-            numpy random state
-
-        init : array-like or None
-            Initialization algorithm or state to use for MMDS
-
-        Returns
-        -------
-        Y : array-like, embedded data [n_sample, ndim]
+        This method is deprecated as the s_gd2 package has been removed.
+        Falls back to SMACOF solver.
         """
-        if not self.ndim == 2:
-            raise NotImplementedError
-        N = D.shape[0]
-        D = squareform(D)
-        # Metric MDS from s_gd2
-        Y = s_gd2.mds_direct(N, D, init=init, random_seed=self.seed)
-        return Y
+        warnings.warn(
+            "The 'sgd' solver is deprecated (s_gd2 removed). Falling back to SMACOF.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self.smacof(D, init=init, metric=True)
 
 
     def smacof(
@@ -240,19 +223,17 @@ class MultidimensionalScaling():
 
         # metric is next fastest
         if self.solver == "sgd":
-            try:
-                # use sgd2 if it is available
-                Y = self.sgd(self.distance_matrix, init=Y_classic)
-                if np.any(~np.isfinite(Y)):
-                    logger.warning("Using SMACOF because SGD returned NaN")
-                    raise NotImplementedError
-            except NotImplementedError:
-                # sgd2 currently only supports n_components==2
-                Y = self.smacof(
-                    self.distance_matrix,
-                    init=Y_classic,
-                    metric=True,
-                )
+            # s_gd2 has been deprecated - fall back to SMACOF
+            warnings.warn(
+                "solver='sgd' is deprecated (s_gd2 package removed). Using SMACOF instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            Y = self.smacof(
+                self.distance_matrix,
+                init=Y_classic,
+                metric=True,
+            )
         elif self.solver == "smacof":
             Y = self.smacof(
                 self.distance_matrix, init=Y_classic, metric=True
