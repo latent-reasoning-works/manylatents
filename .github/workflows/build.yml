@@ -45,7 +45,6 @@ jobs:
           source .venv/bin/activate
           # Validate CLI works with minimal config (PCA)
           # Use logger=none to skip wandb initialization entirely
-          # Note: --config-path required since shop (SearchPathPlugin) not installed in CI
           python -m manylatents.main \
             --config-path=manylatents/configs \
             --config-name=base_config \

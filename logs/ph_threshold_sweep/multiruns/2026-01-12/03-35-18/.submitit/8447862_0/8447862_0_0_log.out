@@ -1,0 +1,69 @@
+Starting job on cn-f001.server.mila.quebec
+SLURM_JOB_ID 8447863
+submitit INFO (2026-01-12 03:35:23,623) - Starting with JobEnvironment(job_id=8447862_0, hostname=cn-f001.server.mila.quebec, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2026-01-12 03:35:23,624) - Loading pickle: /network/scratch/c/cesar.valdez/manyLatents/logs/ph_threshold_sweep/multiruns/2026-01-12/03-35-18/.submitit/8447862_0/8447862_0_submitted.pkl
+[01/12/26 03:35:50] INFO     Final Config:                     experiment.py:331
+                             algorithms:                                        
+                               latent:                                          
+                                 _target_:                                      
+                             manylatents.algorithms.latent.pca                  
+                             .PCAModule                                         
+                                 n_components: 50                               
+                                 random_state: ${seed}                          
+                             pipeline: []                                       
+                             data:                                              
+                               batch_size: 128                                  
+                               num_workers: 1                                   
+                               shuffle_traindata: false                         
+                               _target_:                                        
+                             manylatents.omics.data.anndata.An                  
+                             nDataModule                                        
+                               adata_path:                                      
+                             /network/scratch/c/cesar.valdez/m                  
+                             anyLatents/data/scRNAseq/EBT_2k_h                  
+                             vg.h5ad                                            
+                               label_key: sample_labels                         
+                               layer: null                                      
+                               use_raw: false                                   
+                               mode: full                                       
+                               test_split: 0.2                                  
+                             callbacks: {}                                      
+                             logger:                                            
+                               _target_: wandb.init                             
+                               project: ${project}                              
+                               name: ${name}                                    
+                               config: null                                     
+                               mode: online                                     
+                             trainer: {}                                        
+                             metrics:                                           
+                               embedding:                                       
+                                 persistent_homology:                           
+                                   _target_:                                    
+                             manylatents.metrics.persistent_ho                  
+                             mology.PersistentHomology                          
+                                   _partial_: true                              
+                                   homology_dim: 0                              
+                                   persistence_threshold: 0.5                   
+                             log_level: info                                    
+                             seed: 96520                                        
+                             debug: false                                       
+                             verbose: false                                     
+                             cache_dir: outputs/cache                           
+                             ckpt_dir: outputs/ckpt                             
+                             name: ph_threshold_sweep                           
+                             project: geomancy-topology                         
+                             eval_only: false                                   
+                             pretrained_ckpt: null                              
+                                                                                
+                    INFO     Initializing wandb logger:        experiment.py:338
+                             _target_: wandb.init                               
+                             project: ${project}                                
+                             name: ${name}                                      
+                             config: null                                       
+                             mode: online                                       
+                                                                                
+submitit INFO (2026-01-12 03:35:50,185) - Job completed successfully
+                    INFO     Job completed successfully         submission.py:56
+submitit INFO (2026-01-12 03:35:50,192) - Exiting after successful completion
+                    INFO     Exiting after successful           submission.py:61
+                             completion                                         

@@ -71,6 +71,9 @@ slurm = ["shop"]
 # Central dogma foundation model encoders (ESM3, Orthrus, Evo2)
 # dogma = ["manylatents-omics[dogma]"]  # TODO: re-enable after fixing circular dependency
 
+[project.entry-points."hydra.searchpath"]
+manylatents = "manylatents.plugins:ManylatentsSearchPathPlugin"
+
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
@@ -88,7 +91,7 @@ managed = true
 manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
 
 # shop is optional - install with: uv sync --extra slurm
-# shop = { git = "https://github.com/latent-reasoning-works/shop.git" }
+# shop = { git = "https://github.com/latent-reasoning-works/shop.git" }  # private repo
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -1,0 +1,46 @@
+algorithms:
+  latent:
+    _target_: manylatents.algorithms.latent.pca.PCAModule
+    n_components: 50
+    random_state: ${seed}
+pipeline: []
+data:
+  batch_size: 128
+  num_workers: 1
+  shuffle_traindata: false
+  _target_: manylatents.omics.data.anndata.AnnDataModule
+  adata_path: /network/scratch/c/cesar.valdez/manyLatents/data/scRNAseq/EBT_2k_hvg.h5ad
+  label_key: sample_labels
+  layer: null
+  use_raw: false
+  mode: full
+  test_split: 0.2
+callbacks: {}
+logger:
+  _target_: wandb.init
+  project: ${project}
+  name: ${name}
+  config: null
+  mode: online
+trainer: {}
+metrics:
+  embedding:
+    diffusion_condensation:
+      _target_: manylatents.metrics.diffusion_condensation.DiffusionCondensation
+      _partial_: true
+      scale: 1.025
+      granularity: 0.1
+      knn: 5
+      decay: 40
+      n_pca: 50
+      output_mode: stable
+log_level: info
+seed: 24430
+debug: false
+verbose: false
+cache_dir: outputs/cache
+ckpt_dir: outputs/ckpt
+name: dc_baseline
+project: geomancy-topology
+eval_only: false
+pretrained_ckpt: null

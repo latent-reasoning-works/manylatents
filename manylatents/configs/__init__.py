@@ -7,9 +7,8 @@ from .config import Config
 cs = ConfigStore.instance()
 cs.store(name="base_config", node=Config)
 
-## NOTE: SearchPathPlugin registration is now handled centrally by shop's
-## DynamicSearchPathPlugin via HYDRA_SEARCH_PACKAGES env var.
-## See shop/hydra/search_path.py for details.
+## SearchPathPlugin is registered via entry_points in pyproject.toml
+## See manylatents/plugins/search_path.py
 
 __all__ = [
     "Config",

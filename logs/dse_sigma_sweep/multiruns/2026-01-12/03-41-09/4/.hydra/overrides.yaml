@@ -1,0 +1,9 @@
+- cluster=mila
+- data=embryoid_body
+- algorithms/latent=pca
+- algorithms.latent.n_components=50
+- metrics/embedding=dse_t_sweep
+- metrics.embedding.diffusion_spectral_entropy.gaussian_kernel_sigma=50
+- name=dse_sigma_sweep
+- logger=wandb
+- project=geomancy-topology

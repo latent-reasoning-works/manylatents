@@ -1,0 +1,1 @@
+/network/scratch/c/cesar.valdez/manyLatents/logs/default/multiruns/2026-01-12/03-32-00/.submitit/8447858/8447858_submission.sh

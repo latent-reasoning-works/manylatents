@@ -1,0 +1,4 @@
+- cluster=mila
+- data=embryoid_body
+- algorithms/latent=pca
+- algorithms.latent.n_components=50

@@ -1,0 +1,1 @@
+/network/scratch/c/cesar.valdez/manyLatents/logs/dse_sigma_sweep/multiruns/2026-01-12/03-41-09/.submitit/8447872/8447872_submission.sh

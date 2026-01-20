@@ -1,0 +1,9 @@
+- cluster=mila
+- data=embryoid_body
+- algorithms/latent=pca
+- algorithms.latent.n_components=50
+- metrics/embedding=persistent_homology_beta0
+- metrics.embedding.persistent_homology.persistence_threshold=10.0
+- name=ph_threshold_sweep
+- logger=wandb
+- project=geomancy-topology

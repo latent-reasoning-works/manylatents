@@ -1,0 +1,1 @@
+/network/scratch/c/cesar.valdez/manyLatents/logs/ph_threshold_sweep/multiruns/2026-01-12/03-35-18/.submitit/8447862/8447862_submission.sh

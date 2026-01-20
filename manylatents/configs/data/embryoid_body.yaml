@@ -1,0 +1,13 @@
+defaults:
+  - default
+
+_target_: manylatents.omics.data.anndata.AnnDataModule
+# HVG-filtered embryoid body data (2,000 HVGs)
+adata_path: /network/scratch/c/cesar.valdez/manyLatents/data/scRNAseq/EBT_2k_hvg.h5ad
+label_key: sample_labels
+layer: null
+use_raw: false
+mode: full
+batch_size: 128
+test_split: 0.2
+shuffle_traindata: false

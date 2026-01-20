@@ -1,0 +1,49 @@
+algorithms:
+  latent:
+    _target_: manylatents.algorithms.latent.pca.PCAModule
+    n_components: 50
+    random_state: ${seed}
+pipeline: []
+data:
+  batch_size: 128
+  num_workers: 1
+  shuffle_traindata: false
+  _target_: manylatents.omics.data.anndata.AnnDataModule
+  adata_path: /network/scratch/c/cesar.valdez/manyLatents/data/scRNAseq/EBT_2k_hvg.h5ad
+  label_key: sample_labels
+  layer: null
+  use_raw: false
+  mode: full
+  test_split: 0.2
+callbacks: {}
+logger:
+  _target_: wandb.init
+  project: ${project}
+  name: ${name}
+  config: null
+  mode: online
+trainer: {}
+metrics:
+  embedding:
+    diffusion_spectral_entropy:
+      _target_: manylatents.metrics.diffusion_spectral_entropy.DiffusionSpectralEntropy
+      _partial_: true
+      output_mode: eigenvalue_count_sweep
+      t_high:
+      - 10
+      - 50
+      - 100
+      - 200
+      - 500
+      numerical_floor: 1.0e-06
+      gaussian_kernel_sigma: 10
+log_level: info
+seed: 45178
+debug: false
+verbose: false
+cache_dir: outputs/cache
+ckpt_dir: outputs/ckpt
+name: dse_sigma_sweep
+project: geomancy-topology
+eval_only: false
+pretrained_ckpt: null

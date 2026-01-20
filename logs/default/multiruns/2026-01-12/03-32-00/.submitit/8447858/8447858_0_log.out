@@ -1,0 +1,55 @@
+Starting job on cn-f001.server.mila.quebec
+SLURM_JOB_ID 8447858
+submitit INFO (2026-01-12 03:32:03,242) - Starting with JobEnvironment(job_id=8447858, hostname=cn-f001.server.mila.quebec, local_rank=0(1), node=0(1), global_rank=0(1))
+submitit INFO (2026-01-12 03:32:03,242) - Loading pickle: /network/scratch/c/cesar.valdez/manyLatents/logs/default/multiruns/2026-01-12/03-32-00/.submitit/8447858/8447858_submitted.pkl
+[01/12/26 03:32:30] INFO     Final Config:                     experiment.py:331
+                             algorithms: null                                   
+                             pipeline: []                                       
+                             data:                                              
+                               batch_size: 128                                  
+                               num_workers: 1                                   
+                               shuffle_traindata: false                         
+                               _target_:                                        
+                             manylatents.omics.data.anndata.An                  
+                             nDataModule                                        
+                               adata_path:                                      
+                             /network/scratch/c/cesar.valdez/m                  
+                             anyLatents/data/scRNAseq/EBT_2k_h                  
+                             vg.h5ad                                            
+                               label_key: sample_labels                         
+                               layer: null                                      
+                               use_raw: false                                   
+                               mode: full                                       
+                               test_split: 0.2                                  
+                             callbacks: {}                                      
+                             logger: null                                       
+                             trainer: {}                                        
+                             metrics: null                                      
+                             log_level: info                                    
+                             seed: 65836                                        
+                             debug: false                                       
+                             verbose: false                                     
+                             cache_dir: outputs/cache                           
+                             ckpt_dir: outputs/ckpt                             
+                             name: default                                      
+                             project: default                                   
+                             eval_only: false                                   
+                             pretrained_ckpt: null                              
+                                                                                
+                    INFO     WandB disabled: logger=None        experiment.py:49
+                             (orchestrated by parent)                           
+                    INFO     WandB logging disabled - skipping experiment.py:344
+                             wandb initialization                               
+                    INFO     Cache directory ensured at:        experiment.py:67
+                             outputs/cache                                      
+[01/12/26 03:32:32] INFO     Loading AnnData from:         anndata_dataset.py:55
+                             /network/scratch/c/cesar.vald                      
+                             ez/manyLatents/data/scRNAseq/                      
+                             EBT_2k_hvg.h5ad                                    
+[01/12/26 03:32:33] INFO     Loaded 16815 samples x 2000   anndata_dataset.py:85
+                             features                                           
+submitit INFO (2026-01-12 03:32:33,087) - Job completed successfully
+                    INFO     Job completed successfully         submission.py:56
+submitit INFO (2026-01-12 03:32:33,095) - Exiting after successful completion
+                    INFO     Exiting after successful           submission.py:61
+                             completion                                         

@@ -1,0 +1,8 @@
+# Persistent homology for β₀ (connected components)
+# Sweep persistence_threshold via Hydra multirun
+
+persistent_homology:
+  _target_: manylatents.metrics.persistent_homology.PersistentHomology
+  _partial_: True
+  homology_dim: 0  # β₀ = connected components
+  persistence_threshold: 3.0  # Override via multirun: ...threshold=0.5,1.0,3.0,5.0,10.0

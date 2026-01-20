@@ -18,7 +18,6 @@ printf '  - %s\n' "${ALGORITHMS[@]}"
 echo ""
 
 # Minimal fast configuration
-# Note: --config-path required since shop (SearchPathPlugin) not installed in CI
 BASE_CMD="python -m manylatents.main \
     --config-path=manylatents/configs \
     --config-name=base_config \
