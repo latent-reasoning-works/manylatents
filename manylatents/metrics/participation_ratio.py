@@ -5,9 +5,16 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 logger = logging.getLogger(__name__)
 
+
+@register_metric(
+    aliases=["participation_ratio", "pr"],
+    default_params={"return_per_sample": False},
+    description="Local participation ratio measuring effective dimensionality",
+)
 def ParticipationRatio(embeddings: np.ndarray,
                        dataset: Optional[object] = None,
                        module: Optional[LatentModule] = None,

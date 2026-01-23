@@ -3,8 +3,21 @@ import logging
 import numpy as np
 from ripser import ripser
 
+from manylatents.metrics.registry import register_metric
+
 logger = logging.getLogger(__name__)
 
+
+@register_metric(
+    aliases=["beta_0", "betti_0"],
+    default_params={"homology_dim": 0},
+    description="Count of connected components (H0 Betti number)",
+)
+@register_metric(
+    aliases=["beta_1", "betti_1"],
+    default_params={"homology_dim": 1},
+    description="Count of loops/cycles (H1 Betti number)",
+)
 def PersistentHomology(embeddings: np.ndarray, 
                        dataset=None, 
                        module=None,

@@ -3,8 +3,16 @@ import logging
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
+from manylatents.metrics.registry import register_metric
+
 logger = logging.getLogger(__name__)
 
+
+@register_metric(
+    aliases=["local_intrinsic_dim", "lid", "intrinsic_dim"],
+    default_params={},
+    description="Mean local intrinsic dimensionality of the embedding",
+)
 def LocalIntrinsicDimensionality(embeddings: np.ndarray, 
                                  dataset=None, 
                                  module=None,

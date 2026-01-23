@@ -4,8 +4,14 @@ import numpy as np
 from sklearn.manifold import trustworthiness as sk_trustworthiness
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 
+@register_metric(
+    aliases=["trustworthiness", "trust"],
+    default_params={"n_neighbors": 25},
+    description="Trustworthiness of embedding (preservation of local structure)",
+)
 def Trustworthiness(embeddings: np.ndarray, 
                     dataset: object, 
                     module: Optional[LatentModule] = None,
