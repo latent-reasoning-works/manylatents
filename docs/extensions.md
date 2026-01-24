@@ -40,17 +40,28 @@ This will:
 3. Handle authentication if needed
 4. Install the extensions automatically
 
-### Manual Installation
+### Development Workflow
 
-For development or customization:
+**Working FROM the manylatents-omics repo (Recommended for omics development):**
 
 ```bash
-# Clone the extension repository
-git clone https://github.com/latent-reasoning-works/manylatents-omics.git
-
-# Install in editable mode
-uv add -e manylatents-omics
+cd manylatents-omics
+uv sync  # Pulls manylatents from git automatically
+uv run python -m manylatents.main experiment=single_algorithm
 ```
+
+**Working FROM the manylatents repo (for core development with omics testing):**
+
+```bash
+cd manylatents
+uv sync
+# Install omics from git (NOT editable - editable has plugin discovery issues)
+uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+uv run python -m manylatents.main experiment=single_algorithm
+```
+
+**Note**: Editable installs of manylatents-omics from another project may not work due to
+Hydra plugin discovery limitations with namespace packages. Use git install instead.
 
 ### Using Git Submodules
 
@@ -60,8 +71,8 @@ For contributors working on both core and extensions:
 # Add as submodule
 git submodule add https://github.com/latent-reasoning-works/manylatents-omics.git extensions/manylatents-omics
 
-# Install from submodule
-uv add -e extensions/manylatents-omics
+# Install from submodule (use git install, not editable)
+uv add git+file://extensions/manylatents-omics
 ```
 
 ## Using Extensions
@@ -230,6 +241,32 @@ Submit a PR to add your extension to:
 - `docs/extensions.md` - This documentation
 
 ## Troubleshooting
+
+### Hydra Config Discovery Error
+
+**Problem**: `ConfigAttributeError: Key 'experiment' is not in struct`
+
+**Cause**: Hydra SearchPathPlugin not being discovered - configs not on search path.
+
+**Solutions**:
+1. Ensure manylatents-omics is installed (not just cloned):
+   ```bash
+   uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+   ```
+2. If developing both packages, work from the omics repo (not manylatents repo)
+3. Or use explicit config path:
+   ```bash
+   python -m manylatents.main --config-path=path/to/manylatents/configs
+   ```
+
+**Verification**: Check that the plugin is discovered:
+```python
+from hydra.core.plugins import Plugins
+from hydra.plugins.search_path_plugin import SearchPathPlugin
+plugins = list(Plugins.instance().discover(SearchPathPlugin))
+print([p.__name__ for p in plugins])
+# Should show both ManylatentsSearchPathPlugin and OmicsSearchPathPlugin
+```
 
 ### Extension Not Found
 
