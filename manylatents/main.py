@@ -36,7 +36,7 @@ except ImportError:
     pass  # shop not installed - SLURM launchers and dynamic search path won't be available
 
 
-@hydra.main(config_path=None, config_name=None, version_base=None)
+@hydra.main(config_path=None, config_name="config", version_base=None)
 def main(cfg: DictConfig) -> Dict[str, Any]:
     """
     Smart CLI router that automatically detects and executes the appropriate mode.
