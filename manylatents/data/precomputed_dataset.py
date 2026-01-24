@@ -191,3 +191,63 @@ class PrecomputedDataset(Dataset):
             labels = self.embedding_outputs["label"]
             return labels.numpy() if isinstance(labels, torch.Tensor) else labels
         return np.zeros(len(self.data))
+
+
+class MultiChannelDataset(Dataset):
+    """
+    PyTorch Dataset for multi-channel precomputed embeddings.
+
+    Stores multiple embedding channels and provides samples with all channels
+    concatenated. Supports the EmbeddingOutputs format.
+
+    Example:
+        >>> channels = {"dna": dna_tensor, "protein": protein_tensor}
+        >>> ds = MultiChannelDataset(channels, labels=labels_array)
+        >>> sample = ds[0]  # {"embeddings": concat, "data": concat, "dna": ..., "protein": ...}
+    """
+    def __init__(
+        self,
+        channel_embeddings: dict,
+        labels: Optional[np.ndarray] = None,
+    ):
+        """
+        Args:
+            channel_embeddings: Dict mapping channel name to embedding tensor.
+            labels: Optional labels array aligned with embeddings.
+        """
+        self.channel_embeddings = channel_embeddings
+        self.labels = labels
+
+        # Validate alignment
+        lengths = [len(v) for v in channel_embeddings.values()]
+        if len(set(lengths)) > 1:
+            raise ValueError(f"Channel lengths don't match: {dict(zip(channel_embeddings.keys(), lengths))}")
+
+        # Concatenate for main embeddings
+        self.data = torch.cat(list(channel_embeddings.values()), dim=-1)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        """Return sample with concatenated embeddings and individual channels."""
+        sample = {
+            "embeddings": self.data[idx],
+            "data": self.data[idx],
+        }
+
+        # Include individual channels
+        for name, emb in self.channel_embeddings.items():
+            sample[name] = emb[idx]
+
+        # Include label if available
+        if self.labels is not None:
+            sample["label"] = self.labels[idx]
+
+        return sample
+
+    def get_labels(self):
+        """Returns all labels for compatibility with plotting callbacks."""
+        if self.labels is not None:
+            return self.labels
+        return np.zeros(len(self.data))
