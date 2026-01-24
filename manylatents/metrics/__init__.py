@@ -12,6 +12,14 @@ Usage:
 
     # List all available metrics
     print(list_metrics())
+
+kNN Cache:
+    Many metrics compute k-nearest neighbors. When running multiple metrics,
+    use the shared kNN cache to avoid redundant computation:
+
+    from manylatents.metrics import KNNCache
+    # Cache is (distances, indices) tuple, shape (n_samples, max_k+1)
+    # Metrics slice to their k: distances[:, 1:k+1]
 """
 
 # Import registry first (no dependencies on other metrics)
@@ -24,6 +32,9 @@ from manylatents.metrics.registry import (
     resolve_metric,
     MetricSpec,
 )
+
+# Import metric protocol and types
+from manylatents.metrics.metric import Metric, KNNCache
 
 # Import all metric modules to trigger registration
 # Core G-vector metrics
@@ -41,6 +52,9 @@ from manylatents.metrics.knn_preservation import KNNPreservation
 from manylatents.metrics.tangent_space import TangentSpaceApproximation
 
 __all__ = [
+    # Types
+    "Metric",
+    "KNNCache",
     # Registry functions
     "compute_metric",
     "get_metric",

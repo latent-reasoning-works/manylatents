@@ -147,6 +147,45 @@ def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
         f"{type(algorithm)}! (kwargs: {kwargs})"
     )
 
+def _extract_k_values(metric_cfgs: Dict[str, DictConfig]) -> set:
+    """
+    Extract all k/n_neighbors values from metric configs for shared kNN computation.
+
+    Looks for 'k' and 'n_neighbors' parameters in flattened metric configs.
+    Returns a set of all unique k values found.
+    """
+    k_values = set()
+    for metric_cfg in metric_cfgs.values():
+        # Check common parameter names for kNN
+        for param in ['k', 'n_neighbors']:
+            if hasattr(metric_cfg, param):
+                val = getattr(metric_cfg, param)
+                if isinstance(val, (int, float)) and val > 0:
+                    k_values.add(int(val))
+    return k_values
+
+
+def _compute_knn_cache(
+    embeddings: np.ndarray,
+    max_k: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Compute kNN once for shared use across multiple metrics.
+
+    Args:
+        embeddings: (n_samples, n_features) array
+        max_k: Maximum k value needed (will compute max_k+1 neighbors to include self)
+
+    Returns:
+        Tuple of (distances, indices) arrays, each shape (n_samples, max_k+1)
+    """
+    from sklearn.neighbors import NearestNeighbors
+
+    nbrs = NearestNeighbors(n_neighbors=max_k + 1).fit(embeddings)
+    distances, indices = nbrs.kneighbors(embeddings)
+    return distances, indices
+
+
 @evaluate.register(dict)
 def evaluate_embeddings(
     EmbeddingOutputs: dict,
@@ -168,7 +207,7 @@ def evaluate_embeddings(
 
     # Handle different datamodule types - some store mode directly, others in hparams
     mode = getattr(datamodule, 'mode', None) or getattr(datamodule.hparams, 'mode', 'full')
-    
+
     if mode == "split":
         ds = datamodule.test_dataset
     else:
@@ -190,13 +229,24 @@ def evaluate_embeddings(
 
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
+    # --- Shared kNN computation for efficiency ---
+    # Extract all k values and compute kNN once with max(k)
+    k_values = _extract_k_values(metric_cfgs)
+    knn_cache = None
+    if k_values:
+        max_k = max(k_values)
+        logger.info(f"Computing shared kNN with max_k={max_k} for {len(k_values)} unique k values: {sorted(k_values)}")
+        knn_cache = _compute_knn_cache(emb_sub, max_k)
+
     results: dict[str, float] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
+        # Pass knn_cache to metrics that support it (they'll ignore if not needed)
         results[metric_name] = metric_fn(
             embeddings=emb_sub,
             dataset=ds_sub,
             module=module,
+            _knn_cache=knn_cache,
         )
     return results
 
