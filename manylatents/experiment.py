@@ -1,4 +1,5 @@
 import functools
+import inspect
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -241,13 +242,22 @@ def evaluate_embeddings(
     results: dict[str, float] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
-        # Pass knn_cache to metrics that support it (they'll ignore if not needed)
-        results[metric_name] = metric_fn(
-            embeddings=emb_sub,
-            dataset=ds_sub,
-            module=module,
-            _knn_cache=knn_cache,
-        )
+
+        # Only pass _knn_cache if metric accepts it
+        sig = inspect.signature(metric_fn)
+        if "_knn_cache" in sig.parameters and knn_cache is not None:
+            results[metric_name] = metric_fn(
+                embeddings=emb_sub,
+                dataset=ds_sub,
+                module=module,
+                _knn_cache=knn_cache,
+            )
+        else:
+            results[metric_name] = metric_fn(
+                embeddings=emb_sub,
+                dataset=ds_sub,
+                module=module,
+            )
     return results
 
 @evaluate.register(LightningModule)
