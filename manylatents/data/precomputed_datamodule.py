@@ -136,10 +136,19 @@ class PrecomputedDataModule(LightningDataModule):
         if self.hparams.labels_path:
             labels_path = Path(self.hparams.labels_path)
             if labels_path.suffix == ".npy":
-                self._labels = np.load(labels_path)
+                self._labels = np.load(labels_path, allow_pickle=True)
             elif labels_path.suffix == ".pt":
                 data = torch.load(labels_path)
-                self._labels = data.get("labels", data).numpy() if isinstance(data, dict) else data.numpy()
+                # Handle both tensor and non-tensor labels (e.g., string labels)
+                if isinstance(data, dict):
+                    self._labels = data.get("labels", data)
+                else:
+                    self._labels = data
+                # Convert to numpy only if it's a tensor
+                if isinstance(self._labels, torch.Tensor):
+                    self._labels = self._labels.numpy()
+                elif isinstance(self._labels, list):
+                    self._labels = np.array(self._labels)
 
         # Create dataset with concatenated embeddings for compatibility
         return MultiChannelDataset(self._channel_embeddings, self._labels)
