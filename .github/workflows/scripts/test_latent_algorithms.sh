@@ -19,8 +19,6 @@ echo ""
 
 # Minimal fast configuration
 BASE_CMD="python -m manylatents.main \
-    --config-path=manylatents/configs \
-    --config-name=base_config \
     data=swissroll \
     data.n_distributions=10 \
     data.n_points_per_distribution=20 \

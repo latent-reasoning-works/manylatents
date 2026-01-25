@@ -211,7 +211,7 @@ class MergingModule(LatentModule):
 
         return self.datamodule.get_embeddings()
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fit projection models for projection-based strategies.
 
         For simple strategies (concat, weighted_sum, mean), this is a no-op.
@@ -219,6 +219,7 @@ class MergingModule(LatentModule):
 
         Args:
             x: Input tensor (ignored - embeddings from __init__ or datamodule)
+            y: Optional labels (ignored - MergingModule is unsupervised)
         """
         if self._strategy not in self.PROJECTION_STRATEGIES:
             # Simple strategies don't need fitting

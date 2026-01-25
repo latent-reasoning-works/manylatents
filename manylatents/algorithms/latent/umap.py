@@ -33,7 +33,7 @@ class UMAPModule(LatentModule):
                            n_epochs=n_epochs,
                            learning_rate=learning_rate)
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits UMAP on a subset of data."""
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
@@ -50,7 +50,7 @@ class UMAPModule(LatentModule):
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
     
-    def fit_transform(self, x: Tensor) -> Tensor:
+    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
         """Fit and then transform on same data."""
         x_np = x.detach().cpu().numpy()
         embedding = self.model.fit_transform(x_np)

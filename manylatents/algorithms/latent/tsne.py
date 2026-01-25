@@ -55,7 +55,7 @@ class TSNEModule(LatentModule):
         self.fit_fraction = fit_fraction
         self.random_state = random_state
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))

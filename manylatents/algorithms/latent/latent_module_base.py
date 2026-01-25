@@ -15,15 +15,22 @@ class LatentModule(ABC):
         self._is_fitted = False
 
     @abstractmethod
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+        """Fit the module on data.
+
+        Args:
+            x: Input data of shape (N, D).
+            y: Optional labels of shape (N,) for supervised methods.
+               Ignored by unsupervised modules.
+        """
         pass
 
     @abstractmethod
     def transform(self, x: Tensor) -> Tensor:
         pass
 
-    def fit_transform(self, x: Tensor) -> Tensor:
-        self.fit(x)
+    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
+        self.fit(x, y)
         return self.transform(x)
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
