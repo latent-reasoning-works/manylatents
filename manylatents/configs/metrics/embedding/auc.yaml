@@ -1,0 +1,3 @@
+auc:
+  _target_: manylatents.metrics.auc.AUC
+  _partial_: True

@@ -1,0 +1,5 @@
+outlier_score:
+  _target_: manylatents.metrics.outlier_score.OutlierScore
+  _partial_: True
+  k: 20
+  return_scores: False

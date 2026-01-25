@@ -1,0 +1,5 @@
+_target_: manylatents.algorithms.latent.classifier.ClassifierModule
+model: logistic
+n_components: 1
+max_iter: 1000
+init_seed: ${seed}

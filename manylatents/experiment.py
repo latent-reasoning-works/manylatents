@@ -306,7 +306,8 @@ def execute_step(
     test_tensor: torch.Tensor,
     trainer: lightning.Trainer,
     cfg: DictConfig,
-    datamodule: Optional[LightningDataModule] = None
+    datamodule: Optional[LightningDataModule] = None,
+    train_labels: Optional[torch.Tensor] = None,
 ) -> Optional[torch.Tensor]:
     """
     Core execution engine for a single algorithm step.
@@ -318,6 +319,7 @@ def execute_step(
         trainer: The Lightning trainer instance
         cfg: The Hydra configuration
         datamodule: Optional datamodule for LightningModule training/evaluation
+        train_labels: Optional labels for supervised LatentModules (e.g., ClassifierModule)
 
     Returns:
         The computed latent embeddings as a tensor
@@ -334,7 +336,8 @@ def execute_step(
 
     elif isinstance(algorithm, LatentModule):
         # LatentModule: fit/transform pattern
-        algorithm.fit(train_tensor)
+        # Pass labels for supervised modules (ignored by unsupervised)
+        algorithm.fit(train_tensor, train_labels)
         latents = algorithm.transform(test_tensor)
         logger.info(f"LatentModule embedding shape: {latents.shape}")
 
@@ -506,6 +509,15 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
         train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
         test_tensor  = torch.cat([b[field_index].cpu() for b in test_loader],  dim=0)
 
+        # Extract labels for supervised LatentModules (if available)
+        train_labels = None
+        train_dataset = getattr(datamodule, "train_dataset", None)
+        if train_dataset is not None and hasattr(train_dataset, "get_labels"):
+            labels = train_dataset.get_labels()
+            if labels is not None:
+                train_labels = torch.tensor(labels) if not isinstance(labels, torch.Tensor) else labels
+                logger.info(f"Extracted {len(train_labels)} training labels for supervised learning")
+
         logger.info(
             f"Running algorithm on {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
@@ -520,7 +532,8 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             test_tensor=test_tensor,
             trainer=trainer,
             cfg=cfg,
-            datamodule=datamodule
+            datamodule=datamodule,
+            train_labels=train_labels,
         )
 
         # --- Unified embedding wrapping ---
@@ -654,6 +667,15 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         initial_train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
         initial_test_tensor = torch.cat([b[field_index].cpu() for b in test_loader], dim=0)
 
+        # Extract labels for supervised LatentModules (if available)
+        initial_train_labels = None
+        train_dataset = getattr(initial_datamodule, "train_dataset", None)
+        if train_dataset is not None and hasattr(train_dataset, "get_labels"):
+            labels = train_dataset.get_labels()
+            if labels is not None:
+                initial_train_labels = torch.tensor(labels) if not isinstance(labels, torch.Tensor) else labels
+                logger.info(f"Extracted {len(initial_train_labels)} training labels for supervised learning")
+
         logger.info(
             f"Initial data from {data_source}:\n"
             f"  Train: {initial_train_tensor.shape}\n"
@@ -663,6 +685,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         # Track current embeddings and datamodule
         current_train_tensor = initial_train_tensor
         current_test_tensor = initial_test_tensor
+        current_train_labels = initial_train_labels
         current_datamodule = initial_datamodule
         final_algorithm = None
 
@@ -702,7 +725,8 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
                 test_tensor=current_test_tensor,
                 trainer=trainer,
                 cfg=step_cfg,
-                datamodule=current_datamodule
+                datamodule=current_datamodule,
+                train_labels=current_train_labels,
             )
 
             if latents is None:
@@ -718,6 +742,8 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
 
             # For sequential pipelines, use same data for train and test in subsequent steps
             current_train_tensor = current_test_tensor
+            # Labels only apply to original data; clear for subsequent steps
+            current_train_labels = None
 
             # Note: For next steps, we'd ideally create a PrecomputedDataModule from latents
             # For now, we keep using initial_datamodule (algorithm only needs it for metadata)
