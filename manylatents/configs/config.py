@@ -53,6 +53,12 @@ class Config:
     ckpt_dir: Optional[str] = "outputs/ckpt"
     """Directory to store model checkpoints."""
 
+    data_dir: str = "./data"
+    """Directory for data files. Override via CLI or MANYLATENTS_DATA_DIR env var."""
+
+    output_dir: str = "./outputs"
+    """Directory for output files (embeddings, results). Override via CLI or MANYLATENTS_OUTPUT_DIR env var."""
+
     name: str = "default"
     """Experiment name."""
     
