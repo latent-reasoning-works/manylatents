@@ -47,21 +47,22 @@ This will:
 ```bash
 cd manylatents-omics
 uv sync  # Pulls manylatents from git automatically
-uv run python -m manylatents.main experiment=single_algorithm
+
+# IMPORTANT: Use omics entry point for omics configs
+uv run python -m manylatents.omics.main experiment=single_algorithm
+uv run python -m manylatents.omics.main experiment=central_dogma_fusion
 ```
 
-**Working FROM the manylatents repo (for core development with omics testing):**
+**Working FROM the manylatents repo (core development only):**
 
 ```bash
 cd manylatents
 uv sync
-# Install omics from git (NOT editable - editable has plugin discovery issues)
-uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
 uv run python -m manylatents.main experiment=single_algorithm
 ```
 
-**Note**: Editable installs of manylatents-omics from another project may not work due to
-Hydra plugin discovery limitations with namespace packages. Use git install instead.
+**Note**: For omics experiments, always work from the omics repo and use `manylatents.omics.main`.
+The omics entry point registers configs before Hydra initializes.
 
 ### Using Git Submodules
 
@@ -85,8 +86,10 @@ from manylatents.data import SwissRoll
 from manylatents.algorithms.latent import PCAModule
 
 # Extension imports (available when manylatents-omics is installed)
-from manylatents.omics.data import PlinkDataset
-from manylatents.omics.metrics import GeographicPreservation
+from manylatents.popgen.data import HGDPDataset      # Population genetics
+from manylatents.popgen.metrics import GeographicPreservation
+from manylatents.dogma.encoders import Evo2Encoder   # Foundation models
+from manylatents.singlecell.data import AnnDataModule # Single-cell
 ```
 
 ## Using Extensions in Workflows
