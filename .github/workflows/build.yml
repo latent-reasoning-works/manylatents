@@ -46,8 +46,6 @@ jobs:
           # Validate CLI works with minimal config (PCA)
           # Use logger=none to skip wandb initialization entirely
           python -m manylatents.main \
-            --config-path=manylatents/configs \
-            --config-name=base_config \
             experiment=single_algorithm \
             metrics=test_metric \
             callbacks/embedding=minimal \

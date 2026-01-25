@@ -22,7 +22,7 @@ class ArchetypalAnalysisModule(LatentModule):
         self.model = None
         self._is_fitted = False
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits the archetypal analysis model to the input data."""
         x_np = x.detach().cpu().numpy()
         method_kwargs = {"max_iter_optimizer": self.max_iter}

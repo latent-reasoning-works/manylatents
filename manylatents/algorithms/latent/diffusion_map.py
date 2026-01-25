@@ -445,7 +445,7 @@ class DiffusionMapModule(LatentModule):
                                   n_jobs=n_jobs,
                                   verbose=verbose)
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits DiffusionMap on a subset of data."""
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]

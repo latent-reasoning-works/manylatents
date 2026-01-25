@@ -46,7 +46,7 @@ class PHATEModule(LatentModule):
 
         self.model = PHATE(**phate_kwargs)
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits PHATE on a subset of data."""
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]

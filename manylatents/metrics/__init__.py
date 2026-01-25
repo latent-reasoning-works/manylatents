@@ -50,6 +50,8 @@ from manylatents.metrics.fractal_dimension import FractalDimension
 from manylatents.metrics.correlation import PearsonCorrelation
 from manylatents.metrics.knn_preservation import KNNPreservation
 from manylatents.metrics.tangent_space import TangentSpaceApproximation
+from manylatents.metrics.auc import AUC
+from manylatents.metrics.outlier_score import OutlierScore
 
 __all__ = [
     # Types
@@ -75,4 +77,6 @@ __all__ = [
     "PearsonCorrelation",
     "KNNPreservation",
     "TangentSpaceApproximation",
+    "AUC",
+    "OutlierScore",
 ]

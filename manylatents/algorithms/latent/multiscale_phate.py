@@ -90,7 +90,7 @@ class MultiscalePHATEModule(LatentModule):
         self.clusters_: Optional[np.ndarray] = None
         self.sizes_: Optional[np.ndarray] = None
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """
         Fit Multiscale PHATE and compute embedding at finest resolution.
 

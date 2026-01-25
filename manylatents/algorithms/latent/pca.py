@@ -22,7 +22,7 @@ class PCAModule(LatentModule):
         self._is_fitted = False
         self._fit_data = None  # Store fitted data for covariance computation
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits PCA on a subset of data."""
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]

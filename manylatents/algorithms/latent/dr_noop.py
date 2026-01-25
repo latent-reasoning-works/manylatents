@@ -8,7 +8,7 @@ class NoOpModule(LatentModule):
         super().__init__(n_components=0, init_seed=42, **kwargs)
         self._is_fitted = True 
 
-    def fit(self, x: Tensor) -> None:
+    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         self._is_fitted = True
 
     def transform(self, x: Tensor) -> Tensor:
