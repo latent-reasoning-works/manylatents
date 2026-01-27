@@ -53,6 +53,12 @@ from manylatents.metrics.tangent_space import TangentSpaceApproximation
 from manylatents.metrics.auc import AUC
 from manylatents.metrics.outlier_score import OutlierScore
 
+# Cross-modal alignment metrics
+from manylatents.metrics.cka import CKA, cka_pairwise
+from manylatents.metrics.cross_modal_jaccard import CrossModalJaccard, cross_modal_jaccard_pairwise
+from manylatents.metrics.rank_agreement import RankAgreement
+from manylatents.metrics.alignment_score import AlignmentScore, StratificationResult, stratify_by_percentile
+
 __all__ = [
     # Types
     "Metric",
@@ -79,4 +85,13 @@ __all__ = [
     "TangentSpaceApproximation",
     "AUC",
     "OutlierScore",
+    # Cross-modal alignment metrics
+    "CKA",
+    "cka_pairwise",
+    "CrossModalJaccard",
+    "cross_modal_jaccard_pairwise",
+    "RankAgreement",
+    "AlignmentScore",
+    "StratificationResult",
+    "stratify_by_percentile",
 ]
