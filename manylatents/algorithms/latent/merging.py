@@ -527,3 +527,139 @@ class MergingModule(LatentModule):
         if self._strategy == "modality_proj":
             parts.append(f"proj_aggregation='{self._proj_aggregation}'")
         return f"MergingModule({', '.join(parts)})"
+
+
+class DiffusionMerging:
+    """Merge multiple diffusion operators into a single target operator.
+
+    Strategies:
+    - weighted_interpolation: P* = Σ w_i P_i, then normalize to row-stochastic
+    - frobenius_mean: P* = (1/N) Σ P_i (arithmetic mean, closed-form Frobenius)
+    - ot_barycenter: Wasserstein barycenter (requires POT library)
+
+    Attributes:
+        strategy: Merging strategy
+        weights: Optional per-operator weights (normalized internally)
+        normalize_output: Whether to ensure output is row-stochastic
+    """
+
+    STRATEGIES = ("weighted_interpolation", "frobenius_mean", "ot_barycenter")
+
+    def __init__(
+        self,
+        strategy: str = "weighted_interpolation",
+        weights: Optional[Dict[str, float]] = None,
+        normalize_output: bool = True,
+    ):
+        if strategy not in self.STRATEGIES:
+            raise ValueError(f"strategy must be one of {self.STRATEGIES}")
+
+        self.strategy = strategy
+        self.weights = weights or {}
+        self.normalize_output = normalize_output
+
+    def merge(self, operators: Dict[str, np.ndarray]) -> np.ndarray:
+        """Merge multiple diffusion operators.
+
+        Args:
+            operators: Dict mapping operator name to (N, N) array
+
+        Returns:
+            Merged operator of shape (N, N)
+        """
+        if len(operators) == 0:
+            raise ValueError("operators dict is empty")
+
+        # Validate all same shape
+        shapes = {k: v.shape for k, v in operators.items()}
+        unique_shapes = set(shapes.values())
+        if len(unique_shapes) > 1:
+            raise ValueError(f"All operators must have same shape, got {shapes}")
+
+        if self.strategy == "weighted_interpolation":
+            return self._weighted_interpolation(operators)
+        elif self.strategy == "frobenius_mean":
+            return self._frobenius_mean(operators)
+        elif self.strategy == "ot_barycenter":
+            return self._ot_barycenter(operators)
+        else:
+            raise ValueError(f"Unknown strategy: {self.strategy}")
+
+    def _get_weights(self, operators: Dict[str, np.ndarray]) -> Dict[str, float]:
+        """Get normalized weights for operators."""
+        weights = {k: self.weights.get(k, 1.0) for k in operators}
+        total = sum(weights.values())
+        return {k: w / total for k, w in weights.items()}
+
+    def _weighted_interpolation(
+        self, operators: Dict[str, np.ndarray]
+    ) -> np.ndarray:
+        """Weighted sum of operators, normalized to row-stochastic."""
+        weights = self._get_weights(operators)
+
+        merged = sum(w * operators[k] for k, w in weights.items())
+
+        if self.normalize_output:
+            row_sums = merged.sum(axis=1, keepdims=True)
+            row_sums = np.maximum(row_sums, 1e-10)
+            merged = merged / row_sums
+
+        return merged
+
+    def _frobenius_mean(self, operators: Dict[str, np.ndarray]) -> np.ndarray:
+        """Arithmetic mean (closed-form Frobenius barycenter)."""
+        ops = list(operators.values())
+        merged = np.mean(ops, axis=0)
+
+        if self.normalize_output:
+            row_sums = merged.sum(axis=1, keepdims=True)
+            row_sums = np.maximum(row_sums, 1e-10)
+            merged = merged / row_sums
+
+        return merged
+
+    def _ot_barycenter(self, operators: Dict[str, np.ndarray]) -> np.ndarray:
+        """Wasserstein barycenter using POT library."""
+        try:
+            import ot
+        except ImportError:
+            raise ImportError(
+                "ot_barycenter strategy requires POT library. "
+                "Install with: pip install POT"
+            )
+
+        weights = self._get_weights(operators)
+        ops = list(operators.values())
+        weight_array = np.array([weights[k] for k in operators])
+
+        # Stack operators for POT
+        # POT expects distributions as columns
+        n = ops[0].shape[0]
+
+        # Use Sinkhorn barycenter on rows
+        # Each row of the diffusion operator is a distribution
+        merged_rows = []
+        for i in range(n):
+            # Get i-th row from each operator
+            distributions = np.array([op[i, :] for op in ops]).T  # (n, num_ops)
+
+            # Compute barycenter of these distributions
+            M = ot.dist(np.arange(n).reshape(-1, 1).astype(float))  # Cost matrix
+            M = M / M.max()
+
+            barycenter = ot.bregman.barycenter(
+                distributions,
+                M,
+                reg=0.01,  # Regularization
+                weights=weight_array,
+            )
+            merged_rows.append(barycenter)
+
+        merged = np.array(merged_rows)
+
+        if self.normalize_output:
+            row_sums = merged.sum(axis=1, keepdims=True)
+            row_sums = np.maximum(row_sums, 1e-10)
+            merged = merged / row_sums
+
+        return merged
