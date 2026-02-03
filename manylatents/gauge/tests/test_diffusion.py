@@ -38,3 +38,36 @@ def test_diffusion_gauge_deterministic():
     diff_op2 = gauge(activations)
 
     np.testing.assert_allclose(diff_op1, diff_op2)
+
+
+def test_diffusion_gauge_cosine_metric():
+    """Should work with cosine distance."""
+    gauge = DiffusionGauge(metric="cosine")
+    activations = torch.randn(50, 32)
+
+    diff_op = gauge(activations)
+
+    assert diff_op.shape == (50, 50)
+    row_sums = diff_op.sum(axis=1)
+    np.testing.assert_allclose(row_sums, 1.0, rtol=1e-5)
+
+
+def test_diffusion_gauge_no_knn():
+    """Global bandwidth when knn=None."""
+    gauge = DiffusionGauge(knn=None)
+    activations = torch.randn(50, 32)
+
+    diff_op = gauge(activations)
+
+    assert diff_op.shape == (50, 50)
+
+
+def test_diffusion_gauge_alpha_zero():
+    """alpha=0 gives graph Laplacian normalization."""
+    gauge = DiffusionGauge(alpha=0.0, symmetric=True)
+    activations = torch.randn(30, 16)
+
+    diff_op = gauge(activations)
+
+    # Still symmetric
+    np.testing.assert_allclose(diff_op, diff_op.T, rtol=1e-5)
