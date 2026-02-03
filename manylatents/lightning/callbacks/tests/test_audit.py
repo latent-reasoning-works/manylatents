@@ -107,3 +107,67 @@ def test_representation_audit_callback_captures():
     assert isinstance(step, int)
     assert isinstance(diff_op, np.ndarray)
     assert diff_op.shape == (20, 20)  # probe_loader has 20 samples
+
+
+def test_representation_audit_callback_multi_layer():
+    """Should capture multiple layers."""
+    model = TinyModel()
+    probe_loader = make_probe_loader()
+
+    callback = RepresentationAuditCallback(
+        probe_loader=probe_loader,
+        layer_specs=[
+            LayerSpec(path="0", reduce="none"),  # First linear
+            LayerSpec(path="2", reduce="none"),  # Second linear
+        ],
+        trigger=AuditTrigger(every_n_steps=2),
+    )
+
+    train_loader = make_probe_loader(n_samples=40)
+
+    trainer = Trainer(
+        max_epochs=1,
+        callbacks=[callback],
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        logger=False,
+    )
+    trainer.fit(model, train_loader)
+
+    trajectory = callback.get_trajectory()
+    assert len(trajectory) > 0
+
+    # Multi-layer returns dict
+    step, ops = trajectory[0]
+    assert isinstance(ops, dict)
+    assert "0" in ops
+    assert "2" in ops
+
+
+def test_representation_audit_callback_epoch_trigger():
+    """Should trigger at epoch end."""
+    model = TinyModel()
+    probe_loader = make_probe_loader()
+
+    callback = RepresentationAuditCallback(
+        probe_loader=probe_loader,
+        layer_specs=[LayerSpec(path="0", reduce="none")],
+        trigger=AuditTrigger(every_n_epochs=1),
+    )
+
+    train_loader = make_probe_loader(n_samples=40)
+
+    trainer = Trainer(
+        max_epochs=2,
+        callbacks=[callback],
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        logger=False,
+    )
+    trainer.fit(model, train_loader)
+
+    trajectory = callback.get_full_trajectory()
+    # Should have captured at epoch 0 and epoch 1
+    epochs = [p.epoch for p in trajectory]
+    assert 0 in epochs
+    assert 1 in epochs
