@@ -12,9 +12,9 @@ Strategies:
     - mean: Average embeddings (requires equal dims)
 
     Linear projection:
-    - concat_pca: Concat → PCA to target_dim
-    - modality_proj: PCA each channel to common dim → concat or mean
-    - svd: Concat → truncated SVD to target_dim
+    - concat_pca: Concat -> PCA to target_dim
+    - modality_proj: PCA each channel to common dim -> concat or mean
+    - svd: Concat -> truncated SVD to target_dim
 
 Example (in-memory):
     >>> merger = MergingModule(
@@ -45,12 +45,12 @@ Example (Hydra CLI):
         algorithms.latent.target_dim=256
 """
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
-import torch
-from torch import Tensor
 import numpy as np
+import torch
 from sklearn.decomposition import PCA, TruncatedSVD
+from torch import Tensor
 
 from .latent_module_base import LatentModule
 
@@ -63,7 +63,7 @@ class ChannelLoadings:
         channel_ranges: Dict mapping channel name to (start, end) indices in concat.
         components: Projection matrix (n_features, target_dim) or None.
         explained_variance_ratio: Variance explained per component, or None.
-        channel_contributions: Dict mapping channel → contribution matrix.
+        channel_contributions: Dict mapping channel -> contribution matrix.
             For concat_pca/svd: submatrix of components for that channel's dims.
             For modality_proj: the channel's own PCA components.
     """
@@ -85,11 +85,11 @@ class MergingModule(LatentModule):
     - mean: Average embeddings (requires equal dims)
 
     Linear projection:
-    - concat_pca: Concat → PCA to target_dim. Interpretable loadings show
+    - concat_pca: Concat -> PCA to target_dim. Interpretable loadings show
         which original dimensions (and thus channels) contribute to each component.
-    - modality_proj: PCA each channel to common dim → concat or mean.
+    - modality_proj: PCA each channel to common dim -> concat or mean.
         Use `proj_aggregation` to control final step ('concat' or 'mean').
-    - svd: Concat → truncated SVD to target_dim. Similar to concat_pca but
+    - svd: Concat -> truncated SVD to target_dim. Similar to concat_pca but
         centers data differently (mean-centered vs not).
 
     Embeddings can be provided:
@@ -129,7 +129,6 @@ class MergingModule(LatentModule):
         "svd",
     )
 
-    # Strategies that require fitting (projection-based)
     PROJECTION_STRATEGIES = ("concat_pca", "modality_proj", "svd")
 
     def __init__(
@@ -144,34 +143,10 @@ class MergingModule(LatentModule):
         n_components: Optional[int] = None,
         **kwargs,
     ):
-        if strategy not in self.STRATEGIES:
-            raise ValueError(
-                f"strategy must be one of {self.STRATEGIES}, got '{strategy}'"
-            )
-
-        # Validate projection strategies require target_dim
-        if strategy in self.PROJECTION_STRATEGIES and target_dim is None:
-            raise ValueError(
-                f"strategy='{strategy}' requires target_dim parameter. "
-                f"Example: MergingModule(strategy='{strategy}', target_dim=256)"
-            )
-
-        if proj_aggregation not in ("concat", "mean"):
-            raise ValueError(
-                f"proj_aggregation must be 'concat' or 'mean', got '{proj_aggregation}'"
-            )
-
+        self._validate_init_params(strategy, target_dim, proj_aggregation)
         super().__init__(n_components=n_components or 0, **kwargs)
 
-        # Convert numpy to torch if needed
-        if embeddings is not None:
-            self._embeddings = {
-                k: torch.from_numpy(v).float() if isinstance(v, np.ndarray) else v.float()
-                for k, v in embeddings.items()
-            }
-        else:
-            self._embeddings = None
-
+        self._embeddings = self._convert_embeddings(embeddings)
         self._strategy = strategy
         self._channels = channels
         self._weights = weights or {}
@@ -187,9 +162,37 @@ class MergingModule(LatentModule):
         self.explained_variance_ratio_: Optional[np.ndarray] = None
         self.channel_projections_: Dict[str, PCA] = {}
         self._channel_ranges: Dict[str, tuple] = {}
-        self._pca: Optional[PCA] = None
-        self._svd: Optional[TruncatedSVD] = None
-        self._mean: Optional[np.ndarray] = None
+        self._projection_model: Optional[Union[PCA, TruncatedSVD]] = None
+
+    def _validate_init_params(
+        self, strategy: str, target_dim: Optional[int], proj_aggregation: str
+    ) -> None:
+        """Validate constructor parameters."""
+        if strategy not in self.STRATEGIES:
+            raise ValueError(
+                f"strategy must be one of {self.STRATEGIES}, got '{strategy}'"
+            )
+        if strategy in self.PROJECTION_STRATEGIES and target_dim is None:
+            raise ValueError(
+                f"strategy='{strategy}' requires target_dim parameter. "
+                f"Example: MergingModule(strategy='{strategy}', target_dim=256)"
+            )
+        if proj_aggregation not in ("concat", "mean"):
+            raise ValueError(
+                f"proj_aggregation must be 'concat' or 'mean', got '{proj_aggregation}'"
+            )
+
+    @staticmethod
+    def _convert_embeddings(
+        embeddings: Optional[Dict[str, Union[Tensor, np.ndarray]]]
+    ) -> Optional[Dict[str, Tensor]]:
+        """Convert numpy arrays to torch tensors."""
+        if embeddings is None:
+            return None
+        return {
+            k: torch.from_numpy(v).float() if isinstance(v, np.ndarray) else v.float()
+            for k, v in embeddings.items()
+        }
 
     def _get_embeddings(self) -> Dict[str, Tensor]:
         """Get embeddings from in-memory dict or datamodule."""
@@ -211,6 +214,51 @@ class MergingModule(LatentModule):
 
         return self.datamodule.get_embeddings()
 
+    def _prepare_channels(
+        self, all_embeddings: Dict[str, Tensor]
+    ) -> Tuple[List[str], List[Tensor]]:
+        """Select and validate channels, returning ordered lists."""
+        channels = self._channels or list(all_embeddings.keys())
+        missing = set(channels) - set(all_embeddings.keys())
+        if missing:
+            raise ValueError(
+                f"Channels not found: {missing}. "
+                f"Available: {list(all_embeddings.keys())}"
+            )
+        embeddings = [all_embeddings[ch] for ch in channels]
+        return channels, embeddings
+
+    def _record_channel_dims(
+        self, channels: List[str], embeddings: List[Union[Tensor, np.ndarray]]
+    ) -> None:
+        """Record channel dimensions and ranges for later use."""
+        offset = 0
+        for ch, emb in zip(channels, embeddings):
+            dim = emb.shape[-1]
+            self.channel_dims[ch] = dim
+            self._channel_ranges[ch] = (offset, offset + dim)
+            offset += dim
+
+    @staticmethod
+    def _normalize_embeddings_np(embeddings: List[np.ndarray]) -> List[np.ndarray]:
+        """L2-normalize numpy embeddings."""
+        return [
+            emb / (np.linalg.norm(emb, axis=-1, keepdims=True) + 1e-8)
+            for emb in embeddings
+        ]
+
+    @staticmethod
+    def _normalize_embeddings_torch(embeddings: List[Tensor]) -> List[Tensor]:
+        """L2-normalize torch embeddings."""
+        return [torch.nn.functional.normalize(e, p=2, dim=-1) for e in embeddings]
+
+    @staticmethod
+    def _to_numpy(embeddings: List[Tensor]) -> List[np.ndarray]:
+        """Convert list of tensors to numpy arrays."""
+        return [
+            e.cpu().numpy() if isinstance(e, Tensor) else e for e in embeddings
+        ]
+
     def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fit projection models for projection-based strategies.
 
@@ -222,71 +270,48 @@ class MergingModule(LatentModule):
             y: Optional labels (ignored - MergingModule is unsupervised)
         """
         if self._strategy not in self.PROJECTION_STRATEGIES:
-            # Simple strategies don't need fitting
             self._is_fitted = True
             return
 
-        # Get embeddings and prepare for projection fitting
         all_embeddings = self._get_embeddings()
-        channels = self._channels or list(all_embeddings.keys())
+        channels, embeddings = self._prepare_channels(all_embeddings)
+        embeddings_np = self._to_numpy(embeddings)
+        self._record_channel_dims(channels, embeddings_np)
 
-        # Validate channels exist
-        missing = set(channels) - set(all_embeddings.keys())
-        if missing:
-            raise ValueError(
-                f"Channels not found: {missing}. "
-                f"Available: {list(all_embeddings.keys())}"
-            )
-
-        # Collect embeddings and record dimensions/ranges
-        embeddings_list = []
-        offset = 0
-        for ch in channels:
-            emb = all_embeddings[ch]
-            if isinstance(emb, Tensor):
-                emb = emb.cpu().numpy()
-            dim = emb.shape[-1]
-            self.channel_dims[ch] = dim
-            self._channel_ranges[ch] = (offset, offset + dim)
-            offset += dim
-            embeddings_list.append(emb)
-
-        # Apply normalization if requested
         if self._normalize:
-            embeddings_list = [
-                emb / (np.linalg.norm(emb, axis=-1, keepdims=True) + 1e-8)
-                for emb in embeddings_list
-            ]
+            embeddings_np = self._normalize_embeddings_np(embeddings_np)
 
-        # Fit based on strategy
-        if self._strategy == "concat_pca":
-            self._fit_concat_pca(embeddings_list, channels)
-        elif self._strategy == "modality_proj":
-            self._fit_modality_proj(embeddings_list, channels)
-        elif self._strategy == "svd":
-            self._fit_svd(embeddings_list, channels)
+        if self._strategy == "modality_proj":
+            self._fit_modality_proj(embeddings_np, channels)
+        else:
+            # concat_pca and svd share the same fitting pattern
+            self._fit_concat_projection(embeddings_np, channels)
 
         self._is_fitted = True
 
-    def _fit_concat_pca(
+    def _fit_concat_projection(
         self, embeddings_list: List[np.ndarray], channels: List[str]
     ) -> None:
-        """Fit PCA on concatenated embeddings."""
+        """Fit PCA or SVD on concatenated embeddings."""
         concatenated = np.concatenate(embeddings_list, axis=-1)
 
-        self._pca = PCA(n_components=self._target_dim, random_state=self.init_seed)
-        self._pca.fit(concatenated)
+        if self._strategy == "concat_pca":
+            model = PCA(n_components=self._target_dim, random_state=self.init_seed)
+        else:  # svd
+            model = TruncatedSVD(
+                n_components=self._target_dim, random_state=self.init_seed
+            )
 
-        self.components_ = self._pca.components_.T  # (n_features, target_dim)
-        self.explained_variance_ratio_ = self._pca.explained_variance_ratio_
-        self._mean = self._pca.mean_
+        model.fit(concatenated)
+        self._projection_model = model
+        self.components_ = model.components_.T  # (n_features, target_dim)
+        self.explained_variance_ratio_ = model.explained_variance_ratio_
 
     def _fit_modality_proj(
         self, embeddings_list: List[np.ndarray], channels: List[str]
     ) -> None:
         """Fit per-channel PCA projections."""
         for ch, emb in zip(channels, embeddings_list):
-            # Clamp target_dim to channel dimension
             n_comp = min(self._target_dim, emb.shape[-1])
             pca = PCA(n_components=n_comp, random_state=self.init_seed)
             pca.fit(emb)
@@ -300,20 +325,6 @@ class MergingModule(LatentModule):
         else:  # mean
             self.n_components = self._target_dim
 
-    def _fit_svd(
-        self, embeddings_list: List[np.ndarray], channels: List[str]
-    ) -> None:
-        """Fit truncated SVD on concatenated embeddings."""
-        concatenated = np.concatenate(embeddings_list, axis=-1)
-
-        self._svd = TruncatedSVD(
-            n_components=self._target_dim, random_state=self.init_seed
-        )
-        self._svd.fit(concatenated)
-
-        self.components_ = self._svd.components_.T  # (n_features, target_dim)
-        self.explained_variance_ratio_ = self._svd.explained_variance_ratio_
-
     def transform(self, x: Tensor) -> Tensor:
         """Merge embeddings from all channels.
 
@@ -324,73 +335,46 @@ class MergingModule(LatentModule):
             Merged embeddings of shape (N, merged_dim)
         """
         all_embeddings = self._get_embeddings()
+        channels, embeddings = self._prepare_channels(all_embeddings)
 
-        # Select channels
-        channels = self._channels or list(all_embeddings.keys())
-
-        # Validate
-        missing = set(channels) - set(all_embeddings.keys())
-        if missing:
-            raise ValueError(
-                f"Channels not found: {missing}. "
-                f"Available: {list(all_embeddings.keys())}"
-            )
-
-        # Collect in order
-        embeddings = [all_embeddings[ch] for ch in channels]
-
-        # Record dimensions (if not already done in fit)
         if not self.channel_dims:
             self.channel_dims = {ch: e.shape[-1] for ch, e in zip(channels, embeddings)}
 
-        # Normalize if requested
         if self._normalize:
-            embeddings = [
-                torch.nn.functional.normalize(e, p=2, dim=-1)
-                for e in embeddings
-            ]
+            embeddings = self._normalize_embeddings_torch(embeddings)
 
-        # Apply strategy
-        if self._strategy == "concat":
-            merged = torch.cat(embeddings, dim=-1)
-
-        elif self._strategy == "weighted_sum":
-            self._validate_equal_dims(channels, embeddings)
-            weights = self._compute_weights(channels)
-            merged = sum(w * e for w, e in zip(weights, embeddings))
-
-        elif self._strategy == "mean":
-            self._validate_equal_dims(channels, embeddings)
-            merged = torch.stack(embeddings, dim=0).mean(dim=0)
-
-        elif self._strategy == "concat_pca":
-            merged = self._transform_concat_pca(embeddings)
-
-        elif self._strategy == "modality_proj":
-            merged = self._transform_modality_proj(embeddings, channels)
-
-        elif self._strategy == "svd":
-            merged = self._transform_svd(embeddings)
-
-        else:
-            raise ValueError(f"Unknown strategy: {self._strategy}")
-
+        merged = self._apply_strategy(channels, embeddings)
         self.n_components = merged.shape[-1]
         return merged
 
-    def _transform_concat_pca(self, embeddings: List[Tensor]) -> Tensor:
-        """Transform using fitted PCA on concatenated embeddings."""
-        if self._pca is None:
-            raise RuntimeError("Must call fit() before transform() for concat_pca")
+    def _apply_strategy(self, channels: List[str], embeddings: List[Tensor]) -> Tensor:
+        """Apply the configured merging strategy."""
+        if self._strategy == "concat":
+            return torch.cat(embeddings, dim=-1)
 
-        # Convert to numpy and concatenate
-        concat_np = np.concatenate(
-            [e.cpu().numpy() if isinstance(e, Tensor) else e for e in embeddings],
-            axis=-1,
-        )
+        if self._strategy == "weighted_sum":
+            self._validate_equal_dims(channels, embeddings)
+            weights = self._compute_weights(channels)
+            return sum(w * e for w, e in zip(weights, embeddings))
 
-        # Apply PCA transform
-        projected = self._pca.transform(concat_np)
+        if self._strategy == "mean":
+            self._validate_equal_dims(channels, embeddings)
+            return torch.stack(embeddings, dim=0).mean(dim=0)
+
+        if self._strategy == "modality_proj":
+            return self._transform_modality_proj(embeddings, channels)
+
+        # concat_pca and svd use the same transform logic
+        return self._transform_concat_projection(embeddings)
+
+    def _transform_concat_projection(self, embeddings: List[Tensor]) -> Tensor:
+        """Transform using fitted PCA or SVD on concatenated embeddings."""
+        if self._projection_model is None:
+            strategy_name = self._strategy
+            raise RuntimeError(f"Must call fit() before transform() for {strategy_name}")
+
+        concat_np = np.concatenate(self._to_numpy(embeddings), axis=-1)
+        projected = self._projection_model.transform(concat_np)
         return torch.from_numpy(projected).float()
 
     def _transform_modality_proj(
@@ -409,33 +393,20 @@ class MergingModule(LatentModule):
 
         if self._proj_aggregation == "concat":
             return torch.cat(projected_channels, dim=-1)
-        else:  # mean
-            # Pad to common dimension if needed
-            max_dim = max(p.shape[-1] for p in projected_channels)
-            padded = []
-            for p in projected_channels:
-                if p.shape[-1] < max_dim:
-                    pad = torch.zeros(p.shape[0], max_dim - p.shape[-1])
-                    p = torch.cat([p, pad], dim=-1)
-                padded.append(p)
-            return torch.stack(padded, dim=0).mean(dim=0)
 
-    def _transform_svd(self, embeddings: List[Tensor]) -> Tensor:
-        """Transform using fitted SVD on concatenated embeddings."""
-        if self._svd is None:
-            raise RuntimeError("Must call fit() before transform() for svd")
+        # mean aggregation - pad to common dimension if needed
+        max_dim = max(p.shape[-1] for p in projected_channels)
+        padded = []
+        for p in projected_channels:
+            if p.shape[-1] < max_dim:
+                pad = torch.zeros(p.shape[0], max_dim - p.shape[-1])
+                p = torch.cat([p, pad], dim=-1)
+            padded.append(p)
+        return torch.stack(padded, dim=0).mean(dim=0)
 
-        # Convert to numpy and concatenate
-        concat_np = np.concatenate(
-            [e.cpu().numpy() if isinstance(e, Tensor) else e for e in embeddings],
-            axis=-1,
-        )
-
-        # Apply SVD transform
-        projected = self._svd.transform(concat_np)
-        return torch.from_numpy(projected).float()
-
-    def _validate_equal_dims(self, channels: List[str], embeddings: List[Tensor]) -> None:
+    def _validate_equal_dims(
+        self, channels: List[str], embeddings: List[Tensor]
+    ) -> None:
         """Validate all embeddings have equal dimensions."""
         dims = [e.shape[-1] for e in embeddings]
         if len(set(dims)) > 1:
@@ -464,7 +435,7 @@ class MergingModule(LatentModule):
 
         Returns:
             ChannelLoadings dataclass with:
-            - channel_ranges: Dict mapping channel → (start, end) in concat
+            - channel_ranges: Dict mapping channel -> (start, end) in concat
             - components: Full projection matrix (n_features, target_dim)
             - explained_variance_ratio: Variance per component
             - channel_contributions: Dict of per-channel contribution matrices
@@ -493,18 +464,7 @@ class MergingModule(LatentModule):
         if not self._is_fitted:
             raise RuntimeError("Must call fit() before get_loadings()")
 
-        # Build channel contributions
-        channel_contributions = {}
-
-        if self._strategy in ("concat_pca", "svd"):
-            # Extract submatrix for each channel from full components
-            for ch, (start, end) in self._channel_ranges.items():
-                channel_contributions[ch] = self.components_[start:end, :]
-
-        elif self._strategy == "modality_proj":
-            # Each channel has its own PCA components
-            for ch, pca in self.channel_projections_.items():
-                channel_contributions[ch] = pca.components_.T
+        channel_contributions = self._compute_channel_contributions()
 
         return ChannelLoadings(
             channel_ranges=self._channel_ranges.copy(),
@@ -512,6 +472,16 @@ class MergingModule(LatentModule):
             explained_variance_ratio=self.explained_variance_ratio_,
             channel_contributions=channel_contributions,
         )
+
+    def _compute_channel_contributions(self) -> Dict[str, np.ndarray]:
+        """Compute per-channel contribution matrices for loadings."""
+        if self._strategy in ("concat_pca", "svd"):
+            return {
+                ch: self.components_[start:end, :]
+                for ch, (start, end) in self._channel_ranges.items()
+            }
+        # modality_proj
+        return {ch: pca.components_.T for ch, pca in self.channel_projections_.items()}
 
     def channel_importance(self) -> Dict[str, float]:
         """Compute relative importance of each channel in the fused representation.
@@ -537,13 +507,11 @@ class MergingModule(LatentModule):
         """
         loadings = self.get_loadings()
 
-        # Compute Frobenius norm for each channel
         norms = {
             ch: np.linalg.norm(contrib, "fro")
             for ch, contrib in loadings.channel_contributions.items()
         }
 
-        # Normalize to sum to 1
         total = sum(norms.values())
         return {ch: norm / total for ch, norm in norms.items()}
 
