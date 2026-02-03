@@ -1,7 +1,6 @@
 # manylatents/configs/data/wikitext.yaml
 # Text data for HuggingFace language model training
-defaults:
-  - default
+# Note: Does not inherit from default.yaml (different DataModule interface)
 
 _target_: manylatents.data.text.TextDataModule
 

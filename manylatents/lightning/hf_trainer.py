@@ -46,11 +46,12 @@ class HFTrainerModule(LightningModule):
     - Standard Lightning training interface
     """
 
-    def __init__(self, config: HFTrainerConfig):
+    def __init__(self, config: HFTrainerConfig, datamodule=None):
         super().__init__()
         self.config = config
         self.network: Optional[AutoModelForCausalLM] = None
         self.tokenizer = None
+        # datamodule passed by experiment.py but not used here
 
         self.save_hyperparameters({"config": config.__dict__})
 
@@ -90,6 +91,13 @@ class HFTrainerModule(LightningModule):
         outputs: CausalLMOutput = self(**batch)
         loss = outputs.loss
         self.log("val/loss", loss, on_epoch=True, prog_bar=True, sync_dist=True)
+        return loss
+
+    def test_step(self, batch: Dict[str, torch.Tensor], batch_idx: int):
+        """Standard test step."""
+        outputs: CausalLMOutput = self(**batch)
+        loss = outputs.loss
+        self.log("test/loss", loss, on_epoch=True, prog_bar=True, sync_dist=True)
         return loss
 
     def configure_optimizers(self):

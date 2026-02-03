@@ -13,60 +13,52 @@ requires-python = ">=3.11, <3.13"
 dependencies = [
     # Core scientific stack
     "numpy>=1.25",
-    "scipy>=1.8,<1.15",  # upper bound for archetypes/phate compatibility
+    "scipy>=1.8,<1.15", # upper bound for archetypes/phate compatibility
     "pandas>=2.0",
     "scikit-learn>=1.2",
     "matplotlib>=3.8",
-
     # Deep learning
     "torch>=2.3,<3.0",
     "lightning>=2.5",
     "torchmetrics>=1.6",
     "transformers>=4.40",
-
     # Optimal transport (for DiffusionMerging)
     "POT>=0.9",
-
     # Hydra configuration
     "hydra-core>=1.3",
     "hydra-zen>=0.13",
     "hydra-submitit-launcher>=1.2",
-
     # Dimensionality reduction algorithms
     "phate>=2.0",
     "umap-learn>=0.5",
     "opentsne>=1.0",
     "multiscale-phate",
     "archetypes>=0.6",
-
     # Graph/topology tools
     "graphtools>=2.0",
     "ripser>=0.6",
     "PyGSP>=0.5",
-
     # Single-cell / genomics
     "scanpy>=1.10",
     "pyplink>=1.3",
     "pyproj>=3.6",
-
     # Utilities
     "heatgeo",
-    "scprep",  # TODO: remove after issue #182 (plotting replacement)
+    "scprep", # TODO: remove after issue #182 (plotting replacement)
     "requests>=2.25",
     "rootutils>=1.0",
     "tqdm>=4.67",
     "rich>=13.9",
     "pydantic>=2.9",
     "Deprecated>=1.2",
-
     # Experiment tracking & docs
     "wandb>=0.19",
     "gsutil>=5.33",
     "mkdocs>=1.6",
     "mkdocs-material>=9.6",
-
     # Testing
     "pytest>=8.3",
+    "datasets>=4.5.0",
 ]
 
 [project.optional-dependencies]

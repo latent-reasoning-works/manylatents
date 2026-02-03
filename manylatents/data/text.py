@@ -126,6 +126,9 @@ class TextDataModule(LightningDataModule):
             collate_fn=self._collate_fn,
         )
 
+    def test_dataloader(self):
+        return self.val_dataloader()  # Use validation as test for simplicity
+
     def probe_dataloader(self):
         """Fixed subset for representation probing."""
         return DataLoader(
