@@ -132,3 +132,59 @@ def test_activation_extractor_clears_after_get():
     # Second call should return empty (already cleared)
     activations2 = extractor.get_activations()
     assert len(activations2) == 0
+
+
+# Sequence reduction tests
+
+
+class SequenceModel(nn.Module):
+    """Model that outputs (batch, seq_len, dim)."""
+    def __init__(self):
+        super().__init__()
+        self.layer = nn.Linear(10, 20)
+
+    def forward(self, x):
+        # x: (batch, seq_len, 10) -> (batch, seq_len, 20)
+        return self.layer(x)
+
+
+def test_activation_extractor_reduce_mean():
+    model = SequenceModel()
+    spec = LayerSpec(path="layer", reduce="mean")
+    extractor = ActivationExtractor([spec])
+
+    x = torch.randn(4, 8, 10)  # batch=4, seq_len=8, dim=10
+
+    with extractor.capture(model):
+        _ = model(x)
+
+    activations = extractor.get_activations()
+    assert activations["layer"].shape == (4, 20)  # Reduced over seq_len
+
+
+def test_activation_extractor_reduce_last_token():
+    model = SequenceModel()
+    spec = LayerSpec(path="layer", reduce="last_token")
+    extractor = ActivationExtractor([spec])
+
+    x = torch.randn(4, 8, 10)
+
+    with extractor.capture(model):
+        _ = model(x)
+
+    activations = extractor.get_activations()
+    assert activations["layer"].shape == (4, 20)
+
+
+def test_activation_extractor_reduce_all():
+    model = SequenceModel()
+    spec = LayerSpec(path="layer", reduce="all")
+    extractor = ActivationExtractor([spec])
+
+    x = torch.randn(4, 8, 10)
+
+    with extractor.capture(model):
+        _ = model(x)
+
+    activations = extractor.get_activations()
+    assert activations["layer"].shape == (4, 8, 20)  # Kept full sequence
