@@ -1,7 +1,15 @@
 # manylatents/algorithms/latent/tests/test_diffusion_merging.py
+import sys
 import pytest
 import numpy as np
 from manylatents.algorithms.latent.merging import DiffusionMerging
+
+# Check if POT is available
+try:
+    import ot
+    HAS_POT = True
+except ImportError:
+    HAS_POT = False
 
 
 def make_random_diffusion_op(n: int, seed: int) -> np.ndarray:
@@ -80,3 +88,40 @@ def test_diffusion_merging_empty_operators():
     merger = DiffusionMerging()
     with pytest.raises(ValueError, match="operators dict is empty"):
         merger.merge({})
+
+
+@pytest.mark.skipif(not HAS_POT, reason="POT not installed")
+def test_diffusion_merging_ot_barycenter():
+    """OT barycenter of operators."""
+    ops = {
+        "model_a": make_random_diffusion_op(20, seed=1),
+        "model_b": make_random_diffusion_op(20, seed=2),
+    }
+
+    merger = DiffusionMerging(strategy="ot_barycenter")
+    merged = merger.merge(ops)
+
+    assert merged.shape == (20, 20)
+    # Should be row-stochastic
+    row_sums = merged.sum(axis=1)
+    np.testing.assert_allclose(row_sums, 1.0, rtol=1e-5)
+
+
+def test_diffusion_merging_ot_import_error():
+    """Should raise helpful error if POT not installed."""
+    # Temporarily hide ot module to test error path
+    ot_module = sys.modules.get("ot")
+    sys.modules["ot"] = None
+
+    try:
+        ops = {"a": make_random_diffusion_op(10, seed=1)}
+        merger = DiffusionMerging(strategy="ot_barycenter")
+
+        with pytest.raises(ImportError, match="POT library"):
+            merger.merge(ops)
+    finally:
+        # Restore
+        if ot_module is not None:
+            sys.modules["ot"] = ot_module
+        else:
+            sys.modules.pop("ot", None)
