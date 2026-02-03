@@ -1,19 +1,19 @@
-# manylatents/lightning/callbacks/tests/test_audit.py
+# manylatents/lightning/callbacks/tests/test_probing.py
 import pytest
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from lightning import LightningModule, Trainer
-from manylatents.lightning.callbacks.audit import (
-    AuditTrigger,
-    RepresentationAuditCallback,
+from manylatents.lightning.callbacks.probing import (
+    ProbeTrigger,
+    RepresentationProbeCallback,
 )
 from manylatents.lightning.hooks import LayerSpec
 
 
-def test_audit_trigger_step_based():
-    trigger = AuditTrigger(every_n_steps=100)
+def test_probe_trigger_step_based():
+    trigger = ProbeTrigger(every_n_steps=100)
 
     assert trigger.should_fire(step=0, epoch=0) is True   # First step
     assert trigger.should_fire(step=50, epoch=0) is False
@@ -21,16 +21,16 @@ def test_audit_trigger_step_based():
     assert trigger.should_fire(step=200, epoch=0) is True
 
 
-def test_audit_trigger_epoch_based():
-    trigger = AuditTrigger(every_n_epochs=2)
+def test_probe_trigger_epoch_based():
+    trigger = ProbeTrigger(every_n_epochs=2)
 
     assert trigger.should_fire(step=0, epoch=0, epoch_end=True) is True
     assert trigger.should_fire(step=0, epoch=1, epoch_end=True) is False
     assert trigger.should_fire(step=0, epoch=2, epoch_end=True) is True
 
 
-def test_audit_trigger_combined():
-    trigger = AuditTrigger(every_n_steps=100, every_n_epochs=1)
+def test_probe_trigger_combined():
+    trigger = ProbeTrigger(every_n_steps=100, every_n_epochs=1)
 
     # Steps trigger
     assert trigger.should_fire(step=100, epoch=0) is True
@@ -38,13 +38,13 @@ def test_audit_trigger_combined():
     assert trigger.should_fire(step=50, epoch=1, epoch_end=True) is True
 
 
-def test_audit_trigger_disabled():
-    trigger = AuditTrigger()  # No triggers set
+def test_probe_trigger_disabled():
+    trigger = ProbeTrigger()  # No triggers set
 
     assert trigger.should_fire(step=100, epoch=5) is False
 
 
-# RepresentationAuditCallback tests
+# RepresentationProbeCallback tests
 
 
 class TinyModel(LightningModule):
@@ -76,15 +76,15 @@ def make_probe_loader(n_samples=20, input_dim=10):
     return DataLoader(TensorDataset(x, y), batch_size=10)
 
 
-def test_representation_audit_callback_captures():
+def test_representation_probe_callback_captures():
     """Callback should capture activations and compute diffusion ops."""
     model = TinyModel()
     probe_loader = make_probe_loader()
 
-    callback = RepresentationAuditCallback(
+    callback = RepresentationProbeCallback(
         probe_loader=probe_loader,
         layer_specs=[LayerSpec(path="0", reduce="none")],  # Path relative to .network
-        trigger=AuditTrigger(every_n_steps=1),
+        trigger=ProbeTrigger(every_n_steps=1),
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -109,18 +109,18 @@ def test_representation_audit_callback_captures():
     assert diff_op.shape == (20, 20)  # probe_loader has 20 samples
 
 
-def test_representation_audit_callback_multi_layer():
+def test_representation_probe_callback_multi_layer():
     """Should capture multiple layers."""
     model = TinyModel()
     probe_loader = make_probe_loader()
 
-    callback = RepresentationAuditCallback(
+    callback = RepresentationProbeCallback(
         probe_loader=probe_loader,
         layer_specs=[
             LayerSpec(path="0", reduce="none"),  # First linear
             LayerSpec(path="2", reduce="none"),  # Second linear
         ],
-        trigger=AuditTrigger(every_n_steps=2),
+        trigger=ProbeTrigger(every_n_steps=2),
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -144,15 +144,15 @@ def test_representation_audit_callback_multi_layer():
     assert "2" in ops
 
 
-def test_representation_audit_callback_epoch_trigger():
+def test_representation_probe_callback_epoch_trigger():
     """Should trigger at epoch end."""
     model = TinyModel()
     probe_loader = make_probe_loader()
 
-    callback = RepresentationAuditCallback(
+    callback = RepresentationProbeCallback(
         probe_loader=probe_loader,
         layer_specs=[LayerSpec(path="0", reduce="none")],
-        trigger=AuditTrigger(every_n_epochs=1),
+        trigger=ProbeTrigger(every_n_epochs=1),
     )
 
     train_loader = make_probe_loader(n_samples=40)

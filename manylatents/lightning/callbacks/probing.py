@@ -1,4 +1,4 @@
-"""Representation auditing callback for Lightning."""
+"""Representation probing callback for Lightning."""
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -13,8 +13,8 @@ from manylatents.gauge.diffusion import DiffusionGauge
 
 
 @dataclass
-class AuditTrigger:
-    """Configuration for when to trigger representation audits.
+class ProbeTrigger:
+    """Configuration for when to trigger representation probes.
 
     Multiple triggers can be combined (OR logic).
 
@@ -64,7 +64,7 @@ class TrajectoryPoint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class RepresentationAuditCallback(Callback):
+class RepresentationProbeCallback(Callback):
     """Callback that extracts activations and computes diffusion operators.
 
     At configurable triggers during training, this callback:
@@ -74,10 +74,10 @@ class RepresentationAuditCallback(Callback):
     4. Stores (step, operator) pairs in a trajectory
 
     Usage:
-        callback = RepresentationAuditCallback(
+        callback = RepresentationProbeCallback(
             probe_loader=probe_loader,
             layer_specs=[LayerSpec("model.layers[-1]")],
-            trigger=AuditTrigger(every_n_steps=100),
+            trigger=ProbeTrigger(every_n_steps=100),
         )
         trainer = Trainer(callbacks=[callback])
         trainer.fit(model)
@@ -89,7 +89,7 @@ class RepresentationAuditCallback(Callback):
         self,
         probe_loader: DataLoader,
         layer_specs: List[LayerSpec],
-        trigger: AuditTrigger,
+        trigger: ProbeTrigger,
         gauge: Optional[DiffusionGauge] = None,
     ):
         super().__init__()
@@ -141,7 +141,7 @@ class RepresentationAuditCallback(Callback):
 
         return diffusion_ops
 
-    def _maybe_audit(
+    def _maybe_probe(
         self,
         trainer: Trainer,
         pl_module: LightningModule,
@@ -177,7 +177,7 @@ class RepresentationAuditCallback(Callback):
         batch_idx: int,
     ):
         """Check step-based triggers."""
-        self._maybe_audit(trainer, pl_module)
+        self._maybe_probe(trainer, pl_module)
 
     def on_train_epoch_end(
         self,
@@ -185,7 +185,7 @@ class RepresentationAuditCallback(Callback):
         pl_module: LightningModule,
     ):
         """Check epoch-based triggers."""
-        self._maybe_audit(trainer, pl_module, epoch_end=True)
+        self._maybe_probe(trainer, pl_module, epoch_end=True)
 
     def on_validation_end(
         self,
@@ -193,7 +193,7 @@ class RepresentationAuditCallback(Callback):
         pl_module: LightningModule,
     ):
         """Check validation-end trigger."""
-        self._maybe_audit(trainer, pl_module, validation_end=True)
+        self._maybe_probe(trainer, pl_module, validation_end=True)
 
     def get_trajectory(self) -> List[tuple]:
         """Get trajectory as list of (step, diffusion_operator) tuples.

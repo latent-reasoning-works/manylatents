@@ -1,7 +1,7 @@
-"""Lightning callbacks for representation auditing."""
-from manylatents.lightning.callbacks.audit import (
-    AuditTrigger,
-    RepresentationAuditCallback,
+"""Lightning callbacks for representation probing."""
+from manylatents.lightning.callbacks.probing import (
+    ProbeTrigger,
+    RepresentationProbeCallback,
 )
 
-__all__ = ["AuditTrigger", "RepresentationAuditCallback"]
+__all__ = ["ProbeTrigger", "RepresentationProbeCallback"]

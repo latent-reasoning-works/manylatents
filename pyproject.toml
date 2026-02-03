@@ -24,6 +24,9 @@ dependencies = [
     "torchmetrics>=1.6",
     "transformers>=4.40",
 
+    # Optimal transport (for DiffusionMerging)
+    "POT>=0.9",
+
     # Hydra configuration
     "hydra-core>=1.3",
     "hydra-zen>=0.13",
