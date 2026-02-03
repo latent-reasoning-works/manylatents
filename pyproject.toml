@@ -22,6 +22,7 @@ dependencies = [
     "torch>=2.3,<3.0",
     "lightning>=2.5",
     "torchmetrics>=1.6",
+    "transformers>=4.40",
 
     # Hydra configuration
     "hydra-core>=1.3",
