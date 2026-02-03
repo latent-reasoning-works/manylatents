@@ -1,7 +1,8 @@
 # manylatents/lightning/tests/test_hooks.py
 import pytest
+import torch
 import torch.nn as nn
-from manylatents.lightning.hooks import LayerSpec, resolve_layer
+from manylatents.lightning.hooks import ActivationExtractor, LayerSpec, resolve_layer
 
 
 class MockTransformerBlock(nn.Module):
@@ -66,3 +67,68 @@ def test_resolve_layer_invalid():
     model = MockModel()
     with pytest.raises(AttributeError, match="has no attribute 'nonexistent'"):
         resolve_layer(model, "nonexistent")
+
+
+# ActivationExtractor tests
+
+
+class SimpleModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layer1 = nn.Linear(10, 20)
+        self.layer2 = nn.Linear(20, 5)
+
+    def forward(self, x):
+        x = torch.relu(self.layer1(x))
+        return self.layer2(x)
+
+
+def test_activation_extractor_single_layer():
+    model = SimpleModel()
+    spec = LayerSpec(path="layer1", reduce="none")
+    extractor = ActivationExtractor([spec])
+
+    x = torch.randn(4, 10)
+
+    with extractor.capture(model):
+        _ = model(x)
+
+    activations = extractor.get_activations()
+    assert "layer1" in activations
+    assert activations["layer1"].shape == (4, 20)
+
+
+def test_activation_extractor_multiple_layers():
+    model = SimpleModel()
+    specs = [
+        LayerSpec(path="layer1", reduce="none"),
+        LayerSpec(path="layer2", reduce="none"),
+    ]
+    extractor = ActivationExtractor(specs)
+
+    x = torch.randn(4, 10)
+
+    with extractor.capture(model):
+        _ = model(x)
+
+    activations = extractor.get_activations()
+    assert len(activations) == 2
+    assert activations["layer1"].shape == (4, 20)
+    assert activations["layer2"].shape == (4, 5)
+
+
+def test_activation_extractor_clears_after_get():
+    model = SimpleModel()
+    spec = LayerSpec(path="layer1", reduce="none")
+    extractor = ActivationExtractor([spec])
+
+    x = torch.randn(4, 10)
+
+    with extractor.capture(model):
+        _ = model(x)
+
+    _ = extractor.get_activations()
+
+    # Second call should return empty (already cleared)
+    activations2 = extractor.get_activations()
+    assert len(activations2) == 0
