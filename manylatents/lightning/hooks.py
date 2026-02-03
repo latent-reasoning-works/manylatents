@@ -1,6 +1,9 @@
 """Activation extraction via PyTorch forward hooks."""
+import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
+
+import torch.nn as nn
 
 VALID_REDUCE = ("mean", "last_token", "cls", "first_token", "all", "none")
 VALID_EXTRACTION_POINTS = ("output", "input", "hidden_states")
@@ -34,3 +37,45 @@ class LayerSpec:
                 f"extraction_point must be one of {VALID_EXTRACTION_POINTS}, "
                 f"got '{self.extraction_point}'"
             )
+
+
+def resolve_layer(model: nn.Module, path: str) -> nn.Module:
+    """Resolve a dot-separated path to a layer in a model.
+
+    Supports:
+    - Dot notation: "layers.0.self_attn"
+    - Index notation: "layers[0].self_attn"
+    - Negative indices: "layers[-1]"
+
+    Args:
+        model: The model to traverse
+        path: Dot-separated path with optional bracket indices
+
+    Returns:
+        The resolved layer
+
+    Raises:
+        AttributeError: If path component doesn't exist
+        IndexError: If index is out of bounds
+    """
+    current: Any = model
+
+    # Split on dots, but preserve bracket notation
+    # "layers[-1].self_attn" -> ["layers[-1]", "self_attn"]
+    parts = re.split(r'\.(?![^\[]*\])', path)
+
+    for part in parts:
+        # Check for index notation: "layers[0]" or "layers[-1]"
+        match = re.match(r'(\w+)\[(-?\d+)\]', part)
+        if match:
+            attr_name, idx = match.groups()
+            current = getattr(current, attr_name)
+            current = current[int(idx)]
+        else:
+            if not hasattr(current, part):
+                raise AttributeError(
+                    f"'{type(current).__name__}' has no attribute '{part}'"
+                )
+            current = getattr(current, part)
+
+    return current
