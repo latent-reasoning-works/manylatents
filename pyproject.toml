@@ -97,6 +97,9 @@ manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylat
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["manylatents"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [[tool.uv.dependency-metadata]]
 name = "heatgeo"
