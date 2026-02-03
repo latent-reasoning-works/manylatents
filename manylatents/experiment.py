@@ -407,9 +407,12 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
 
     if not wandb_disabled and cfg.logger is not None:
         logger.info(f"Initializing wandb logger: {OmegaConf.to_yaml(cfg.logger)}")
-        wandb_run = hydra.utils.instantiate(
-            cfg.logger,
-            config=OmegaConf.to_container(cfg, resolve=True)
+        # Call wandb.init directly to avoid hydra.instantiate config parameter conflict
+        wandb_run = wandb.init(
+            project=cfg.logger.get("project", cfg.project),
+            name=cfg.logger.get("name", cfg.name),
+            config=OmegaConf.to_container(cfg, resolve=True),
+            mode=cfg.logger.get("mode", "online"),
         )
     else:
         logger.info("WandB logging disabled - skipping wandb initialization")
