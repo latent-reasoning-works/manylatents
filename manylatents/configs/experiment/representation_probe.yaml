@@ -1,0 +1,47 @@
+# @package _global_
+#
+# End-to-end experiment for representation probing during HF model training.
+#
+# Usage:
+#   python -m manylatents.main experiment=representation_probe
+#   python -m manylatents.main experiment=representation_probe debug=true
+#   python -m manylatents.main experiment=representation_probe \
+#       algorithms.lightning.config.model_name_or_path=gpt2-medium
+#
+name: representation_probe
+
+defaults:
+  - override /data: wikitext
+  - override /algorithms/lightning: hf_trainer
+  - override /trainer: default
+  - override /callbacks/trainer: probe
+  - _self_
+
+seed: 42
+project: representation_probe
+debug: false
+
+# --- Data Configuration ---
+data:
+  tokenizer_name: ${algorithms.lightning.config.model_name_or_path}
+  max_length: 128
+  batch_size: 8
+  probe_n_samples: 512
+
+# --- Model Configuration ---
+algorithms:
+  lightning:
+    config:
+      model_name_or_path: "gpt2"
+      learning_rate: 2e-5
+      weight_decay: 0.01
+      warmup_steps: 100
+
+# --- Trainer Configuration ---
+trainer:
+  max_epochs: 3
+  precision: bf16-mixed
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 4
+  val_check_interval: 0.5
+  log_every_n_steps: 50

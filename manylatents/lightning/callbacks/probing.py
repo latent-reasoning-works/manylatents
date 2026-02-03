@@ -1,6 +1,6 @@
 """Representation probing callback for Lightning."""
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -9,7 +9,8 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 
 from manylatents.lightning.hooks import ActivationExtractor, LayerSpec
-from manylatents.gauge.diffusion import DiffusionGauge
+from manylatents.callbacks.probing import DiffusionGauge
+from manylatents.lightning.callbacks.wandb_probe import WandbProbeLogger
 
 
 @dataclass
@@ -74,11 +75,20 @@ class RepresentationProbeCallback(Callback):
     4. Stores (step, operator) pairs in a trajectory
 
     Usage:
+        # Option 1: Pass probe_loader directly (for testing)
         callback = RepresentationProbeCallback(
             probe_loader=probe_loader,
-            layer_specs=[LayerSpec("model.layers[-1]")],
+            layer_specs=[LayerSpec("transformer.h[-1]")],
             trigger=ProbeTrigger(every_n_steps=100),
         )
+
+        # Option 2: Let callback fetch from datamodule (for experiments)
+        callback = RepresentationProbeCallback(
+            layer_specs=[LayerSpec("transformer.h[-1]")],
+            trigger=ProbeTrigger(every_n_steps=100),
+        )
+        # Datamodule must have probe_dataloader() method
+
         trainer = Trainer(callbacks=[callback])
         trainer.fit(model)
 
@@ -87,19 +97,36 @@ class RepresentationProbeCallback(Callback):
 
     def __init__(
         self,
-        probe_loader: DataLoader,
         layer_specs: List[LayerSpec],
         trigger: ProbeTrigger,
+        probe_loader: Optional[DataLoader] = None,
         gauge: Optional[DiffusionGauge] = None,
+        log_to_wandb: bool = False,
+        wandb_logger: Optional[WandbProbeLogger] = None,
     ):
         super().__init__()
         self.probe_loader = probe_loader
         self.layer_specs = layer_specs
         self.trigger = trigger
         self.gauge = gauge or DiffusionGauge()
+        self.log_to_wandb = log_to_wandb
+        self.wandb_logger = wandb_logger or WandbProbeLogger() if log_to_wandb else None
 
         self.extractor = ActivationExtractor(layer_specs)
         self._trajectory: List[TrajectoryPoint] = []
+
+    def on_fit_start(self, trainer: Trainer, pl_module: LightningModule):
+        """Fetch probe_loader from datamodule if not provided."""
+        if self.probe_loader is None:
+            dm = trainer.datamodule
+            if dm is not None and hasattr(dm, 'probe_dataloader'):
+                self.probe_loader = dm.probe_dataloader()
+            else:
+                raise ValueError(
+                    "probe_loader not provided and datamodule has no probe_dataloader() method. "
+                    "Either pass probe_loader to RepresentationProbeCallback or use a datamodule "
+                    "with probe_dataloader() (e.g., TextDataModule)."
+                )
 
     def _extract_and_gauge(
         self,
@@ -167,6 +194,13 @@ class RepresentationProbeCallback(Callback):
             diffusion_operators=diff_ops,
         )
         self._trajectory.append(point)
+
+        # Log to wandb if enabled
+        if self.log_to_wandb and self.wandb_logger is not None:
+            self.wandb_logger.log_trajectory(
+                self.get_trajectory(),
+                step=trainer.global_step,
+            )
 
     def on_train_batch_end(
         self,

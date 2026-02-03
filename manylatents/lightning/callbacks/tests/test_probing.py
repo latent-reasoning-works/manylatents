@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 import torch
 import torch.nn as nn
+from unittest.mock import patch, MagicMock
 from torch.utils.data import DataLoader, TensorDataset
 from lightning import LightningModule, Trainer
 from manylatents.lightning.callbacks.probing import (
@@ -82,9 +83,9 @@ def test_representation_probe_callback_captures():
     probe_loader = make_probe_loader()
 
     callback = RepresentationProbeCallback(
-        probe_loader=probe_loader,
         layer_specs=[LayerSpec(path="0", reduce="none")],  # Path relative to .network
         trigger=ProbeTrigger(every_n_steps=1),
+        probe_loader=probe_loader,
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -115,12 +116,12 @@ def test_representation_probe_callback_multi_layer():
     probe_loader = make_probe_loader()
 
     callback = RepresentationProbeCallback(
-        probe_loader=probe_loader,
         layer_specs=[
             LayerSpec(path="0", reduce="none"),  # First linear
             LayerSpec(path="2", reduce="none"),  # Second linear
         ],
         trigger=ProbeTrigger(every_n_steps=2),
+        probe_loader=probe_loader,
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -150,9 +151,9 @@ def test_representation_probe_callback_epoch_trigger():
     probe_loader = make_probe_loader()
 
     callback = RepresentationProbeCallback(
-        probe_loader=probe_loader,
         layer_specs=[LayerSpec(path="0", reduce="none")],
         trigger=ProbeTrigger(every_n_epochs=1),
+        probe_loader=probe_loader,
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -171,3 +172,33 @@ def test_representation_probe_callback_epoch_trigger():
     epochs = [p.epoch for p in trajectory]
     assert 0 in epochs
     assert 1 in epochs
+
+
+def test_representation_probe_callback_with_wandb():
+    """Should log to wandb when enabled."""
+    model = TinyModel()
+    probe_loader = make_probe_loader()
+
+    callback = RepresentationProbeCallback(
+        layer_specs=[LayerSpec(path="0", reduce="none")],
+        trigger=ProbeTrigger(every_n_steps=2),
+        probe_loader=probe_loader,
+        log_to_wandb=True,
+    )
+
+    train_loader = make_probe_loader(n_samples=40)
+
+    with patch("wandb.run", MagicMock()), \
+         patch("wandb.log") as mock_log:
+
+        trainer = Trainer(
+            max_epochs=1,
+            callbacks=[callback],
+            enable_progress_bar=False,
+            enable_model_summary=False,
+            logger=False,
+        )
+        trainer.fit(model, train_loader)
+
+        # Should have logged at least once
+        assert mock_log.called

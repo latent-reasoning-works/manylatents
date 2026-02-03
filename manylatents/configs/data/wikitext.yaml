@@ -1,0 +1,15 @@
+# manylatents/configs/data/wikitext.yaml
+# Text data for HuggingFace language model training
+defaults:
+  - default
+
+_target_: manylatents.data.text.TextDataModule
+
+dataset_name: "wikitext"
+dataset_config: "wikitext-2-raw-v1"
+tokenizer_name: "gpt2"
+max_length: 128
+batch_size: 8
+num_workers: 0
+probe_n_samples: 512
+seed: ${seed}
