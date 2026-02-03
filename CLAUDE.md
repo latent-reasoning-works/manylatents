@@ -21,7 +21,7 @@ pytest manylatents/tests/algorithms/dr_compliance_test.py # Run compliance tests
 ```bash
 python -m manylatents.main experiment=hgdp_pca                                    # Basic experiment
 python -m manylatents.main experiment=hgdp_pca algorithm.dimensionality_reduction.n_components=10  # Override hyperparameters
-python -m manylatents.main experiment=multiple_algorithms                        # Sequential pipeline experiment
+python -m manylatents.main experiment=representation_probe                       # HF model training with representation probing
 ```
 
 ### Code Quality
@@ -41,29 +41,21 @@ The codebase is built around **PyTorch Lightning**, **Hydra**, and **uv** for de
 - **Algorithms**: Traditional DR methods (PCA, t-SNE, PHATE, UMAP) and neural network modules all inherit from this base
 - **Neural Networks**: Located in `manylatents/algorithms/networks/` - autoencoder and other architectures that can be used standalone or chained with DR methods
 
-#### 2. Unified Experiment Pipeline (`manylatents/main.py`)
-The main entry point supports two execution modes and two types of algorithms:
-
-**Execution Modes:**
-- **Single Algorithm Mode**: Run one algorithm (backward compatible)
-- **Sequential Pipeline Mode**: Chain multiple algorithms in sequence
+#### 2. Experiment Entry Point (`manylatents/main.py`)
+The main entry point supports two types of algorithms:
 
 **Algorithm Types:**
 - **LatentModule instances**: Traditional DR algorithms that implement fit/transform interface
-- **LightningModule instances**: Neural network models that can be trained with PyTorch Lightning
+- **LightningModule instances**: Neural network models (autoencoders, HF models) trained with PyTorch Lightning
 
-Key pipeline stages:
+Key experiment stages:
 1. Data instantiation and loading
-2. Algorithm instantiation (can be multiple algorithms in sequence)
+2. Algorithm instantiation
 3. Latent embedding computation (fit/transform for traditional methods, training for neural networks)
 4. Evaluation with configurable metrics
-5. Callback processing for visualization and logging
+5. Callback processing for visualization, probing, and logging
 
-**Sequential Pipeline Features:**
-- Algorithms run in order, with each algorithm receiving the output of the previous
-- Supports mixed algorithm types (e.g., PCA → Autoencoder → final embedding)
-- Per-step hyperparameter overrides via YAML configuration
-- Full interpolation support for dynamic configuration (e.g., `${data}` references)
+**Note:** Sequential pipeline mode (chaining algorithms) is deprecated from CLI but available through the Python API via `manylatents.api.run()`.
 
 #### 3. Configuration System (`manylatents/configs/`)
 Highly modular Hydra-based configuration:
@@ -72,17 +64,6 @@ Highly modular Hydra-based configuration:
 - **Data**: Dataset-specific configurations
 - **Metrics**: Configurable evaluation metrics for embeddings and models
 - **Sweeps**: Hyperparameter sweep configurations for large-scale experiments
-
-**Pipeline Configuration Format:**
-```yaml
-# Sequential pipeline example
-pipeline:
-  - latent/pca                              # Simple algorithm reference
-  - lightning/ae_reconstruction:            # Algorithm with parameter overrides
-      network:
-        latent_dim: 2
-        input_dim: 2
-```
 
 #### 4. Data Management (`manylatents/data/`)
 - Supports various dataset types: genomic (HGDP, AOU, UKBB), synthetic (Swiss roll, saddle surface), and single-cell data
@@ -96,7 +77,8 @@ Comprehensive metric computation using single dispatch pattern:
 - **Model metrics**: For neural network evaluation
 
 #### 6. Callback System
-- **Lightning Callbacks**: Standard PyTorch Lightning callbacks for training
+- **Lightning Callbacks**: Standard PyTorch Lightning callbacks for training (see `manylatents/lightning/callbacks/`)
+  - `RepresentationProbeCallback`: Extracts activations from model layers at configurable triggers and computes diffusion operators for trajectory analysis
 - **Embedding Callbacks**: Custom callbacks for post-processing embeddings (plotting, saving, logging to W&B)
 
 ### Adding New Components
@@ -114,11 +96,10 @@ Comprehensive metric computation using single dispatch pattern:
 4. Test with the unified pipeline through `manylatents/main.py`
 
 ### Important Notes
-- **Sequential Pipeline Support**: The system supports chaining algorithms (e.g., PCA → Autoencoder → final embedding)
-- **Algorithm Resolution**: Uses `manylatents/utils/pipeline.py` to resolve pipeline configurations and handle interpolations
 - **Hydra Integration**: All algorithms are instantiated via Hydra, enabling easy configuration and hyperparameter sweeps
 - **Evaluation System**: The `evaluate()` function uses single dispatch to handle both embedding dictionaries and LightningModule instances
 - **Output Management**: Results are saved in `outputs/<date>/<time>/` with full experiment logging and W&B integration
+- **Pipeline Mode**: Sequential pipelines (chaining algorithms) are available through `manylatents.api.run()` but deprecated from CLI
 
 ### API Metrics Configuration
 
@@ -186,7 +167,7 @@ result = run(
 **Entrypoints:**
 - `manylatents/main.py` - Hydra CLI with smart routing (single vs pipeline)
 - `manylatents/api.py` - Programmatic Python interface for manyAgents
-- `manylatents/experiment.py` - Core execution (`run_algorithm`, `run_pipeline`)
+- `manylatents/experiment.py` - Core execution (`run_algorithm`)
 
 **Hydra Partial Instantiation:**
 All metrics use `_partial_: True` to create `functools.partial` objects. This defers parameter binding until call-time:
@@ -320,27 +301,3 @@ python -m manylatents.main experiment=single_algorithm logger=none
 python -m manylatents.main experiment=single_algorithm logger=wandb
 ```
 
-### Pipeline Examples
-
-**Basic Sequential Pipeline:**
-```yaml
-# experiment/my_pipeline.yaml
-pipeline:
-  - latent/pca
-  - latent/umap
-```
-
-**Complex Mixed Pipeline:**
-```yaml
-# experiment/complex_pipeline.yaml  
-pipeline:
-  - latent/pca:
-      n_components: 50
-  - lightning/ae_reconstruction:
-      network:
-        input_dim: 50
-        latent_dim: 2
-        hidden_dims: [128, 64]
-      optimizer:
-        lr: 0.01
-```

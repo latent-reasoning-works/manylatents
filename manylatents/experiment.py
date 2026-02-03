@@ -433,13 +433,20 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
         raise ValueError("No algorithm specified in configuration")
 
     # --- Callbacks ---
-    trainer_cb_cfg   = cfg.trainer.get("callbacks")
+    # Merge callbacks from both cfg.trainer.callbacks and cfg.callbacks.trainer
+    trainer_cb_cfg = dict(cfg.trainer.get("callbacks") or {})
+    if hasattr(cfg, "callbacks") and cfg.callbacks is not None:
+        # Also check cfg.callbacks.trainer for Lightning callbacks (e.g., probe callback)
+        extra_trainer_cbs = cfg.callbacks.get("trainer") or {}
+        trainer_cb_cfg.update(extra_trainer_cbs)
     embedding_cb_cfg = cfg.callbacks.get("embedding") if hasattr(cfg, "callbacks") else None
 
     lightning_cbs, embedding_cbs = instantiate_callbacks(
         trainer_cb_cfg,
         embedding_cb_cfg
     )
+    if lightning_cbs:
+        logger.info(f"Instantiated {len(lightning_cbs)} Lightning callbacks: {[type(cb).__name__ for cb in lightning_cbs]}")
 
     if not embedding_cbs:
         logger.info("No embedding callbacks configured; skip embedding‐level hooks.")

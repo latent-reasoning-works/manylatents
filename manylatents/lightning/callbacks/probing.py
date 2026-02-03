@@ -1,4 +1,5 @@
 """Representation probing callback for Lightning."""
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
@@ -11,6 +12,8 @@ from torch.utils.data import DataLoader
 from manylatents.lightning.hooks import ActivationExtractor, LayerSpec
 from manylatents.callbacks.probing import DiffusionGauge
 from manylatents.lightning.callbacks.wandb_probe import WandbProbeLogger
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -117,10 +120,12 @@ class RepresentationProbeCallback(Callback):
 
     def on_fit_start(self, trainer: Trainer, pl_module: LightningModule):
         """Fetch probe_loader from datamodule if not provided."""
+        logger.info("RepresentationProbeCallback.on_fit_start called")
         if self.probe_loader is None:
             dm = trainer.datamodule
             if dm is not None and hasattr(dm, 'probe_dataloader'):
                 self.probe_loader = dm.probe_dataloader()
+                logger.info(f"Probe loader fetched from datamodule: {len(self.probe_loader)} batches")
             else:
                 raise ValueError(
                     "probe_loader not provided and datamodule has no probe_dataloader() method. "
@@ -177,15 +182,18 @@ class RepresentationProbeCallback(Callback):
         validation_end: bool = False,
     ):
         """Check trigger and perform audit if needed."""
-        if not self.trigger.should_fire(
+        should_fire = self.trigger.should_fire(
             step=trainer.global_step,
             epoch=trainer.current_epoch,
             epoch_end=epoch_end,
             checkpoint=checkpoint,
             validation_end=validation_end,
-        ):
+        )
+        logger.debug(f"_maybe_probe: step={trainer.global_step}, should_fire={should_fire}")
+        if not should_fire:
             return
 
+        logger.info(f"Probe triggered at step {trainer.global_step}")
         diff_ops = self._extract_and_gauge(trainer, pl_module)
 
         point = TrajectoryPoint(
