@@ -6,5 +6,5 @@ logger:
   _target_: wandb.init
   project: ${project}
   name: ${name}
-  config: null  # Will be set programmatically in experiment.py
   mode: online
+  # config is set programmatically in experiment.py
