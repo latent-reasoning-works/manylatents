@@ -1,12 +1,72 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Protocol, Union, runtime_checkable
 
 import numpy as np
 from torch import Tensor
 from manylatents.callbacks.base import BaseCallback
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ColormapInfo:
+    """
+    Structured colormap information for visualization.
+
+    This dataclass provides a standardized way for datasets and metrics to communicate
+    their preferred colormap and label information to visualization callbacks.
+
+    Attributes:
+        cmap: The colormap to use. Can be:
+              - A matplotlib colormap name (str), e.g., "viridis"
+              - A dict mapping label values to color strings, e.g., {1: "#ff0000", 2: "#00ff00"}
+              - A matplotlib ListedColormap object
+              - Special values: "categorical" (auto-generate discrete colors)
+        label_names: Optional mapping from label values to display names.
+                    Used for legend generation with categorical data.
+                    Example: {0: "Class A", 1: "Class B"}
+                    If None and label_format is set, labels are generated dynamically.
+        label_format: Optional format string for dynamic label generation.
+                     Example: "Dim = {}" generates "Dim = 1", "Dim = 2", etc.
+                     Used when label_names is None and is_categorical is True.
+        is_categorical: Whether the colormap represents categorical (discrete)
+                       or continuous data. Affects legend vs colorbar rendering.
+    """
+    cmap: Union[str, Dict[Union[int, str], str], Any]  # Any for ListedColormap
+    label_names: Optional[Dict[Union[int, str], str]] = None
+    label_format: Optional[str] = None
+    is_categorical: bool = True
+
+
+@runtime_checkable
+class ColormapProvider(Protocol):
+    """
+    Protocol for datasets that can provide colormap information.
+
+    Datasets implementing this protocol can specify their preferred colormap
+    and label names, allowing PlotEmbeddings to render them appropriately
+    without requiring isinstance checks for specific dataset types.
+
+    Example:
+        class MyDataset(ColormapProvider):
+            def get_colormap_info(self) -> ColormapInfo:
+                return ColormapInfo(
+                    cmap={"A": "#ff0000", "B": "#00ff00"},
+                    label_names={0: "Category A", 1: "Category B"},
+                    is_categorical=True
+                )
+    """
+
+    def get_colormap_info(self) -> ColormapInfo:
+        """
+        Return colormap information for visualization.
+
+        Returns:
+            ColormapInfo with cmap, optional label_names, and is_categorical flag.
+        """
+        ...
 
 EmbeddingOutputs = dict[str, Any]
 """

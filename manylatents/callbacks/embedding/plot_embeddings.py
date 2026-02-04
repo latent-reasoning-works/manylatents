@@ -1,21 +1,40 @@
 import logging
 import os
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-import scprep
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import ListedColormap, Normalize
+from matplotlib.patches import Patch
 
 import wandb
-from manylatents.callbacks.embedding.base import EmbeddingCallback
-from manylatents.data.synthetic_dataset import DLAtree
-from manylatents.utils.mappings import cmap_dla_tree
+from manylatents.callbacks.embedding.base import (
+    EmbeddingCallback,
+    ColormapInfo,
+    ColormapProvider,
+)
+from manylatents.utils.plotting import resolve_colormap, merge_colormap_info
 
 logger = logging.getLogger(__name__)
 
+
 class PlotEmbeddings(EmbeddingCallback):
+    """
+    Callback for plotting 2D embeddings with customizable colormaps and legends.
+
+    This callback creates scatter plots of embeddings, supporting:
+    - Categorical coloring with dict-based or ListedColormap colormaps
+    - Continuous coloring with colorbars
+    - Dataset-provided colormaps via the ColormapProvider protocol
+    - WandB integration for logging plots
+
+    The callback can be extended by:
+    - Overriding `_get_colormap()` for custom colormap logic
+    - Having datasets implement `ColormapProvider.get_colormap_info()`
+    """
+
     def __init__(
         self,
         save_dir: str = "outputs",
@@ -23,32 +42,43 @@ class PlotEmbeddings(EmbeddingCallback):
         figsize: tuple = (8, 6),
         label_col: str = "Population",
         legend: bool = False,
-        color_by_score: str = None,  # e.g. "tangent_space" or any metric key
+        color_by_score: str = None,
         x_label: str = "Dim 1",
         y_label: str = "Dim 2",
         title: str = "Dimensionality Reduction Plot",
-        apply_norm: bool = False,    ## EXPERIMENTAL, NOT INCONSISTENT IN TSA CASE
+        apply_norm: bool = False,
         alpha: float = 0.8,
-        log_key: str = "embedding_plot",  # Key for WandB logging, can be customized for step-aware logging
-        enable_wandb_upload: bool = True  # Whether to upload to WandB (if available)
+        log_key: str = "embedding_plot",
+        enable_wandb_upload: bool = True,
+        # User overrides for colormap (take precedence over metric/dataset)
+        cmap_override: str = None,
+        is_categorical_override: bool = None,
+        label_format_override: str = None,
     ):
-        super().__init__()
         """
+        Initialize the PlotEmbeddings callback.
+
         Args:
-            save_dir (str): Directory where the plot will be saved.
-            experiment_name (str): Name of the experiment for the filename.
-            figsize (tuple): Figure size (width, height).
-            label_col (str): Column name in metadata to use for labels (fallback).
-            legend (bool): Whether to include a legend.
-            color_by_score (str): Optional key in embeddings to use for continuous score-based coloring.
-            x_label (str): Label for the x-axis.
-            y_label (str): Label for the y-axis.
-            title (str): Title for the plot.
-            apply_norm (bool): Whether to apply dynamic normalization to the color array.
-            alpha (float): Transparency of the points (0 = completely transparent, 1 = opaque).
-            log_key (str): Key for WandB logging. Can be customized for step-aware logging (e.g., "step_0/PCA/plot").
-            enable_wandb_upload (bool): Whether to upload to WandB when available. Set to False for offline mode.
+            save_dir: Directory where the plot will be saved.
+            experiment_name: Name of the experiment for the filename.
+            figsize: Figure size (width, height).
+            label_col: Column name in metadata to use for labels (fallback).
+            legend: Whether to include a legend for categorical data.
+            color_by_score: Optional key in scores to use for coloring.
+                           Metric can provide visualization hints via __viz suffix.
+            x_label: Label for the x-axis.
+            y_label: Label for the y-axis.
+            title: Title for the plot.
+            apply_norm: Whether to apply dynamic normalization to continuous color arrays.
+            alpha: Transparency of the points (0 = transparent, 1 = opaque).
+            log_key: Key for WandB logging. Can be customized for step-aware logging.
+            enable_wandb_upload: Whether to upload to WandB when available.
+            cmap_override: Override colormap (e.g., "viridis", "plasma"). Takes precedence
+                          over metric-declared and dataset-declared colormaps.
+            is_categorical_override: Override categorical/continuous treatment.
+            label_format_override: Override label format string (e.g., "Dim = {}").
         """
+        super().__init__()
         self.save_dir = save_dir
         self.experiment_name = experiment_name
         self.figsize = figsize
@@ -62,135 +92,252 @@ class PlotEmbeddings(EmbeddingCallback):
         self.alpha = alpha
         self.log_key = log_key
         self.enable_wandb_upload = enable_wandb_upload
+        # User overrides
+        self.cmap_override = cmap_override
+        self.is_categorical_override = is_categorical_override
+        self.label_format_override = label_format_override
 
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(
-            f"PlotEmbeddings initialized with directory: {self.save_dir} and experiment name: {self.experiment_name}"
+            f"PlotEmbeddings initialized with directory: {self.save_dir} "
+            f"and experiment name: {self.experiment_name}"
         )
         if not enable_wandb_upload:
             logger.info("WandB upload disabled - running in offline mode")
 
-    def _get_colormap(self, dataset: any) -> any:
-        """Get colormap for plotting. Override this method in subclasses for dataset-specific colormaps."""
-        if self.color_by_score == "tangent_space":
-            # Define discrete colors for the two categories (adjust colors as needed)
-            return ListedColormap(["#1f77b4", "#ff7f0e"])
-        if self.color_by_score is not None:
-            return "viridis"
-        if isinstance(dataset, DLAtree):
-            # Check if we have more branches than colors in our palette
-            if hasattr(dataset, 'n_branch') and dataset.n_branch > 10:
-                logger.warning(f"DLA tree has {dataset.n_branch} branches but colormap only supports 10. Falling back to viridis.")
-                cmap = "viridis"
+    def _get_colormap(
+        self, dataset: Any, embeddings: Optional[dict] = None
+    ) -> ColormapInfo:
+        """
+        Get colormap information for plotting.
+
+        Resolution order (highest to lowest priority):
+        1. User overrides (cmap_override, is_categorical_override, label_format_override)
+        2. Metric-declared via scores["<color_by_score>__viz"]
+        3. Dataset-provided via ColormapProvider protocol
+        4. Inferred defaults (viridis)
+
+        This method can be overridden in subclasses for custom colormap logic,
+        particularly useful for downstream packages like manylatents-omics.
+
+        Args:
+            dataset: The dataset object, optionally implementing ColormapProvider.
+            embeddings: The embeddings dict, used to look up metric viz metadata.
+
+        Returns:
+            ColormapInfo containing the colormap and optional label names.
+        """
+        base_info = None
+
+        # Check for metric-declared viz metadata in scores
+        if self.color_by_score is not None and embeddings is not None:
+            scores = embeddings.get("scores", {})
+            viz_key = f"{self.color_by_score}__viz"
+            if viz_key in scores and isinstance(scores[viz_key], ColormapInfo):
+                base_info = scores[viz_key]
+                logger.debug(f"Using metric-declared colormap from {viz_key}")
+
+        # Fall back to dataset-provided colormap
+        if base_info is None and isinstance(dataset, ColormapProvider):
+            base_info = dataset.get_colormap_info()
+            logger.debug("Using dataset-provided colormap via ColormapProvider")
+
+        # Fall back to defaults based on whether we're coloring by score
+        if base_info is None:
+            if self.color_by_score is not None:
+                # Default to continuous for score coloring (metric can override via __viz)
+                base_info = ColormapInfo(
+                    cmap="viridis", label_names=None, is_categorical=False
+                )
             else:
-                cmap = cmap_dla_tree
-        else:
-            cmap = "viridis"
-        return cmap
+                # Default to categorical for label coloring
+                base_info = ColormapInfo(
+                    cmap="viridis", label_names=None, is_categorical=True
+                )
+
+        # Apply user overrides
+        return merge_colormap_info(
+            base=base_info,
+            cmap_override=self.cmap_override,
+            is_categorical_override=self.is_categorical_override,
+            label_format_override=self.label_format_override,
+        )
 
     def _get_embeddings(self, embeddings: dict) -> np.ndarray:
-        embeddings = embeddings["embeddings"]
-        if hasattr(embeddings, "numpy"):
-            emb_np = embeddings.numpy()
-        else:
-            emb_np = embeddings
-        embeddings_to_plot = emb_np[:, :2] if emb_np.shape[1] > 2 else emb_np
-        return embeddings_to_plot[1:]
+        """
+        Extract and prepare embeddings for 2D plotting.
 
-    def _get_color_array(self, dataset: any, embeddings: dict) -> np.ndarray:
+        Args:
+            embeddings: Dictionary containing 'embeddings' key.
+
+        Returns:
+            2D numpy array of shape (n_samples, 2) for plotting.
+        """
+        emb = embeddings["embeddings"]
+
+        # Convert torch tensors to numpy
+        if hasattr(emb, "numpy"):
+            emb_np = emb.numpy()
+        elif hasattr(emb, "cpu"):  # Handle GPU tensors
+            emb_np = emb.cpu().numpy()
+        else:
+            emb_np = np.asarray(emb)
+
+        # Take first 2 dimensions for plotting
+        embeddings_to_plot = emb_np[:, :2] if emb_np.shape[1] > 2 else emb_np
+
+        return embeddings_to_plot
+
+    def _get_color_array(self, dataset: Any, embeddings: dict) -> Optional[np.ndarray]:
+        """
+        Extract color array for scatter plot coloring.
+
+        Resolution order:
+        1. If color_by_score is set, look in embeddings['scores'][key] or embeddings[key].
+        2. Use embeddings['label'] if available.
+        3. Fall back to dataset.get_labels().
+
+        Args:
+            dataset: Dataset object with optional get_labels() method.
+            embeddings: Dictionary potentially containing 'label' or 'scores'.
+
+        Returns:
+            Numpy array of colors/labels, or None if unavailable.
+        """
         color_array = None
+
         if self.color_by_score is not None:
+            # Try to get from scores dict first
             scores = embeddings.get("scores")
             if scores is not None and isinstance(scores, dict):
                 color_array = scores.get(self.color_by_score)
-            else:
+
+            # Fall back to direct key
+            if color_array is None:
                 color_array = embeddings.get(self.color_by_score)
+
             if color_array is None:
                 logger.warning(
-                    f"Coloring key '{self.color_by_score}' not found in embeddings; falling back to label-based coloring."
+                    f"Coloring key '{self.color_by_score}' not found; "
+                    "falling back to label-based coloring."
                 )
-                if "label" in embeddings and embeddings["label"] is not None:
-                    color_array = embeddings["label"]
-                else:
-                    color_array = dataset.get_labels(self.label_col)
             else:
                 logger.info(f"Using '{self.color_by_score}' for coloring.")
-        else:
+
+        # Label-based coloring fallback
+        if color_array is None:
             if "label" in embeddings and embeddings["label"] is not None:
                 color_array = embeddings["label"]
-            else:
-                color_array = dataset.get_labels(self.label_col)
+            elif hasattr(dataset, "get_labels"):
+                # Note: get_labels() doesn't take label_col argument in most implementations
+                try:
+                    color_array = dataset.get_labels(self.label_col)
+                except TypeError:
+                    # Fall back to no-argument version
+                    color_array = dataset.get_labels()
+
+        # Convert to numpy array
         if color_array is not None:
             if hasattr(color_array, "numpy"):
                 color_array = color_array.numpy()
+            elif hasattr(color_array, "cpu"):
+                color_array = color_array.cpu().numpy()
             color_array = np.asarray(color_array)
-            return color_array[1:]
+            return color_array
+
         return None
-    
-    def _plot_embeddings(self, dataset: any, embeddings_to_plot: np.ndarray, color_array: np.ndarray) -> str:
-        cmap = self._get_colormap(dataset)
-        fig_size = (self.figsize[0], self.figsize[1])
-        
-        norm = None
-        # For continuous scores, you may want to normalize. For tangent_space (categorical), skip normalization.
-        if self.color_by_score is not None and self.color_by_score != "tangent_space" and color_array is not None and self.apply_norm:
-            score_min = float(color_array.min())
-            score_max = float(color_array.max())
-            norm = mcolors.Normalize(vmin=score_min, vmax=score_max)
-        ax = scprep.plot.scatter2d(
-            embeddings_to_plot,
-            s=8,
-            figsize=fig_size,
-            cmap=cmap,
-            c=color_array,
-            ticks=False,
-            legend=self.legend,
-            xlabel=' ',
-            ylabel=' ',
-            legend_loc='upper center',
-            legend_anchor=(1.0, -0.02),
-            legend_ncol=8,
-            label_prefix=None,
-            title='',
-            fontsize=36,
-            alpha=self.alpha
+
+    def _apply_dict_colormap(
+        self, labels: np.ndarray, cmap_dict: Dict[Union[int, str], str]
+    ) -> List[str]:
+        """
+        Apply a dict-based colormap to label array.
+
+        Args:
+            labels: Array of label values (int or str).
+            cmap_dict: Mapping from label values to color strings.
+
+        Returns:
+            List of color strings for each point.
+        """
+        default_color = "#808080"  # Gray for unknown labels
+        return [cmap_dict.get(label, default_color) for label in labels]
+
+    def _add_categorical_legend(self, ax: plt.Axes, cmap_info: ColormapInfo) -> None:
+        """
+        Add categorical legend using ColormapInfo label_names.
+
+        Args:
+            ax: Matplotlib axes object.
+            cmap_info: ColormapInfo with label_names mapping.
+        """
+        if cmap_info.label_names is None:
+            return
+
+        patches = []
+        for idx, name in sorted(cmap_info.label_names.items()):
+            if isinstance(cmap_info.cmap, dict):
+                color = cmap_info.cmap.get(idx, "#808080")
+            elif isinstance(cmap_info.cmap, ListedColormap):
+                colors = cmap_info.cmap.colors
+                color = colors[idx % len(colors)]
+            else:
+                # String colormap name - get color from matplotlib
+                cmap = plt.colormaps.get_cmap(cmap_info.cmap)
+                max_idx = max(cmap_info.label_names.keys())
+                color = cmap(idx / max_idx) if max_idx > 0 else cmap(0)
+            patches.append(Patch(facecolor=color, label=name))
+
+        ax.legend(
+            handles=patches,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.05),
+            ncol=min(8, len(patches)),
+            fontsize=8,
         )
-        
-        if norm is not None and ax.collections:
-            mappable = ax.collections[0]
-            mappable.set_norm(norm)
-            mappable.set_array(np.asarray(color_array))
-        
-        plt.xlabel(self.x_label, fontsize=12)
-        plt.ylabel(self.y_label, fontsize=12)
-        plt.title(self.title, fontsize=16)
-        
-        # For tangent_space, create a categorical legend
-        if self.color_by_score == "tangent_space":
-            from matplotlib.patches import Patch
-            # Adjust the colors to match those returned by _get_colormap (ListedColormap)
-            legend_elements = [
-                Patch(facecolor="#1f77b4", label="Dim ~ 1"),
-                Patch(facecolor="#ff7f0e", label="Dim ~ 2")
-            ]
-            plt.legend(handles=legend_elements, loc='upper right')
-        elif self.color_by_score is not None and ax.collections:
-            # For continuous scores, create a colorbar
-            mappable = ax.collections[0]
-            cbar = plt.colorbar(mappable)
-            cbar.set_label(f"{self.color_by_score} Score")
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
-        self.save_path = os.path.join(self.save_dir, filename)
 
-        os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
-        plt.savefig(self.save_path, bbox_inches="tight")
-        plt.close()
+    def _add_categorical_legend_from_data(
+        self,
+        ax: plt.Axes,
+        labels: np.ndarray,
+        cmap_info: ColormapInfo,
+    ) -> None:
+        """
+        Add categorical legend when no label_names provided, using unique labels from data.
 
-        logger.info(f"Saved 2D embeddings plot to {self.save_path}")
+        Args:
+            ax: Matplotlib axes object.
+            labels: Array of label values.
+            cmap_info: ColormapInfo containing the colormap.
+        """
+        unique_labels = sorted(set(labels))
 
-        # Only upload to WandB if enabled and WandB run is active
+        patches = []
+        for lbl in unique_labels:
+            if isinstance(cmap_info.cmap, dict):
+                color = cmap_info.cmap.get(lbl, "#808080")
+            elif isinstance(cmap_info.cmap, ListedColormap):
+                colors = cmap_info.cmap.colors
+                # For numeric labels, use as index; for others, use hash
+                idx = lbl if isinstance(lbl, (int, np.integer)) else hash(lbl)
+                color = colors[int(idx) % len(colors)]
+            else:
+                cmap = plt.colormaps.get_cmap(cmap_info.cmap)
+                n_unique = len(unique_labels)
+                idx = unique_labels.index(lbl)
+                color = cmap(idx / max(1, n_unique - 1))
+            patches.append(Patch(facecolor=color, label=str(lbl)))
+
+        ax.legend(
+            handles=patches,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.05),
+            ncol=min(8, len(patches)),
+            fontsize=8,
+        )
+
+    def _upload_to_wandb(self) -> None:
+        """Upload plot to WandB if enabled and run is active."""
         if self.enable_wandb_upload and wandb.run is not None:
             wandb.log({self.log_key: wandb.Image(self.save_path)})
             logger.info(f"Uploaded plot to WandB with key: {self.log_key}")
@@ -199,11 +346,147 @@ class PlotEmbeddings(EmbeddingCallback):
         else:
             logger.info("WandB upload skipped (no active run)")
 
+    def _plot_embeddings(
+        self,
+        dataset: Any,
+        embeddings_to_plot: np.ndarray,
+        color_array: Optional[np.ndarray],
+        embeddings: Optional[dict] = None,
+    ) -> str:
+        """
+        Create and save the embedding scatter plot using matplotlib.
+
+        Args:
+            dataset: Dataset for colormap information.
+            embeddings_to_plot: 2D array of shape (n_samples, 2).
+            color_array: Array of colors/labels for each point.
+            embeddings: Full embeddings dict for metric viz metadata lookup.
+
+        Returns:
+            Path to the saved plot file.
+        """
+        cmap_info = self._get_colormap(dataset, embeddings)
+
+        # Resolve semantic hints to concrete colormap/labels using actual data
+        cmap, label_names, is_categorical = resolve_colormap(cmap_info, color_array)
+
+        # Update cmap_info with resolved values for legend generation
+        cmap_info = ColormapInfo(
+            cmap=cmap,
+            label_names=label_names,
+            label_format=cmap_info.label_format,
+            is_categorical=is_categorical,
+        )
+
+        fig, ax = plt.subplots(figsize=self.figsize)
+
+        # Handle different colormap types
+        if cmap_info.is_categorical and isinstance(cmap_info.cmap, dict):
+            # Dict-based colormap: map labels to colors directly
+            if color_array is not None:
+                colors = self._apply_dict_colormap(color_array, cmap_info.cmap)
+                scatter = ax.scatter(
+                    embeddings_to_plot[:, 0],
+                    embeddings_to_plot[:, 1],
+                    c=colors,
+                    s=8,
+                    alpha=self.alpha,
+                )
+            else:
+                scatter = ax.scatter(
+                    embeddings_to_plot[:, 0],
+                    embeddings_to_plot[:, 1],
+                    s=8,
+                    alpha=self.alpha,
+                )
+
+            # Create categorical legend
+            if self.legend:
+                if cmap_info.label_names:
+                    self._add_categorical_legend(ax, cmap_info)
+                elif color_array is not None:
+                    self._add_categorical_legend_from_data(ax, color_array, cmap_info)
+
+        elif isinstance(cmap_info.cmap, ListedColormap):
+            # ListedColormap for discrete categories
+            scatter = ax.scatter(
+                embeddings_to_plot[:, 0],
+                embeddings_to_plot[:, 1],
+                c=color_array,
+                cmap=cmap_info.cmap,
+                s=8,
+                alpha=self.alpha,
+            )
+
+            if self.legend and cmap_info.label_names:
+                self._add_categorical_legend(ax, cmap_info)
+
+        else:
+            # String colormap name (continuous or categorical fallback)
+            norm = None
+            if (
+                not cmap_info.is_categorical
+                and self.apply_norm
+                and color_array is not None
+            ):
+                norm = Normalize(vmin=color_array.min(), vmax=color_array.max())
+
+            scatter = ax.scatter(
+                embeddings_to_plot[:, 0],
+                embeddings_to_plot[:, 1],
+                c=color_array,
+                cmap=cmap_info.cmap,
+                norm=norm,
+                s=8,
+                alpha=self.alpha,
+            )
+
+            # Add colorbar for continuous data
+            if not cmap_info.is_categorical and self.color_by_score:
+                cbar = plt.colorbar(scatter, ax=ax)
+                cbar.set_label(f"{self.color_by_score} Score")
+            elif self.legend and cmap_info.is_categorical and color_array is not None:
+                # Categorical with string colormap
+                self._add_categorical_legend_from_data(ax, color_array, cmap_info)
+
+        # Configure axes
+        ax.set_xlabel(self.x_label, fontsize=12)
+        ax.set_ylabel(self.y_label, fontsize=12)
+        ax.set_title(self.title, fontsize=16)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        # Save figure
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"embedding_plot_{self.experiment_name}_{timestamp}.png"
+        self.save_path = os.path.join(self.save_dir, filename)
+
+        os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
+        plt.savefig(self.save_path, bbox_inches="tight", dpi=150)
+        plt.close(fig)
+
+        logger.info(f"Saved 2D embeddings plot to {self.save_path}")
+
+        # WandB upload
+        self._upload_to_wandb()
+
         return self.save_path
 
-    def on_latent_end(self, dataset: any, embeddings: dict) -> str:
+    def on_latent_end(self, dataset: Any, embeddings: dict) -> dict:
+        """
+        Called when the latent process is complete.
+
+        Creates a 2D scatter plot of the embeddings and optionally uploads to WandB.
+
+        Args:
+            dataset: A dataset object that may implement ColormapProvider.
+            embeddings: Dictionary containing 'embeddings' and optionally 'label', 'scores'.
+
+        Returns:
+            Dictionary containing callback outputs including 'embedding_plot_path'.
+        """
         emb2d = self._get_embeddings(embeddings)
         colors = self._get_color_array(dataset, embeddings)
-        path = self._plot_embeddings(dataset, emb2d, colors)
+        path = self._plot_embeddings(dataset, emb2d, colors, embeddings)
         self.register_output("embedding_plot_path", path)
         return self.callback_outputs
