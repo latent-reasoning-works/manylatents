@@ -15,6 +15,7 @@ from manylatents.callbacks.embedding.base import (
     ColormapInfo,
     ColormapProvider,
 )
+from manylatents.utils.plotting import resolve_colormap, merge_colormap_info
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,10 @@ class PlotEmbeddings(EmbeddingCallback):
         alpha: float = 0.8,
         log_key: str = "embedding_plot",
         enable_wandb_upload: bool = True,
+        # User overrides for colormap (take precedence over metric/dataset)
+        cmap_override: str = None,
+        is_categorical_override: bool = None,
+        label_format_override: str = None,
     ):
         """
         Initialize the PlotEmbeddings callback.
@@ -59,8 +64,8 @@ class PlotEmbeddings(EmbeddingCallback):
             figsize: Figure size (width, height).
             label_col: Column name in metadata to use for labels (fallback).
             legend: Whether to include a legend for categorical data.
-            color_by_score: Optional key in embeddings to use for score-based coloring.
-                           Special value "tangent_space" enables categorical coloring.
+            color_by_score: Optional key in scores to use for coloring.
+                           Metric can provide visualization hints via __viz suffix.
             x_label: Label for the x-axis.
             y_label: Label for the y-axis.
             title: Title for the plot.
@@ -68,6 +73,10 @@ class PlotEmbeddings(EmbeddingCallback):
             alpha: Transparency of the points (0 = transparent, 1 = opaque).
             log_key: Key for WandB logging. Can be customized for step-aware logging.
             enable_wandb_upload: Whether to upload to WandB when available.
+            cmap_override: Override colormap (e.g., "viridis", "plasma"). Takes precedence
+                          over metric-declared and dataset-declared colormaps.
+            is_categorical_override: Override categorical/continuous treatment.
+            label_format_override: Override label format string (e.g., "Dim = {}").
         """
         super().__init__()
         self.save_dir = save_dir
@@ -83,6 +92,10 @@ class PlotEmbeddings(EmbeddingCallback):
         self.alpha = alpha
         self.log_key = log_key
         self.enable_wandb_upload = enable_wandb_upload
+        # User overrides
+        self.cmap_override = cmap_override
+        self.is_categorical_override = is_categorical_override
+        self.label_format_override = label_format_override
 
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(
@@ -92,43 +105,63 @@ class PlotEmbeddings(EmbeddingCallback):
         if not enable_wandb_upload:
             logger.info("WandB upload disabled - running in offline mode")
 
-    def _get_colormap(self, dataset: Any) -> ColormapInfo:
+    def _get_colormap(
+        self, dataset: Any, embeddings: Optional[dict] = None
+    ) -> ColormapInfo:
         """
         Get colormap information for plotting.
 
-        Resolution order:
-        1. If color_by_score is "tangent_space", return categorical colormap.
-        2. If color_by_score is set (continuous), return "viridis".
-        3. If dataset implements ColormapProvider protocol, use its colormap.
-        4. Fall back to "viridis".
+        Resolution order (highest to lowest priority):
+        1. User overrides (cmap_override, is_categorical_override, label_format_override)
+        2. Metric-declared via scores["<color_by_score>__viz"]
+        3. Dataset-provided via ColormapProvider protocol
+        4. Inferred defaults (viridis)
 
         This method can be overridden in subclasses for custom colormap logic,
         particularly useful for downstream packages like manylatents-omics.
 
         Args:
             dataset: The dataset object, optionally implementing ColormapProvider.
+            embeddings: The embeddings dict, used to look up metric viz metadata.
 
         Returns:
             ColormapInfo containing the colormap and optional label names.
         """
-        # Special case: tangent_space categorical coloring
-        if self.color_by_score == "tangent_space":
-            return ColormapInfo(
-                cmap=ListedColormap(["#1f77b4", "#ff7f0e"]),
-                label_names={0: "Dim ~ 1", 1: "Dim ~ 2"},
-                is_categorical=True,
-            )
+        base_info = None
 
-        # Continuous score coloring
-        if self.color_by_score is not None:
-            return ColormapInfo(cmap="viridis", label_names=None, is_categorical=False)
+        # Check for metric-declared viz metadata in scores
+        if self.color_by_score is not None and embeddings is not None:
+            scores = embeddings.get("scores", {})
+            viz_key = f"{self.color_by_score}__viz"
+            if viz_key in scores and isinstance(scores[viz_key], ColormapInfo):
+                base_info = scores[viz_key]
+                logger.debug(f"Using metric-declared colormap from {viz_key}")
 
-        # Dataset-provided colormap via protocol (no isinstance checks for specific types)
-        if isinstance(dataset, ColormapProvider):
-            return dataset.get_colormap_info()
+        # Fall back to dataset-provided colormap
+        if base_info is None and isinstance(dataset, ColormapProvider):
+            base_info = dataset.get_colormap_info()
+            logger.debug("Using dataset-provided colormap via ColormapProvider")
 
-        # Fallback
-        return ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+        # Fall back to defaults based on whether we're coloring by score
+        if base_info is None:
+            if self.color_by_score is not None:
+                # Default to continuous for score coloring (metric can override via __viz)
+                base_info = ColormapInfo(
+                    cmap="viridis", label_names=None, is_categorical=False
+                )
+            else:
+                # Default to categorical for label coloring
+                base_info = ColormapInfo(
+                    cmap="viridis", label_names=None, is_categorical=True
+                )
+
+        # Apply user overrides
+        return merge_colormap_info(
+            base=base_info,
+            cmap_override=self.cmap_override,
+            is_categorical_override=self.is_categorical_override,
+            label_format_override=self.label_format_override,
+        )
 
     def _get_embeddings(self, embeddings: dict) -> np.ndarray:
         """
@@ -318,6 +351,7 @@ class PlotEmbeddings(EmbeddingCallback):
         dataset: Any,
         embeddings_to_plot: np.ndarray,
         color_array: Optional[np.ndarray],
+        embeddings: Optional[dict] = None,
     ) -> str:
         """
         Create and save the embedding scatter plot using matplotlib.
@@ -326,11 +360,23 @@ class PlotEmbeddings(EmbeddingCallback):
             dataset: Dataset for colormap information.
             embeddings_to_plot: 2D array of shape (n_samples, 2).
             color_array: Array of colors/labels for each point.
+            embeddings: Full embeddings dict for metric viz metadata lookup.
 
         Returns:
             Path to the saved plot file.
         """
-        cmap_info = self._get_colormap(dataset)
+        cmap_info = self._get_colormap(dataset, embeddings)
+
+        # Resolve semantic hints to concrete colormap/labels using actual data
+        cmap, label_names, is_categorical = resolve_colormap(cmap_info, color_array)
+
+        # Update cmap_info with resolved values for legend generation
+        cmap_info = ColormapInfo(
+            cmap=cmap,
+            label_names=label_names,
+            label_format=cmap_info.label_format,
+            is_categorical=is_categorical,
+        )
 
         fig, ax = plt.subplots(figsize=self.figsize)
 
@@ -441,6 +487,6 @@ class PlotEmbeddings(EmbeddingCallback):
         """
         emb2d = self._get_embeddings(embeddings)
         colors = self._get_color_array(dataset, embeddings)
-        path = self._plot_embeddings(dataset, emb2d, colors)
+        path = self._plot_embeddings(dataset, emb2d, colors, embeddings)
         self.register_output("embedding_plot_path", path)
         return self.callback_outputs

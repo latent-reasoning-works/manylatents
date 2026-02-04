@@ -15,7 +15,7 @@ class ColormapInfo:
     """
     Structured colormap information for visualization.
 
-    This dataclass provides a standardized way for datasets to communicate
+    This dataclass provides a standardized way for datasets and metrics to communicate
     their preferred colormap and label information to visualization callbacks.
 
     Attributes:
@@ -23,14 +23,20 @@ class ColormapInfo:
               - A matplotlib colormap name (str), e.g., "viridis"
               - A dict mapping label values to color strings, e.g., {1: "#ff0000", 2: "#00ff00"}
               - A matplotlib ListedColormap object
-        label_names: Optional mapping from numeric label indices to display names.
+              - Special values: "categorical" (auto-generate discrete colors)
+        label_names: Optional mapping from label values to display names.
                     Used for legend generation with categorical data.
                     Example: {0: "Class A", 1: "Class B"}
+                    If None and label_format is set, labels are generated dynamically.
+        label_format: Optional format string for dynamic label generation.
+                     Example: "Dim = {}" generates "Dim = 1", "Dim = 2", etc.
+                     Used when label_names is None and is_categorical is True.
         is_categorical: Whether the colormap represents categorical (discrete)
                        or continuous data. Affects legend vs colorbar rendering.
     """
     cmap: Union[str, Dict[Union[int, str], str], Any]  # Any for ListedColormap
-    label_names: Optional[Dict[int, str]] = None
+    label_names: Optional[Dict[Union[int, str], str]] = None
+    label_format: Optional[str] = None
     is_categorical: bool = True
 
 

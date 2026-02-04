@@ -75,15 +75,30 @@ class TestPlotEmbeddingsInit:
 class TestGetColormap:
     """Tests for _get_colormap method."""
 
-    def test_tangent_space_colormap(self):
-        """Test tangent_space special case returns ListedColormap."""
+    def test_metric_provided_viz_metadata(self):
+        """Test that metric-provided __viz metadata is used for coloring."""
         with tempfile.TemporaryDirectory() as tmpdir:
             callback = PlotEmbeddings(save_dir=tmpdir, color_by_score="tangent_space")
-            cmap_info = callback._get_colormap(MockDataset(np.array([0, 1])))
+
+            # Simulate metric providing viz metadata via __viz key
+            embeddings = {
+                "scores": {
+                    "tangent_space": np.array([1, 2, 1, 2]),
+                    "tangent_space__viz": ColormapInfo(
+                        cmap="categorical",
+                        label_format="Dim = {}",
+                        is_categorical=True,
+                    ),
+                }
+            }
+
+            cmap_info = callback._get_colormap(
+                MockDataset(np.array([0, 1])), embeddings=embeddings
+            )
 
             assert cmap_info.is_categorical is True
-            assert cmap_info.label_names == {0: "Dim ~ 1", 1: "Dim ~ 2"}
-            assert isinstance(cmap_info.cmap, ListedColormap)
+            assert cmap_info.cmap == "categorical"
+            assert cmap_info.label_format == "Dim = {}"
 
     def test_continuous_score_colormap(self):
         """Test continuous score coloring returns viridis."""
@@ -120,6 +135,34 @@ class TestGetColormap:
 
             assert cmap_info.cmap == "viridis"
             assert cmap_info.is_categorical is True
+
+    def test_user_override_takes_precedence(self):
+        """Test that user overrides take precedence over metric-declared info."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir,
+                color_by_score="tangent_space",
+                cmap_override="plasma",
+                is_categorical_override=False,
+            )
+
+            # Even with metric providing categorical info, user override wins
+            embeddings = {
+                "scores": {
+                    "tangent_space": np.array([1, 2, 1, 2]),
+                    "tangent_space__viz": ColormapInfo(
+                        cmap="categorical",
+                        is_categorical=True,
+                    ),
+                }
+            }
+
+            cmap_info = callback._get_colormap(
+                MockDataset(np.array([0, 1])), embeddings=embeddings
+            )
+
+            assert cmap_info.cmap == "plasma"
+            assert cmap_info.is_categorical is False
 
 
 class TestGetEmbeddings:
