@@ -67,8 +67,54 @@ Highly modular Hydra-based configuration:
 
 #### 4. Data Management (`manylatents/data/`)
 - Supports various dataset types: genomic (HGDP, AOU, UKBB), synthetic (Swiss roll, saddle surface), and single-cell data
-- **Precomputed Mixin**: Allows loading pre-computed embeddings for evaluation-only runs
+- **PrecomputedDataModule**: Canonical way to load cached embeddings with optional metadata support
 - **Split vs Full modes**: Configurable train/test splitting
+
+### Precomputed Embeddings Pattern
+
+**PrecomputedDataModule** is the canonical way to load cached embeddings:
+
+```python
+# Basic usage - just load embeddings
+dm = PrecomputedDataModule(path="embeddings.npy")
+
+# With metadata for domain-specific access
+dm = PrecomputedDataModule(
+    path="embeddings.npy",
+    metadata_path="metadata.parquet",
+)
+dm.setup()
+dm.get_metadata_column("label")  # Access any metadata column
+```
+
+**Domain DataModules** inherit from PrecomputedDataModule for dual-mode support:
+
+```python
+class MyDomainDataModule(PrecomputedDataModule):
+    def __init__(
+        self,
+        # Raw mode params
+        raw_data_dir: Optional[str] = None,
+        # Precomputed mode params
+        path: Optional[str] = None,
+        metadata_path: Optional[str] = None,
+        **kwargs,
+    ):
+        self._raw_mode = path is None
+        if self._raw_mode:
+            super().__init__(data=placeholder, **kwargs)
+            # Store raw mode params
+        else:
+            super().__init__(path=path, metadata_path=metadata_path, **kwargs)
+
+    # Domain methods work in both modes
+    def get_my_domain_labels(self):
+        if self._raw_mode:
+            return self._raw_metadata["label"]
+        return self.get_metadata_column("label")
+```
+
+**Synthetic DataModules** (SwissRoll, etc.) don't inherit - use PrecomputedDataModule directly for caching.
 
 #### 5. Evaluation System (`manylatents/metrics/`)
 Comprehensive metric computation using single dispatch pattern:
