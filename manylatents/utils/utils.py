@@ -183,10 +183,12 @@ def is_numeric(value: str) -> bool:
     except ValueError:
         return False
 
-def load_precomputed_embeddings(cfg) -> dict:
+def load_precomputed_embeddings(cfg) -> Optional[dict]:
     """
     Loads precomputed embeddings from a file specified in the config.
-    
+
+    Returns None if no precomputed path is configured (defensive behavior).
+
     This function supports:
       - .npy files: loaded using numpy.load
       - .csv files: loaded by checking if there's a header. If a header is detected
@@ -194,14 +196,20 @@ def load_precomputed_embeddings(cfg) -> dict:
         and the header row is skipped. Otherwise, np.loadtxt is used.
       - .pt or .pth files: loaded using torch.load. If the loaded object is a tensor, it is converted to a numpy array.
         If it's a dictionary, it looks for an 'embeddings' key.
-    
+
     Returns:
-        dict: A dictionary with keys "embeddings", "label", "scores", and "metadata".
-              "label", "scores", and "metadata" are set to None by default.
+        dict: A dictionary with keys "embeddings", "label", "scores", and "metadata",
+              or None if no precomputed path is configured.
     """
-    precomputed_path = cfg.data.precomputed_path
+    # Defensive: use getattr to avoid ConfigAttributeError on missing key
+    precomputed_path = getattr(cfg.data, 'precomputed_path', None)
+
+    # Also check for 'path' as fallback (PrecomputedDataModule uses this)
     if not precomputed_path:
-        raise ValueError("No precomputed path specified in the configuration.")
+        precomputed_path = getattr(cfg.data, 'path', None)
+
+    if not precomputed_path:
+        return None  # No precomputed embeddings configured
 
     ext = os.path.splitext(precomputed_path)[-1].lower()
     embeddings = None
@@ -235,7 +243,6 @@ def load_precomputed_embeddings(cfg) -> dict:
     else:
         raise ValueError(f"Unsupported precomputed embedding file extension: {ext}")
 
-    # You can expand this to load labels or metadata if they are stored in a structured file.
     return {
         "embeddings": embeddings,
         "label": None,
