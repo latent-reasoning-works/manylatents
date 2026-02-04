@@ -1,7 +1,8 @@
 """Representation probing callback for Lightning."""
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -103,7 +104,9 @@ class RepresentationProbeCallback(Callback):
         layer_specs: List[LayerSpec],
         trigger: ProbeTrigger,
         probe_loader: Optional[DataLoader] = None,
-        gauge: Optional[DiffusionGauge] = None,
+        gauge: Optional[DiffusionGauge] = None,  # Now truly optional (no default)
+        save_raw: bool = False,
+        save_path: Optional[str] = None,
         log_to_wandb: bool = False,
         wandb_logger: Optional[WandbProbeLogger] = None,
     ):
@@ -111,12 +114,18 @@ class RepresentationProbeCallback(Callback):
         self.probe_loader = probe_loader
         self.layer_specs = layer_specs
         self.trigger = trigger
-        self.gauge = gauge or DiffusionGauge()
+        self.gauge = gauge  # No longer defaults to DiffusionGauge()
+        self.save_raw = save_raw
+        self.save_path = Path(save_path) if save_path else None
         self.log_to_wandb = log_to_wandb
         self.wandb_logger = wandb_logger or WandbProbeLogger() if log_to_wandb else None
 
         self.extractor = ActivationExtractor(layer_specs)
         self._trajectory: List[TrajectoryPoint] = []
+
+        # Create save directory if needed
+        if self.save_raw and self.save_path:
+            self.save_path.mkdir(parents=True, exist_ok=True)
 
     def on_fit_start(self, trainer: Trainer, pl_module: LightningModule):
         """Fetch probe_loader from datamodule if not provided."""
@@ -133,21 +142,22 @@ class RepresentationProbeCallback(Callback):
                     "with probe_dataloader() (e.g., TextDataModule)."
                 )
 
-    def _extract_and_gauge(
+    def _sanitize_layer_name(self, layer: str) -> str:
+        """Convert layer path to safe filename."""
+        return layer.replace(".", "_").replace("[", "_").replace("]", "_").replace("-", "m")
+
+    def _extract_activations(
         self,
         trainer: Trainer,
         pl_module: LightningModule,
     ) -> Dict[str, np.ndarray]:
-        """Extract activations and compute diffusion operators."""
-        # Get the underlying network
+        """Extract activations from specified layers."""
         network = getattr(pl_module, 'network', pl_module)
 
-        # Run probe set through model
         network.eval()
         with torch.no_grad():
             with self.extractor.capture(network):
                 for batch in self.probe_loader:
-                    # Handle different batch formats
                     if isinstance(batch, (tuple, list)):
                         inputs = batch[0]
                     elif isinstance(batch, dict):
@@ -159,19 +169,15 @@ class RepresentationProbeCallback(Callback):
                         inputs = inputs.to(pl_module.device)
                         network(inputs)
                     else:
-                        # Dict input (for HF models)
                         inputs = {k: v.to(pl_module.device) for k, v in inputs.items()}
                         network(**inputs)
 
         network.train()
 
-        # Get activations and compute diffusion operators
+        # Get activations as numpy arrays
         activations = self.extractor.get_activations()
-        diffusion_ops = {}
-        for path, acts in activations.items():
-            diffusion_ops[path] = self.gauge(acts)
-
-        return diffusion_ops
+        return {path: acts.cpu().numpy() if isinstance(acts, torch.Tensor) else acts
+                for path, acts in activations.items()}
 
     def _maybe_probe(
         self,
@@ -181,7 +187,7 @@ class RepresentationProbeCallback(Callback):
         checkpoint: bool = False,
         validation_end: bool = False,
     ):
-        """Check trigger and perform audit if needed."""
+        """Check trigger and perform probe if needed."""
         should_fire = self.trigger.should_fire(
             step=trainer.global_step,
             epoch=trainer.current_epoch,
@@ -194,21 +200,40 @@ class RepresentationProbeCallback(Callback):
             return
 
         logger.info(f"Probe triggered at step {trainer.global_step}")
-        diff_ops = self._extract_and_gauge(trainer, pl_module)
+        activations = self._extract_activations(trainer, pl_module)
 
-        point = TrajectoryPoint(
-            step=trainer.global_step,
-            epoch=trainer.current_epoch,
-            diffusion_operators=diff_ops,
-        )
-        self._trajectory.append(point)
+        # Save raw activations if requested
+        if self.save_raw and self.save_path:
+            for layer, acts in activations.items():
+                safe_name = self._sanitize_layer_name(layer)
+                path = self.save_path / f"{safe_name}_step{trainer.global_step}.npy"
+                np.save(path, acts)
+                logger.debug(f"Saved activations to {path}")
 
-        # Log to wandb if enabled
-        if self.log_to_wandb and self.wandb_logger is not None:
-            self.wandb_logger.log_trajectory(
-                self.get_trajectory(),
+        # Compute gauge transform if gauge provided
+        if self.gauge is not None:
+            diff_ops = {}
+            for path, acts in activations.items():
+                # gauge expects tensor, convert back
+                acts_tensor = torch.from_numpy(acts) if isinstance(acts, np.ndarray) else acts
+                diff_ops[path] = self.gauge(acts_tensor)
+
+            point = TrajectoryPoint(
                 step=trainer.global_step,
+                epoch=trainer.current_epoch,
+                diffusion_operators=diff_ops,
             )
+            self._trajectory.append(point)
+
+            # Log to wandb if enabled
+            if self.log_to_wandb and self.wandb_logger is not None:
+                self.wandb_logger.log_trajectory(
+                    self.get_trajectory(),
+                    step=trainer.global_step,
+                )
+
+        # Clear extractor to free memory
+        self.extractor.clear()
 
     def on_train_batch_end(
         self,

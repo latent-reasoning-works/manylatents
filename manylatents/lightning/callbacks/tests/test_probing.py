@@ -11,6 +11,7 @@ from manylatents.lightning.callbacks.probing import (
     RepresentationProbeCallback,
 )
 from manylatents.lightning.hooks import LayerSpec
+from manylatents.callbacks.probing import DiffusionGauge
 
 
 def test_probe_trigger_step_based():
@@ -86,6 +87,7 @@ def test_representation_probe_callback_captures():
         layer_specs=[LayerSpec(path="0", reduce="none")],  # Path relative to .network
         trigger=ProbeTrigger(every_n_steps=1),
         probe_loader=probe_loader,
+        gauge=DiffusionGauge(),
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -122,6 +124,7 @@ def test_representation_probe_callback_multi_layer():
         ],
         trigger=ProbeTrigger(every_n_steps=2),
         probe_loader=probe_loader,
+        gauge=DiffusionGauge(),
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -154,6 +157,7 @@ def test_representation_probe_callback_epoch_trigger():
         layer_specs=[LayerSpec(path="0", reduce="none")],
         trigger=ProbeTrigger(every_n_epochs=1),
         probe_loader=probe_loader,
+        gauge=DiffusionGauge(),
     )
 
     train_loader = make_probe_loader(n_samples=40)
@@ -183,6 +187,7 @@ def test_representation_probe_callback_with_wandb():
         layer_specs=[LayerSpec(path="0", reduce="none")],
         trigger=ProbeTrigger(every_n_steps=2),
         probe_loader=probe_loader,
+        gauge=DiffusionGauge(),
         log_to_wandb=True,
     )
 
