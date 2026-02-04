@@ -202,3 +202,88 @@ def test_representation_probe_callback_with_wandb():
 
         # Should have logged at least once
         assert mock_log.called
+
+
+def test_representation_probe_callback_save_raw(tmp_path):
+    """Should save raw activations to disk when save_raw=True."""
+    model = TinyModel()
+    probe_loader = make_probe_loader()
+
+    callback = RepresentationProbeCallback(
+        layer_specs=[LayerSpec(path="0", reduce="none")],
+        trigger=ProbeTrigger(every_n_steps=1),
+        probe_loader=probe_loader,
+        save_raw=True,
+        save_path=str(tmp_path / "activations"),
+    )
+
+    train_loader = make_probe_loader(n_samples=40)
+
+    trainer = Trainer(
+        max_epochs=1,
+        callbacks=[callback],
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        logger=False,
+    )
+    trainer.fit(model, train_loader)
+
+    # Should have saved .npy files
+    saved_files = list((tmp_path / "activations").glob("*.npy"))
+    assert len(saved_files) > 0
+
+    # Verify saved arrays are correct shape
+    arr = np.load(saved_files[0])
+    assert arr.shape[0] == 20  # probe_loader samples
+    assert arr.shape[1] == 20  # output dim of first linear layer
+
+
+def test_representation_probe_callback_sanitizes_layer_names(tmp_path):
+    """Layer paths with special chars should become safe filenames."""
+    model = TinyModel()
+    probe_loader = make_probe_loader()
+
+    callback = RepresentationProbeCallback(
+        layer_specs=[LayerSpec(path="0", reduce="none")],
+        trigger=ProbeTrigger(every_n_steps=1),
+        probe_loader=probe_loader,
+        save_raw=True,
+        save_path=str(tmp_path / "activations"),
+    )
+
+    # Test sanitization directly
+    assert callback._sanitize_layer_name("model.layers[-1]") == "model_layers_m1_"
+    assert callback._sanitize_layer_name("transformer.h[0].attn") == "transformer_h_0__attn"
+
+
+def test_representation_probe_callback_save_raw_without_gauge(tmp_path):
+    """Should save activations without computing diffusion ops when gauge=None."""
+    model = TinyModel()
+    probe_loader = make_probe_loader()
+
+    callback = RepresentationProbeCallback(
+        layer_specs=[LayerSpec(path="0", reduce="none")],
+        trigger=ProbeTrigger(every_n_steps=1),
+        probe_loader=probe_loader,
+        gauge=None,  # Explicitly no gauge
+        save_raw=True,
+        save_path=str(tmp_path / "activations"),
+    )
+
+    train_loader = make_probe_loader(n_samples=40)
+
+    trainer = Trainer(
+        max_epochs=1,
+        callbacks=[callback],
+        enable_progress_bar=False,
+        enable_model_summary=False,
+        logger=False,
+    )
+    trainer.fit(model, train_loader)
+
+    # Should have saved files
+    saved_files = list((tmp_path / "activations").glob("*.npy"))
+    assert len(saved_files) > 0
+
+    # Trajectory should be empty (no gauge)
+    assert len(callback.get_trajectory()) == 0
