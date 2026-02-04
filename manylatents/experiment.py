@@ -342,15 +342,14 @@ def execute_step(
         logger.info(f"LatentModule embedding shape: {latents.shape}")
 
     elif isinstance(algorithm, LightningModule):
-        # LightningModule: training or eval-only
+        # LightningModule: training with optional pretrained checkpoint
 
-        # Handle eval-only mode with pretrained checkpoint
-        if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
+        # Load pretrained checkpoint if specified (skip training)
+        if hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
             logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
             algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-
-        # Training phase (if not eval_only)
-        if not cfg.eval_only:
+        else:
+            # Training phase
             logger.info("Running training...")
             trainer.fit(algorithm, datamodule=datamodule)
 
@@ -478,10 +477,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     # --- Algorithm Execution ---
     embeddings: Dict[str, Any] = {}
 
-    if cfg.eval_only:
-        logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
-        embeddings = load_precomputed_embeddings(cfg)
-    elif isinstance(algorithm, FoundationEncoder):
+    if isinstance(algorithm, FoundationEncoder):
         # FoundationEncoder: skip tensor unrolling, uses datamodule directly
         logger.info(f"Running FoundationEncoder: {type(algorithm).__name__}")
         latents = execute_step(
