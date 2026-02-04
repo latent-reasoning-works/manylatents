@@ -264,6 +264,47 @@ Automatic sampling based on dataset size and metric complexity (O(n²) metrics g
 **Phase 4: Reproducible Sampling with Caching** (Planned)
 Cache sampled subsets for reproducibility across runs.
 
+### Activation Collection for SAE Training
+
+**Workflow for offline SAE training on layer activations:**
+
+#### Step 1: Collect activations during training
+
+```bash
+python -m manylatents.main experiment=hf_training \
+    callbacks.trainer.probe.save_raw=true \
+    callbacks.trainer.probe.save_path="outputs/activations/"
+```
+
+This saves `.npy` files per layer per trigger step.
+
+#### Step 2: Train SAE on activations
+
+```bash
+python -m manylatents.main experiment=sae_training \
+    data.path=outputs/activations/ \
+    algorithms.lightning.network.input_dim=768
+```
+
+#### Step 3: Use trained SAE as gauge
+
+```python
+from manylatents.algorithms.lightning.networks.autoencoder import Autoencoder
+
+sae = Autoencoder.load_from_checkpoint("sae.ckpt")
+callback = RepresentationProbeCallback(
+    gauge=sae.encode,  # Any callable works as gauge
+    layer_specs=[...],
+    trigger=ProbeTrigger(every_n_steps=100),
+)
+```
+
+**Key insight:** The `gauge` parameter accepts any `Callable[[Tensor], Any]`. This includes:
+- `DiffusionGauge()` - default geometric measurement
+- `sae.encode` - sparse autoencoder encoding
+- `pca.fit_transform` - PCA projection
+- Any lambda function
+
 ### Hydra `null` Override Issue
 
 **IMPORTANT**: Hydra does NOT support `null` as an override value. This causes `ValueError: Config group override must be a string or a list. Got NoneType`.
