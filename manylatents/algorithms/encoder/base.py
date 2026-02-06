@@ -101,20 +101,96 @@ class FoundationEncoder(LatentModule):
         """
         pass
 
-    def encode_batch(self, inputs: List[Any]) -> Tensor:
-        """Encode a batch of inputs into embedding space.
+    def encode_batch(
+        self,
+        inputs: List[Any],
+        batch_size: int = 32,
+        show_progress: bool = True,
+    ) -> Tensor:
+        """Batched encoding with micro-batch chunking.
 
-        Default implementation calls encode() for each input.
-        Subclasses should override for efficient batched inference.
+        If the subclass implements _tokenize_batch() and _extract_embeddings(),
+        uses true GPU batching (single forward pass per micro-batch). Otherwise
+        falls back to looping encode() with consolidated CPU transfer.
 
         Args:
-            inputs: List of raw inputs.
+            inputs: List of raw inputs (sequences, etc.)
+            batch_size: Micro-batch size for GPU forward passes.
+            show_progress: Show tqdm progress bar.
 
         Returns:
-            Embedding tensor of shape (batch_size, embedding_dim).
+            (N, embedding_dim) tensor on CPU.
         """
-        embeddings = [self.encode(inp) for inp in inputs]
-        return torch.stack([e.squeeze(0) for e in embeddings], dim=0)
+        self._ensure_loaded()
+
+        if not self._supports_batched_forward():
+            # Fallback: loop with consolidated CPU transfer
+            embeddings = []
+            iterator = range(0, len(inputs), batch_size)
+            if show_progress:
+                from tqdm import tqdm
+                iterator = tqdm(iterator, desc=f"{self.__class__.__name__} encode")
+            for start in iterator:
+                chunk = inputs[start:start + batch_size]
+                chunk_embs = [self.encode(inp) for inp in chunk]
+                embeddings.append(torch.stack(
+                    [e.squeeze(0) for e in chunk_embs]
+                ).cpu())
+            return torch.cat(embeddings, dim=0)
+
+        # True batched inference path with OOM retry
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        all_embeddings = []
+        start = 0
+        current_bs = batch_size
+        n_total = len(inputs)
+
+        if show_progress:
+            from tqdm import tqdm
+            pbar = tqdm(total=n_total, desc=f"{self.__class__.__name__} batched")
+        else:
+            pbar = None
+
+        while start < n_total:
+            chunk = inputs[start:start + current_bs]
+            try:
+                batch_inputs = self._tokenize_batch(chunk)
+                with torch.no_grad():
+                    embeddings = self._extract_embeddings(batch_inputs)
+                all_embeddings.append(embeddings.float().cpu())
+                if pbar:
+                    pbar.update(len(chunk))
+                start += current_bs
+                # Restore batch size after successful forward
+                current_bs = batch_size
+            except torch.cuda.OutOfMemoryError:
+                torch.cuda.empty_cache()
+                if current_bs <= 1:
+                    raise RuntimeError(
+                        f"OOM even at batch_size=1 (seq_len={len(chunk[0]) if chunk else '?'}). "
+                        "Reduce max_length or use a smaller model."
+                    )
+                current_bs = max(1, current_bs // 2)
+                _logger.warning(f"OOM at batch_size={current_bs * 2}, retrying with {current_bs}")
+
+        if pbar:
+            pbar.close()
+
+        return torch.cat(all_embeddings, dim=0)
+
+    def _supports_batched_forward(self) -> bool:
+        """Override to return True if _tokenize_batch/_extract_embeddings are implemented."""
+        return False
+
+    def _tokenize_batch(self, inputs: List[Any]) -> dict:
+        """Tokenize + pad + stack a batch. Override in subclass."""
+        raise NotImplementedError
+
+    def _extract_embeddings(self, batch: dict) -> Tensor:
+        """Single forward pass -> pooled embeddings. Override in subclass."""
+        raise NotImplementedError
 
     # --- LatentModule interface ---
 
