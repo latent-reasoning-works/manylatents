@@ -11,6 +11,49 @@ from sklearn.neighbors import kneighbors_graph
 logger = logging.getLogger(__name__)
 
 
+def compute_svd_cache(
+    embeddings: np.ndarray,
+    knn_indices: np.ndarray,
+    k_values: set,
+) -> Dict[int, np.ndarray]:
+    """Compute SVD of centered kNN neighborhoods once for shared use across metrics.
+
+    For each k in k_values, gathers k neighbors per sample, centers them,
+    and computes singular values via batch SVD. Uses the same chunking pattern
+    as ParticipationRatio and TangentSpaceApproximation.
+
+    Args:
+        embeddings: (n_samples, d) array.
+        knn_indices: (n_samples, max_k+1) indices from kNN cache (index 0 is self).
+        k_values: Set of k values to compute SVD for.
+
+    Returns:
+        Dict mapping k -> singular values array of shape (n_samples, min(k, d)).
+    """
+    n_samples, d = embeddings.shape
+    result = {}
+
+    for k in sorted(k_values):
+        # Slice indices: skip self (index 0), take next k neighbors
+        idx = knn_indices[:, 1:k + 1]  # (n_samples, k)
+        chunk_size = max(1, min(10_000, int(2e9 / (k * d * 4))))
+
+        sv_chunks = []
+        for start in range(0, n_samples, chunk_size):
+            end = min(start + chunk_size, n_samples)
+            neigh = embeddings[idx[start:end]]  # (chunk, k, d)
+            centered = neigh - neigh.mean(axis=1, keepdims=True)
+            s = np.linalg.svd(centered, compute_uv=False)  # (chunk, min(k, d))
+            sv_chunks.append(s)
+
+        result[k] = np.concatenate(sv_chunks, axis=0)
+        logger.info(
+            f"compute_svd_cache: k={k}, shape={result[k].shape}"
+        )
+
+    return result
+
+
 def compute_knn(
     data: np.ndarray,
     k: int,
