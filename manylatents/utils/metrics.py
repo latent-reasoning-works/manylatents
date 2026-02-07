@@ -16,7 +16,12 @@ def compute_knn(
     k: int,
     include_self: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Compute k-nearest neighbors using FAISS (if available) or sklearn.
+    """Compute k-nearest neighbors using FAISS-GPU > FAISS-CPU > sklearn.
+
+    Automatically selects the fastest available backend:
+    1. FAISS-GPU if a CUDA device is available (~100x faster than CPU)
+    2. FAISS-CPU if faiss is installed (~10-50x faster than sklearn)
+    3. sklearn NearestNeighbors as fallback
 
     Args:
         data: (n_samples, n_features) float32 array.
@@ -34,18 +39,32 @@ def compute_knn(
     try:
         import faiss
 
-        index = faiss.IndexFlatL2(data.shape[1])
+        d = data.shape[1]
+        index_cpu = faiss.IndexFlatL2(d)
+
+        # Try GPU if available
+        backend = "faiss-cpu"
+        if faiss.get_num_gpus() > 0:
+            try:
+                res = faiss.StandardGpuResources()
+                index = faiss.index_cpu_to_gpu(res, 0, index_cpu)
+                backend = "faiss-gpu"
+            except Exception:
+                index = index_cpu
+        else:
+            index = index_cpu
+
         index.add(data)
         distances, indices = index.search(data, n_neighbors)
         # FAISS returns squared L2; convert to Euclidean for sklearn compat
         distances = np.sqrt(np.maximum(distances, 0))
-        logger.debug(f"compute_knn: FAISS backend, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+        logger.info(f"compute_knn: {backend}, n={data.shape[0]}, d={d}, k={k}")
     except ImportError:
         from sklearn.neighbors import NearestNeighbors
 
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)
         distances, indices = nbrs.kneighbors(data)
-        logger.debug(f"compute_knn: sklearn backend, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+        logger.info(f"compute_knn: sklearn, n={data.shape[0]}, d={data.shape[1]}, k={k}")
 
     if not include_self:
         distances = distances[:, 1:]
