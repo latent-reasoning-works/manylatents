@@ -2,9 +2,9 @@ import logging
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.metrics import compute_knn
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ def LocalIntrinsicDimensionality(
     Compute the Local Intrinsic Dimensionality (LID) for the embedding.
 
     Uses maximum likelihood estimation based on k-NN distances.
+    kNN is computed via FAISS when available (~10-50x faster), sklearn otherwise.
 
     Parameters:
       - embeddings: A numpy array representing the embeddings.
@@ -46,10 +47,8 @@ def LocalIntrinsicDimensionality(
         # distances includes self-distance at index 0, slice [1:k+1]
         distances = distances[:, 1:k + 1]
     else:
-        # Compute kNN from scratch
-        nbrs = NearestNeighbors(n_neighbors=k + 1).fit(embeddings)
-        distances, _ = nbrs.kneighbors(embeddings)
-        distances = distances[:, 1:]  # Exclude the self-distance
+        # Compute kNN (FAISS if available, sklearn fallback)
+        distances, _ = compute_knn(embeddings, k=k, include_self=False)
 
     # LID computation: MLE estimator
     r_k = distances[:, -1]

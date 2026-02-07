@@ -21,7 +21,7 @@ from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.algorithms.encoder import FoundationEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
-from manylatents.utils.metrics import flatten_and_unroll_metrics
+from manylatents.utils.metrics import compute_knn, flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -173,6 +173,9 @@ def _compute_knn_cache(
     """
     Compute kNN once for shared use across multiple metrics.
 
+    Uses FAISS when available for ~10-50x speedup on large datasets,
+    falls back to sklearn.
+
     Args:
         embeddings: (n_samples, n_features) array
         max_k: Maximum k value needed (will compute max_k+1 neighbors to include self)
@@ -180,11 +183,7 @@ def _compute_knn_cache(
     Returns:
         Tuple of (distances, indices) arrays, each shape (n_samples, max_k+1)
     """
-    from sklearn.neighbors import NearestNeighbors
-
-    nbrs = NearestNeighbors(n_neighbors=max_k + 1).fit(embeddings)
-    distances, indices = nbrs.kneighbors(embeddings)
-    return distances, indices
+    return compute_knn(embeddings, k=max_k, include_self=True)
 
 
 @evaluate.register(dict)

@@ -1,11 +1,57 @@
 import copy
+import logging
 from itertools import product
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 from omegaconf import DictConfig, ListConfig
 from scipy.sparse.csgraph import connected_components, shortest_path
 from sklearn.neighbors import kneighbors_graph
+
+logger = logging.getLogger(__name__)
+
+
+def compute_knn(
+    data: np.ndarray,
+    k: int,
+    include_self: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute k-nearest neighbors using FAISS (if available) or sklearn.
+
+    Args:
+        data: (n_samples, n_features) float32 array.
+        k: Number of neighbors (excluding self).
+        include_self: If True, returns k+1 columns with self at index 0.
+            If False, returns k columns (self excluded).
+
+    Returns:
+        (distances, indices) — both shape (n_samples, k+1) if include_self,
+        or (n_samples, k) if not.
+    """
+    data = np.ascontiguousarray(data, dtype=np.float32)
+    n_neighbors = k + 1  # always query k+1 to include self, then trim
+
+    try:
+        import faiss
+
+        index = faiss.IndexFlatL2(data.shape[1])
+        index.add(data)
+        distances, indices = index.search(data, n_neighbors)
+        # FAISS returns squared L2; convert to Euclidean for sklearn compat
+        distances = np.sqrt(np.maximum(distances, 0))
+        logger.debug(f"compute_knn: FAISS backend, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+    except ImportError:
+        from sklearn.neighbors import NearestNeighbors
+
+        nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)
+        distances, indices = nbrs.kneighbors(data)
+        logger.debug(f"compute_knn: sklearn backend, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+
+    if not include_self:
+        distances = distances[:, 1:]
+        indices = indices[:, 1:]
+
+    return distances, indices
 
 
 def flatten_and_unroll_metrics(
