@@ -1,0 +1,19 @@
+# Representation probe callback configuration
+probe:
+  _target_: manylatents.lightning.callbacks.probing.RepresentationProbeCallback
+  layer_specs:
+    - _target_: manylatents.lightning.hooks.LayerSpec
+      path: "transformer.h[-1]"
+      extraction_point: "output"
+      reduce: "mean"
+  trigger:
+    _target_: manylatents.lightning.callbacks.probing.ProbeTrigger
+    every_n_steps: 500
+    on_checkpoint: true
+    on_validation_end: true
+  gauge:
+    _target_: manylatents.callbacks.probing.DiffusionGauge
+    knn: 15
+    alpha: 1.0
+    symmetric: false
+  log_to_wandb: true

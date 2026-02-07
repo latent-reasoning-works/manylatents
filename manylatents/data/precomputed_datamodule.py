@@ -1,10 +1,15 @@
+import logging
+import warnings
 import torch
 import numpy as np
+import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, random_split
 from .precomputed_dataset import PrecomputedDataset, InMemoryDataset, MultiChannelDataset
+
+logger = logging.getLogger(__name__)
 
 class PrecomputedDataModule(LightningDataModule):
     """
@@ -39,6 +44,7 @@ class PrecomputedDataModule(LightningDataModule):
         num_workers: int = 0,
         label_col: str = None,
         labels_path: Optional[str] = None,
+        metadata_path: Optional[str] = None,
         mode: str = 'full',
         test_split: float = 0.2,
         seed: int = 42,
@@ -66,6 +72,7 @@ class PrecomputedDataModule(LightningDataModule):
         self.channels = channels
         self._channel_embeddings: Dict[str, torch.Tensor] = {}
         self._labels: Optional[np.ndarray] = None
+        self._metadata: Optional[pd.DataFrame] = None
         self.train_dataset = None
         self.test_dataset = None
 
@@ -80,6 +87,19 @@ class PrecomputedDataModule(LightningDataModule):
             # File-based path: use PrecomputedDataset
             full_dataset = PrecomputedDataset(path=self.hparams.path, label_col=self.hparams.label_col)
 
+        # Load metadata if path provided
+        self._load_metadata()
+
+        # Validate metadata length matches data (before split)
+        if self._metadata is not None:
+            data_len = len(full_dataset)
+            if len(self._metadata) != data_len:
+                warnings.warn(
+                    f"Metadata length ({len(self._metadata)}) does not match embeddings length ({data_len}). "
+                    "Ensure metadata rows align with embedding rows.",
+                    UserWarning
+                )
+
         if self.hparams.mode == 'full':
             self.train_dataset = full_dataset
             self.test_dataset = full_dataset
@@ -92,6 +112,26 @@ class PrecomputedDataModule(LightningDataModule):
             )
         else:
             raise ValueError(f"Mode '{self.hparams.mode}' is not supported. Use 'full' or 'split'.")
+
+    def _load_metadata(self) -> None:
+        """Load metadata from file if metadata_path provided."""
+        if not self.hparams.metadata_path:
+            return
+
+        meta_path = Path(self.hparams.metadata_path)
+        if not meta_path.exists():
+            raise FileNotFoundError(f"Metadata file not found: {meta_path}")
+
+        if meta_path.suffix == ".parquet":
+            self._metadata = pd.read_parquet(meta_path)
+        elif meta_path.suffix == ".csv":
+            self._metadata = pd.read_csv(meta_path)
+        elif meta_path.suffix == ".tsv":
+            self._metadata = pd.read_csv(meta_path, sep="\t")
+        else:
+            raise ValueError(f"Unsupported metadata format: {meta_path.suffix}. Use .parquet, .csv, or .tsv")
+
+        logger.info(f"Loaded metadata with {len(self._metadata)} rows, columns: {list(self._metadata.columns)}")
 
     def _setup_multi_channel(self):
         """Load multi-channel embeddings from directory or HDF5."""
@@ -199,6 +239,29 @@ class PrecomputedDataModule(LightningDataModule):
         if hasattr(self.train_dataset, 'get_labels'):
             return self.train_dataset.get_labels()
         return None
+
+    @property
+    def metadata(self) -> Optional[pd.DataFrame]:
+        """Return loaded metadata DataFrame, or None if not loaded."""
+        return self._metadata
+
+    def get_metadata_column(self, column: str) -> np.ndarray:
+        """Get a specific metadata column as numpy array.
+
+        Args:
+            column: Name of the metadata column to retrieve.
+
+        Returns:
+            Column values as numpy array.
+
+        Raises:
+            ValueError: If metadata not loaded or column not found.
+        """
+        if self._metadata is None:
+            raise ValueError("No metadata loaded. Provide metadata_path when creating PrecomputedDataModule.")
+        if column not in self._metadata.columns:
+            raise ValueError(f"Column '{column}' not found in metadata. Available: {list(self._metadata.columns)}")
+        return self._metadata[column].values
 
     def get_tensor(self) -> torch.Tensor:
         """Return concatenated embeddings tensor for LatentModule compatibility.

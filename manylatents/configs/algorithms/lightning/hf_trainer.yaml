@@ -1,0 +1,13 @@
+# manylatents/configs/algorithms/lightning/hf_trainer.yaml
+# HuggingFace causal LM trainer configuration
+_target_: manylatents.lightning.hf_trainer.HFTrainerModule
+
+config:
+  _target_: manylatents.lightning.hf_trainer.HFTrainerConfig
+  model_name_or_path: "gpt2"
+  learning_rate: 2e-5
+  weight_decay: 0.0
+  warmup_steps: 100
+  adam_epsilon: 1e-8
+  trust_remote_code: false
+  # Optional: torch_dtype, attn_implementation

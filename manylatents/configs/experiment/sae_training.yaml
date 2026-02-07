@@ -1,0 +1,38 @@
+# @package _global_
+# SAE training on precomputed activations
+#
+# Usage:
+#   python -m manylatents.main experiment=sae_training \
+#       data.path=outputs/.../activations/ \
+#       algorithms.lightning.network.input_dim=768
+
+name: sae_training
+
+defaults:
+  - override /data: precomputed
+  - override /algorithms/lightning: ae_reconstruction
+  - override /trainer: default
+  - override /logger: none
+  - override /metrics: null
+
+seed: 42
+project: sae_training
+
+data:
+  path: ???  # Required: path to activations directory
+  mode: split  # Use train/test split for SAE training
+  test_split: 0.1
+
+algorithms:
+  lightning:
+    network:
+      input_dim: ???  # Required: must match activation dimension
+      latent_dim: 64
+      hidden_dims: [256, 128]
+      activation: relu
+      batchnorm: true
+      dropout: 0.1
+
+trainer:
+  max_epochs: 100
+  accelerator: auto

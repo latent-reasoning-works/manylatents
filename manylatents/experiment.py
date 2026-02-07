@@ -334,15 +334,14 @@ def execute_step(
         logger.info(f"LatentModule embedding shape: {latents.shape}")
 
     elif isinstance(algorithm, LightningModule):
-        # LightningModule: training or eval-only
+        # LightningModule: training with optional pretrained checkpoint
 
-        # Handle eval-only mode with pretrained checkpoint
-        if cfg.eval_only and hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
+        # Load pretrained checkpoint if specified (skip training)
+        if hasattr(cfg, 'pretrained_ckpt') and cfg.pretrained_ckpt:
             logger.info(f"Loading pretrained model from {cfg.pretrained_ckpt}")
             algorithm = LightningModule.load_from_checkpoint(cfg.pretrained_ckpt)
-
-        # Training phase (if not eval_only)
-        if not cfg.eval_only:
+        else:
+            # Training phase
             logger.info("Running training...")
             trainer.fit(algorithm, datamodule=datamodule)
 
@@ -399,9 +398,12 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
 
     if not wandb_disabled and cfg.logger is not None:
         logger.info(f"Initializing wandb logger: {OmegaConf.to_yaml(cfg.logger)}")
-        wandb_run = hydra.utils.instantiate(
-            cfg.logger,
-            config=OmegaConf.to_container(cfg, resolve=True)
+        # Call wandb.init directly to avoid hydra.instantiate config parameter conflict
+        wandb_run = wandb.init(
+            project=cfg.logger.get("project", cfg.project),
+            name=cfg.logger.get("name", cfg.name),
+            config=OmegaConf.to_container(cfg, resolve=True),
+            mode=cfg.logger.get("mode", "online"),
         )
     else:
         logger.info("WandB logging disabled - skipping wandb initialization")
@@ -425,13 +427,20 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
         raise ValueError("No algorithm specified in configuration")
 
     # --- Callbacks ---
-    trainer_cb_cfg   = cfg.trainer.get("callbacks")
+    # Merge callbacks from both cfg.trainer.callbacks and cfg.callbacks.trainer
+    trainer_cb_cfg = dict(cfg.trainer.get("callbacks") or {})
+    if hasattr(cfg, "callbacks") and cfg.callbacks is not None:
+        # Also check cfg.callbacks.trainer for Lightning callbacks (e.g., probe callback)
+        extra_trainer_cbs = cfg.callbacks.get("trainer") or {}
+        trainer_cb_cfg.update(extra_trainer_cbs)
     embedding_cb_cfg = cfg.callbacks.get("embedding") if hasattr(cfg, "callbacks") else None
 
     lightning_cbs, embedding_cbs = instantiate_callbacks(
         trainer_cb_cfg,
         embedding_cb_cfg
     )
+    if lightning_cbs:
+        logger.info(f"Instantiated {len(lightning_cbs)} Lightning callbacks: {[type(cb).__name__ for cb in lightning_cbs]}")
 
     if not embedding_cbs:
         logger.info("No embedding callbacks configured; skip embedding‐level hooks.")

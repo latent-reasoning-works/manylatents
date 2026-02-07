@@ -82,11 +82,11 @@ def RankAgreement(
         emb = _ensure_2d(emb)
         if metric_fn == "lid":
             vals = LocalIntrinsicDimensionality(
-                emb, dataset=None, module=None, n_neighbors=k, return_per_sample=True
+                emb, dataset=None, module=None, k=k, return_per_sample=True
             )
         elif metric_fn == "pr":
             vals = ParticipationRatio(
-                emb, dataset=None, module=None, n_neighbors=k, return_per_sample=True
+                emb, dataset=None, module=None, return_per_sample=True
             )
         else:
             raise ValueError(f"Unknown metric_fn: {metric_fn}. Use 'lid' or 'pr'.")

@@ -1,0 +1,41 @@
+# manylatents/configs/sweep/representation_probe_convergence.yaml
+#
+# Multi-model convergence experiment sweep.
+# Runs representation probing across model sizes and seeds to study
+# whether different initializations converge to similar representations.
+#
+# Usage:
+#   # Local multirun
+#   python -m manylatents.main experiment=representation_probe \
+#       --multirun \
+#       --config-name=sweep/representation_probe_convergence
+#
+#   # SLURM cluster (via hydra-submitit-launcher)
+#   python -m manylatents.main experiment=representation_probe \
+#       --multirun \
+#       hydra/launcher=submitit_slurm \
+#       hydra.launcher.partition=main \
+#       hydra.launcher.gpus_per_node=1 \
+#       --config-name=sweep/representation_probe_convergence
+#
+
+defaults:
+  - override /experiment: representation_probe
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      # Sweep over model sizes
+      algorithms.lightning.config.model_name_or_path: gpt2,gpt2-medium,gpt2-large
+      # Multiple seeds per model
+      seed: 42,43,44,45,46
+
+# Override for sweep-specific settings
+wandb:
+  project: lrw-representation-probe
+  group: "convergence_sweep"
+  tags:
+    - convergence
+    - multi-seed
+    - sweep
