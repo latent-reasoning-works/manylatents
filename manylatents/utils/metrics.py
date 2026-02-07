@@ -40,19 +40,17 @@ def compute_knn(
         import faiss
 
         d = data.shape[1]
-        index_cpu = faiss.IndexFlatL2(d)
+        index = faiss.IndexFlatL2(d)
 
-        # Try GPU if available
+        # Try GPU if available (faiss-gpu-cu12 package)
         backend = "faiss-cpu"
-        if faiss.get_num_gpus() > 0:
+        if getattr(faiss, "get_num_gpus", lambda: 0)() > 0:
             try:
                 res = faiss.StandardGpuResources()
-                index = faiss.index_cpu_to_gpu(res, 0, index_cpu)
+                index = faiss.index_cpu_to_gpu(res, 0, index)
                 backend = "faiss-gpu"
             except Exception:
-                index = index_cpu
-        else:
-            index = index_cpu
+                pass
 
         index.add(data)
         distances, indices = index.search(data, n_neighbors)
