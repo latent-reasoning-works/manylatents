@@ -18,10 +18,10 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
-from manylatents.algorithms.encoder import FoundationEncoder
+from manylatents.dogma.encoders.base import FoundationEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
-from manylatents.utils.metrics import compute_knn, flatten_and_unroll_metrics
+from manylatents.utils.metrics import compute_knn, compute_svd_cache, flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -238,25 +238,42 @@ def evaluate_embeddings(
         logger.info(f"Computing shared kNN with max_k={max_k} for {len(k_values)} unique k values: {sorted(k_values)}")
         knn_cache = _compute_knn_cache(emb_sub, max_k)
 
+    # --- Shared SVD computation for metrics that need it (PR, TSA) ---
+    svd_cache = None
+    if knn_cache is not None:
+        # Discover which metrics accept _svd_cache and collect their k values
+        svd_k_values = set()
+        for metric_cfg in metric_cfgs.values():
+            metric_fn_probe = hydra.utils.instantiate(metric_cfg)
+            sig = inspect.signature(metric_fn_probe)
+            if "_svd_cache" in sig.parameters:
+                for param in ['k', 'n_neighbors']:
+                    if hasattr(metric_cfg, param):
+                        val = getattr(metric_cfg, param)
+                        if isinstance(val, (int, float)) and val > 0:
+                            svd_k_values.add(int(val))
+        if svd_k_values:
+            _, knn_indices = knn_cache
+            logger.info(f"Computing shared SVD cache for k values: {sorted(svd_k_values)}")
+            svd_cache = compute_svd_cache(emb_sub, knn_indices, svd_k_values)
+
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
 
-        # Only pass _knn_cache if metric accepts it
+        # Build kwargs, only passing caches the metric accepts
         sig = inspect.signature(metric_fn)
+        call_kwargs: dict[str, Any] = dict(
+            embeddings=emb_sub,
+            dataset=ds_sub,
+            module=module,
+        )
         if "_knn_cache" in sig.parameters and knn_cache is not None:
-            raw_result = metric_fn(
-                embeddings=emb_sub,
-                dataset=ds_sub,
-                module=module,
-                _knn_cache=knn_cache,
-            )
-        else:
-            raw_result = metric_fn(
-                embeddings=emb_sub,
-                dataset=ds_sub,
-                module=module,
-            )
+            call_kwargs["_knn_cache"] = knn_cache
+        if "_svd_cache" in sig.parameters and svd_cache is not None:
+            call_kwargs["_svd_cache"] = svd_cache
+
+        raw_result = metric_fn(**call_kwargs)
 
         # Unpack (value, ColormapInfo) tuples from metrics that provide viz metadata
         if (
@@ -483,7 +500,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     # --- Algorithm Execution ---
     embeddings: Dict[str, Any] = {}
 
-    if cfg.eval_only:
+    if OmegaConf.select(cfg, "eval_only", default=False):
         logger.info("Evaluation-only mode: Loading precomputed latent outputs.")
         embeddings = load_precomputed_embeddings(cfg)
     else:
