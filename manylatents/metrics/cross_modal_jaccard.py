@@ -6,9 +6,9 @@ modalities without requiring projection to a common dimension.
 
 from typing import Dict, Optional, Tuple, Union
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.metrics import compute_knn
 
 
 def _ensure_2d(arr: np.ndarray) -> np.ndarray:
@@ -25,18 +25,18 @@ def compute_knn_indices(
 ) -> np.ndarray:
     """Compute k-nearest neighbor indices for each sample.
 
+    Uses FAISS when available (~10-50x faster), sklearn otherwise.
+
     Args:
         embeddings: Array of shape (N, D).
         k: Number of neighbors to find.
-        metric: Distance metric.
+        metric: Distance metric (only 'euclidean' supported with FAISS).
 
     Returns:
         Array of shape (N, k) with neighbor indices.
     """
     embeddings = _ensure_2d(embeddings)
-    nn = NearestNeighbors(n_neighbors=k + 1, metric=metric, algorithm="auto")
-    nn.fit(embeddings)
-    indices = nn.kneighbors(return_distance=False)[:, 1:]  # Exclude self
+    _, indices = compute_knn(embeddings, k=k, include_self=False)
     return indices
 
 

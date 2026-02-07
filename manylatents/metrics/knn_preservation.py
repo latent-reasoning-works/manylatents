@@ -1,9 +1,9 @@
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.utils.metrics import compute_knn
 
 
 def KNNPreservation(
@@ -20,6 +20,7 @@ def KNNPreservation(
 
     This metric reflects the proportion of shared neighbors for each point between the
     high-dimensional space and the low-dimensional embedding.
+    kNN is computed via FAISS when available (~10-50x faster), sklearn otherwise.
 
     Parameters:
         embeddings: Low-dimensional embeddings of shape (n_samples, n_components).
@@ -38,8 +39,7 @@ def KNNPreservation(
     n_samples = dataset.data.shape[0]
 
     # High-dimensional kNN (always computed - no cache for high-dim)
-    knn_high = NearestNeighbors(n_neighbors=n_neighbors, metric=metric).fit(dataset.data)
-    neighbors_high = knn_high.kneighbors(return_distance=False)
+    _, neighbors_high = compute_knn(dataset.data, k=n_neighbors, include_self=False)
 
     # Low-dimensional (embedding) kNN - use cache if available
     if _knn_cache is not None:
@@ -47,8 +47,7 @@ def KNNPreservation(
         # Slice to required k (indices includes self at 0)
         neighbors_low = indices[:, 1:n_neighbors + 1]
     else:
-        knn_low = NearestNeighbors(n_neighbors=n_neighbors, metric=metric).fit(embeddings)
-        neighbors_low = knn_low.kneighbors(return_distance=False)
+        _, neighbors_low = compute_knn(embeddings, k=n_neighbors, include_self=False)
 
     # Compute per-sample neighbor overlap
     overlap_scores = np.array([

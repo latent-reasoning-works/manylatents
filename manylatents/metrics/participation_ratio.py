@@ -2,10 +2,10 @@ import logging
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.metrics import compute_knn
 
 logger = logging.getLogger(__name__)
 
@@ -49,27 +49,28 @@ def ParticipationRatio(
         # all_idx includes self at index 0, slice [0:n_neighbors+1] to get self + k neighbors
         all_idx = all_idx[:, :n_neighbors + 1]
     else:
-        # build knn graph (include the point itself by doing k+1)
-        nbrs = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(embeddings)
-        _, all_idx = nbrs.kneighbors(embeddings)
+        # Compute kNN (FAISS if available, sklearn fallback)
+        _, all_idx = compute_knn(embeddings, k=n_neighbors, include_self=True)
 
-    pr_list = []
-    for idx in all_idx:
-        neigh_pts = embeddings[idx[1:]]      # drop the query point itself
-        centered = neigh_pts - neigh_pts.mean(axis=0)
-        cov = np.cov(centered, rowvar=False)
+    # Vectorized: gather neighborhoods, batch SVD in chunks to control memory
+    n_samples = embeddings.shape[0]
+    k = all_idx.shape[1] - 1  # exclude self
+    chunk_size = max(1, min(10_000, int(2e9 / (k * embeddings.shape[1] * 4))))
 
-        # get eigenvalues via SVD
-        eigs = np.linalg.svd(cov, compute_uv=False)
-        total = eigs.sum()
-        if total <= 0:
-            pr = 0.0
-        else:
-            pr = (total * total) / np.sum(eigs * eigs)
-
-        pr_list.append(pr)
-
-    pr_arr = np.array(pr_list, dtype=float)
+    pr_arr = np.empty(n_samples, dtype=np.float64)
+    for start in range(0, n_samples, chunk_size):
+        end = min(start + chunk_size, n_samples)
+        # (chunk, k, d)
+        neigh = embeddings[all_idx[start:end, 1:]]
+        centered = neigh - neigh.mean(axis=1, keepdims=True)
+        # Batch SVD: singular values shape (chunk, min(k, d))
+        s = np.linalg.svd(centered, compute_uv=False)
+        # Eigenvalues of covariance ∝ s²
+        s2 = s * s
+        total = s2.sum(axis=1)
+        sum_sq = (s2 * s2).sum(axis=1)
+        pr_chunk = np.where(total > 0, total * total / sum_sq, 0.0)
+        pr_arr[start:end] = pr_chunk
 
     if return_per_sample:
         logger.info(f"ParticipationRatio: per-sample PR, mean={pr_arr.mean():.3f}")

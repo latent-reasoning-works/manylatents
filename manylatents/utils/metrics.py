@@ -1,11 +1,78 @@
 import copy
+import logging
 from itertools import product
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 from omegaconf import DictConfig, ListConfig
 from scipy.sparse.csgraph import connected_components, shortest_path
 from sklearn.neighbors import kneighbors_graph
+
+logger = logging.getLogger(__name__)
+
+
+def compute_knn(
+    data: np.ndarray,
+    k: int,
+    include_self: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute k-nearest neighbors using FAISS-GPU > FAISS-CPU > sklearn.
+
+    Automatically selects the fastest available backend:
+    1. FAISS-GPU if a CUDA device is available (~100x faster than CPU)
+    2. FAISS-CPU if faiss is installed (~10-50x faster than sklearn)
+    3. sklearn NearestNeighbors as fallback
+
+    Args:
+        data: (n_samples, n_features) float32 array.
+        k: Number of neighbors (excluding self).
+        include_self: If True, returns k+1 columns with self at index 0.
+            If False, returns k columns (self excluded).
+
+    Returns:
+        (distances, indices) — both shape (n_samples, k+1) if include_self,
+        or (n_samples, k) if not.
+    """
+    data = np.ascontiguousarray(data, dtype=np.float32)
+    n_neighbors = k + 1  # always query k+1 to include self, then trim
+
+    try:
+        import faiss
+
+        d = data.shape[1]
+        index = faiss.IndexFlatL2(d)
+
+        # Try GPU if available (faiss-gpu-cu12 package)
+        backend = "faiss-cpu"
+        if getattr(faiss, "get_num_gpus", lambda: 0)() > 0:
+            try:
+                res = faiss.StandardGpuResources()
+                index = faiss.index_cpu_to_gpu(res, 0, index)
+                backend = "faiss-gpu"
+            except Exception:
+                pass
+
+        index.add(data)
+        distances, indices = index.search(data, n_neighbors)
+        # FAISS returns squared L2; convert to Euclidean for sklearn compat
+        distances = np.sqrt(np.maximum(distances, 0))
+        logger.info(f"compute_knn: {backend}, n={data.shape[0]}, d={d}, k={k}")
+    except Exception as e:
+        # Catches ImportError (no faiss), AttributeError (faiss-gpu without CUDA
+        # runtime — module loads but symbols like IndexFlatL2 are missing), etc.
+        if not isinstance(e, ImportError):
+            logger.warning(f"FAISS failed ({type(e).__name__}: {e}), falling back to sklearn")
+        from sklearn.neighbors import NearestNeighbors
+
+        nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)
+        distances, indices = nbrs.kneighbors(data)
+        logger.info(f"compute_knn: sklearn, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+
+    if not include_self:
+        distances = distances[:, 1:]
+        indices = indices[:, 1:]
+
+    return distances, indices
 
 
 def flatten_and_unroll_metrics(
