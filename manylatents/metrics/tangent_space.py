@@ -2,10 +2,10 @@ import logging
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import ColormapInfo
+from manylatents.utils.metrics import compute_knn
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,7 @@ def TangentSpaceApproximation(
         _, indices = _knn_cache
         indices = indices[:, :n_neighbors + 1]
     else:
-        nbrs = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(embeddings)
-        _, indices = nbrs.kneighbors(embeddings)
+        _, indices = compute_knn(embeddings, k=n_neighbors, include_self=True)
 
     dims = []
     for idx in indices:

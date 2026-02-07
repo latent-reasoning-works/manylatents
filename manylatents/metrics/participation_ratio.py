@@ -2,10 +2,10 @@ import logging
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.metrics import compute_knn
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +49,8 @@ def ParticipationRatio(
         # all_idx includes self at index 0, slice [0:n_neighbors+1] to get self + k neighbors
         all_idx = all_idx[:, :n_neighbors + 1]
     else:
-        # build knn graph (include the point itself by doing k+1)
-        nbrs = NearestNeighbors(n_neighbors=n_neighbors + 1).fit(embeddings)
-        _, all_idx = nbrs.kneighbors(embeddings)
+        # Compute kNN (FAISS if available, sklearn fallback)
+        _, all_idx = compute_knn(embeddings, k=n_neighbors, include_self=True)
 
     pr_list = []
     for idx in all_idx:
