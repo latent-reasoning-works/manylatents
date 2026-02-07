@@ -57,7 +57,11 @@ def compute_knn(
         # FAISS returns squared L2; convert to Euclidean for sklearn compat
         distances = np.sqrt(np.maximum(distances, 0))
         logger.info(f"compute_knn: {backend}, n={data.shape[0]}, d={d}, k={k}")
-    except ImportError:
+    except Exception as e:
+        # Catches ImportError (no faiss), AttributeError (faiss-gpu without CUDA
+        # runtime — module loads but symbols like IndexFlatL2 are missing), etc.
+        if not isinstance(e, ImportError):
+            logger.warning(f"FAISS failed ({type(e).__name__}: {e}), falling back to sklearn")
         from sklearn.neighbors import NearestNeighbors
 
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)

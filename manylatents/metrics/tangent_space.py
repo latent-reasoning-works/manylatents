@@ -45,31 +45,37 @@ def TangentSpaceApproximation(
     else:
         _, indices = compute_knn(embeddings, k=n_neighbors, include_self=True)
 
-    dims = []
-    for idx in indices:
-        local_points = embeddings[idx[1:]]  # Exclude the point itself.
-        local_centered = local_points - np.mean(local_points, axis=0)
-        # Perform SVD on the local neighborhood.
-        _, s, _ = np.linalg.svd(local_centered, full_matrices=False)
-        variance_explained = (s ** 2) / np.sum(s ** 2)
-        cum_variance = np.cumsum(variance_explained)
-        local_dim = np.searchsorted(cum_variance, variance_threshold) + 1
-        dims.append(local_dim)
-    
-    if return_per_sample:
-        # Round to integers for categorical labeling
-        dims_array = np.array(dims, dtype=int)
-        logger.info(f"TangentSpaceApproximation: Per-sample local dimensions (unique: {np.unique(dims_array)})")
+    # Vectorized: gather neighborhoods, batch SVD in chunks to control memory
+    n_samples = embeddings.shape[0]
+    k = indices.shape[1] - 1  # exclude self
+    chunk_size = max(1, min(10_000, int(2e9 / (k * embeddings.shape[1] * 4))))
 
-        # Provide visualization metadata - plotting util will generate colors dynamically
+    dims_array = np.empty(n_samples, dtype=np.int32)
+    for start in range(0, n_samples, chunk_size):
+        end = min(start + chunk_size, n_samples)
+        neigh = embeddings[indices[start:end, 1:]]  # (chunk, k, d)
+        centered = neigh - neigh.mean(axis=1, keepdims=True)
+        s = np.linalg.svd(centered, compute_uv=False)  # (chunk, min(k,d))
+        s2 = s * s
+        total_var = s2.sum(axis=1, keepdims=True)
+        total_var = np.where(total_var > 0, total_var, 1.0)  # avoid div by zero
+        var_explained = s2 / total_var
+        cum_var = np.cumsum(var_explained, axis=1)
+        # searchsorted per row: find first index where cum_var >= threshold
+        local_dims = (cum_var < variance_threshold).sum(axis=1) + 1
+        dims_array[start:end] = local_dims
+
+    if return_per_sample:
+        logger.info(f"TangentSpaceApproximation: Per-sample local dimensions: {dims_array}")
+
         viz_info = ColormapInfo(
-            cmap="categorical",  # Signal to generate discrete colors
-            label_names=None,  # Will be generated from data
-            label_format="Dim = {}",  # Template for label generation
+            cmap="categorical",
+            label_names=None,
+            label_format="Dim = {}",
             is_categorical=True,
         )
         return dims_array, viz_info
     else:
-        avg_dim = float(np.mean(dims))
+        avg_dim = float(np.mean(dims_array))
         logger.info(f"TangentSpaceApproximation: Average local dimension computed as {avg_dim}")
         return avg_dim
