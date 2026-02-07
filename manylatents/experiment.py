@@ -18,7 +18,8 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
-from manylatents.callbacks.embedding.base import EmbeddingCallback
+from manylatents.algorithms.encoder import FoundationEncoder
+from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
@@ -238,25 +239,39 @@ def evaluate_embeddings(
         logger.info(f"Computing shared kNN with max_k={max_k} for {len(k_values)} unique k values: {sorted(k_values)}")
         knn_cache = _compute_knn_cache(emb_sub, max_k)
 
-    results: dict[str, float] = {}
+    results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
 
         # Only pass _knn_cache if metric accepts it
         sig = inspect.signature(metric_fn)
         if "_knn_cache" in sig.parameters and knn_cache is not None:
-            results[metric_name] = metric_fn(
+            raw_result = metric_fn(
                 embeddings=emb_sub,
                 dataset=ds_sub,
                 module=module,
                 _knn_cache=knn_cache,
             )
         else:
-            results[metric_name] = metric_fn(
+            raw_result = metric_fn(
                 embeddings=emb_sub,
                 dataset=ds_sub,
                 module=module,
             )
+
+        # Unpack (value, ColormapInfo) tuples from metrics that provide viz metadata
+        if (
+            isinstance(raw_result, tuple)
+            and len(raw_result) == 2
+            and isinstance(raw_result[1], ColormapInfo)
+        ):
+            value, viz_info = raw_result
+            results[metric_name] = value
+            results[f"{metric_name}__viz"] = viz_info
+            logger.debug(f"Metric {metric_name} provided visualization metadata")
+        else:
+            results[metric_name] = raw_result
+
     return results
 
 @evaluate.register(LightningModule)

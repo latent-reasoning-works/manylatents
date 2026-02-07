@@ -1,0 +1,21 @@
+_target_: manylatents.algorithms.lightning.latent_ode.LatentODE
+datamodule: ${data}
+network:
+  _target_: manylatents.algorithms.lightning.networks.latent_ode.LatentODENetwork
+  input_dim: null # inferred from data in setup()
+  latent_dim: 16
+  hidden_dim: 128
+  encoder_hidden_dims: [256, 128]
+  decoder_hidden_dims: [128, 256]
+  ode_n_layers: 2
+  solver: dopri5
+  rtol: 1e-4
+  atol: 1e-4
+  use_adjoint: true
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+loss:
+  _target_: manylatents.algorithms.lightning.losses.mse.MSELoss
+integration_times: [0.0, 1.0]

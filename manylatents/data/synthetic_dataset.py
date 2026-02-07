@@ -63,6 +63,19 @@ class SyntheticDataset(Dataset):
     def get_gt_dists(self):
         pass
 
+    def get_colormap_info(self):
+        """
+        Return colormap information for visualization.
+
+        Default implementation returns viridis colormap with no label names.
+        Override in subclasses for dataset-specific colormaps.
+
+        Returns:
+            ColormapInfo with default viridis colormap.
+        """
+        from manylatents.callbacks.embedding.base import ColormapInfo
+        return ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+
 
 class SwissRoll(SyntheticDataset):
     def __init__(
@@ -709,6 +722,37 @@ class DLAtree(SyntheticDataset):
     #         import graphtools
     #         self.graph = graphtools.Graph(self.data_gt, knn=10, decay=None)
     #     return self.graph
+
+    def get_colormap_info(self):
+        """
+        Return DLA tree specific colormap.
+
+        Uses the discrete branch colormap from mappings.py.
+        Falls back to viridis if more than 10 branches.
+
+        Returns:
+            ColormapInfo with branch-specific colors and label names.
+        """
+        from manylatents.callbacks.embedding.base import ColormapInfo
+        from manylatents.utils.mappings import cmap_dla_tree
+
+        n_branch = getattr(self, 'n_branch', len(set(self.metadata)) if self.metadata is not None else 0)
+
+        if n_branch > 10:
+            logging.warning(
+                f"DLA tree has {n_branch} branches but colormap only supports 10. "
+                "Falling back to viridis."
+            )
+            return ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+
+        # Generate label names: "Branch 1", "Branch 2", etc.
+        label_names = {i: f"Branch {i}" for i in range(1, n_branch + 1)}
+
+        return ColormapInfo(
+            cmap=cmap_dla_tree,
+            label_names=label_names,
+            is_categorical=True
+        )
 
     def _make_sim_data(
         self,
@@ -1562,7 +1606,45 @@ class DLATreeFromGraph(SyntheticDataset):
     def get_graph(self):
         """Return the precomputed adjacency graph built during data generation."""
         return self.graph
-    
+
+    def get_colormap_info(self):
+        """
+        Return DLA tree specific colormap for DLATreeFromGraph.
+
+        Uses the discrete branch colormap from mappings.py.
+        Falls back to viridis if more than 10 unique edge labels.
+
+        Returns:
+            ColormapInfo with edge-specific colors and label names.
+        """
+        from manylatents.callbacks.embedding.base import ColormapInfo
+        from manylatents.utils.mappings import cmap_dla_tree
+
+        # Get unique edge labels from metadata
+        unique_labels = sorted(set(self.metadata)) if self.metadata is not None else []
+        n_unique = len(unique_labels)
+
+        if n_unique > 10:
+            logging.warning(
+                f"DLA tree has {n_unique} branches but colormap only supports 10. "
+                "Falling back to viridis."
+            )
+            return ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+
+        # Generate label names based on edge renumbering if available
+        if hasattr(self, 'edge_renumbering') and self.edge_renumbering:
+            # Labels have been renumbered to be sequential
+            label_names = {i: f"Edge {i}" for i in unique_labels}
+        else:
+            label_names = {i: f"Edge {i}" for i in unique_labels}
+
+        return ColormapInfo(
+            cmap=cmap_dla_tree,
+            label_names=label_names,
+            is_categorical=True
+        )
+
+
 if __name__ == "__main__":
 
     import matplotlib.pyplot as plt

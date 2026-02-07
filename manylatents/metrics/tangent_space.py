@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.callbacks.embedding.base import ColormapInfo
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def TangentSpaceApproximation(
     variance_threshold: float = 0.95,
     return_per_sample: bool = False,
     _knn_cache: Optional[Tuple[np.ndarray, np.ndarray]] = None,
-) -> Union[float, np.ndarray]:
+) -> Union[float, Tuple[np.ndarray, ColormapInfo]]:
     """
     Estimate the local manifold dimension by approximating the tangent space via PCA.
 
@@ -27,13 +28,15 @@ def TangentSpaceApproximation(
         module:       (unused) kept for Protocol compatibility.
         n_neighbors:  how many neighbors to use for local PCA.
         variance_threshold: cumulative variance threshold to determine local dim.
-        return_per_sample: if True, return per-sample dimensions; else return mean.
+        return_per_sample: if True, return per-sample dimensions with viz metadata.
         _knn_cache:   Optional (distances, indices) tuple from precomputed kNN.
                       Indices should be shape (n_samples, max_k+1) including self.
 
     Returns:
         float: Average local dimension (if return_per_sample=False)
-        np.ndarray: Per-sample local dimensions (if return_per_sample=True)
+        Tuple[np.ndarray, ColormapInfo]: Per-sample dimensions with visualization
+            metadata (if return_per_sample=True). The ColormapInfo specifies
+            categorical rendering with dynamic label generation.
     """
     if _knn_cache is not None:
         # Use precomputed kNN indices, slice to required k
@@ -55,9 +58,18 @@ def TangentSpaceApproximation(
         dims.append(local_dim)
     
     if return_per_sample:
-        dims_array = np.array(dims)
-        logger.info(f"TangentSpaceApproximation: Per-sample local dimensions: {dims_array}")
-        return dims_array
+        # Round to integers for categorical labeling
+        dims_array = np.array(dims, dtype=int)
+        logger.info(f"TangentSpaceApproximation: Per-sample local dimensions (unique: {np.unique(dims_array)})")
+
+        # Provide visualization metadata - plotting util will generate colors dynamically
+        viz_info = ColormapInfo(
+            cmap="categorical",  # Signal to generate discrete colors
+            label_names=None,  # Will be generated from data
+            label_format="Dim = {}",  # Template for label generation
+            is_categorical=True,
+        )
+        return dims_array, viz_info
     else:
         avg_dim = float(np.mean(dims))
         logger.info(f"TangentSpaceApproximation: Average local dimension computed as {avg_dim}")
