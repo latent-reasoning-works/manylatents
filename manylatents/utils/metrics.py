@@ -11,6 +11,65 @@ from sklearn.neighbors import kneighbors_graph
 logger = logging.getLogger(__name__)
 
 
+def _svd_gpu(
+    embeddings: np.ndarray,
+    idx: np.ndarray,
+    chunk_size: int,
+) -> np.ndarray:
+    """Compute batched SVD on GPU via torch.linalg.svdvals.
+
+    Args:
+        embeddings: (n_samples, d) float32 array.
+        idx: (n_samples, k) neighbor indices (self excluded).
+        chunk_size: Number of samples per chunk.
+
+    Returns:
+        Singular values array (n_samples, min(k, d)).
+    """
+    import torch
+
+    device = torch.device("cuda")
+    emb_t = torch.from_numpy(embeddings).to(device)
+    idx_t = torch.from_numpy(idx).long().to(device)
+    n_samples = idx.shape[0]
+
+    sv_chunks = []
+    for start in range(0, n_samples, chunk_size):
+        end = min(start + chunk_size, n_samples)
+        neigh = emb_t[idx_t[start:end]]  # (chunk, k, d)
+        centered = neigh - neigh.mean(dim=1, keepdim=True)
+        s = torch.linalg.svdvals(centered)  # (chunk, min(k, d))
+        sv_chunks.append(s.cpu().numpy())
+
+    return np.concatenate(sv_chunks, axis=0)
+
+
+def _svd_cpu(
+    embeddings: np.ndarray,
+    idx: np.ndarray,
+    chunk_size: int,
+) -> np.ndarray:
+    """Compute batched SVD on CPU via np.linalg.svd.
+
+    Args:
+        embeddings: (n_samples, d) float32 array.
+        idx: (n_samples, k) neighbor indices (self excluded).
+        chunk_size: Number of samples per chunk.
+
+    Returns:
+        Singular values array (n_samples, min(k, d)).
+    """
+    n_samples = idx.shape[0]
+    sv_chunks = []
+    for start in range(0, n_samples, chunk_size):
+        end = min(start + chunk_size, n_samples)
+        neigh = embeddings[idx[start:end]]  # (chunk, k, d)
+        centered = neigh - neigh.mean(axis=1, keepdims=True)
+        s = np.linalg.svd(centered, compute_uv=False)  # (chunk, min(k, d))
+        sv_chunks.append(s)
+    return np.concatenate(sv_chunks, axis=0)
+
+
 def compute_svd_cache(
     embeddings: np.ndarray,
     knn_indices: np.ndarray,
@@ -18,9 +77,12 @@ def compute_svd_cache(
 ) -> Dict[int, np.ndarray]:
     """Compute SVD of centered kNN neighborhoods once for shared use across metrics.
 
+    Automatically selects the fastest available backend:
+    1. torch GPU if CUDA is available (~10-50x faster than CPU for large batches)
+    2. numpy CPU as fallback
+
     For each k in k_values, gathers k neighbors per sample, centers them,
-    and computes singular values via batch SVD. Uses the same chunking pattern
-    as ParticipationRatio and TangentSpaceApproximation.
+    and computes singular values via batch SVD.
 
     Args:
         embeddings: (n_samples, d) array.
@@ -30,25 +92,36 @@ def compute_svd_cache(
     Returns:
         Dict mapping k -> singular values array of shape (n_samples, min(k, d)).
     """
+    # Detect GPU availability once
+    use_gpu = False
+    try:
+        import torch
+        if torch.cuda.is_available():
+            use_gpu = True
+    except ImportError:
+        pass
+
+    backend = "torch-gpu" if use_gpu else "numpy-cpu"
+    embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
     n_samples, d = embeddings.shape
     result = {}
 
     for k in sorted(k_values):
-        # Slice indices: skip self (index 0), take next k neighbors
-        idx = knn_indices[:, 1:k + 1]  # (n_samples, k)
+        idx = knn_indices[:, 1:k + 1]  # (n_samples, k), skip self
         chunk_size = max(1, min(10_000, int(2e9 / (k * d * 4))))
 
-        sv_chunks = []
-        for start in range(0, n_samples, chunk_size):
-            end = min(start + chunk_size, n_samples)
-            neigh = embeddings[idx[start:end]]  # (chunk, k, d)
-            centered = neigh - neigh.mean(axis=1, keepdims=True)
-            s = np.linalg.svd(centered, compute_uv=False)  # (chunk, min(k, d))
-            sv_chunks.append(s)
+        if use_gpu:
+            try:
+                result[k] = _svd_gpu(embeddings, idx, chunk_size)
+            except Exception as e:
+                logger.warning(f"GPU SVD failed ({type(e).__name__}: {e}), falling back to CPU")
+                result[k] = _svd_cpu(embeddings, idx, chunk_size)
+                backend = "numpy-cpu (gpu-fallback)"
+        else:
+            result[k] = _svd_cpu(embeddings, idx, chunk_size)
 
-        result[k] = np.concatenate(sv_chunks, axis=0)
         logger.info(
-            f"compute_svd_cache: k={k}, shape={result[k].shape}"
+            f"compute_svd_cache: {backend}, k={k}, shape={result[k].shape}"
         )
 
     return result
