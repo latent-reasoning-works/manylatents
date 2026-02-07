@@ -52,6 +52,7 @@ def LocalIntrinsicDimensionality(
 
     # LID computation: MLE estimator
     r_k = distances[:, -1]
+    r_k = np.maximum(r_k, 1e-10)  # prevent division by zero (duplicate embeddings)
     lid_values = -k / np.sum(np.log(distances / r_k[:, None] + 1e-10), axis=1)
 
     if return_per_sample:
