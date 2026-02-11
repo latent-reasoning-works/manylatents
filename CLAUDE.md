@@ -1,390 +1,241 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Agent instructions for manyLatents. Read this first, then MEMORY.md.
 
-## Common Development Commands
+## Project Identity
 
-### Environment Setup
-```bash
-uv sync                    # Install dependencies and create virtual environment
-source .venv/bin/activate  # Activate virtual environment
-```
+manyLatents is a unified framework for dimensionality reduction and neural network analysis. Built on PyTorch Lightning + Hydra.
 
-### Testing
-```bash
-pytest                                           # Run all tests
-pytest manylatents/algorithms/test_latentmodule_hydra.py # Run specific test file
-pytest manylatents/tests/algorithms/dr_compliance_test.py # Run compliance tests for DR modules
-```
+**Two execution modes:**
+- **CLI** (`python -m manylatents.main`) — single-step execution: one algorithm + metrics on one dataset. This is the primary user-facing interface.
+- **Python API** (`manylatents.api.run()`) — programmatic interface that enables multi-step workflows when called directly by other agents or scripts. Supports `input_data` for chaining results between calls and `pipeline` configs for sequential steps.
 
-### Running Experiments
-```bash
-python -m manylatents.main experiment=hgdp_pca                                    # Basic experiment
-python -m manylatents.main experiment=hgdp_pca algorithm.dimensionality_reduction.n_components=10  # Override hyperparameters
-python -m manylatents.main experiment=representation_probe                       # HF model training with representation probing
-```
+**manyLatents is NOT:**
+- An orchestration framework (future: manyAgents handles multi-step orchestration by calling the API)
+- An RL training system (future: Geomancer)
+- A cluster job manager (that's Shop)
 
-### Code Quality
-```bash
-pre-commit run --all-files  # Run linting and formatting
-```
+## Architecture at a Glance
 
-## Architecture Overview
+### Two Algorithm Base Classes
 
-### Core Framework Structure
-The codebase is built around **PyTorch Lightning**, **Hydra**, and **uv** for dependency management. The system provides a unified interface for applying dimensionality reduction and neural network techniques to diverse datasets.
+- **`LatentModule`** (`manylatents.algorithms.latent.latent_module_base`) — fit/transform for non-neural algorithms (PCA, UMAP, t-SNE, PHATE, DiffusionMap, MDS, Archetypes, MultiscalePHATE). Subclass this for any algorithm that doesn't need a training loop. The **FoundationEncoder pattern** is a LatentModule where `fit()` is a no-op and `transform()` wraps a pretrained model. It is NOT a separate base class — it is a usage convention within LatentModule for frozen/pretrained encoders.
+- **`LightningModule` subclasses** (`manylatents.algorithms.lightning`) — neural networks with Lightning training loops. Subclass this for autoencoders, VAEs, Latent ODEs, or any trainable architecture.
 
-### Key Components
+**Decision rule:** If the algorithm trains with backprop, use LightningModule. If not, use LatentModule. Frozen foundation models are LatentModules.
 
-#### 1. Latent Module System (`manylatents/algorithms/`)
-- **Base Class**: `LatentModule` in `latent_module_base.py` provides the core interface with `fit()`, `transform()`, and `fit_transform()` methods
-- **Algorithms**: Traditional DR methods (PCA, t-SNE, PHATE, UMAP) and neural network modules all inherit from this base
-- **Neural Networks**: Located in `manylatents/algorithms/networks/` - autoencoder and other architectures that can be used standalone or chained with DR methods
+### Data Contract
 
-#### 2. Experiment Entry Point (`manylatents/main.py`)
-The main entry point supports two types of algorithms:
+`EmbeddingOutputs = dict[str, Any]` — the universal interchange format. This is a HANDOFF INTERFACE.
 
-**Algorithm Types:**
-- **LatentModule instances**: Traditional DR algorithms that implement fit/transform interface
-- **LightningModule instances**: Neural network models (autoencoders, HF models) trained with PyTorch Lightning
+Required key: `"embeddings"`. Optional keys: `"label"`, `"metadata"`, `"scores"`.
 
-Key experiment stages:
-1. Data instantiation and loading
-2. Algorithm instantiation
-3. Latent embedding computation (fit/transform for traditional methods, training for neural networks)
-4. Evaluation with configurable metrics
-5. Callback processing for visualization, probing, and logging
+It is a dict (not a dataclass) because stateless agents and downstream consumers must read/write it without schema migration. When a new metric injects a custom field, every downstream consumer still works.
 
-**Note:** Sequential pipeline mode (chaining algorithms) is deprecated from CLI but available through the Python API via `manylatents.api.run()`.
+### Metric Contract
 
-#### 3. Configuration System (`manylatents/configs/`)
-Highly modular Hydra-based configuration:
-- **Experiments**: Pre-defined combinations in `manylatents/configs/experiment/`
-- **Algorithms**: Located in `manylatents/configs/algorithms/` with separate configs for DR methods (`latent/`) and neural models (`lightning/`)
-- **Data**: Dataset-specific configurations
-- **Metrics**: Configurable evaluation metrics for embeddings and models
-- **Sweeps**: Hyperparameter sweep configurations for large-scale experiments
-
-#### 4. Data Management (`manylatents/data/`)
-- Supports various dataset types: genomic (HGDP, AOU, UKBB), synthetic (Swiss roll, saddle surface), and single-cell data
-- **PrecomputedDataModule**: Canonical way to load cached embeddings with optional metadata support
-- **Split vs Full modes**: Configurable train/test splitting
-
-### Precomputed Embeddings Pattern
-
-**PrecomputedDataModule** is the canonical way to load cached embeddings:
+Metrics follow the `Metric` protocol (`manylatents.metrics.metric`):
 
 ```python
-# Basic usage - just load embeddings
-dm = PrecomputedDataModule(path="embeddings.npy")
-
-# With metadata for domain-specific access
-dm = PrecomputedDataModule(
-    path="embeddings.npy",
-    metadata_path="metadata.parquet",
-)
-dm.setup()
-dm.get_metadata_column("label")  # Access any metadata column
+def __call__(
+    self,
+    embeddings: np.ndarray,
+    dataset=None,
+    module=None,
+    _knn_cache=None,
+) -> float | tuple[float, np.ndarray] | dict[str, Any]
 ```
 
-**Domain DataModules** inherit from PrecomputedDataModule for dual-mode support:
+Three evaluation contexts: `dataset`, `embedding`, `module`. Registered via Hydra `_target_` with `_partial_: True`. Parameters (like `return_per_sample`, `k`, `n_neighbors`) are set in Hydra config, not at call time.
 
-```python
-class MyDomainDataModule(PrecomputedDataModule):
-    def __init__(
-        self,
-        # Raw mode params
-        raw_data_dir: Optional[str] = None,
-        # Precomputed mode params
-        path: Optional[str] = None,
-        metadata_path: Optional[str] = None,
-        **kwargs,
-    ):
-        self._raw_mode = path is None
-        if self._raw_mode:
-            super().__init__(data=placeholder, **kwargs)
-            # Store raw mode params
-        else:
-            super().__init__(path=path, metadata_path=metadata_path, **kwargs)
+`flatten_and_unroll_metrics()` handles nested/swept metric configs. List-valued parameters expand via Cartesian product.
 
-    # Domain methods work in both modes
-    def get_my_domain_labels(self):
-        if self._raw_mode:
-            return self._raw_metadata["label"]
-        return self.get_metadata_column("label")
+### Namespace Extension Pattern
+
+`manylatents-omics` extends via `pkgutil.extend_path()` in `__init__.py`. Extensions add algorithms, metrics, and data modules to the same namespace. Core never imports from extensions; extensions import from core.
+
+## Handoff Interfaces
+
+### Starting a Session
+
+1. Read this file (CLAUDE.md) — understand the rules
+2. Read MEMORY.md — understand current state, known results, known gotchas
+3. Check for any consolidated results or EmbeddingOutputs from previous runs
+
+### Ending a Session
+
+1. Update MEMORY.md with: what was done, what was learned, what's pending
+2. Ensure any new scripts have explicit input/output declarations in docstrings
+3. Do NOT leave implicit state — if the next session needs to know something, write it down
+
+### Compute Handoff (SLURM)
+
+- You cannot SSH into compute nodes or wait for jobs
+- Workflow: write scripts -> user runs `sbatch` (or Shop launcher) -> you pick up results next session
+- Every submission script must be self-documenting: partition, GPU count, venv path, exact command
+- For Shop launcher configs, reference `shop/CLAUDE.md`
+
+## Safety Constraints (Non-Negotiable)
+
+These are HARD RULES. Violating them can get users locked out of compute clusters.
+
+- **NEVER** run computation on login nodes. Every compute command goes through `sbatch`, `srun`, or `salloc`. If you generate a script that runs `python train.py` directly on a login node, that is a FATAL mistake.
+- **ALWAYS** set time limits. Default to 15 minutes for test jobs. Never exceed 4 hours without explicit user confirmation.
+- **ALWAYS** use `fast_dev_run=true` or `max_epochs<=2` for testing. Unbounded training loops are forbidden in test contexts.
+- **ALL** outputs go to `$SCRATCH` (on Mila) or a designated output directory. Never write to `$HOME` on cluster systems.
+- **ALWAYS** set `WANDB_MODE=offline` for test runs. Use `logger=none` for CI. Only go online when the run config is verified.
+- **NEVER** run `pip install` outside a venv. Use `uv`, not `pip`, for dependency management.
+- If you encounter a CAPTCHA, authentication prompt, or cluster access issue, **STOP** and inform the user.
+
+## Key File Locations
+
+### Core Package
+
+| Location | Purpose | Config Group |
+|----------|---------|-------------|
+| `manylatents/algorithms/latent/` | LatentModule algorithms | `algorithms/latent` |
+| `manylatents/algorithms/lightning/` | LightningModule algorithms | `algorithms/lightning` |
+| `manylatents/metrics/` | Evaluation metrics | `metrics/embedding`, `metrics/dataset`, `metrics/module` |
+| `manylatents/data/` | Data modules & datasets | `data` |
+| `manylatents/callbacks/` | Embedding & trainer callbacks | `callbacks/embedding` |
+| `manylatents/experiment.py` | Core engine: `run_algorithm()`, `execute_step()`, `evaluate()` |
+| `manylatents/api.py` | Programmatic API: `run()` for agent-driven multi-step workflows |
+| `manylatents/main.py` | CLI entry point: `python -m manylatents.main` |
+| `manylatents/configs/` | Hydra config root |
+| `manylatents/plugins/search_path.py` | Hydra `SearchPathPlugin` registration |
+
+### Hydra Config Groups
+
+```
+configs/
+  algorithms/
+    latent/         pca, umap, tsne, phate, diffusionmap, mds, aa, noop, classifier, multiscale_phate
+    lightning/      ae_reconstruction, aanet_reconstruction, latent_ode, hf_trainer
+      loss/         default, ae_dim, ae_neighbors, ae_shape
+      network/      autoencoder, aanet
+      optimizer/    adam
+  data/             swissroll, torus, saddle_surface, gaussian_blobs, clusters, dla_tree, precomputed, test_data, ...
+  metrics/
+    embedding/      trustworthiness, continuity, participation_ratio, fractal_dimension, knn_preservation, local_intrinsic_dimensionality, anisotropy, magnitude_dimension, persistent_homology, tangent_space, pearson_correlation, diffusion_curvature
+    dataset/        admixture_laplacian, stratification, sample_id, test_metric
+    module/         affinity_spectrum, connected_components, kernel_matrix_sparsity, kernel_matrix_density, diffusion_map_correlation
+    sampling/       random, stratified, farthest_point
+  callbacks/embedding/  default, minimal, save_embeddings, plot_embeddings, wandb_log_scores
+  experiment/       single_algorithm, single_algorithm_no_metrics, eval_algorithm
+  trainer/          default
+  logger/           none, wandb
+  cluster/          mila, mila_remote, narval
+  launcher/         basic, cpu_job, gpu_job, mila_cluster, mila_cpu_cluster, cc_cpu, cc_gpu
 ```
 
-**Synthetic DataModules** (SwissRoll, etc.) don't inherit - use PrecomputedDataModule directly for caching.
+### Namespace Extensions (manylatents-omics)
 
-#### 5. Evaluation System (`manylatents/metrics/`)
-Comprehensive metric computation using single dispatch pattern:
-- **Embedding metrics**: Trustworthiness, continuity, participation ratio, fractal dimension, etc.
-- **Dataset-specific metrics**: Geographic preservation, admixture preservation for genomic data
-- **Model metrics**: For neural network evaluation
+| Location | Purpose |
+|----------|---------|
+| `manylatents/dogma/encoders/` | Foundation model encoders (Evo2, ESM3, Orthrus, AlphaGenome) |
+| `manylatents/dogma/algorithms/` | Fusion algorithms (CentralDogmaFusion, BatchEncoder) |
+| `manylatents/dogma/data/` | Sequence & ClinVar data modules |
+| `manylatents/popgen/data/` | ManifoldGeneticsDataModule |
+| `manylatents/popgen/metrics/` | GeographicPreservation, AdmixturePreservation |
+| `manylatents/singlecell/data/` | AnnDataModule for .h5ad files |
 
-#### 6. Callback System
-- **Lightning Callbacks**: Standard PyTorch Lightning callbacks for training (see `manylatents/lightning/callbacks/`)
-  - `RepresentationProbeCallback`: Extracts activations from model layers at configurable triggers and computes diffusion operators for trajectory analysis
-- **Embedding Callbacks**: Custom callbacks for post-processing embeddings (plotting, saving, logging to W&B)
+### Shop Integration
 
-### Adding New Components
+| Location | Purpose |
+|----------|---------|
+| `shop/shop/hydra/config_templates/cluster/` | Cluster configs (mila, narval, cedar) |
+| `shop/shop/hydra/config_templates/resources/` | Resource templates (cpu, gpu) |
+| `shop.hydra.launchers.RemoteSlurmLauncher` | Remote SLURM submission via SSH |
 
-#### New Dimensionality Reduction Method
-1. Create class inheriting from `LatentModule` in `manylatents/algorithms/yourmethod.py`
-2. Add Hydra config in `manylatents/configs/algorithm/dimensionality_reduction/yourmethod.yaml`
-3. Write tests in `manylatents/algorithms/yourmethod_test.py`
-4. Run compliance test to ensure interface compatibility
+## Common Tasks
 
-#### New Neural Network Architecture
-1. Create class inheriting from `LightningModule` in `manylatents/algorithms/networks/yournet.py`
-2. Add configs in `manylatents/configs/algorithm/model/network/yournet.yaml`
-3. Configure loss functions and optimizers as needed
-4. Test with the unified pipeline through `manylatents/main.py`
+### Add a new metric
 
-### Important Notes
-- **Hydra Integration**: All algorithms are instantiated via Hydra, enabling easy configuration and hyperparameter sweeps
-- **Evaluation System**: The `evaluate()` function uses single dispatch to handle both embedding dictionaries and LightningModule instances
-- **Output Management**: Results are saved in `outputs/<date>/<time>/` with full experiment logging and W&B integration
-- **Pipeline Mode**: Sequential pipelines (chaining algorithms) are available through `manylatents.api.run()` but deprecated from CLI
+1. Create `manylatents/metrics/your_metric.py` with a function matching the `Metric` protocol
+2. Create `manylatents/configs/metrics/embedding/your_metric.yaml` (or `dataset/` or `module/`)
+3. Add `_target_`, `_partial_: True`, and default parameters
+4. Import in `manylatents/metrics/__init__.py`
+5. Verify: `python -c "from manylatents.metrics import YourMetric"`
 
-### API Metrics Configuration
+### Add a new LatentModule algorithm
 
-**IMPORTANT**: When using `manylatents.api.run()` directly, metric configurations MUST include `_target_` keys pointing to the metric class. Empty dicts `{}` will NOT work.
+1. Create `manylatents/algorithms/latent/your_algo.py` inheriting from `LatentModule`
+2. Implement `fit(x, y=None)` and `transform(x)`
+3. Create `manylatents/configs/algorithms/latent/your_algo.yaml` with `_target_`
+4. Import in `manylatents/algorithms/latent/__init__.py`
+5. Test: `python -m manylatents.main algorithms/latent=your_algo data=swissroll`
 
-**This will NOT compute metrics (empty scores):**
+### Add a new LightningModule algorithm
+
+1. Create `manylatents/algorithms/lightning/your_algo.py` inheriting from `LightningModule`
+2. Implement `setup()`, `training_step()`, `encode()`, and `configure_optimizers()`
+3. Use `self.save_hyperparameters(ignore=["datamodule", "network", "loss"])`
+4. Create config in `manylatents/configs/algorithms/lightning/your_algo.yaml`
+5. Test: `python -m manylatents.main algorithms/lightning=your_algo data=swissroll trainer.fast_dev_run=true`
+
+### Run an experiment
+
+```bash
+# LatentModule
+python -m manylatents.main algorithms/latent=pca data=swissroll metrics/embedding=trustworthiness
+
+# LightningModule
+python -m manylatents.main algorithms/lightning=ae_reconstruction data=swissroll trainer.max_epochs=10
+
+# With SLURM (via Shop)
+python -m manylatents.main -m cluster=mila resources=gpu algorithms/latent=umap data=swissroll
+```
+
+### Use the Python API (for agent-driven multi-step workflows)
+
 ```python
+from manylatents.api import run
+
+# Single step
 result = run(
     data='swissroll',
-    algorithms={'latent': {'_target_': '...PCA', 'n_components': 10}},
-    metrics={
-        'embedding': {
-            'trustworthiness': {},  # Missing _target_ - WILL BE SKIPPED
-            'continuity': {}        # Missing _target_ - WILL BE SKIPPED
-        }
-    }
+    algorithms={'latent': {'_target_': 'manylatents.algorithms.latent.pca.PCAModule', 'n_components': 10}},
+    metrics={'embedding': {'trustworthiness': {
+        '_target_': 'manylatents.metrics.trustworthiness.Trustworthiness',
+        '_partial_': True, 'n_neighbors': 5
+    }}}
 )
-# result['scores'] == {}  (empty!)
-```
+embeddings = result['embeddings']
+scores = result['scores']
 
-**Correct usage with full metric configs:**
-```python
-result = run(
-    data='swissroll',
-    algorithms={'latent': {'_target_': '...PCA', 'n_components': 10}},
-    metrics={
-        'embedding': {
-            'trustworthiness': {
-                '_target_': 'manylatents.metrics.trustworthiness.Trustworthiness',
-                '_partial_': True,
-                'n_neighbors': 5,
-                'metric': 'euclidean'
-            },
-            'continuity': {
-                '_target_': 'manylatents.metrics.continuity.Continuity',
-                '_partial_': True,
-                'return_per_sample': True
-            },
-            'local_intrinsic_dimensionality': {
-                '_target_': 'manylatents.metrics.lid.LocalIntrinsicDimensionality',
-                '_partial_': True,
-                'k': 20
-            }
-        }
-    }
-)
-# result['scores'] contains computed metrics
-```
-
-**Why this matters:**
-- The `flatten_and_unroll_metrics()` function in `manylatents/utils/metrics.py` filters for configs with `_target_` keys
-- The manyAgents adapter handles this transformation automatically by loading configs from `manylatents/configs/metrics/`
-- When calling the API directly, you must provide the full Hydra-style configs
-
-**Available metric configs** (in `manylatents/configs/metrics/embedding/`):
-- `trustworthiness.yaml` - Local neighborhood preservation
-- `continuity.yaml` - Reverse trustworthiness
-- `local_intrinsic_dimensionality.yaml` - Local intrinsic dimensionality (LID)
-- `participation_ratio.yaml` - Effective dimensionality
-- `fractal_dimension.yaml` - Fractal structure measure
-- `knn_preservation.yaml` - k-NN graph preservation
-
-### Metric Evaluation Architecture
-
-**Entrypoints:**
-- `manylatents/main.py` - Hydra CLI with smart routing (single vs pipeline)
-- `manylatents/api.py` - Programmatic Python interface for manyAgents
-- `manylatents/experiment.py` - Core execution (`run_algorithm`)
-
-**Hydra Partial Instantiation:**
-All metrics use `_partial_: True` to create `functools.partial` objects. This defers parameter binding until call-time:
-
-```yaml
-trustworthiness:
-  _target_: manylatents.metrics.trustworthiness.Trustworthiness
-  _partial_: True      # Creates functools.partial
-  n_neighbors: 5
-```
-
-At execution time (experiment.py:187-193):
-```python
-metric_fn = hydra.utils.instantiate(metric_cfg)  # → functools.partial
-result = metric_fn(embeddings=emb, dataset=ds, module=module)  # Bound at call-time
-```
-
-**Multi-Scale Expansion:**
-List-valued parameters trigger Cartesian product expansion via `flatten_and_unroll_metrics()`:
-
-```yaml
-n_neighbors: [15, 25, 50, 100, 250]  # Expands to 5 separate metrics
-```
-
-Naming convention: `embedding.trustworthiness__n_neighbors_15`, `embedding.trustworthiness__n_neighbors_25`, etc.
-
-**Subsampling (DEPRECATED):**
-```yaml
-# OLD - deprecated, use sampling strategies instead
-metrics:
-  subsample_fraction: 0.1
-```
-
-### Sampling Strategies (Implemented)
-
-Pluggable sampling strategies for metric evaluation. Located in `manylatents/utils/sampling.py`.
-
-**Available Strategies:**
-
-| Strategy | Description | Use Case |
-|----------|-------------|----------|
-| `RandomSampling` | Random without replacement | Default, fast |
-| `StratifiedSampling` | Preserves label distribution | Population-balanced metrics |
-| `FarthestPointSampling` | Maximizes embedding coverage | Representative subsets |
-| `FixedIndexSampling` | Uses precomputed indices | Cross-setting comparisons |
-
-**Usage via Hydra Config:**
-```yaml
-metrics:
-  sampling:
-    _target_: manylatents.utils.sampling.RandomSampling
-    seed: 42
-    fraction: 0.1
-  embedding:
-    trustworthiness: {}
-```
-
-**Deterministic Index Workflow (for comparing across settings):**
-```python
-from manylatents.utils.sampling import RandomSampling, FixedIndexSampling
-
-# 1. Precompute indices once
-sampler = RandomSampling(seed=42)
-indices = sampler.get_indices(n_total=1000, fraction=0.1)
-np.save('shared_indices.npy', indices)
-
-# 2. Use same indices across different algorithm settings
-fixed = FixedIndexSampling(indices=np.load('shared_indices.npy'))
-emb_sub_A, ds_sub_A, _ = fixed.sample(embeddings_A, dataset_A)
-emb_sub_B, ds_sub_B, _ = fixed.sample(embeddings_B, dataset_B)
-```
-
-**Config Files:**
-- `configs/metrics/sampling/random.yaml`
-- `configs/metrics/sampling/stratified.yaml`
-- `configs/metrics/sampling/farthest_point.yaml`
-
-### Sampling Roadmap (Future)
-
-**Phase 2: Per-Metric Sampling** (Planned)
-```yaml
-metrics:
-  embedding:
-    trustworthiness:
-      _sampling:
-        strategy: stratified
-        fraction: 0.1
-        stratify_by: population_label
-```
-
-**Phase 3: Adaptive Sampling** (Planned)
-Automatic sampling based on dataset size and metric complexity (O(n²) metrics get smaller samples).
-
-**Phase 4: Reproducible Sampling with Caching** (Planned)
-Cache sampled subsets for reproducibility across runs.
-
-### Activation Collection for SAE Training
-
-**Workflow for offline SAE training on layer activations:**
-
-#### Step 1: Collect activations during training
-
-```bash
-python -m manylatents.main experiment=hf_training \
-    callbacks.trainer.probe.save_raw=true \
-    callbacks.trainer.probe.save_path="outputs/activations/"
-```
-
-This saves `.npy` files per layer per trigger step.
-
-#### Step 2: Train SAE on activations
-
-```bash
-python -m manylatents.main experiment=sae_training \
-    data.path=outputs/activations/ \
-    algorithms.lightning.network.input_dim=768
-```
-
-#### Step 3: Use trained SAE as gauge
-
-```python
-from manylatents.algorithms.lightning.networks.autoencoder import Autoencoder
-
-sae = Autoencoder.load_from_checkpoint("sae.ckpt")
-callback = RepresentationProbeCallback(
-    gauge=sae.encode,  # Any callable works as gauge
-    layer_specs=[...],
-    trigger=ProbeTrigger(every_n_steps=100),
+# Chaining: feed one step's output into the next
+result2 = run(
+    input_data=result['embeddings'],
+    algorithms={'latent': {'_target_': 'manylatents.algorithms.latent.phate.PHATEModule', 'n_components': 2}}
 )
 ```
 
-**Key insight:** The `gauge` parameter accepts any `Callable[[Tensor], Any]`. This includes:
-- `DiffusionGauge()` - default geometric measurement
-- `sae.encode` - sparse autoencoder encoding
-- `pca.fit_transform` - PCA projection
-- Any lambda function
+### Test namespace extension
 
-### Hydra `null` Override Issue
-
-**IMPORTANT**: Hydra does NOT support `null` as an override value. This causes `ValueError: Config group override must be a string or a list. Got NoneType`.
-
-**Problem Examples (these FAIL):**
 ```bash
-python -m manylatents.main experiment=single_algorithm callbacks=null
-python -m manylatents.main experiment=single_algorithm +callbacks=null
-python -m manylatents.main experiment=single_algorithm callbacks/embedding=null
+python -c "import manylatents; import manylatents.popgen; print('Namespace OK')"
 ```
 
-**Why this matters:**
-- Cannot disable config groups via command-line overrides
-- Cannot pass `null` through manyAgents adapter to manyLatents
-- Forces us to create explicit "none" or "minimal" config files
+## Known Gotchas
 
-**Current Workarounds:**
-1. Use `debug=true` to set wandb mode to "disabled" (but still initializes wandb with overhead)
-2. Create explicit config files like `metrics/null.yaml` with `defaults: [dataset: null, embedding: null, module: null]`
-3. Design default configs to be minimal/fast, with separate `_with_wandb` variants for logging
+**GOTCHA: FoundationEncoder is a LatentModule pattern, NOT a separate class** -> FoundationEncoder is a usage convention within LatentModule where `fit()` is a no-op and `transform()` wraps a pretrained model. Implementations live in `manylatents-omics/manylatents/dogma/encoders/`. There is no separate FoundationEncoder base class in core.
 
-**Solution (IMPLEMENTED):**
-A `logger` config group now controls experiment-level wandb logging:
-- `logger=none` - No wandb initialization, fastest (default for CI/testing)
-- `logger=wandb` - Full wandb integration
+**GOTCHA: Hydra does NOT support `null` as a CLI override value** -> You cannot do `callbacks=null` on the command line. Use explicit null config files (e.g., `metrics=null`) or `logger=none` to disable logging.
 
-This allows `python -m manylatents.main experiment=test logger=none` to cleanly disable logging without fighting Hydra's type system or requiring environment variables.
+**GOTCHA: API metrics require full `_target_` configs** -> When calling `manylatents.api.run()`, metric configs MUST include `_target_` keys. Empty dicts `{}` will be silently skipped. The `flatten_and_unroll_metrics()` function filters for configs with `_target_`.
 
-**Usage:**
-```bash
-# No logging (CI/testing)
-python -m manylatents.main experiment=single_algorithm logger=none
+**GOTCHA: GlobalHydra conflicts** -> If running multiple Hydra calls in the same process (e.g., via the API), you must clear GlobalHydra between calls. The API handles this internally, but be aware if writing custom scripts.
 
-# Full wandb logging
-python -m manylatents.main experiment=single_algorithm logger=wandb
-```
+**GOTCHA: `save_hyperparameters` warnings** -> Always ignore nn.Module args: `self.save_hyperparameters(ignore=["datamodule", "network", "loss"])`. Lightning can't serialize these.
 
+**GOTCHA: LightningModule tests need `model.setup()`** -> Unit tests that don't use `trainer.fit()` must call `model.setup()` manually to initialize the network.
+
+**GOTCHA: `scipy` upper bound** -> `scipy>=1.8,<1.15` is required for archetypes/PHATE compatibility. Don't relax this without testing.
+
+**GOTCHA: Config group rename pending** -> `algorithms/latent/` should be renamed to `algorithms/latent_module/` per TODO in `configs/algorithms/latent/__init__.py`. Not yet done.
+
+**GOTCHA: Loss functions** -> Use the project's `MSELoss` from `manylatents.algorithms.lightning.losses.mse` (accepts `outputs, targets, **kwargs`), NOT `torch.nn.MSELoss`.
+
+## UV Dependency Management
+
+Trust the resolver. Use loose lower bounds. Don't pin torch versions. Don't duplicate transitive dependencies. Run `uv sync` and let it figure out compatibility. See the project root `CLAUDE.md` for detailed UV policy.
