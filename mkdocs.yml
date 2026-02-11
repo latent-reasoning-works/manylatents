@@ -14,19 +14,9 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Algorithms: algorithms.md
+  - Metrics: metrics.md
   - Extensions: extensions.md
-  - Guides:
-    - API Usage: api_usage.md
-    - Representation Probing: guides/representation-probing.md
-  - Reference:
-    - Metrics Architecture: metrics_architecture.md
-    - Null Metrics: null_metrics.md
-    - Testing: testing.md
-    - Integration Testing: integration_testing_guide.md
-    - Local Namespace Testing: local_namespace_testing.md
-  - Architecture:
-    - Probing: designs/probing-architecture.md
-    - HF Representation Audit: designs/hf-representation-audit-architecture.md
-  - Plans:
-    - Neural ODE: plans/2026-02-06-neural-ode-latent-module.md
-    - HF Representation Audit: plans/2026-02-02-hf-representation-audit.md
+  - API: api_usage.md
+  - Probing: probing.md
+  - Testing: testing.md

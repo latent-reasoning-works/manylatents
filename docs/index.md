@@ -21,24 +21,12 @@ python -m manylatents.main data=swissroll algorithms/latent=pca
 
 ## Documentation
 
-### Core
-
-- **[Extensions](extensions.md)** — Install, use, and develop domain extensions (Usage | Architecture | Development)
-- **[API Usage](api_usage.md)** — Programmatic API for chaining algorithms
-- **[Metrics Architecture](metrics_architecture.md)** — Three-level metrics system design
-
-### Guides
-
-- **[Representation Probing](guides/representation-probing.md)** — Probe neural network representations during training
-- **[Null Metrics](null_metrics.md)** — Running experiments without metrics
-- **[Testing](testing.md)** — Testing infrastructure and CI pipeline
-- **[Integration Testing](integration_testing_guide.md)** — Namespace integration testing
-- **[Local Namespace Testing](local_namespace_testing.md)** — Mock package testing for CI
-
-### Architecture
-
-- **[Probing Architecture](designs/probing-architecture.md)** — ADR for representation probing design
-- **[HF Representation Audit](designs/hf-representation-audit-architecture.md)** — Architecture for HuggingFace representation auditing
+- **[Algorithms](algorithms.md)** — LatentModule (fit/transform) and LightningModule (trainable) algorithms, networks, and losses
+- **[Metrics](metrics.md)** — Three-level evaluation system: embedding, dataset, and module metrics
+- **[Extensions](extensions.md)** — Install, use, and develop domain extensions
+- **[API](api_usage.md)** — Programmatic API for agent-driven multi-step workflows
+- **[Probing](probing.md)** — Representation probing for auditing algorithm internals during training
+- **[Testing](testing.md)** — CI pipeline, namespace integration testing, and mock package patterns
 
 ---
 

@@ -1,222 +1,240 @@
-# Testing Strategy
+# Testing
 
-This document outlines the GitHub Actions testing strategy and local testing practices for ManyLatents.
+Testing strategy, CI pipeline, and namespace integration testing for manyLatents.
 
-## Overview
+=== "CI Pipeline"
 
-Our testing pipeline ensures code quality and validates algorithm functionality across different datasets and configurations.
+    ## GitHub Actions Pipeline
 
-## GitHub Actions Pipeline
+    ### Three-Phase Testing
 
-### Three-Phase Testing
+    1. **Build & Unit Tests** (20 min): Fast validation of code quality and unit tests
+    2. **LatentModule Smoke Tests** (conditional): Automatic testing of all DR algorithms when configs change
+    3. **Integration Tests** (25 min): Matrix testing of algorithm combinations with real data
 
-1. **Build & Unit Tests** (20 min): Fast validation of code quality and unit tests
-2. **LatentModule Smoke Tests** (conditional): Automatic testing of all DR algorithms when configs change
-3. **Integration Tests** (25 min): Matrix testing of algorithm combinations with real data
+    ## LatentModule Smoke Tests
 
-### Current Test Matrix
+    **Triggers on changes to**:
 
-#### LatentModule Smoke Tests (Conditional)
+    - `manylatents/algorithms/latent/**`
+    - `manylatents/configs/algorithms/latent/**`
 
-**Purpose**: Automatically test all LatentModule algorithms when configs change
+    **Script**: `.github/workflows/scripts/test_latent_algorithms.sh`
 
-**Triggers on changes to**:
-- `manylatents/algorithms/latent/**`
-- `manylatents/configs/algorithms/latent/**`
+    Dynamically discovers all algorithm configs and runs quick instantiation tests using minimal test data (swissroll: 10 distributions x 20 points). Currently tests: `aa`, `diffusionmap`, `mds`, `noop`, `pca`, `phate`, `tsne`, `umap`.
 
-**Script**: `.github/workflows/scripts/test_latent_algorithms.sh`
+    **Validates**:
 
-**What it does**:
-- Dynamically discovers all algorithm configs in `manylatents/configs/algorithms/latent/`
-- Runs quick instantiation test for each algorithm
-- Uses minimal test data (swissroll: 10 distributions × 20 points)
-- Currently tests: `aa`, `diffusionmap`, `mds`, `noop`, `pca`, `phate`, `tsne`, `umap`
+    - Algorithm config is valid YAML
+    - Algorithm class can be instantiated via Hydra
+    - Algorithm can fit and transform data
+    - Full pipeline completes without errors
 
-**What it validates**:
-- ✅ Algorithm config is valid YAML
-- ✅ Algorithm class can be instantiated via Hydra
-- ✅ Algorithm can fit and transform data
-- ✅ Full pipeline completes without errors
+    **Does NOT test**: mathematical correctness (unit tests), Lightning modules, or comprehensive data/metric combinations (integration tests).
 
-**What it does NOT test**:
-- ❌ Mathematical correctness (covered by unit tests)
-- ❌ Lightning modules (future work)
-- ❌ Comprehensive data/metric combinations (covered by integration tests)
+    ## Integration Test Matrix
 
-**Run locally**:
-```bash
-.github/workflows/scripts/test_latent_algorithms.sh
-```
+    | Test | Algorithm | Data | Timeout |
+    |------|-----------|------|---------|
+    | smoke-test | `latent/noop` | `test_data` | 2 min |
+    | pca-swissroll | `latent/pca` | `swissroll` | 8 min |
+    | umap-swissroll | `latent/umap` | `swissroll` | 10 min |
+    | autoencoder-swissroll | `lightning/ae_reconstruction` | `swissroll` | 15 min |
 
-#### Basic Smoke Tests
-- **smoke-test**: Basic functionality validation
-  - Algorithm: `latent/noop`
-  - Data: `test_data`
-  - Timeout: 2 minutes
+    ## Local Testing
 
-#### Traditional Dimensionality Reduction
-- **pca-swissroll**: PCA on SwissRoll manifold data
-  - Algorithm: `latent/pca`
-  - Data: `swissroll`
-  - Timeout: 8 minutes
+    ```bash
+    # Smoke test
+    python -m manylatents.main \
+      algorithms/latent=noop data=test_data metrics=test_metric debug=true
 
-- **umap-swissroll**: UMAP embedding validation
-  - Algorithm: `latent/umap`
-  - Data: `swissroll`
-  - Timeout: 10 minutes
+    # PCA + SwissRoll
+    python -m manylatents.main \
+      algorithms/latent=pca data=swissroll metrics=synthetic_data_metrics \
+      debug=true trainer.max_epochs=1
 
-#### Neural Network Algorithms
-- **autoencoder-swissroll**: Autoencoder training validation
-  - Algorithm: `lightning/ae_reconstruction`
-  - Data: `swissroll`
-  - Timeout: 15 minutes
+    # Autoencoder + SwissRoll
+    python -m manylatents.main \
+      algorithms/lightning=ae_reconstruction data=swissroll \
+      debug=true trainer.max_epochs=1
 
-## Local Testing
+    # Full pytest suite
+    pytest --cov=manylatents --cov-report=xml
+    ```
 
-### Running Matrix Tests Locally
+    ## Adding New Algorithm Tests
 
-You can run any of the matrix configurations locally:
+    Edit `.github/workflows/build.yml`:
 
-```bash
-# Smoke test
-python -m manylatents.main \
-  algorithms/latent=noop \
-  data=test_data \
-  metrics=test_metric \
-  debug=true
+    ```yaml
+    - name: "new-algorithm-test"
+      algorithm: "latent/your_algorithm"
+      data: "test_dataset"
+      metrics: "appropriate_metrics"
+      timeout: 5
+    ```
 
-# PCA + SwissRoll  
-python -m manylatents.main \
-  algorithms/latent=pca \
-  data=swissroll \
-  metrics=synthetic_data_metrics \
-  debug=true \
-  trainer.max_epochs=1
+    ## Timeout Guidelines
 
-# Autoencoder + SwissRoll
-python -m manylatents.main \
-  algorithms/lightning=ae_reconstruction \
-  data=swissroll \
-  metrics=synthetic_data_metrics \
-  debug=true \
-  trainer.max_epochs=1
-```
+    | Type | Timeout |
+    |------|---------|
+    | Smoke tests | 2-3 min |
+    | Traditional DR | 5-10 min |
+    | Neural networks | 10-20 min |
+    | Large datasets | 20-30 min |
 
-### Unit Tests
+    ## Failure Investigation
 
-Run the full pytest suite:
+    1. Check test-specific artifacts in GitHub Actions
+    2. Run the same configuration locally
+    3. Enable `HYDRA_FULL_ERROR=1` for detailed stack traces
+    4. Use `debug=true` for verbose logging
 
-```bash
-# Full test suite with coverage
-pytest --cov=manylatents --cov-report=xml
+=== "Namespace Integration"
 
-# Quick tests only
-pytest --maxfail=1 --disable-warnings -q
-```
+    ## Testing manylatents + manylatents-omics Integration
 
-## Future Expansion
+    This guide validates that the namespace integration works end-to-end.
 
-### Adding New Algorithm Tests
+    ## Setup
 
-To add a new algorithm to the CI matrix, edit `.github/workflows/build.yml`:
+    ```bash
+    # Install core package
+    uv add -e /path/to/manylatents --no-deps
 
-```yaml
-- name: "new-algorithm-test"
-  algorithm: "latent/your_algorithm"  # or lightning/your_model
-  data: "test_dataset"
-  metrics: "appropriate_metrics"
-  timeout: 5  # minutes
-```
+    # Install mock omics package for testing
+    uv add -e /path/to/manylatents/tests/mock_omics_package --no-deps
 
-### Dataset-Specific Testing
+    # Verify imports
+    python3 -c "
+    from manylatents.omics.data import PlinkDataset
+    from manylatents.omics.metrics import GeographicPreservation
+    print('Namespace integration successful')
+    "
+    ```
 
-Examples for specialized algorithm-dataset combinations:
+    ## Integration Test Config
 
-```yaml
-# Genomic data validation
-- name: "pca-genomic"
-  algorithm: "latent/pca"
-  data: "hgdp_split"
-  metrics: "genomic_metrics"
-  timeout: 20
+    ```yaml
+    # configs/experiment/integration_test.yaml
+    data:
+      _target_: manylatents.data.synthetic_dataset.SwissRoll
+      n_samples: 100
+      noise: 0.01
+      seed: 42
 
-# Single-cell data validation
-- name: "phate-singlecell"
-  algorithm: "latent/phate"
-  data: "anndata"
-  metrics: "singlecell_metrics"
-  timeout: 15
-```
+    algorithms:
+      latent:
+        _target_: manylatents.algorithms.latent.pca.PCAModule
+        n_components: 2
 
-## Testing Guidelines
+    metrics:
+      embedding:
+        - continuity
+        - trustworthiness
 
-### Algorithm Integration Checklist
+    logger: none
+    trainer:
+      max_epochs: 1
+    ```
 
-When adding a new algorithm:
+    ## Verification Levels
 
-- [ ] Unit tests for the algorithm class
-- [ ] Integration test in CI matrix
-- [ ] Config file validation
-- [ ] Documentation examples
-- [ ] Performance benchmark (if applicable)
+    ### Level 1: Package Discovery
 
-### Timeout Guidelines
+    ```python
+    import manylatents
+    print(manylatents.__path__)  # Should show multiple paths
+    ```
 
-- **Smoke tests**: 2-3 minutes
-- **Traditional DR**: 5-10 minutes  
-- **Neural networks**: 10-20 minutes
-- **Large datasets**: 20-30 minutes
+    ### Level 2: Module Loading
 
-### Data Size Considerations
+    ```python
+    from manylatents.omics import data, metrics
+    ```
 
-- **CI Tests**: Use small/synthetic datasets for speed
-- **Integration**: Focus on algorithm correctness, not performance
-- **Nightly**: Reserve large datasets for scheduled runs
+    ### Level 3: Class Instantiation
 
-## Monitoring and Debugging
+    ```python
+    from manylatents.omics.data import PlinkDataset
+    from manylatents.omics.metrics import GeographicPreservation
+    dataset = PlinkDataset()
+    metric = GeographicPreservation()
+    ```
 
-### Test Artifacts
+    ## Troubleshooting
 
-All test runs generate artifacts:
-- Test outputs saved to `outputs/`
-- Coverage reports from unit tests
-- Individual test logs for debugging
+    ### "No module named 'manylatents.omics'"
 
-### Failure Investigation
+    Install the extension:
+    ```bash
+    uv add -e ./tests/mock_omics_package --no-deps
+    ```
 
-1. Check test-specific artifacts in GitHub Actions
-2. Run the same configuration locally
-3. Enable `HYDRA_FULL_ERROR=1` for detailed stack traces
-4. Use `debug=true` for verbose logging
+    ### Namespace not extending
 
-### Performance Monitoring
+    Ensure both packages have the declaration in `manylatents/__init__.py`:
+    ```python
+    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    ```
 
-Key metrics to track:
-- **Test duration**: Monitor for performance regressions
-- **Failure patterns**: Identify problematic combinations
-- **Coverage**: Ensure new code is tested
+    ## Checklist
 
-## Best Practices
+    - [ ] Core manylatents imports work
+    - [ ] Omics namespace is importable
+    - [ ] Mock classes can be instantiated
+    - [ ] Both packages coexist in the same environment
 
-### Algorithm Development
+=== "Mock Package Pattern"
 
-1. **Start with smoke test**: Ensure basic instantiation works
-2. **Add integration test**: Validate with real data
-3. **Document configuration**: Update examples and docs
-4. **Monitor CI**: Watch for failures across environments
+    ## Local Namespace Testing Without Private Repos
 
-### Configuration Testing
+    The organization is on a free GitHub plan, so CI cannot access private repos like `manylatents-omics`. The solution: a mock package that simulates the extension structure.
 
-- Test with `debug=true` for development
-- Use `trainer.max_epochs=1` for quick validation
-- Include both `latent/` and `lightning/` algorithm types
-- Test with different dataset sizes and types
+    ## Directory Structure
 
-### Contributing
+    ```
+    tests/
+    ├── mock_omics_package/
+    │   ├── setup.py
+    │   └── manylatents/
+    │       ├── __init__.py           # Namespace declaration
+    │       └── omics/
+    │           ├── __init__.py
+    │           ├── data/
+    │           │   └── __init__.py   # Mock PlinkDataset
+    │           └── metrics/
+    │               └── __init__.py   # Mock GeographicPreservation
+    └── test_namespace_integration.py
+    ```
 
-When submitting PRs:
+    ## How It Works
 
-1. Ensure CI passes for all matrix tests
-2. Add new tests for new algorithms/features
-3. Update documentation with examples
-4. Consider performance implications of new tests
+    1. Declares `manylatents` as a namespace package using `pkgutil.extend_path()`
+    2. Provides mock implementations of key classes
+    3. Allows testing namespace integration without the private repo
+
+    ## Running
+
+    ```bash
+    python3 tests/test_namespace_integration.py
+    ```
+
+    The script creates a temporary venv, installs both packages, verifies namespace merging, and cleans up.
+
+    ## Why This Approach
+
+    - No CI secrets needed
+    - Validates the namespace architecture
+    - Fast (no large repo cloning)
+    - Part of the repo and under version control
+
+    ## When to Update
+
+    Update the mock package if:
+
+    - `manylatents-omics` adds new top-level modules
+    - Namespace package organization changes
+    - New integration scenarios need testing
+
+    Mock classes don't need implementation details — they just need to exist so Python can import them.
