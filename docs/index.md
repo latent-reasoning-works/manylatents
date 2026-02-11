@@ -22,6 +22,8 @@ python -m manylatents.main data=swissroll algorithms/latent=pca
 ## Documentation
 
 - **[Algorithms](algorithms.md)** — LatentModule (fit/transform) and LightningModule (trainable) algorithms, networks, and losses
+- **[Evaluation](evaluation.md)** — Algorithm dispatch, sampling strategies, and shared caching
+- **[Callbacks](callbacks.md)** — Embedding callbacks (save, plot, wandb) and trainer callbacks (probing)
 - **[Metrics](metrics.md)** — Three-level evaluation system: embedding, dataset, and module metrics
 - **[Extensions](extensions.md)** — Install, use, and develop domain extensions
 - **[API](api_usage.md)** — Programmatic API for agent-driven multi-step workflows
