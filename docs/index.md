@@ -1,60 +1,51 @@
-# Welcome to ManyLatents
+# ManyLatents
 
 **Part of the [Latent Reasoning Works](https://github.com/latent-reasoning-works) ecosystem**
 
-ManyLatents is a unified framework for dimensionality reduction and neural network analysis on diverse datasets. Built on **PyTorch Lightning** and **Hydra**, it bridges traditional DR techniques with modern neural architectures.
-
----
-
-## What You'll Find Here
-
-- **[Extensions Guide](extensions.md)**: Install domain-specific extensions (genomics, etc.)
-- **[API Usage Guide](api_usage.md)**: Programmatic API for chaining algorithms
-- **[Metrics Architecture](metrics_architecture.md)**: Three-level metrics system design
-- **[Testing Guide](testing.md)**: Testing infrastructure and best practices
-- **[Null Metrics](null_metrics.md)**: Running experiments without metrics
+ManyLatents is a unified framework for dimensionality reduction and neural network analysis. Built on **PyTorch Lightning** and **Hydra**, it bridges traditional DR techniques with modern neural architectures.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone and install
 git clone https://github.com/latent-reasoning-works/manylatents.git
 cd manylatents
 uv sync
 source .venv/bin/activate
 
-# Run an experiment
 python -m manylatents.main data=swissroll algorithms/latent=pca
 ```
 
 ---
 
-## Extensions
+## Documentation
 
-ManyLatents supports domain-specific extensions through namespace packages:
+### Core
 
-- **[manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics)**: Genomics and population genetics
-  - PLINK/VCF data loaders
-  - Geographic preservation metrics
-  - Ancestry-specific algorithms
+- **[Extensions](extensions.md)** — Install, use, and develop domain extensions (Usage | Architecture | Development)
+- **[API Usage](api_usage.md)** — Programmatic API for chaining algorithms
+- **[Metrics Architecture](metrics_architecture.md)** — Three-level metrics system design
 
-Install extensions:
-```bash
-uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
-```
+### Guides
 
-[Learn more about extensions →](extensions.md)
+- **[Representation Probing](guides/representation-probing.md)** — Probe neural network representations during training
+- **[Null Metrics](null_metrics.md)** — Running experiments without metrics
+- **[Testing](testing.md)** — Testing infrastructure and CI pipeline
+- **[Integration Testing](integration_testing_guide.md)** — Namespace integration testing
+- **[Local Namespace Testing](local_namespace_testing.md)** — Mock package testing for CI
+
+### Architecture
+
+- **[Probing Architecture](designs/probing-architecture.md)** — ADR for representation probing design
+- **[HF Representation Audit](designs/hf-representation-audit-architecture.md)** — Architecture for HuggingFace representation auditing
 
 ---
 
 ## LRW Ecosystem
 
-ManyLatents is part of the **Latent Reasoning Works** suite:
-
 | Project | Description |
 |---------|-------------|
 | [manylatents](https://github.com/latent-reasoning-works/manylatents) | Core DR framework |
-| [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) | Genomics extensions |
+| [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) | Genomics, population genetics, single-cell extensions |
 | [shop](https://github.com/latent-reasoning-works/shop) | Multi-cluster SLURM management |

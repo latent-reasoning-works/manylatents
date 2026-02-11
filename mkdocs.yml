@@ -2,10 +2,31 @@ site_name: ManyLatents
 theme:
   name: material
 
+markdown_extensions:
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - tables
+  - admonitions
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
 nav:
   - Home: index.md
   - Extensions: extensions.md
-  - Testing: testing.md
-  - Architecture:
-    - Metrics: metrics_architecture.md
+  - Guides:
     - API Usage: api_usage.md
+    - Representation Probing: guides/representation-probing.md
+  - Reference:
+    - Metrics Architecture: metrics_architecture.md
+    - Null Metrics: null_metrics.md
+    - Testing: testing.md
+    - Integration Testing: integration_testing_guide.md
+    - Local Namespace Testing: local_namespace_testing.md
+  - Architecture:
+    - Probing: designs/probing-architecture.md
+    - HF Representation Audit: designs/hf-representation-audit-architecture.md
+  - Plans:
+    - Neural ODE: plans/2026-02-06-neural-ode-latent-module.md
+    - HF Representation Audit: plans/2026-02-02-hf-representation-audit.md

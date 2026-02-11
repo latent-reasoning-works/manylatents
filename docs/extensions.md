@@ -1,319 +1,653 @@
-# Working with Extensions
+# Extensions
 
-`manylatents` is designed with a modular extension system that allows domain-specific functionality to be installed as separate packages. Extensions integrate seamlessly through Python's namespace package system.
+manyLatents uses a modular extension system that allows domain-specific functionality to be installed as separate packages. Extensions integrate seamlessly through Python's namespace package system and Hydra's config composition.
 
 ## Available Extensions
 
 ### manylatents-omics
 
-The genetics and population genetics extension for `manylatents`.
+The genomics, population genetics, and single-cell extension for manyLatents.
 
-**Repository**: [https://github.com/latent-reasoning-works/manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics)
+**Repository**: [github.com/latent-reasoning-works/manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics)
 
-**Features**:
-- Genetics data loaders (PLINK, VCF, etc.)
-- Population genetics metrics (Geographic Preservation, FST, etc.)
-- Ancestry-specific algorithms
-- Integration with genetic databases
+**Adds three submodules:**
 
-## Installing Extensions
+- `manylatents.dogma` — Foundation model encoders (Evo2, ESM3, Orthrus, AlphaGenome) and fusion algorithms
+- `manylatents.popgen` — Population genetics data modules and metrics (GeographicPreservation, AdmixturePreservation)
+- `manylatents.singlecell` — Single-cell AnnData data modules
 
-### Quick Install (Recommended)
+---
 
-Install directly from GitHub:
+=== "Usage"
 
-```bash
-uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
-```
+    ## Installing
 
-### Interactive Setup
+    ### Quick Install (Recommended)
 
-Use the provided setup script:
+    ```bash
+    uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+    ```
 
-```bash
-bash setup_extensions.sh
-```
+    ### Interactive Setup
 
-This will:
-1. Detect available extensions
-2. Prompt you to choose which to install
-3. Handle authentication if needed
-4. Install the extensions automatically
+    ```bash
+    bash setup_extensions.sh
+    ```
 
-### Development Workflow
+    ### Using Git Submodules
 
-**Working FROM the manylatents-omics repo (Recommended for omics development):**
+    For contributors working on both core and extensions:
 
-```bash
-cd manylatents-omics
-uv sync  # Pulls manylatents from git automatically
+    ```bash
+    git submodule add https://github.com/latent-reasoning-works/manylatents-omics.git extensions/manylatents-omics
+    uv add git+file://extensions/manylatents-omics
+    ```
 
-# IMPORTANT: Use omics entry point for omics configs
-uv run python -m manylatents.omics.main experiment=single_algorithm
-uv run python -m manylatents.omics.main experiment=central_dogma_fusion
-```
+    ## Development Workflow
 
-**Working FROM the manylatents repo (core development only):**
+    **Working FROM the manylatents-omics repo (recommended for omics development):**
 
-```bash
-cd manylatents
-uv sync
-uv run python -m manylatents.main experiment=single_algorithm
-```
+    ```bash
+    cd manylatents-omics
+    uv sync  # Pulls manylatents from git automatically
 
-**Note**: For omics experiments, always work from the omics repo and use `manylatents.omics.main`.
-The omics entry point registers configs before Hydra initializes.
+    # IMPORTANT: Use omics entry point for omics configs
+    uv run python -m manylatents.omics.main experiment=single_algorithm
+    ```
 
-### Using Git Submodules
+    **Working FROM the manylatents repo (core development only):**
 
-For contributors working on both core and extensions:
+    ```bash
+    cd manylatents
+    uv sync
+    uv run python -m manylatents.main experiment=single_algorithm
+    ```
 
-```bash
-# Add as submodule
-git submodule add https://github.com/latent-reasoning-works/manylatents-omics.git extensions/manylatents-omics
+    For omics experiments, always work from the omics repo and use `manylatents.omics.main`. The omics entry point registers configs before Hydra initializes.
 
-# Install from submodule (use git install, not editable)
-uv add git+file://extensions/manylatents-omics
-```
+    ## Using Extensions in Code
 
-## Using Extensions
+    Once installed, extension features are available through the `manylatents` namespace:
 
-Once installed, extension features are available through the `manylatents` namespace:
+    ```python
+    # Core imports (always available)
+    from manylatents.data import SwissRoll
+    from manylatents.algorithms.latent import PCAModule
 
-```python
-# Core imports (always available)
-from manylatents.data import SwissRoll
-from manylatents.algorithms.latent import PCAModule
+    # Extension imports (available when manylatents-omics is installed)
+    from manylatents.popgen.data import HGDPDataset
+    from manylatents.popgen.metrics import GeographicPreservation
+    from manylatents.dogma.encoders import Evo2Encoder
+    from manylatents.singlecell.data import AnnDataModule
+    ```
 
-# Extension imports (available when manylatents-omics is installed)
-from manylatents.popgen.data import HGDPDataset      # Population genetics
-from manylatents.popgen.metrics import GeographicPreservation
-from manylatents.dogma.encoders import Evo2Encoder   # Foundation models
-from manylatents.singlecell.data import AnnDataModule # Single-cell
-```
+    ## Using Extensions with Hydra
 
-## Using Extensions in Workflows
+    Extensions integrate directly with Hydra configs:
 
-Extensions integrate directly with Hydra configs:
+    ```bash
+    python -m manylatents.main \
+      data=hgdp_1kgp \
+      algorithms/latent=pca \
+      metrics=genetic_metrics \
+      logger=wandb
+    ```
 
-```yaml
-# Using genetics data from manylatents-omics
-data:
-  _target_: manylatents.omics.data.PlinkDataset
-  file_path: /path/to/data.bed
-  
-algorithms:
-  latent:
-    _target_: manylatents.algorithms.latent.pca.PCAModule
-    n_components: 10
+    ## Checking What's Installed
 
-# Using genetics-specific metrics
-metrics:
-  embedding:
-    - trustworthiness
-    - continuity
-  dataset:
-    - geographic_preservation  # From manylatents-omics
-```
+    ```python
+    import pkgutil
+    import manylatents
 
-Run as usual:
+    for importer, modname, ispkg in pkgutil.iter_modules(manylatents.__path__):
+        print(f"- {modname}")
+    ```
 
-```bash
-python -m manylatents.main \
-  data=hgdp_1kgp \
-  algorithms/latent=pca \
-  metrics=genetic_metrics \
-  logger=wandb
-```
+    ## Troubleshooting
 
-## Namespace Package Architecture
+    ### Hydra Config Discovery Error
 
-Extensions use Python's namespace package system, which means:
+    **Problem**: `ConfigAttributeError: Key 'experiment' is not in struct`
 
-1. **Seamless integration**: Extension code lives under `manylatents.omics.*` (or similar)
-2. **No conflicts**: Core and extensions can be installed/uninstalled independently
-3. **Clean imports**: Use `from manylatents.omics import ...` naturally
-4. **Optional dependencies**: Extensions only need to be installed if you use them
+    **Cause**: Hydra SearchPathPlugin not being discovered.
 
-### How It Works
+    **Solutions**:
 
-```
-manylatents (core package)
-├── data/
-├── algorithms/
-├── metrics/
-└── ...
+    1. Ensure the extension is installed (not just cloned):
+        ```bash
+        uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+        ```
+    2. If developing both packages, work from the omics repo
+    3. Verify plugin discovery:
+        ```python
+        from hydra.core.plugins import Plugins
+        from hydra.plugins.search_path_plugin import SearchPathPlugin
+        plugins = list(Plugins.instance().discover(SearchPathPlugin))
+        print([p.__name__ for p in plugins])
+        ```
 
-manylatents-omics (extension package)
-└── manylatents/
-    └── omics/         # Extends the manylatents namespace
-        ├── data/
-        ├── metrics/
-        └── algorithms/
-```
+    ### Extension Not Found
 
-Both packages declare `manylatents` as a namespace package, so Python automatically merges them:
+    **Problem**: `ModuleNotFoundError: No module named 'manylatents.omics'`
 
-```python
-import manylatents
-print(manylatents.__path__)
-# Output: ['/path/to/manylatents', '/path/to/manylatents-omics/manylatents']
-```
+    **Solution**: Install the extension:
+    ```bash
+    uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
+    ```
 
-## Checking What's Installed
+    ### Import Conflicts
 
-Verify which extensions are available:
+    **Problem**: Namespace package not merging correctly.
 
-```python
-import importlib
+    **Solution**: Ensure both packages have the namespace declaration in `manylatents/__init__.py`:
+    ```python
+    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    ```
 
-# Check if omics extension is installed
-try:
-    importlib.import_module("manylatents.omics")
-    print("✅ manylatents-omics is installed")
-except ImportError:
-    print("❌ manylatents-omics is not installed")
-```
+=== "Architecture"
 
-Or programmatically list available features:
+    ## Design Philosophy
 
-```python
-import pkgutil
-import manylatents
+    manyLatents is built around a simple idea: **every interface between stages is a file with a known schema**. This matters because the agents and scripts that compose manyLatents into larger workflows are stateless — they don't remember what happened in the last call. If the output of one step doesn't fully describe itself, the next step can't use it.
 
-# List all top-level packages under manylatents
-for importer, modname, ispkg in pkgutil.iter_modules(manylatents.__path__):
-    print(f"- {modname}")
-# Output might include: data, algorithms, metrics, omics, ...
-```
+    This constraint shapes everything:
 
-## Developing Your Own Extension
+    - **EmbeddingOutputs** is a `dict[str, Any]`, not a dataclass. When a new metric injects a custom field, every downstream consumer still works without schema migration.
+    - **Metrics** are registered via Hydra configs with `_target_` and `_partial_: True`. Parameters are bound at config time, not at call time, so the evaluation engine doesn't need to know what parameters each metric takes.
+    - **Algorithms** are either `LatentModule` (fit/transform) or `LightningModule` subclasses (training loops). The execution engine dispatches on type, not on name.
 
-Want to create a new extension for `manylatents`? Here's how:
+    The result is a system where you can add a new algorithm, metric, dataset, or entire domain extension without touching core code.
 
-### 1. Package Structure
+    ## Two Execution Modes
 
-```
-manylatents-yourextension/
-├── setup.py
-└── manylatents/
-    ├── __init__.py          # Namespace package declaration
-    └── yourextension/
+    **CLI** (`python -m manylatents.main`) executes a single step: one algorithm + metrics on one dataset. This is the primary user-facing interface and what SLURM jobs invoke.
+
+    **Python API** (`manylatents.api.run()`) is the programmatic interface designed for agent-driven workflows. It accepts `input_data` to chain the output of one call into the next, and supports `pipeline` configs for sequential steps within a single process.
+
+    ```python
+    from manylatents.api import run
+
+    # Single step
+    result = run(
+        data='swissroll',
+        algorithms={'latent': {
+            '_target_': 'manylatents.algorithms.latent.pca.PCAModule',
+            'n_components': 50
+        }}
+    )
+
+    # Chaining: feed output of one step into the next
+    result2 = run(
+        input_data=result['embeddings'],
+        algorithms={'latent': {
+            '_target_': 'manylatents.algorithms.latent.phate.PHATEModule',
+            'n_components': 2
+        }}
+    )
+    ```
+
+    ## Namespace Extension via pkgutil
+
+    The core package's `__init__.py` contains one line:
+
+    ```python
+    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    ```
+
+    This tells Python: "if another installed package also defines a `manylatents` directory, merge its contents into mine." The rule is simple: **core never imports from extensions; extensions import from core.**
+
+    Extensions also register a Hydra `SearchPathPlugin` so their configs are discovered automatically:
+
+    ```python
+    class OmicsSearchPathPlugin(SearchPathPlugin):
+        def manipulate_search_path(self, search_path):
+            search_path.append(
+                provider="manylatents-omics",
+                path="pkg://manylatents.dogma.configs",
+            )
+    ```
+
+    ## Four Extension Axes
+
+    ### 1. Algorithms
+
+    Two base classes, binary decision rule:
+
+    - **`LatentModule`** — fit/transform for non-neural algorithms (PCA, UMAP, PHATE, etc.). The **FoundationEncoder pattern** is a LatentModule where `fit()` is a no-op and `transform()` wraps a pretrained model.
+    - **`LightningModule` subclasses** — trainable neural networks with Lightning training loops (autoencoders, Latent ODEs).
+
+    Optional methods `kernel_matrix()` and `affinity_matrix()` enable module-level metrics like `KernelMatrixSparsity` and `AffinitySpectrum`.
+
+    ### 2. Metrics
+
+    Metrics follow the `Metric` protocol with three evaluation contexts:
+
+    | Context | `embeddings` | `dataset` | `module` | Use case |
+    |---------|-------------|-----------|----------|----------|
+    | `embedding` | Low-dim output | Source dataset | - | Trustworthiness, continuity |
+    | `dataset` | - | Source dataset | - | Stratification, admixture |
+    | `module` | - | Source dataset | Fitted LatentModule | Affinity spectrum, kernel sparsity |
+
+    List-valued parameters in configs expand via Cartesian product through `flatten_and_unroll_metrics()`. Metrics sharing kNN graphs use a shared `_knn_cache`.
+
+    ### 3. Data Modules
+
+    Data modules provide `get_data()` and are auto-discovered at import time. Synthetic datasets generate on-the-fly; file-based datasets load from disk. For LightningModule algorithms, they also implement `LightningDataModule`.
+
+    ### 4. Domain Extensions
+
+    A domain extension is a separate installable package that adds algorithms, metrics, and data modules to the `manylatents` namespace. See the **Development** tab for how to create one.
+
+    ## Hydra Configuration
+
+    Every extensible component has a corresponding Hydra config group:
+
+    ```
+    configs/
+      algorithms/
+        latent/         # LatentModule configs
+        lightning/      # LightningModule configs
+          loss/         # Loss function configs
+          network/      # Network architecture configs
+          optimizer/    # Optimizer configs
+      data/             # Dataset configs
+      metrics/
+        embedding/      # Embedding-level metric configs
+        dataset/        # Dataset-level metric configs
+        module/         # Module-level metric configs
+        sampling/       # Metric sampling strategies
+      callbacks/embedding/
+      experiment/       # Experiment preset configs
+      trainer/          # Lightning trainer configs
+      logger/           # Logger configs (none, wandb)
+      cluster/          # SLURM cluster configs (via Shop)
+      launcher/         # Job launcher configs (via Shop)
+    ```
+
+    ## Scope Boundaries
+
+    manyLatents owns single-step execution and the Python API for composable workflows. It does NOT own:
+
+    - **Multi-step orchestration** — manyAgents calls `manylatents.api.run()` to compose steps
+    - **RL / reward-driven training** — Geomancer
+    - **Cluster job submission** — Shop provides Hydra launcher plugins
+
+=== "Development"
+
+    ## Creating an Extension
+
+    This guide documents how to create extension packages for manyLatents, following the patterns established by `manylatents-omics`.
+
+    ### Architecture Overview
+
+    ```
+    ┌─────────────────────────────────────────────────────────────┐
+    │                    Your Application                          │
+    ├─────────────────────────────────────────────────────────────┤
+    │  manylatents-yourextension   │   manylatents-omics          │
+    │  (your namespace package)    │   (popgen, dogma, singlecell)│
+    ├─────────────────────────────────────────────────────────────┤
+    │                        shop (optional)                       │
+    │              (shared SLURM launchers, logging utils)         │
+    ├─────────────────────────────────────────────────────────────┤
+    │                      manylatents (core)                      │
+    │         (LatentModule, metrics, data, experiment runner)     │
+    └─────────────────────────────────────────────────────────────┘
+    ```
+
+    ## Package Structure
+
+    ```
+    manylatents-yourextension/
+    ├── pyproject.toml
+    ├── README.md
+    ├── CLAUDE.md                    # AI assistant instructions
+    ├── manylatents/
+    │   ├── __init__.py              # Namespace package declaration (CRITICAL)
+    │   ├── yourext_plugin.py        # Hydra SearchPathPlugin
+    │   └── yourext/
+    │       ├── __init__.py
+    │       ├── algorithms/
+    │       │   ├── __init__.py
+    │       │   └── your_algorithm.py
+    │       ├── data/
+    │       │   ├── __init__.py
+    │       │   └── your_dataset.py
+    │       ├── metrics/
+    │       │   ├── __init__.py
+    │       │   └── your_metric.py
+    │       └── configs/
+    │           ├── __init__.py      # Empty, required for pkg://
+    │           ├── data/
+    │           │   └── your_data.yaml
+    │           ├── algorithms/
+    │           │   └── latent/
+    │           │       └── your_algo.yaml
+    │           ├── metrics/
+    │           │   └── dataset/
+    │           │       └── your_metric.yaml
+    │           └── experiment/
+    │               └── your_experiment.yaml
+    └── tests/
         ├── __init__.py
-        ├── data/
-        │   └── __init__.py
-        ├── metrics/
-        │   └── __init__.py
-        └── algorithms/
-            └── __init__.py
-```
+        ├── test_imports.py
+        └── test_config_e2e.py
+    ```
 
-### 2. Namespace Package Declaration
+    ### Critical File: `manylatents/__init__.py`
 
-In `manylatents/__init__.py`:
+    This file MUST contain the namespace package declaration:
 
-```python
-# This makes manylatents a namespace package
-__path__ = __import__('pkgutil').extend_path(__path__, __name__)
-```
+    ```python
+    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    ```
 
-### 3. Setup Configuration
+    Without this, Python won't merge your package with core manyLatents.
 
-In `setup.py`:
+    ## Hydra Config Integration
 
-```python
-from setuptools import setup, find_packages
+    ### SearchPathPlugin
 
-setup(
-    name="manylatents-yourextension",
-    version="0.1.0",
-    packages=find_packages(),
-    namespace_packages=["manylatents"],
-    install_requires=[
-        "manylatents>=0.1.0",
-        # Your extension-specific dependencies
-    ],
-)
-```
+    Create `manylatents/yourext_plugin.py`:
 
-### 4. Register with Core
+    ```python
+    from hydra.core.config_search_path import ConfigSearchPath
+    from hydra.plugins.search_path_plugin import SearchPathPlugin
 
-Submit a PR to add your extension to:
-- `EXTENSIONS.md` - User-facing documentation
-- `setup_extensions.sh` - Auto-detection in setup script
-- `docs/extensions.md` - This documentation
 
-## Troubleshooting
+    class YourExtSearchPathPlugin(SearchPathPlugin):
+        def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
+            search_path.append(
+                provider="manylatents",
+                path="pkg://manylatents.configs",
+            )
+            # Higher priority for YOUR configs
+            search_path.prepend(
+                provider="manylatents-yourext",
+                path="pkg://manylatents.yourext.configs",
+            )
+    ```
 
-### Hydra Config Discovery Error
+    Use `prepend()` if your configs should override core configs with the same name, `append()` if core should take precedence.
 
-**Problem**: `ConfigAttributeError: Key 'experiment' is not in struct`
+    ### Entry Point Registration
 
-**Cause**: Hydra SearchPathPlugin not being discovered - configs not on search path.
+    In `pyproject.toml`:
 
-**Solutions**:
-1. Ensure manylatents-omics is installed (not just cloned):
-   ```bash
-   uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
-   ```
-2. If developing both packages, work from the omics repo (not manylatents repo)
-3. Or use explicit config path:
-   ```bash
-   python -m manylatents.main --config-path=path/to/manylatents/configs
-   ```
+    ```toml
+    [project.entry-points."hydra.searchpath"]
+    manylatents-yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
+    ```
 
-**Verification**: Check that the plugin is discovered:
-```python
-from hydra.core.plugins import Plugins
-from hydra.plugins.search_path_plugin import SearchPathPlugin
-plugins = list(Plugins.instance().discover(SearchPathPlugin))
-print([p.__name__ for p in plugins])
-# Should show both ManylatentsSearchPathPlugin and OmicsSearchPathPlugin
-```
+    Hydra 1.3 doesn't reliably discover entry-point plugins. You should also auto-register in your package's `__init__.py` or provide an alternative entry point.
 
-### Extension Not Found
+    ### Alternative Entry Point (Recommended)
 
-**Problem**: `ModuleNotFoundError: No module named 'manylatents.omics'`
+    Create `manylatents/yourext/main.py`:
 
-**Solution**: Install the extension:
-```bash
-uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
-```
+    ```python
+    # Register SearchPathPlugin BEFORE importing manylatents.main
+    from hydra.core.plugins import Plugins
+    from hydra.plugins.search_path_plugin import SearchPathPlugin
+    from manylatents.yourext_plugin import YourExtSearchPathPlugin
 
-### Import Conflicts
+    plugins = Plugins.instance()
+    existing = list(plugins.discover(SearchPathPlugin))
+    if YourExtSearchPathPlugin not in existing:
+        plugins.register(YourExtSearchPathPlugin)
 
-**Problem**: Namespace package not merging correctly
+    from manylatents.main import main
 
-**Solution**: Ensure both packages have proper namespace declarations:
-```python
-# In manylatents/__init__.py (both core and extension)
-__path__ = __import__('pkgutil').extend_path(__path__, __name__)
-```
+    if __name__ == "__main__":
+        main()
+    ```
 
-### Authentication Issues
+    ### pyproject.toml
 
-**Problem**: Can't clone private extension repository
+    ```toml
+    [project]
+    name = "manylatents-yourext"
+    version = "0.1.0"
+    requires-python = ">=3.10, <3.13"
 
-**Solution**: Set up GitHub authentication:
-```bash
-# Using SSH
-git clone git@github.com:latent-reasoning-works/manylatents-omics.git
+    dependencies = [
+        "manylatents",
+    ]
 
-# Using HTTPS with token
-git clone https://TOKEN@github.com/latent-reasoning-works/manylatents-omics.git
-```
+    [project.entry-points."hydra.searchpath"]
+    manylatents-yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
 
-## Best Practices
+    [build-system]
+    requires = ["hatchling"]
+    build-backend = "hatchling.build"
 
-1. **Install only what you need**: Extensions are optional - only install those you'll use
-2. **Keep extensions updated**: Run `uv add --upgrade git+https://...` periodically
-3. **Check compatibility**: Some extensions may require specific core versions
-4. **Use virtual environments**: Keep extension sets isolated per project
-5. **Document dependencies**: If your workflow uses extensions, note them in your README
+    [tool.hatch.build.targets.wheel]
+    packages = ["manylatents"]  # CRITICAL: Package the manylatents/ directory
 
-## Learn More
+    [tool.uv]
+    managed = true
 
-- See `EXTENSIONS.md` for complete installation guide
-- Check extension repositories for specific documentation
-- Review `examples/` for workflows using extensions
-- Join discussions on extension development in GitHub Issues
+    [tool.uv.sources]
+    manylatents = { git = "https://github.com/latent-reasoning-works/manylatents.git" }
+    ```
+
+    ## Component Types
+
+    ### Custom LatentModule (Algorithm)
+
+    ```python
+    from torch import Tensor
+    from manylatents.algorithms.latent.latent_module_base import LatentModule
+
+
+    class YourAlgorithm(LatentModule):
+        def __init__(self, n_components=2, your_param=1.0, **kwargs):
+            super().__init__(n_components=n_components, **kwargs)
+            self.your_param = your_param
+
+        def fit(self, x: Tensor) -> None:
+            x_np = x.detach().cpu().numpy()
+            # Your fitting logic
+            self._is_fitted = True
+
+        def transform(self, x: Tensor) -> Tensor:
+            if not self._is_fitted:
+                raise RuntimeError("Model not fitted. Call fit() first.")
+            x_np = x.detach().cpu().numpy()
+            embedding = ...  # Your embedding computation
+            return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+    ```
+
+    Config: `manylatents/yourext/configs/algorithms/latent/your_algo.yaml`
+
+    ```yaml
+    _target_: manylatents.yourext.algorithms.YourAlgorithm
+    n_components: 2
+    your_param: 1.0
+    ```
+
+    ### Custom Dataset
+
+    ```python
+    import numpy as np
+
+
+    class YourDataset:
+        def __init__(self, data_path: str, n_samples=None):
+            self.data_path = data_path
+            self._data = np.load(data_path)
+            if n_samples:
+                self._data = self._data[:n_samples]
+
+        def get_data(self) -> np.ndarray:
+            return self._data
+
+        @property
+        def data(self) -> np.ndarray:
+            return self._data
+    ```
+
+    Config: `manylatents/yourext/configs/data/your_data.yaml`
+
+    ```yaml
+    _target_: manylatents.yourext.data.YourDataset
+    data_path: ${paths.data_dir}/your_data.npy
+    n_samples: null
+    ```
+
+    ### Custom Metric
+
+    ```python
+    import numpy as np
+    from typing import Optional
+    from manylatents.algorithms.latent.latent_module_base import LatentModule
+
+
+    def YourMetric(
+        embeddings: np.ndarray,
+        dataset: object,
+        module: Optional[LatentModule] = None,
+        threshold: float = 0.5,
+        return_per_sample: bool = False,
+    ) -> float:
+        scores = ...  # Your metric computation
+        if return_per_sample:
+            return float(np.mean(scores)), scores
+        return float(np.mean(scores))
+    ```
+
+    Config: `manylatents/yourext/configs/metrics/dataset/your_metric.yaml`
+
+    ```yaml
+    _target_: manylatents.yourext.metrics.YourMetric
+    _partial_: true  # CRITICAL: deferred parameter binding
+    threshold: 0.5
+    return_per_sample: false
+    ```
+
+    ### Experiment Config
+
+    `manylatents/yourext/configs/experiment/your_experiment.yaml`:
+
+    ```yaml
+    # @package _global_
+    name: your_experiment
+    project: your_project
+
+    defaults:
+      - override /algorithms/latent: your_algo
+      - override /data: your_data
+      - override /callbacks/embedding: default
+      - override /metrics: default
+
+    seed: 42
+    ```
+
+    ## CI Requirements
+
+    ### Import Tests
+
+    ```python
+    def test_namespace_package():
+        import manylatents.yourext
+        from manylatents.yourext.algorithms import YourAlgorithm
+        from manylatents.data import SwissRoll  # Core still works
+        assert YourAlgorithm is not None
+
+    def test_algorithm_interface():
+        from manylatents.yourext.algorithms import YourAlgorithm
+        import torch
+
+        algo = YourAlgorithm(n_components=2)
+        X = torch.randn(100, 50)
+        embedding = algo.fit_transform(X)
+        assert embedding.shape == (100, 2)
+    ```
+
+    ### Config Resolution Tests
+
+    ```python
+    from omegaconf import OmegaConf
+    from pathlib import Path
+
+    CONFIGS_DIR = Path(__file__).parent.parent / "manylatents" / "yourext" / "configs"
+
+    def test_all_targets_importable():
+        for config_file in CONFIGS_DIR.rglob("*.yaml"):
+            cfg = OmegaConf.load(config_file)
+            if hasattr(cfg, "_target_"):
+                assert cfg._target_.startswith("manylatents")
+    ```
+
+    ### GitHub Actions Workflow
+
+    ```yaml
+    name: CI
+    on:
+      push:
+        branches: [main]
+      pull_request:
+        branches: [main]
+
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            python-version: ["3.10", "3.11", "3.12"]
+        steps:
+        - uses: actions/checkout@v4
+        - uses: astral-sh/setup-uv@v5
+        - run: uv sync
+        - run: uv run pytest tests/ -v
+        - run: |
+            uv run python -c "
+            import manylatents
+            assert len(manylatents.__path__) >= 2
+            print('Namespace package OK')
+            "
+    ```
+
+    ## Testing Checklist
+
+    ### Namespace Package
+    - [ ] `manylatents/__init__.py` has `extend_path` line
+    - [ ] `import manylatents.yourext` works
+    - [ ] Core manylatents still importable
+
+    ### Hydra Config
+    - [ ] SearchPathPlugin registered (entry-point + manual)
+    - [ ] All configs have valid `_target_` paths
+    - [ ] Metrics use `_partial_: true`
+    - [ ] Experiment configs use `# @package _global_`
+
+    ### Interface Compliance
+    - [ ] LatentModule subclasses implement `fit()` and `transform()`
+    - [ ] Datasets have `get_data()` method
+    - [ ] Metrics accept `(embeddings, dataset, module, **kwargs)`
+
+    ### CI
+    - [ ] Import tests pass on Python 3.10-3.12
+    - [ ] Config resolution tests pass
+    - [ ] Core tests still pass with extension installed
+
+    ## Quick Reference
+
+    ```bash
+    # Using extension entry point (recommended)
+    python -m manylatents.yourext.main experiment=your_experiment
+
+    # Using environment variable (requires shop)
+    HYDRA_SEARCH_PACKAGES="manylatents.configs:manylatents.yourext.configs" \
+        python -m manylatents.main experiment=your_experiment
+    ```
+
+    ### Debugging Config Discovery
+
+    ```python
+    from hydra.core.plugins import Plugins
+    from hydra.plugins.search_path_plugin import SearchPathPlugin
+
+    plugins = list(Plugins.instance().discover(SearchPathPlugin))
+    print([p.__name__ for p in plugins])
+    ```
