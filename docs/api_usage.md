@@ -165,4 +165,4 @@ Provide either `data='dataset_name'` OR `input_data=array`, not both or neither.
 ## See Also
 
 - [Testing Guide](testing.md)
-- [Metrics Architecture](metrics_architecture.md)
+- [Metrics](metrics.md)

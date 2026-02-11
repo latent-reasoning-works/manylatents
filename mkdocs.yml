@@ -8,7 +8,7 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.highlight
   - tables
-  - admonitions
+  - admonition
   - pymdownx.tasklist:
       custom_checkbox: true
 
