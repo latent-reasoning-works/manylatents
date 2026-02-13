@@ -66,6 +66,9 @@ from manylatents.metrics.spectral_decay_rate import SpectralDecayRate
 # Embedding quality metrics
 from manylatents.metrics.silhouette import SilhouetteScore
 
+# Dataset metrics
+from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
+
 __all__ = [
     # Types
     "Metric",
@@ -106,4 +109,6 @@ __all__ = [
     "SpectralDecayRate",
     # Embedding quality metrics
     "SilhouetteScore",
+    # Dataset metrics
+    "GeodesicDistanceCorrelation",
 ]
