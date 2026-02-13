@@ -5,10 +5,13 @@ from torch import Tensor
 
 
 class LatentModule(ABC):
-    def __init__(self, n_components: int = 2, init_seed: int = 42, **kwargs):
+    def __init__(self, n_components: int = 2, init_seed: int = 42,
+                 backend: str | None = None, device: str | None = None, **kwargs):
         """Base class for latent modules (DR, clustering, etc.)."""
         self.n_components = n_components
         self.init_seed = init_seed
+        self.backend = backend
+        self.device = device
         # Flexible handling: if datamodule is passed, store it as a weak port
         self.datamodule = kwargs.pop('datamodule', None)
         # Ignore any other unexpected kwargs to maintain compatibility
@@ -81,4 +84,21 @@ class LatentModule(ABC):
         raise NotImplementedError(
             f"{self.__class__.__name__} does not expose an affinity_matrix. "
             "This may be because the algorithm does not use a kernel-based approach."
+        )
+
+    def affinity_tensor(self) -> 'torch.Tensor':
+        """Return affinity matrix as a torch.Tensor.
+
+        When the TorchDR backend is active, returns the GPU tensor directly.
+        Otherwise, converts the numpy affinity matrix.
+
+        Returns:
+            torch.Tensor: Affinity matrix on compute device.
+        """
+        import torch
+
+        if self.backend == "torchdr" and hasattr(self, 'model') and hasattr(self.model, 'affinity_in_'):
+            return self.model.affinity_in_
+        return torch.from_numpy(
+            self.affinity_matrix(use_symmetric=True).astype('float32')
         )
