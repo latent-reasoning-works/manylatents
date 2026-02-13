@@ -2,19 +2,17 @@ from typing import Optional, Union
 
 import numpy as np
 import torch
-from openTSNE import initialization
-from openTSNE.affinity import PerplexityBasedNN
-from openTSNE.tsne import TSNEEmbedding
 from torch import Tensor
 
 from .latent_module_base import LatentModule
 from ...utils.kernel_utils import symmetric_diffusion_operator
+from ...utils.backend import resolve_backend, resolve_device
 
 
 def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
     """
     Construct a full NxN matrix from distances and neighbors.
-    
+
     Args:
         distances: NxK array of distances to neighbors
         neighbors:  NxK indices of neighbors
@@ -31,6 +29,7 @@ def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
 
     return matrix
 
+
 class TSNEModule(LatentModule):
     def __init__(
         self,
@@ -43,9 +42,14 @@ class TSNEModule(LatentModule):
         metric: str = "euclidean",
         initialization: str = "random",
         fit_fraction: float = 1.0,
+        backend: str | None = None,
+        device: str | None = None,
         **kwargs
     ):
-        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
+        super().__init__(
+            n_components=n_components, init_seed=random_state,
+            backend=backend, device=device, **kwargs,
+        )
         self.perplexity = perplexity
         self.n_iter_early = n_iter_early
         self.n_iter_late = n_iter_late
@@ -55,61 +59,80 @@ class TSNEModule(LatentModule):
         self.fit_fraction = fit_fraction
         self.random_state = random_state
 
+        self._resolved_backend = resolve_backend(backend)
+        if self._resolved_backend == "torchdr":
+            self.model = self._create_torchdr_model()
+
+    def _create_torchdr_model(self):
+        from torchdr import TSNE
+
+        return TSNE(
+            n_components=self.n_components,
+            perplexity=self.perplexity,
+            device=resolve_device(self.device),
+            random_state=self.random_state,
+        )
+
     def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         x_np = x.detach().cpu().numpy()
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))
         x_fit = x_np[:n_fit]
 
-        # Step 1: Compute affinities (P matrix)
-        
-        # monkey patch to allow for large perplexity
-        # Overwriting:
-        # https://github.com/pavlin-policar/openTSNE/blob/52ae1d67cbe2b99995e6c8dc0fcc3992344998bc/openTSNE/affinity.py#L340
-        def do_nothing_check_perplexity(perplexity, k_neighbors):
-            # Always just return the perplexity passed in, no checks or clamping
-            return perplexity
-        PerplexityBasedNN.check_perplexity = staticmethod(do_nothing_check_perplexity)
+        if self._resolved_backend == "torchdr":
+            import torch as th
+            x_torch = th.from_numpy(x_fit).float()
+            if resolve_device(self.device) == "cuda":
+                x_torch = x_torch.cuda()
+            self.model.fit(x_torch)
+        else:
+            from openTSNE.affinity import PerplexityBasedNN
+            from openTSNE.tsne import TSNEEmbedding
 
-        self.affinities = PerplexityBasedNN(
-            x_fit,
-            perplexity=self.perplexity,
-            metric=self.metric,
-            n_jobs=-1,
-            method="approx",  # or "exact"
-            random_state=self.random_state
-        )
+            # monkey patch to allow for large perplexity
+            # Overwriting:
+            # https://github.com/pavlin-policar/openTSNE/blob/52ae1d67cbe2b99995e6c8dc0fcc3992344998bc/openTSNE/affinity.py#L340
+            def do_nothing_check_perplexity(perplexity, k_neighbors):
+                # Always just return the perplexity passed in, no checks or clamping
+                return perplexity
+            PerplexityBasedNN.check_perplexity = staticmethod(do_nothing_check_perplexity)
 
-        # Step 2: Initialize embedding
-        init = _get_tsne_initialization(
-            init_arg=self.initialization,
-            x_fit=x_fit,
-            n_fit=n_fit,
-            n_components=self.n_components,
-            random_state=self.random_state,
-            affinities=self.affinities,
-        )
+            self.affinities = PerplexityBasedNN(
+                x_fit,
+                perplexity=self.perplexity,
+                metric=self.metric,
+                n_jobs=-1,
+                method="approx",
+                random_state=self.random_state
+            )
 
-        # Step 3: Create Embedding object
-        self.embedding_train = TSNEEmbedding(
-            init, self.affinities, random_state=self.random_state
-        )
+            init = _get_tsne_initialization(
+                init_arg=self.initialization,
+                x_fit=x_fit,
+                n_fit=n_fit,
+                n_components=self.n_components,
+                random_state=self.random_state,
+                affinities=self.affinities,
+            )
 
-        # Step 4: Optimize (i.e., fit)
-        self.embedding_train.optimize(
-            n_iter=self.n_iter_early,
-            learning_rate=self.learning_rate,
-            exaggeration=12,  # default in openTSNE
-            momentum=0.5,
-            inplace=True
-        )
+            self.embedding_train = TSNEEmbedding(
+                init, self.affinities, random_state=self.random_state
+            )
 
-        self.embedding_train.optimize(
-            n_iter=self.n_iter_late,
-            learning_rate=self.learning_rate,
-            momentum=0.8,
-            inplace=True
-        )
+            self.embedding_train.optimize(
+                n_iter=self.n_iter_early,
+                learning_rate=self.learning_rate,
+                exaggeration=12,
+                momentum=0.5,
+                inplace=True
+            )
+
+            self.embedding_train.optimize(
+                n_iter=self.n_iter_late,
+                learning_rate=self.learning_rate,
+                momentum=0.8,
+                inplace=True
+            )
 
         self._is_fitted = True
 
@@ -118,8 +141,34 @@ class TSNEModule(LatentModule):
             raise RuntimeError("tSNE model is not fitted yet. Call `fit` first.")
 
         x_np = x.detach().cpu().numpy()
-        embedding_out = self.embedding_train.transform(x_np)
-        return torch.tensor(embedding_out, device=x.device, dtype=x.dtype)
+
+        if self._resolved_backend == "torchdr":
+            import torch as th
+            x_torch = th.from_numpy(x_np).float()
+            if resolve_device(self.device) == "cuda":
+                x_torch = x_torch.cuda()
+            embedding = self.model.transform(x_torch)
+            return torch.tensor(embedding.cpu().numpy(), device=x.device, dtype=x.dtype)
+        else:
+            embedding_out = self.embedding_train.transform(x_np)
+            return torch.tensor(embedding_out, device=x.device, dtype=x.dtype)
+
+    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
+        """Fit and then transform on same data."""
+        x_np = x.detach().cpu().numpy()
+        n_fit = max(1, int(self.fit_fraction * x_np.shape[0]))
+
+        if self._resolved_backend == "torchdr":
+            import torch as th
+            x_torch = th.from_numpy(x_np[:n_fit]).float()
+            if resolve_device(self.device) == "cuda":
+                x_torch = x_torch.cuda()
+            embedding = self.model.fit_transform(x_torch)
+            self._is_fitted = True
+            return torch.tensor(embedding.cpu().numpy(), device=x.device, dtype=x.dtype)
+        else:
+            self.fit(x, y)
+            return torch.tensor(np.array(self.embedding_train), device=x.device, dtype=x.dtype)
 
     def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
@@ -135,27 +184,30 @@ class TSNEModule(LatentModule):
                 positive eigenvalues. If False, return row-stochastic matrix. Default False.
 
         Returns:
-            N×N affinity matrix (row-normalized if use_symmetric=False, symmetric if True).
+            N x N affinity matrix (row-normalized if use_symmetric=False, symmetric if True).
         """
         if not self._is_fitted:
             raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
         if use_symmetric:
-            # Return symmetric diffusion operator for positive eigenvalue guarantee
             K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
             return symmetric_diffusion_operator(K)
         else:
-            # Return row-stochastic matrix (original behavior)
-            P = np.asarray(self.affinities.P.todense())
+            if self._resolved_backend == "torchdr":
+                A = self.model.affinity_in_.cpu().numpy()
+                if hasattr(A, 'toarray'):
+                    A = A.toarray()
+                A = np.asarray(A)
+            else:
+                A = np.asarray(self.affinities.P.todense())
+
             if ignore_diagonal:
-                P = P - np.diag(np.diag(P))
+                A = A - np.diag(np.diag(A))
 
             # Row-normalize to make it a proper transition matrix
-            row_sums = P.sum(axis=1, keepdims=True)
+            row_sums = A.sum(axis=1, keepdims=True)
             row_sums[row_sums == 0] = 1  # Avoid division by zero
-            P_normalized = P / row_sums
-
-            return P_normalized
+            return A / row_sums
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
         """
@@ -168,22 +220,25 @@ class TSNEModule(LatentModule):
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
 
         Returns:
-            N×N kernel matrix based on Gaussian similarities.
+            N x N kernel matrix based on Gaussian similarities.
         """
         if not self._is_fitted:
             raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
-        # Build kernel from raw knn distances and neighbors
-        # The P matrix is built from perplexity-calibrated conditional probabilities
-        # For the kernel, we use the symmetrized P as a reasonable kernel
-        # (since true raw Gaussian kernel would require storing all pairwise distances)
-        K = np.asarray(self.affinities.P.todense())
+        if self._resolved_backend == "torchdr":
+            K = self.model.affinity_in_.cpu().numpy()
+            if hasattr(K, 'toarray'):
+                K = K.toarray()
+            K = np.asarray(K)
+        else:
+            K = np.asarray(self.affinities.P.todense())
 
         if ignore_diagonal:
             K = K - np.diag(np.diag(K))
 
         return K
-    
+
+
 def _get_tsne_initialization(
     init_arg: Union[str, np.ndarray],
     x_fit: np.ndarray,
@@ -198,6 +253,8 @@ def _get_tsne_initialization(
       - "pca", "random", "spectral", "rescale", "jitter"
       - any custom ndarray of shape (n_fit, n_components)
     """
+    from openTSNE import initialization
+
     # custom array takes absolute precedence
     if isinstance(init_arg, np.ndarray):
         return init_arg
