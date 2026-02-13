@@ -68,6 +68,7 @@ from manylatents.metrics.silhouette import SilhouetteScore
 
 # Dataset metrics
 from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
+from manylatents.metrics.dataset_topology_descriptor import DatasetTopologyDescriptor
 
 __all__ = [
     # Types
@@ -111,4 +112,5 @@ __all__ = [
     "SilhouetteScore",
     # Dataset metrics
     "GeodesicDistanceCorrelation",
+    "DatasetTopologyDescriptor",
 ]
