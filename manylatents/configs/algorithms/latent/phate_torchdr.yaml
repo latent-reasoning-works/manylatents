@@ -5,10 +5,6 @@ knn: 5
 t: 5
 gamma: 1.0
 decay: 40
-n_pca: null #100 #default in source library
-n_landmark: null
-n_jobs: -1
-verbose: False
 fit_fraction: 1.0
-backend: null
-device: null
+backend: torchdr
+device: auto
