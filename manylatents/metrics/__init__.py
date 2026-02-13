@@ -63,6 +63,9 @@ from manylatents.metrics.alignment_score import AlignmentScore, StratificationRe
 from manylatents.metrics.spectral_gap_ratio import SpectralGapRatio
 from manylatents.metrics.spectral_decay_rate import SpectralDecayRate
 
+# Embedding quality metrics
+from manylatents.metrics.silhouette import SilhouetteScore
+
 __all__ = [
     # Types
     "Metric",
@@ -101,4 +104,6 @@ __all__ = [
     # Spectral metrics
     "SpectralGapRatio",
     "SpectralDecayRate",
+    # Embedding quality metrics
+    "SilhouetteScore",
 ]
