@@ -1,0 +1,4 @@
+spectral_decay_rate:
+  _target_: manylatents.metrics.spectral_decay_rate.SpectralDecayRate
+  _partial_: True
+  top_k: 20
