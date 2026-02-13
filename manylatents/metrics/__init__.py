@@ -70,6 +70,9 @@ from manylatents.metrics.silhouette import SilhouetteScore
 from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
 from manylatents.metrics.dataset_topology_descriptor import DatasetTopologyDescriptor
 
+# Post-hoc analysis
+from manylatents.metrics.metric_agreement import MetricAgreement
+
 __all__ = [
     # Types
     "Metric",
@@ -113,4 +116,6 @@ __all__ = [
     # Dataset metrics
     "GeodesicDistanceCorrelation",
     "DatasetTopologyDescriptor",
+    # Post-hoc analysis
+    "MetricAgreement",
 ]

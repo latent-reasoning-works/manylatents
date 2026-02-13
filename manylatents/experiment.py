@@ -261,6 +261,10 @@ def evaluate_embeddings(
 
     module = kwargs.get("module", None)
 
+    # Log dataset capabilities
+    from manylatents.data.capabilities import log_capabilities
+    log_capabilities(ds_sub)
+
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
     # --- Shared kNN computation for efficiency ---

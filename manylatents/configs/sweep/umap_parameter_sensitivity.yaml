@@ -1,0 +1,12 @@
+defaults:
+  - override /algorithms/latent: umap
+  - override /data: swissroll
+  - override /metrics/embedding: [trustworthiness, continuity, knn_preservation]
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithms.latent.n_neighbors: 5,10,15,30,50
+      algorithms.latent.min_dist: 0.01,0.1,0.5,1.0
+      seed: 42,43,44
