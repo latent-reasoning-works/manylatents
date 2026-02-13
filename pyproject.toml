@@ -67,6 +67,11 @@ dependencies = [
 slurm = ["shop"]
 # Neural SDE support (future)
 dynamics = ["torchsde>=0.2"]
+# GPU-accelerated DR via TorchDR
+torchdr = [
+    "torchdr>=0.3,<0.4",
+    "faiss-cpu",
+]
 # Central dogma foundation model encoders (ESM3, Orthrus, Evo2)
 # dogma = ["manylatents-omics[dogma]"]  # TODO: re-enable after fixing circular dependency
 
