@@ -109,6 +109,49 @@ def load_all_runs_from_sweeps(
     else:
         return pd.DataFrame()  # Return empty DataFrame if no rows
 
+
+def generate_pivot_table(
+    df: pd.DataFrame,
+    metric_cols: list[str],
+    index_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    """Generate pivot table with metrics as columns.
+
+    Args:
+        df: DataFrame with columns for data, algorithm, metrics, seed.
+        metric_cols: Metric column names to include.
+        index_cols: Columns to use as index. Defaults to ["data", "algorithm"].
+
+    Returns:
+        DataFrame with (data, algorithm) rows and metric columns.
+    """
+    if index_cols is None:
+        index_cols = [c for c in ["data", "algorithm"] if c in df.columns]
+    return df.groupby(index_cols)[metric_cols].mean().reset_index()
+
+
+def parameter_sensitivity_summary(
+    df: pd.DataFrame,
+    param_cols: list[str],
+    metric_cols: list[str],
+) -> pd.DataFrame:
+    """Compute mean and std of metrics across seeds for each parameter combo.
+
+    Args:
+        df: DataFrame with parameter and metric columns.
+        param_cols: Parameter column names to group by.
+        metric_cols: Metric column names to summarize.
+
+    Returns:
+        DataFrame with mean and std columns for each metric.
+    """
+    agg_dict = {}
+    for m in metric_cols:
+        agg_dict[f"{m}_mean"] = (m, "mean")
+        agg_dict[f"{m}_std"] = (m, "std")
+    return df.groupby(param_cols).agg(**agg_dict).reset_index()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Merge results from multiple sweep directories.")
     parser.add_argument(

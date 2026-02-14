@@ -18,7 +18,6 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
-from manylatents.dogma.encoders.base import FoundationEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import compute_knn, compute_svd_cache, flatten_and_unroll_metrics
@@ -186,6 +185,40 @@ def _compute_knn_cache(
     return compute_knn(embeddings, k=max_k, include_self=True)
 
 
+def _compute_eigenvalue_cache(
+    module,
+    top_k_values: set[int | None],
+) -> dict[tuple[bool, int | None], np.ndarray]:
+    """Compute eigenvalues of affinity matrix for sharing across metrics.
+
+    Args:
+        module: Fitted LatentModule with affinity_matrix() method.
+        top_k_values: Set of top_k values requested by metrics. None means all.
+
+    Returns:
+        Dict keyed by (use_symmetric, top_k) -> sorted eigenvalues (descending).
+    """
+    cache = {}
+
+    try:
+        affinity = module.affinity_matrix(use_symmetric=True)
+    except (NotImplementedError, AttributeError):
+        logger.warning("Module does not expose affinity_matrix; eigenvalue cache empty.")
+        return cache
+
+    # Compute full eigenvalue spectrum once
+    eigenvalues = np.linalg.eigvalsh(affinity)
+    eigenvalues_sorted = np.sort(eigenvalues)[::-1]
+
+    for top_k in top_k_values:
+        if top_k is None:
+            cache[(True, None)] = eigenvalues_sorted
+        else:
+            cache[(True, top_k)] = eigenvalues_sorted[:top_k]
+
+    return cache
+
+
 @evaluate.register(dict)
 def evaluate_embeddings(
     EmbeddingOutputs: dict,
@@ -227,6 +260,10 @@ def evaluate_embeddings(
 
     module = kwargs.get("module", None)
 
+    # Log dataset capabilities
+    from manylatents.data.capabilities import log_capabilities
+    log_capabilities(ds_sub)
+
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
     # --- Shared kNN computation for efficiency ---
@@ -257,6 +294,20 @@ def evaluate_embeddings(
             logger.info(f"Computing shared SVD cache for k values: {sorted(svd_k_values)}")
             svd_cache = compute_svd_cache(emb_sub, knn_indices, svd_k_values)
 
+    # --- Shared eigenvalue computation for spectral metrics ---
+    eigenvalue_cache = None
+    if module is not None:
+        eig_k_values = set()
+        for metric_cfg in metric_cfgs.values():
+            metric_fn_probe = hydra.utils.instantiate(metric_cfg)
+            sig = inspect.signature(metric_fn_probe)
+            if "_eigenvalue_cache" in sig.parameters:
+                top_k = getattr(metric_cfg, 'top_k', None)
+                eig_k_values.add(top_k)
+        if eig_k_values:
+            logger.info(f"Computing shared eigenvalue cache for top_k values: {eig_k_values}")
+            eigenvalue_cache = _compute_eigenvalue_cache(module, eig_k_values)
+
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
@@ -272,6 +323,8 @@ def evaluate_embeddings(
             call_kwargs["_knn_cache"] = knn_cache
         if "_svd_cache" in sig.parameters and svd_cache is not None:
             call_kwargs["_svd_cache"] = svd_cache
+        if "_eigenvalue_cache" in sig.parameters and eigenvalue_cache is not None:
+            call_kwargs["_eigenvalue_cache"] = eigenvalue_cache
 
         raw_result = metric_fn(**call_kwargs)
 
@@ -361,7 +414,16 @@ def execute_step(
         # LatentModule: fit/transform pattern
         # Pass labels for supervised modules (ignored by unsupervised)
         algorithm.fit(train_tensor, train_labels)
-        latents = algorithm.transform(test_tensor)
+        try:
+            latents = algorithm.transform(test_tensor)
+        except NotImplementedError:
+            # Transductive backends (e.g. TorchDR) don't support out-of-sample
+            # transform — fall back to fit_transform on test data directly
+            logger.warning(
+                f"{type(algorithm).__name__} does not support transform(). "
+                "Falling back to fit_transform() on test data (transductive mode)."
+            )
+            latents = algorithm.fit_transform(test_tensor)
         logger.info(f"LatentModule embedding shape: {latents.shape}")
 
     elif isinstance(algorithm, LightningModule):

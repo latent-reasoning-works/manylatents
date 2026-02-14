@@ -1,0 +1,27 @@
+# @package _global_
+#
+# Profiling: CPU library vs TorchDR backend.
+# Compares wall-clock time across algorithms and datasets.
+#
+# Usage (Mila cluster, GPU):
+#   python -m manylatents.main -m experiment=torchdr_profiling \
+#       cluster=mila hydra.launcher.gpus_per_task=1 \
+#       hydra.launcher.timeout_min=30 hydra.launcher.mem_gb=32
+#
+name: torchdr_profiling
+
+defaults:
+  - override /metrics/embedding: [trustworthiness, continuity, knn_preservation]
+  - override /metrics/module: [spectral_gap_ratio, affinity_spectrum]
+  - override /callbacks/embedding: default
+
+seed: 42
+project: torchdr_profiling
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithms/latent: umap,umap_torchdr,phate,phate_torchdr,tsne,tsne_torchdr
+      data: swissroll,torus,saddle_surface
+      seed: 42

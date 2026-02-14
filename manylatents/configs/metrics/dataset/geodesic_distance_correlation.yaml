@@ -1,0 +1,4 @@
+geodesic_distance_correlation:
+  _target_: manylatents.metrics.geodesic_distance_correlation.GeodesicDistanceCorrelation
+  _partial_: True
+  correlation_type: "spearman"

@@ -1,0 +1,31 @@
+# @package _global_
+#
+# Backend comparison: CPU vs TorchDR across algorithms and datasets.
+# Runs as SLURM array job on Mila cluster (GPU partition).
+#
+# Usage (local dry run, single config):
+#   python -m manylatents.main experiment=backend_comparison \
+#       algorithms/latent=umap_torchdr data=swissroll logger=none
+#
+# Usage (Mila cluster, full sweep):
+#   python -m manylatents.main -m experiment=backend_comparison \
+#       cluster=mila launcher=gpu_job
+#
+name: backend_comparison
+
+defaults:
+  - override /data: swissroll
+  - override /metrics/embedding: [trustworthiness, continuity, knn_preservation]
+  - override /metrics/module: [spectral_gap_ratio, affinity_spectrum]
+  - override /callbacks/embedding: default
+
+seed: 42
+project: backend_comparison
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithms/latent: umap,umap_torchdr,phate,phate_torchdr,tsne,tsne_torchdr
+      data: swissroll,torus,saddle_surface,gaussian_blobs,dla_tree
+      seed: 42,43,44

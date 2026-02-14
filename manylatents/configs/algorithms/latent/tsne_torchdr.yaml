@@ -2,11 +2,6 @@ _target_: manylatents.algorithms.latent.tsne.TSNEModule
 n_components: 2
 random_state: ${seed}
 perplexity: 30
-n_iter_early: 250
-n_iter_late: 750
-learning_rate: 'auto'
-metric: "euclidean"
-initialization: "pca"
 fit_fraction: 1.0
-backend: null
-device: null
+backend: torchdr
+device: auto

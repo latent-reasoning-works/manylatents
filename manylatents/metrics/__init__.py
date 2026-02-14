@@ -59,6 +59,20 @@ from manylatents.metrics.cross_modal_jaccard import CrossModalJaccard, cross_mod
 from manylatents.metrics.rank_agreement import RankAgreement
 from manylatents.metrics.alignment_score import AlignmentScore, StratificationResult, stratify_by_percentile
 
+# Spectral metrics
+from manylatents.metrics.spectral_gap_ratio import SpectralGapRatio
+from manylatents.metrics.spectral_decay_rate import SpectralDecayRate
+
+# Embedding quality metrics
+from manylatents.metrics.silhouette import SilhouetteScore
+
+# Dataset metrics
+from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
+from manylatents.metrics.dataset_topology_descriptor import DatasetTopologyDescriptor
+
+# Post-hoc analysis
+from manylatents.metrics.metric_agreement import MetricAgreement
+
 __all__ = [
     # Types
     "Metric",
@@ -94,4 +108,14 @@ __all__ = [
     "AlignmentScore",
     "StratificationResult",
     "stratify_by_percentile",
+    # Spectral metrics
+    "SpectralGapRatio",
+    "SpectralDecayRate",
+    # Embedding quality metrics
+    "SilhouetteScore",
+    # Dataset metrics
+    "GeodesicDistanceCorrelation",
+    "DatasetTopologyDescriptor",
+    # Post-hoc analysis
+    "MetricAgreement",
 ]
