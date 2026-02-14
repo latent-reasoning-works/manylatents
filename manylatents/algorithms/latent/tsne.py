@@ -6,7 +6,7 @@ from torch import Tensor
 
 from .latent_module_base import LatentModule
 from ...utils.kernel_utils import symmetric_diffusion_operator
-from ...utils.backend import resolve_backend, resolve_device
+from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
 
 
 def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
@@ -148,7 +148,7 @@ class TSNEModule(LatentModule):
             if resolve_device(self.device) == "cuda":
                 x_torch = x_torch.cuda()
             embedding = self.model.transform(x_torch)
-            return torch.tensor(embedding.cpu().numpy(), device=x.device, dtype=x.dtype)
+            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
         else:
             embedding_out = self.embedding_train.transform(x_np)
             return torch.tensor(embedding_out, device=x.device, dtype=x.dtype)
@@ -165,7 +165,7 @@ class TSNEModule(LatentModule):
                 x_torch = x_torch.cuda()
             embedding = self.model.fit_transform(x_torch)
             self._is_fitted = True
-            return torch.tensor(embedding.cpu().numpy(), device=x.device, dtype=x.dtype)
+            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
         else:
             self.fit(x, y)
             return torch.tensor(np.array(self.embedding_train), device=x.device, dtype=x.dtype)
@@ -194,10 +194,7 @@ class TSNEModule(LatentModule):
             return symmetric_diffusion_operator(K)
         else:
             if self._resolved_backend == "torchdr":
-                A = self.model.affinity_in_.cpu().numpy()
-                if hasattr(A, 'toarray'):
-                    A = A.toarray()
-                A = np.asarray(A)
+                A = torchdr_knn_to_dense(self.model).cpu().numpy()
             else:
                 A = np.asarray(self.affinities.P.todense())
 
@@ -226,10 +223,7 @@ class TSNEModule(LatentModule):
             raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
         if self._resolved_backend == "torchdr":
-            K = self.model.affinity_in_.cpu().numpy()
-            if hasattr(K, 'toarray'):
-                K = K.toarray()
-            K = np.asarray(K)
+            K = torchdr_knn_to_dense(self.model).cpu().numpy()
         else:
             K = np.asarray(self.affinities.P.todense())
 

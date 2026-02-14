@@ -1,0 +1,32 @@
+# @package _global_
+#
+# TorchDR parameter sensitivity sweep for UMAP and PHATE.
+# Tests how n_neighbors and min_dist affect embedding quality under GPU backend.
+#
+# Usage (local dry run):
+#   python -m manylatents.main experiment=torchdr_parameter_sweep \
+#       algorithms/latent=umap_torchdr data=swissroll logger=none
+#
+# Usage (Mila cluster):
+#   python -m manylatents.main -m experiment=torchdr_parameter_sweep \
+#       cluster=mila launcher=gpu_job
+#
+name: torchdr_parameter_sweep
+
+defaults:
+  - override /data: swissroll
+  - override /metrics/embedding: [trustworthiness, continuity, knn_preservation]
+  - override /metrics/module: [spectral_gap_ratio, spectral_decay_rate]
+  - override /callbacks/embedding: default
+
+seed: 42
+project: torchdr_parameter_sweep
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      algorithms/latent: umap_torchdr,phate_torchdr
+      data: swissroll,torus,saddle_surface
+      algorithms.latent.n_neighbors: 5,15,30,50
+      seed: 42,43,44

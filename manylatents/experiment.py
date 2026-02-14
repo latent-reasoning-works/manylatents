@@ -18,7 +18,6 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
-from manylatents.dogma.encoders.base import FoundationEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
 from manylatents.utils.metrics import compute_knn, compute_svd_cache, flatten_and_unroll_metrics
@@ -415,7 +414,16 @@ def execute_step(
         # LatentModule: fit/transform pattern
         # Pass labels for supervised modules (ignored by unsupervised)
         algorithm.fit(train_tensor, train_labels)
-        latents = algorithm.transform(test_tensor)
+        try:
+            latents = algorithm.transform(test_tensor)
+        except NotImplementedError:
+            # Transductive backends (e.g. TorchDR) don't support out-of-sample
+            # transform — fall back to fit_transform on test data directly
+            logger.warning(
+                f"{type(algorithm).__name__} does not support transform(). "
+                "Falling back to fit_transform() on test data (transductive mode)."
+            )
+            latents = algorithm.fit_transform(test_tensor)
         logger.info(f"LatentModule embedding shape: {latents.shape}")
 
     elif isinstance(algorithm, LightningModule):

@@ -98,7 +98,7 @@ class LatentModule(ABC):
         import torch
 
         if self.backend == "torchdr" and hasattr(self, 'model') and hasattr(self.model, 'affinity_in_'):
-            return self.model.affinity_in_
+            return self.model.affinity_in_.detach()
         return torch.from_numpy(
             self.affinity_matrix(use_symmetric=True).astype('float32')
         )

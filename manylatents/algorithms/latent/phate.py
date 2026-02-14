@@ -6,7 +6,7 @@ from torch import Tensor
 
 from .latent_module_base import LatentModule
 from ...utils.kernel_utils import symmetric_diffusion_operator
-from ...utils.backend import resolve_backend, resolve_device
+from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
 
 
 class PHATEModule(LatentModule):
@@ -116,7 +116,7 @@ class PHATEModule(LatentModule):
             if resolve_device(self.device) == "cuda":
                 x_torch = x_torch.cuda()
             embedding = self.model.transform(x_torch)
-            return torch.tensor(embedding.cpu().numpy(), device=x.device, dtype=x.dtype)
+            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
         else:
             # Check for potential data permutation issues
             if (x_np.shape == self._training_shape and
@@ -146,7 +146,7 @@ class PHATEModule(LatentModule):
                 x_torch = x_torch.cuda()
             embedding = self.model.fit_transform(x_torch)
             self._is_fitted = True
-            return torch.tensor(embedding.cpu().numpy(), device=x.device, dtype=x.dtype)
+            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
         else:
             # Store lightweight statistics for permutation detection in transform
             self._training_shape = x_np[:n_fit].shape
@@ -180,10 +180,8 @@ class PHATEModule(LatentModule):
             return symmetric_diffusion_operator(K)
         else:
             if self._resolved_backend == "torchdr":
-                A = self.model.affinity_in_.cpu().numpy()
-                if hasattr(A, 'toarray'):
-                    A = A.toarray()
-                A = np.asarray(A)
+                # TorchDR PHATE stores affinity_in_ as NxN dense in log-space
+                A = torch.exp(self.model.affinity_in_.detach()).cpu().numpy()
             else:
                 diff_op = self.model.diff_op
                 A = np.asarray(diff_op)
@@ -206,10 +204,8 @@ class PHATEModule(LatentModule):
             raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
 
         if self._resolved_backend == "torchdr":
-            K = self.model.affinity_in_.cpu().numpy()
-            if hasattr(K, 'toarray'):
-                K = K.toarray()
-            K = np.asarray(K)
+            # TorchDR PHATE stores affinity_in_ as NxN dense in log-space
+            K = torch.exp(self.model.affinity_in_.detach()).cpu().numpy()
         else:
             K = np.asarray(self.model.graph.K.todense())
 
