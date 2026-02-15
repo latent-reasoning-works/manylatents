@@ -1,4 +1,0 @@
-defaults:
-- _self_
-- embedding:
-  - participation_ratio

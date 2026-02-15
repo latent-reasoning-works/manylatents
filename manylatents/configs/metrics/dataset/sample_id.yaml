@@ -1,4 +1,0 @@
-sample_id:
-  _target_: manylatents.omics.metrics.sample_id.SampleId
-  _partial_: True
-  random_state: ${seed}

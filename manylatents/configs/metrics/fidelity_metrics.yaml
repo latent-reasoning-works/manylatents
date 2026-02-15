@@ -1,8 +1,0 @@
-defaults:
-- _self_
-- embedding:
-  - tangent_space_k
-  - participation_ratio_k
-  - continuity_k
-  - trustworthiness_k
-  - anisotropy
