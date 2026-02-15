@@ -116,7 +116,7 @@ Config pattern: `metrics/dataset=<name>`
     Use `metrics=test_metric` to verify integration:
 
     ```bash
-    python -m manylatents.main data=swissroll algorithms/latent=pca metrics=test_metric
+    uv run python -m manylatents.main data=swissroll algorithms/latent=pca metrics=test_metric
     ```
 
 === "Running Without Metrics"
@@ -133,10 +133,10 @@ Config pattern: `metrics/dataset=<name>`
 
     ```bash
     # No metrics (default)
-    python -m manylatents.main data=swissroll algorithms/latent=pca
+    uv run python -m manylatents.main data=swissroll algorithms/latent=pca
 
     # With metrics (explicit opt-in)
-    python -m manylatents.main data=swissroll algorithms/latent=pca metrics=test_metric
+    uv run python -m manylatents.main data=swissroll algorithms/latent=pca metrics=test_metric
     ```
 
     ### Experiment Configs

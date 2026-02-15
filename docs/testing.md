@@ -45,16 +45,16 @@ Testing strategy, CI pipeline, and namespace integration testing for manyLatents
 
     ```bash
     # Smoke test
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/latent=noop data=test_data metrics=test_metric debug=true
 
     # PCA + SwissRoll
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/latent=pca data=swissroll metrics=synthetic_data_metrics \
       debug=true trainer.max_epochs=1
 
     # Autoencoder + SwissRoll
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/lightning=ae_reconstruction data=swissroll \
       debug=true trainer.max_epochs=1
 

@@ -74,7 +74,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ```bash
     # PCA (1000→50) → PHATE (50→2)
-    python -m manylatents.main experiment=my_pipeline
+    uv run python -m manylatents.main experiment=my_pipeline
     ```
 
 === "Sampling"

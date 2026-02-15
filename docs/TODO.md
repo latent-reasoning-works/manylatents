@@ -14,7 +14,7 @@ Add a CLI test for Lightning modules (e.g., autoencoder) to validate training wo
 - name: Test CLI - Lightning Module
   run: |
     source .venv/bin/activate
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/lightning=ae_reconstruction \
       data=swissroll \
       metrics=test_metric \

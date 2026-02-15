@@ -17,7 +17,7 @@ Representation probing extracts activations from model layers at configurable po
 Run the default probing experiment:
 
 ```bash
-python -m manylatents.main experiment=representation_probe \
+uv run python -m manylatents.main experiment=representation_probe \
     algorithms.lightning.config.model_name_or_path=gpt2 \
     trainer.max_epochs=3 \
     logger=wandb
@@ -165,7 +165,7 @@ class MyGauge(DiffusionGauge):
 Run probing sweeps on cluster:
 
 ```bash
-python -m manylatents.main -m \
+uv run python -m manylatents.main -m \
     experiment=representation_probe \
     hydra/launcher=mila_cluster \
     algorithms.lightning.config.model_name_or_path=gpt2,gpt2-medium \

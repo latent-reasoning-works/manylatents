@@ -11,7 +11,7 @@ Domain-specific datasets (genomics, single-cell) are available via the [manylate
 Load your own data from `.npy` or `.npz` files:
 
 ```bash
-python -m manylatents.main data=precomputed data.path=/path/to/data.npy algorithms/latent=umap
+uv run python -m manylatents.main data=precomputed data.path=/path/to/data.npy algorithms/latent=umap
 ```
 
 ## Sampling

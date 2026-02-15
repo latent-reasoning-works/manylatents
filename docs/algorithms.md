@@ -50,7 +50,7 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     ### Running
 
     ```bash
-    python -m manylatents.main algorithms/latent=pca data=swissroll
+    uv run python -m manylatents.main algorithms/latent=pca data=swissroll
     ```
 
     ### Adding a New LatentModule
@@ -111,7 +111,7 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     The `LatentODE` algorithm integrates neural ODEs for learning continuous-time dynamics in latent space:
 
     ```bash
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/lightning=latent_ode \
       data=swissroll \
       trainer.max_epochs=10
@@ -122,13 +122,13 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     ### Running
 
     ```bash
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/lightning=ae_reconstruction \
       data=swissroll \
       trainer.max_epochs=10
 
     # Fast dev run for testing
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       algorithms/lightning=ae_reconstruction \
       data=swissroll \
       trainer.fast_dev_run=true

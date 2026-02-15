@@ -86,7 +86,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     Extensions integrate directly with Hydra configs:
 
     ```bash
-    python -m manylatents.main \
+    uv run python -m manylatents.main \
       data=hgdp_1kgp \
       algorithms/latent=pca \
       metrics=genetic_metrics \
@@ -160,7 +160,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
 
     ## Two Execution Modes
 
-    **CLI** (`python -m manylatents.main`) executes a single step: one algorithm + metrics on one dataset. This is the primary user-facing interface and what SLURM jobs invoke.
+    **CLI** (`uv run python -m manylatents.main`) executes a single step: one algorithm + metrics on one dataset. This is the primary user-facing interface and what SLURM jobs invoke.
 
     **Python API** (`manylatents.api.run()`) is the programmatic interface designed for agent-driven workflows. It accepts `input_data` to chain the output of one call into the next, and supports `pipeline` configs for sequential steps within a single process.
 
@@ -635,11 +635,11 @@ The genomics, population genetics, and single-cell extension for manyLatents.
 
     ```bash
     # Using extension entry point (recommended)
-    python -m manylatents.yourext.main experiment=your_experiment
+    uv run python -m manylatents.yourext.main experiment=your_experiment
 
     # Using environment variable (requires shop)
     HYDRA_SEARCH_PACKAGES="manylatents.configs:manylatents.yourext.configs" \
-        python -m manylatents.main experiment=your_experiment
+        uv run python -m manylatents.main experiment=your_experiment
     ```
 
     ### Debugging Config Discovery
