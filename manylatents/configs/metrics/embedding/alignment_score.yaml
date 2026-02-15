@@ -1,0 +1,5 @@
+alignment_score:
+  _target_: manylatents.metrics.alignment_score.AlignmentScore
+  _partial_: True
+  k: 20
+  method: jaccard

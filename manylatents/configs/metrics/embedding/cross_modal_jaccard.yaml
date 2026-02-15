@@ -1,0 +1,5 @@
+cross_modal_jaccard:
+  _target_: manylatents.metrics.cross_modal_jaccard.CrossModalJaccard
+  _partial_: True
+  k: 20
+  metric: euclidean

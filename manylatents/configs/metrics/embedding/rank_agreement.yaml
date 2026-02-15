@@ -1,0 +1,5 @@
+rank_agreement:
+  _target_: manylatents.metrics.rank_agreement.RankAgreement
+  _partial_: True
+  k: 20
+  metric_fn: lid

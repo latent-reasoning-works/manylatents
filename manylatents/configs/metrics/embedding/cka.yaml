@@ -1,0 +1,4 @@
+cka:
+  _target_: manylatents.metrics.cka.CKA
+  _partial_: True
+  kernel: linear
