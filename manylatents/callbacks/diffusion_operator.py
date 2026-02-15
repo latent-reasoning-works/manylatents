@@ -1,18 +1,16 @@
-# manylatents/callbacks/probing.py
-"""Representation probing utilities and callbacks.
+# manylatents/callbacks/diffusion_operator.py
+"""Diffusion operator construction and trajectory analysis.
 
-Probes are hook-based observers that extract and analyze representations
-during training or after inference. They don't transform the main data flow -
-they compute derived quantities (diffusion operators, SAE features, etc.)
-that can be logged, visualized, or used for analysis.
+Build diffusion operators from representations for spectral analysis.
+These are used by the activation tracker callback during training and
+by standalone spectral diagnostic pipelines.
 
 Usage:
     # Direct computation
-    from manylatents.callbacks.probing import probe
-    diff_op = probe(embeddings, method="diffusion")
+    from manylatents.callbacks.diffusion_operator import build_diffusion_operator
+    diff_op = build_diffusion_operator(embeddings, method="diffusion")
 
-    # As Lightning callback (see lightning/callbacks/probing.py)
-    # As embedding callback (planned)
+    # As Lightning callback (see lightning/callbacks/activation_tracker.py)
 """
 import functools
 from dataclasses import dataclass
@@ -27,52 +25,56 @@ from manylatents.utils.kernel_utils import symmetric_diffusion_operator
 
 
 # =============================================================================
-# Core probe dispatch
+# Core dispatch
 # =============================================================================
 
 @functools.singledispatch
-def probe(
+def build_diffusion_operator(
     source: Any,
     /,
     method: str = "diffusion",
     **kwargs,
 ) -> np.ndarray:
-    """Compute probe from representations.
+    """Build diffusion operator from representations.
 
     Args:
         source: Input representations (N samples x D features)
-        method: Probe method ("diffusion", future: "sae", "attention")
+        method: Construction method ("diffusion", future: "sae", "attention")
         **kwargs: Method-specific parameters
 
     Returns:
-        Probe output (shape depends on method)
+        Diffusion operator (N, N)
     """
     raise NotImplementedError(
-        f"probe() not implemented for type {type(source)}. "
+        f"build_diffusion_operator() not implemented for type {type(source)}. "
         f"Expected np.ndarray or torch.Tensor."
     )
 
 
-@probe.register(np.ndarray)
-def _probe_ndarray(source: np.ndarray, /, method: str = "diffusion", **kwargs) -> np.ndarray:
+@build_diffusion_operator.register(np.ndarray)
+def _from_ndarray(source: np.ndarray, /, method: str = "diffusion", **kwargs) -> np.ndarray:
     if method == "diffusion":
         gauge = DiffusionGauge(**kwargs)
         return gauge(source)
     else:
-        raise ValueError(f"Unknown probe method: {method}")
+        raise ValueError(f"Unknown method: {method}")
 
 
-@probe.register(Tensor)
-def _probe_tensor(source: Tensor, /, method: str = "diffusion", **kwargs) -> np.ndarray:
+@build_diffusion_operator.register(Tensor)
+def _from_tensor(source: Tensor, /, method: str = "diffusion", **kwargs) -> np.ndarray:
     if method == "diffusion":
         gauge = DiffusionGauge(**kwargs)
         return gauge(source)
     else:
-        raise ValueError(f"Unknown probe method: {method}")
+        raise ValueError(f"Unknown method: {method}")
+
+
+# Backward-compatible alias
+probe = build_diffusion_operator
 
 
 # =============================================================================
-# Diffusion probe
+# Diffusion operator builder
 # =============================================================================
 
 @dataclass
@@ -128,7 +130,7 @@ class DiffusionGauge:
 
 
 # =============================================================================
-# Trajectory analysis (for analyzing probe outputs over time/models)
+# Trajectory analysis (for analyzing operator outputs over time/models)
 # =============================================================================
 
 @dataclass

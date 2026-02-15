@@ -1,11 +1,11 @@
 # manylatents/callbacks/tests/test_probing.py
-"""Tests for probing utilities."""
+"""Tests for diffusion operator utilities."""
 from typing import List, Tuple
 import pytest
 import numpy as np
 import torch
-from manylatents.callbacks.probing import (
-    probe,
+from manylatents.callbacks.diffusion_operator import (
+    build_diffusion_operator as probe,
     DiffusionGauge,
     TrajectoryVisualizer,
     compute_multi_model_spread,

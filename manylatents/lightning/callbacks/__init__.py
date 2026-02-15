@@ -1,8 +1,11 @@
-"""Lightning callbacks for representation probing."""
-from manylatents.lightning.callbacks.probing import (
+"""Lightning callbacks for activation tracking and diffusion operators."""
+from manylatents.lightning.callbacks.activation_tracker import (
     ProbeTrigger,
-    RepresentationProbeCallback,
+    ActivationTrajectoryCallback,
 )
 from manylatents.lightning.callbacks.wandb_probe import WandbProbeLogger
 
-__all__ = ["ProbeTrigger", "RepresentationProbeCallback", "WandbProbeLogger"]
+# Backward-compatible alias
+RepresentationProbeCallback = ActivationTrajectoryCallback
+
+__all__ = ["ProbeTrigger", "ActivationTrajectoryCallback", "RepresentationProbeCallback", "WandbProbeLogger"]

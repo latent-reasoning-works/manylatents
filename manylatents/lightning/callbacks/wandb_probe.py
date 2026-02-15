@@ -88,7 +88,7 @@ class WandbProbeLogger:
         if not WANDB_AVAILABLE or wandb.run is None:
             return
 
-        from manylatents.callbacks.probing import compute_multi_model_spread
+        from manylatents.callbacks.diffusion_operator import compute_multi_model_spread
 
         spreads = compute_multi_model_spread(trajectories)
 
