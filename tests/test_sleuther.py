@@ -143,3 +143,22 @@ def test_prewarm_cache_spectral():
     })
     cache = prewarm_cache(cfgs, emb, FakeDataset(), module=FakeModule())
     assert "eigenvalues" in cache
+
+
+def test_prewarm_cache_no_data_attribute():
+    """prewarm_cache should not crash if dataset lacks .data."""
+    from manylatents.experiment import prewarm_cache
+    rng = np.random.RandomState(42)
+    emb = rng.randn(20, 2).astype(np.float32)
+
+    class NoDataDataset:
+        pass
+
+    cfgs = _make_metric_cfgs({
+        "embedding.knn_preservation": {
+            "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
+            "n_neighbors": 5,
+        },
+    })
+    cache = prewarm_cache(cfgs, emb, NoDataDataset())
+    assert id(emb) in cache  # embedding kNN still warmed

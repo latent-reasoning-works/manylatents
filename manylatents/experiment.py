@@ -228,7 +228,7 @@ def prewarm_cache(
         logger.info(f"Pre-warming cache: embedding kNN with max_k={max_k}")
         compute_knn(embeddings, k=max_k, cache=cache)
 
-    if reqs["data_k"] and dataset is not None:
+    if reqs["data_k"] and dataset is not None and hasattr(dataset, "data"):
         max_k = max(reqs["data_k"])
         logger.info(f"Pre-warming cache: dataset kNN with max_k={max_k}")
         compute_knn(dataset.data, k=max_k, cache=cache)
