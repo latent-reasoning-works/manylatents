@@ -10,11 +10,17 @@ import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.data.capabilities import get_capabilities
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_eigenvalues
 
 logger = logging.getLogger(__name__)
 
 
+@register_metric(
+    aliases=["dataset_topology", "topology_descriptor"],
+    default_params={},
+    description="Topological descriptor of the dataset structure",
+)
 def DatasetTopologyDescriptor(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

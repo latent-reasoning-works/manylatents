@@ -3,9 +3,15 @@ from typing import Optional, Union
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_knn
 
 
+@register_metric(
+    aliases=["knn_preservation"],
+    default_params={"n_neighbors": 10},
+    description="k-nearest neighbor preservation between original and embedded spaces",
+)
 def KNNPreservation(
     embeddings: np.ndarray,
     dataset,

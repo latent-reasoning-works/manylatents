@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_eigenvalues
 
 
@@ -32,6 +33,11 @@ def affinity_spectrum(affinity_matrix: np.ndarray, top_k: int = 25) -> np.ndarra
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
+@register_metric(
+    aliases=["affinity_spectrum"],
+    default_params={"top_k": 25},
+    description="Top-k eigenvalues of the affinity matrix",
+)
 def AffinitySpectrum(embeddings: np.ndarray, dataset=None,
                      module: Optional[LatentModule] = None,
                      top_k: int = 25, cache: Optional[dict] = None) -> np.ndarray:

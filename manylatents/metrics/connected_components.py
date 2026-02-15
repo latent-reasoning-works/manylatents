@@ -2,6 +2,7 @@ import warnings
 import numpy as np
 import networkx as nx
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 def connected_components(kernel_matrix: np.ndarray) -> np.ndarray:
     """
@@ -22,6 +23,11 @@ def connected_components(kernel_matrix: np.ndarray) -> np.ndarray:
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
+@register_metric(
+    aliases=["connected_components"],
+    default_params={"ignore_diagonal": False},
+    description="Number of connected components in the kNN graph",
+)
 def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule, ignore_diagonal: bool = False) -> np.ndarray:
     """
     Compute connected components from the module's kernel matrix.

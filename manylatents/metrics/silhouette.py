@@ -10,10 +10,16 @@ from typing import Optional
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 logger = logging.getLogger(__name__)
 
 
+@register_metric(
+    aliases=["silhouette", "silhouette_score"],
+    default_params={"metric": "euclidean"},
+    description="Silhouette score for cluster separation in embedding",
+)
 def SilhouetteScore(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

@@ -3,8 +3,14 @@ from typing import Optional
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 
+@register_metric(
+    aliases=["anisotropy"],
+    default_params={},
+    description="Anisotropy of embedding space",
+)
 def Anisotropy(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

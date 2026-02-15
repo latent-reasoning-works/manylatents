@@ -5,6 +5,7 @@ from typing import Literal, Optional
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.algorithms.latent.diffusion_map import compute_dm
+from manylatents.metrics.registry import register_metric
 
 
 def diffusion_map_correlation(
@@ -67,6 +68,11 @@ def diffusion_map_correlation(
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
+@register_metric(
+    aliases=["diffusion_map_correlation"],
+    default_params={"dm_components": 2, "alpha": 1.0, "correlation_type": "pearson"},
+    description="Correlation between diffusion map and embedding distances",
+)
 def DiffusionMapCorrelation(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

@@ -3,7 +3,14 @@ import numpy as np
 from typing import Optional, Any
 from magnipy.magnipy import Magnipy
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
+
+@register_metric(
+    aliases=["magnitude_dimension", "mag_dim"],
+    default_params={"n_ts": 50, "log_scale": False, "scale_finding": "convergence", "target_prop": 0.95, "metric": "euclidean", "p": 2, "n_neighbors": 12, "method": "cholesky", "one_point_property": True, "perturb_singularities": True, "positive_magnitude": False, "exact": False},
+    description="Magnitude-based effective dimensionality",
+)
 def MagnitudeDimension(
     embeddings: np.ndarray, 
     dataset: Any, 

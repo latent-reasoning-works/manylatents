@@ -4,9 +4,15 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from typing import Optional
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 logger = logging.getLogger(__name__)
 
-def kmeans_stratification(embeddings: np.ndarray, 
+@register_metric(
+    aliases=["stratification", "kmeans_stratification"],
+    default_params={"random_state": 42},
+    description="K-means stratification score for population structure",
+)
+def kmeans_stratification(embeddings: np.ndarray,
                         dataset, 
                         module: Optional[LatentModule] = None,
                         random_state=42):  

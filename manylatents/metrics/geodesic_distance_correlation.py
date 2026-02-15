@@ -12,10 +12,16 @@ from scipy.stats import spearmanr, kendalltau
 from sklearn.metrics import pairwise_distances
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 logger = logging.getLogger(__name__)
 
 
+@register_metric(
+    aliases=["geodesic_correlation", "geodesic_distance_correlation"],
+    default_params={"correlation_type": "spearman"},
+    description="Correlation between geodesic and embedded distances",
+)
 def GeodesicDistanceCorrelation(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

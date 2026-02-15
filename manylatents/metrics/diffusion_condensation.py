@@ -8,6 +8,8 @@ import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from sklearn.decomposition import PCA
 
+from manylatents.metrics.registry import register_metric
+
 logger = logging.getLogger(__name__)
 
 
@@ -122,6 +124,11 @@ def find_stable_scales(n_components: list[int], gradient: np.ndarray) -> tuple[l
     return stable_scales, int(stable_values[best_idx])
 
 
+@register_metric(
+    aliases=["diffusion_condensation"],
+    default_params={"scale": 1.025, "granularity": 0.1, "knn": 5, "decay": 40, "n_pca": 50, "n_subsample": 1000, "output_mode": "stable"},
+    description="Diffusion condensation score",
+)
 def DiffusionCondensation(
     embeddings: np.ndarray,
     dataset: Optional[Any] = None,

@@ -4,8 +4,16 @@ import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import pearsonr
 
+from manylatents.metrics.registry import register_metric
+
 logger = logging.getLogger(__name__)
 
+
+@register_metric(
+    aliases=["pearson_correlation", "distance_correlation"],
+    default_params={"num_dists": 100, "random_state": 42},
+    description="Pearson correlation between pairwise distances",
+)
 def PearsonCorrelation(dataset, embeddings: np.ndarray,
                        return_per_sample: bool = False, 
                        num_dists: int = 100,

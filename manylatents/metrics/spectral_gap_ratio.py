@@ -9,11 +9,17 @@ from typing import Optional
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_eigenvalues
 
 logger = logging.getLogger(__name__)
 
 
+@register_metric(
+    aliases=["spectral_gap_ratio", "spectral_gap"],
+    default_params={},
+    description="Ratio of first to second eigenvalue of the diffusion operator",
+)
 def SpectralGapRatio(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

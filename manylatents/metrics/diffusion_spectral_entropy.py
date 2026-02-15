@@ -4,6 +4,8 @@ import os
 import random
 from typing import Optional
 
+from manylatents.metrics.registry import register_metric
+
 
 def exact_eigvals(K: np.ndarray) -> np.ndarray:
     """Compute exact eigenvalues with symmetry safety check.
@@ -244,6 +246,11 @@ def diffusion_spectral_entropy(embedding_vectors: np.array,
 
     return entropy
 
+@register_metric(
+    aliases=["diffusion_spectral_entropy", "dse"],
+    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0},
+    description="Diffusion spectral entropy (eigenvalue count at diffusion time t)",
+)
 def DiffusionSpectralEntropy(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

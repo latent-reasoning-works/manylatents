@@ -3,8 +3,16 @@ import logging
 import numpy as np
 from scipy.stats import linregress
 
+from manylatents.metrics.registry import register_metric
+
 logger = logging.getLogger(__name__)
 
+
+@register_metric(
+    aliases=["fractal_dimension", "fractal_dim"],
+    default_params={"n_box_sizes": 10},
+    description="Correlation fractal dimension of embedding",
+)
 def FractalDimension(dataset, embeddings: np.ndarray, n_box_sizes: int = 10) -> float:
     """
     Estimate the fractal (box-counting) dimension of the embedding.

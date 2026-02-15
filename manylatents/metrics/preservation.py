@@ -13,6 +13,7 @@ from scipy.spatial.distance import pdist
 from scipy.stats import spearmanr
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 
 ##############################################################################
@@ -125,6 +126,11 @@ def compute_ground_truth_preservation(ancestry_coords,
 # Single-Value Wrapper (conforms to Metric Protocol)
 ##############################################################################
 
+@register_metric(
+    aliases=["admixture_laplacian"],
+    default_params={"scale_embeddings": True},
+    description="Admixture Laplacian preservation score",
+)
 def GroundTruthPreservation(embeddings: np.ndarray,
                             dataset,
                             module: Optional[LatentModule] = None,

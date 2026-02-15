@@ -5,11 +5,17 @@ import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import ColormapInfo
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_knn
 
 logger = logging.getLogger(__name__)
 
 
+@register_metric(
+    aliases=["tangent_space"],
+    default_params={"n_neighbors": 25, "variance_threshold": 0.95},
+    description="Tangent space alignment between original and embedded spaces",
+)
 def TangentSpaceApproximation(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

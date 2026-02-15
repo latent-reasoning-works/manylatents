@@ -3,6 +3,7 @@ from sklearn.metrics import pairwise_distances
 from typing import Optional
 import warnings
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 
 def diffusion_curvature(P: np.ndarray, t: int = 3, percentile: float = 5) -> np.ndarray:
     """
@@ -38,6 +39,11 @@ def diffusion_curvature(P: np.ndarray, t: int = 3, percentile: float = 5) -> np.
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
+@register_metric(
+    aliases=["diffusion_curvature"],
+    default_params={"t": 3, "percentile": 5},
+    description="Diffusion curvature of embedding manifold",
+)
 def DiffusionCurvature(
     dataset,
     embeddings: np.ndarray,

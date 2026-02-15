@@ -9,11 +9,17 @@ from typing import Optional
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_eigenvalues
 
 logger = logging.getLogger(__name__)
 
 
+@register_metric(
+    aliases=["spectral_decay_rate", "spectral_decay"],
+    default_params={"top_k": 20},
+    description="Log-eigenvalue slope measuring effective spectral dimensionality",
+)
 def SpectralDecayRate(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

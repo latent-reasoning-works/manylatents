@@ -43,7 +43,7 @@ from manylatents.metrics.participation_ratio import ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
 from manylatents.metrics.trustworthiness import Trustworthiness
 
-# Additional metrics (not yet decorated, but available via class name)
+# Additional embedding metrics
 from manylatents.metrics.continuity import Continuity
 from manylatents.metrics.anisotropy import Anisotropy
 from manylatents.metrics.fractal_dimension import FractalDimension
@@ -62,6 +62,29 @@ from manylatents.metrics.alignment_score import AlignmentScore, StratificationRe
 # Spectral metrics
 from manylatents.metrics.spectral_gap_ratio import SpectralGapRatio
 from manylatents.metrics.spectral_decay_rate import SpectralDecayRate
+from manylatents.metrics.affinity_spectrum import AffinitySpectrum
+
+# Module metrics (kernel/graph-based)
+from manylatents.metrics.connected_components import ConnectedComponents
+from manylatents.metrics.diffusion_map_correlation import DiffusionMapCorrelation
+from manylatents.metrics.kernel_matrix_sparsity import KernelMatrixSparsity, KernelMatrixDensity
+
+# Diffusion-based metrics
+from manylatents.metrics.diffusion_condensation import DiffusionCondensation
+from manylatents.metrics.diffusion_curvature import DiffusionCurvature
+from manylatents.metrics.diffusion_spectral_entropy import DiffusionSpectralEntropy
+
+# Topological metrics (optional deps: gudhi, ripser)
+try:
+    from manylatents.metrics.reeb_graph import ReebGraphNodesEdges
+except ImportError:
+    pass
+
+# Magnitude metrics (optional dep: magnipy)
+try:
+    from manylatents.metrics.magnitude_dimension import MagnitudeDimension
+except ImportError:
+    pass
 
 # Embedding quality metrics
 from manylatents.metrics.silhouette import SilhouetteScore
@@ -69,6 +92,8 @@ from manylatents.metrics.silhouette import SilhouetteScore
 # Dataset metrics
 from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
 from manylatents.metrics.dataset_topology_descriptor import DatasetTopologyDescriptor
+from manylatents.metrics.preservation import GroundTruthPreservation
+from manylatents.metrics.stratification import kmeans_stratification
 
 # Post-hoc analysis
 from manylatents.metrics.metric_agreement import MetricAgreement
@@ -110,11 +135,27 @@ __all__ = [
     # Spectral metrics
     "SpectralGapRatio",
     "SpectralDecayRate",
+    "AffinitySpectrum",
+    # Module metrics (kernel/graph-based)
+    "ConnectedComponents",
+    "DiffusionMapCorrelation",
+    "KernelMatrixSparsity",
+    "KernelMatrixDensity",
+    # Diffusion-based metrics
+    "DiffusionCondensation",
+    "DiffusionCurvature",
+    "DiffusionSpectralEntropy",
+    # Topological metrics
+    "ReebGraphNodesEdges",
+    # Magnitude metrics
+    "MagnitudeDimension",
     # Embedding quality metrics
     "SilhouetteScore",
     # Dataset metrics
     "GeodesicDistanceCorrelation",
     "DatasetTopologyDescriptor",
+    "GroundTruthPreservation",
+    "kmeans_stratification",
     # Post-hoc analysis
     "MetricAgreement",
 ]

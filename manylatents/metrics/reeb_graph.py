@@ -8,6 +8,8 @@ from sklearn.metrics import pairwise_distances
 from sklearn.decomposition import PCA
 import gudhi as gd
 
+from manylatents.metrics.registry import register_metric
+
 logger = logging.getLogger(__name__)
 
 class DecoratedReebGraph:
@@ -105,6 +107,11 @@ def Reeb_approx_graph(H, function, n_bins, return_embedding_data=True, density_f
     return G, colors
 
 
+@register_metric(
+    aliases=["reeb_graph"],
+    default_params={"n_bins": 10},
+    description="Reeb graph node and edge counts",
+)
 def ReebGraphNodesEdges(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,

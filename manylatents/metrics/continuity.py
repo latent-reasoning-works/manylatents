@@ -3,9 +3,15 @@ from typing import Optional, Tuple, Union
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_knn
 
 
+@register_metric(
+    aliases=["continuity"],
+    default_params={"n_neighbors": 25},
+    description="Continuity of embedding (preservation of original neighborhoods)",
+)
 def Continuity(embeddings: np.ndarray,
                dataset: Optional[object] = None,
                module: Optional[LatentModule] = None,
