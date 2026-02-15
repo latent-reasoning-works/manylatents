@@ -1,4 +1,6 @@
 import warnings
+from typing import Optional
+
 import numpy as np
 import networkx as nx
 from manylatents.algorithms.latent.latent_module_base import LatentModule
@@ -28,7 +30,7 @@ def connected_components(kernel_matrix: np.ndarray) -> np.ndarray:
     default_params={"ignore_diagonal": False},
     description="Number of connected components in the kNN graph",
 )
-def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule, ignore_diagonal: bool = False) -> np.ndarray:
+def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule, ignore_diagonal: bool = False, cache: Optional[dict] = None) -> np.ndarray:
     """
     Compute connected components from the module's kernel matrix.
 

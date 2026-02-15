@@ -79,7 +79,8 @@ def DiffusionMapCorrelation(
     module: Optional[LatentModule] = None,
     dm_components: int = 2,
     alpha: float = 1.0,
-    correlation_type: Literal["pearson", "spearman"] = "pearson"
+    correlation_type: Literal["pearson", "spearman"] = "pearson",
+    cache: Optional[dict] = None,
 ) -> np.ndarray:
     """
     Compute correlation between embeddings and corresponding diffusion map coordinates.

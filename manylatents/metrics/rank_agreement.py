@@ -39,6 +39,7 @@ def RankAgreement(
     metric_fn: str = "lid",
     return_correlations: bool = False,
     return_per_sample: bool = False,
+    cache: Optional[dict] = None,
 ) -> Union[float, np.ndarray, Dict[str, float]]:
     """Compare per-sample metrics across modalities using percentile ranks.
 

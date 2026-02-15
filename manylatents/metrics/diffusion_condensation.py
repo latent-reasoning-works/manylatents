@@ -140,6 +140,7 @@ def DiffusionCondensation(
     n_pca: Optional[int] = 50,
     n_subsample: int = 1000,
     output_mode: str = "stable",
+    cache: Optional[dict] = None,
 ) -> Union[int, dict[str, Any]]:
     """
     Compute component stability via diffusion condensation.

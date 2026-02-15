@@ -110,6 +110,7 @@ def CKA(
     kernel: str = "linear",
     sigma: Optional[float] = None,
     return_matrix: bool = False,
+    cache: Optional[dict] = None,
 ) -> Union[float, Dict[str, float], np.ndarray]:
     """Compute Centered Kernel Alignment across modalities.
 

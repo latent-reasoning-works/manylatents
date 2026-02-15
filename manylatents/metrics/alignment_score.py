@@ -88,6 +88,7 @@ def AlignmentScore(
     stratify: bool = False,
     low_percentile: float = 25,
     high_percentile: float = 75,
+    cache: Optional[dict] = None,
 ) -> Union[float, np.ndarray, StratificationResult]:
     """Compute composite per-variant alignment score.
 

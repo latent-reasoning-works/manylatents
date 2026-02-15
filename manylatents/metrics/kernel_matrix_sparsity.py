@@ -1,4 +1,6 @@
 import warnings
+from typing import Optional
+
 import numpy as np
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
@@ -66,7 +68,7 @@ def kernel_matrix_density(embeddings: np.ndarray, kernel_matrix: np.ndarray, thr
     default_params={"threshold": 1e-10, "ignore_diagonal": False},
     description="Sparsity of the kernel/affinity matrix",
 )
-def KernelMatrixSparsity(dataset, embeddings: np.ndarray, module: LatentModule, threshold: float = 1e-10, ignore_diagonal: bool = False) -> float:
+def KernelMatrixSparsity(dataset, embeddings: np.ndarray, module: LatentModule, threshold: float = 1e-10, ignore_diagonal: bool = False, cache: Optional[dict] = None) -> float:
     """
     Metric wrapper for kernel matrix sparsity computation.
 
@@ -97,7 +99,7 @@ def KernelMatrixSparsity(dataset, embeddings: np.ndarray, module: LatentModule, 
     default_params={"threshold": 1e-10, "ignore_diagonal": False},
     description="Density of the kernel/affinity matrix",
 )
-def KernelMatrixDensity(dataset, embeddings: np.ndarray, module: LatentModule, threshold: float = 1e-10, ignore_diagonal: bool = False) -> float:
+def KernelMatrixDensity(dataset, embeddings: np.ndarray, module: LatentModule, threshold: float = 1e-10, ignore_diagonal: bool = False, cache: Optional[dict] = None) -> float:
     """
     Metric wrapper for kernel matrix density computation.
 

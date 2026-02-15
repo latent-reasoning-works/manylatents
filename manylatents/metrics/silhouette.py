@@ -25,6 +25,7 @@ def SilhouetteScore(
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
     metric: str = "euclidean",
+    cache: Optional[dict] = None,
 ) -> float:
     """Compute silhouette coefficient of embedding w.r.t. cluster labels.
 

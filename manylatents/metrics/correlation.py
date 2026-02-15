@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
@@ -15,9 +16,10 @@ logger = logging.getLogger(__name__)
     description="Pearson correlation between pairwise distances",
 )
 def PearsonCorrelation(dataset, embeddings: np.ndarray,
-                       return_per_sample: bool = False, 
+                       return_per_sample: bool = False,
                        num_dists: int = 100,
-                       random_state: int = 42) -> float:
+                       random_state: int = 42,
+                       cache: Optional[dict] = None) -> float:
     """
     Compute the Pearson correlation between pairwise distances in the 
     original high-dimensional data and the low-dimensional embeddings.

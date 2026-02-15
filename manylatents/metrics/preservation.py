@@ -135,6 +135,7 @@ def GroundTruthPreservation(embeddings: np.ndarray,
                             dataset,
                             module: Optional[LatentModule] = None,
                             scale_embeddings: bool = True,
+                            cache: Optional[dict] = None,
                             **kwargs) -> float:
     """
     Computes preservation of embedding distance versus ground truth distance.

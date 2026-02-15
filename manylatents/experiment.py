@@ -293,23 +293,12 @@ def evaluate_embeddings(
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
 
-        try:
-            raw_result = metric_fn(
-                embeddings=emb_sub,
-                dataset=ds_sub,
-                module=module,
-                cache=cache,
-            )
-        except TypeError:
-            logger.warning(
-                f"Metric '{metric_name}' does not accept cache=; "
-                "calling without it. Consider adding cache=None."
-            )
-            raw_result = metric_fn(
-                embeddings=emb_sub,
-                dataset=ds_sub,
-                module=module,
-            )
+        raw_result = metric_fn(
+            embeddings=emb_sub,
+            dataset=ds_sub,
+            module=module,
+            cache=cache,
+        )
 
         # Unpack (value, ColormapInfo) tuples from metrics that provide viz metadata
         if (

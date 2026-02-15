@@ -262,6 +262,7 @@ def DiffusionSpectralEntropy(
     numerical_floor: float = 1e-6,
     max_N: int = 10000,
     random_seed: int = 0,
+    cache: Optional[dict] = None,
 ) -> float:
     """
     Wrapper for diffusion_spectral_entropy.

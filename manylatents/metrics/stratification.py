@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
     description="K-means stratification score for population structure",
 )
 def kmeans_stratification(embeddings: np.ndarray,
-                        dataset, 
+                        dataset,
                         module: Optional[LatentModule] = None,
-                        random_state=42):  
+                        random_state=42,
+                        cache: Optional[dict] = None):
     """
     Computes the Adjusted Rand Index (ARI) between the KMeans clustering labels and the provided dataset labels.
     """

@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import numpy as np
 from ripser import ripser
@@ -18,11 +19,12 @@ logger = logging.getLogger(__name__)
     default_params={"homology_dim": 1},
     description="Count of loops/cycles (H1 Betti number)",
 )
-def PersistentHomology(embeddings: np.ndarray, 
-                       dataset=None, 
+def PersistentHomology(embeddings: np.ndarray,
+                       dataset=None,
                        module=None,
-                       homology_dim: int = 1, 
-                       persistence_threshold: float = 0.1) -> float:
+                       homology_dim: int = 1,
+                       persistence_threshold: float = 0.1,
+                       cache: Optional[dict] = None) -> float:
     """
     Compute a persistent homology metric for the embedding.
 

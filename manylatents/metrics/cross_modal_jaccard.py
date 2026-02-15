@@ -91,6 +91,7 @@ def CrossModalJaccard(
     metric: str = "euclidean",
     return_per_sample: bool = False,
     return_pairwise: bool = False,
+    cache: Optional[dict] = None,
 ) -> Union[float, np.ndarray, Dict[str, np.ndarray]]:
     """Compute cross-modal k-NN neighborhood overlap.
 

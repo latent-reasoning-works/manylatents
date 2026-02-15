@@ -49,7 +49,8 @@ def DiffusionCurvature(
     embeddings: np.ndarray,
     module: LatentModule,
     t: int = 3,
-    percentile: float = 5
+    percentile: float = 5,
+    cache: Optional[dict] = None,
 ) -> np.ndarray:
     """
     Compute diffusion curvature from the module's affinity matrix.

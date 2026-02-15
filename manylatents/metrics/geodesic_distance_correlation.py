@@ -27,6 +27,7 @@ def GeodesicDistanceCorrelation(
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
     correlation_type: str = "spearman",
+    cache: Optional[dict] = None,
 ) -> float:
     """Compute correlation between geodesic and embedding pairwise distances.
 

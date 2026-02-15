@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import numpy as np
 from scipy.stats import linregress
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
     default_params={"n_box_sizes": 10},
     description="Correlation fractal dimension of embedding",
 )
-def FractalDimension(dataset, embeddings: np.ndarray, n_box_sizes: int = 10) -> float:
+def FractalDimension(dataset, embeddings: np.ndarray, n_box_sizes: int = 10, cache: Optional[dict] = None) -> float:
     """
     Estimate the fractal (box-counting) dimension of the embedding.
     

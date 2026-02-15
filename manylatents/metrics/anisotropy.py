@@ -15,6 +15,7 @@ def Anisotropy(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
+    cache: Optional[dict] = None,
 ) -> float:
     """
     Compute anisotropy as the ratio of the first singular value 
