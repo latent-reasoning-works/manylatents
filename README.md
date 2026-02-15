@@ -232,6 +232,6 @@ See [docs/extensions.md](docs/extensions.md) for creating your own.
 
 <div align="center">
 
-MIT License -- Cesar Miguel Valdez Cordova, Matthew Scicluna, Shuang Ni, and contributors -- [Latent Reasoning Works](https://github.com/latent-reasoning-works)
+MIT License -- César Miguel Valdez Córdova, Matthew Scicluna, Shuang Ni, and contributors -- [Latent Reasoning Works](https://github.com/latent-reasoning-works)
 
 </div>
