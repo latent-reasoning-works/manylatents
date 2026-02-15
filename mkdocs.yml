@@ -1,6 +1,16 @@
-site_name: ManyLatents
+site_name: manylatents
+site_url: https://latent-reasoning-works.github.io/manylatents/
+
 theme:
   name: material
+
+plugins:
+  - search
+  - macros:
+      module_name: docs/macros
+
+exclude_docs: |
+  plans/
 
 markdown_extensions:
   - pymdownx.tabbed:
@@ -15,9 +25,11 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Algorithms: algorithms.md
-  - Evaluation: evaluation.md
-  - Callbacks: callbacks.md
+  - Data: data.md
   - Metrics: metrics.md
+  - Evaluation: evaluation.md
+  - Cache Protocol: cache.md
+  - Callbacks: callbacks.md
   - Extensions: extensions.md
   - API: api_usage.md
   - Probing: probing.md

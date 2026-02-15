@@ -942,7 +942,7 @@ Append the following jobs after the existing `build-and-test` job in `.github/wo
         uses: astral-sh/setup-uv@v5
         with:
           version: 'latest'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${ secrets.GITHUB_TOKEN }
 
       - name: Install dependencies
         run: |
@@ -983,7 +983,7 @@ Append the following jobs after the existing `build-and-test` job in `.github/wo
         uses: astral-sh/setup-uv@v5
         with:
           version: 'latest'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${ secrets.GITHUB_TOKEN }
 
       - name: Install dependencies
         run: |
