@@ -1,15 +1,15 @@
 <div align="center">
 
 <pre>
-       · · · ·
-     · · · · · ·                · · ·
+         · · ·
+      · · · · · ·               · · ·
     · · · · · · · ·  ───────►  · · · · ·
-     · · · · · ·                · · ·
-       · · · ·
+      · · · · · ·               · · ·
+         · · ·
 
-          m a n y l a t e n t s
+         m a n y l a t e n t s
 
-   one geometry, learned through many latents
+  one geometry, learned through many latents
 </pre>
 
 [![license](https://img.shields.io/badge/license-MIT-2DD4BF.svg)](LICENSE)
