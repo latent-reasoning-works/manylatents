@@ -65,3 +65,20 @@ def test_compute_knn_cache_different_arrays():
     compute_knn(data_a, k=5, cache=cache)
     compute_knn(data_b, k=5, cache=cache)
     assert len(cache) == 2
+
+
+def test_compute_knn_k_exceeds_n_samples():
+    """k >= n_samples should clamp and warn."""
+    small_data = np.random.RandomState(42).randn(10, 3).astype(np.float32)
+    with pytest.warns(UserWarning, match="Clamping k"):
+        dists, idxs = compute_knn(small_data, k=15)
+    assert dists.shape[1] <= 10
+    assert idxs.shape[1] <= 10
+
+
+def test_compute_knn_k_equals_n_samples():
+    """k == n_samples should also clamp."""
+    data = np.random.RandomState(42).randn(5, 2).astype(np.float32)
+    with pytest.warns(UserWarning, match="Clamping k"):
+        dists, idxs = compute_knn(data, k=5)
+    assert dists.shape[0] == 5

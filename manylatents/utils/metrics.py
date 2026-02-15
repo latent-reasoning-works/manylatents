@@ -165,6 +165,17 @@ def compute_knn(
                     dists, idxs = dists[:, 1:], idxs[:, 1:]
                 return dists, idxs
 
+    n_samples = data.shape[0]
+    if k >= n_samples:
+        import warnings
+        warnings.warn(
+            f"Clamping k from {k} to {n_samples - 1} (n_samples={n_samples})",
+            UserWarning,
+        )
+        k = n_samples - 1
+    if k <= 0:
+        return np.zeros((n_samples, 0)), np.zeros((n_samples, 0), dtype=np.int64)
+
     data = np.ascontiguousarray(data, dtype=np.float32)
     n_neighbors = k + 1  # always query k+1 to include self, then trim
 
