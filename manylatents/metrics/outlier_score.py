@@ -34,7 +34,7 @@ def OutlierScore(
     module: Optional[object] = None,
     k: int = 20,
     return_scores: bool = False,
-    _knn_cache: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    cache: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
     Compute outlier scores using Local Outlier Factor.
@@ -45,7 +45,7 @@ def OutlierScore(
         module: Provided for protocol compliance (unused).
         k: Number of neighbors for LOF. Default 20.
         return_scores: If True, include per-sample scores in result.
-        _knn_cache: Provided for protocol compliance (unused).
+        cache: Optional shared cache dict (unused).
 
     Returns:
         Dict containing:

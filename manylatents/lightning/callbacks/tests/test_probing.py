@@ -6,12 +6,12 @@ import torch.nn as nn
 from unittest.mock import patch, MagicMock
 from torch.utils.data import DataLoader, TensorDataset
 from lightning import LightningModule, Trainer
-from manylatents.lightning.callbacks.probing import (
+from manylatents.lightning.callbacks.activation_tracker import (
     ProbeTrigger,
-    RepresentationProbeCallback,
+    ActivationTrajectoryCallback as RepresentationProbeCallback,
 )
 from manylatents.lightning.hooks import LayerSpec
-from manylatents.callbacks.probing import DiffusionGauge
+from manylatents.callbacks.diffusion_operator import DiffusionGauge
 
 
 def test_probe_trigger_step_based():

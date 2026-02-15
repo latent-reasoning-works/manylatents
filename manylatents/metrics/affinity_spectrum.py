@@ -1,6 +1,10 @@
 import warnings
+from typing import Optional
+
 import numpy as np
+
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.utils.metrics import compute_eigenvalues
 
 
 def affinity_spectrum(affinity_matrix: np.ndarray, top_k: int = 25) -> np.ndarray:
@@ -19,38 +23,42 @@ def affinity_spectrum(affinity_matrix: np.ndarray, top_k: int = 25) -> np.ndarra
     Returns:
         np.ndarray: Top `k` eigenvalues in descending order.
     """
-    # Compute eigenvalues of symmetric matrix
-    # For symmetric matrices, eigenvalues are always real
     eigenvalues = np.linalg.eigvalsh(affinity_matrix)
-
-    # Sort in descending order and return top-k
     eigenvalues_sorted = np.sort(eigenvalues)[::-1]
-
     return eigenvalues_sorted[:top_k]
+
 
 ##############################################################################
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def AffinitySpectrum(dataset, embeddings: np.ndarray, module: LatentModule, top_k: int = 25) -> np.ndarray:
+def AffinitySpectrum(embeddings: np.ndarray, dataset=None,
+                     module: Optional[LatentModule] = None,
+                     top_k: int = 25, cache: Optional[dict] = None) -> np.ndarray:
     """
     Compute affinity spectrum from the module's symmetric affinity matrix.
 
-    This metric requests the symmetric version of the affinity matrix to guarantee
-    real, non-negative eigenvalues. The symmetric normalization preserves the
-    spectral properties of the underlying kernel while ensuring numerical stability.
+    Uses compute_eigenvalues with cache for shared eigendecomposition.
 
     Args:
-        dataset: Dataset object (unused).
         embeddings: Low-dimensional embeddings (unused).
+        dataset: Dataset object (unused).
         module: LatentModule instance with affinity_matrix method.
         top_k: Number of top eigenvalues to return.
+        cache: Shared cache dict. Pass through to compute_eigenvalues().
 
     Returns:
         Array of top_k eigenvalues, or [nan] if affinity matrix not available.
     """
+    if module is None:
+        return np.array([np.nan])
+
+    eigenvalues = compute_eigenvalues(module, cache=cache)
+    if eigenvalues is not None:
+        return eigenvalues[:top_k]
+
+    # Fallback: legacy path if compute_eigenvalues returned None
     try:
-        # Request symmetric affinity matrix for positive eigenvalue guarantee
         affinity_mat = module.affinity_matrix(use_symmetric=True)
     except (NotImplementedError, AttributeError, TypeError):
         warnings.warn(

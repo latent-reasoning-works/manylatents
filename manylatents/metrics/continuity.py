@@ -1,9 +1,9 @@
 from typing import Optional, Tuple, Union
 
 import numpy as np
-from sklearn.metrics import pairwise_distances
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.utils.metrics import compute_knn
 
 
 def Continuity(embeddings: np.ndarray,
@@ -13,19 +13,23 @@ def Continuity(embeddings: np.ndarray,
                metric: str = 'euclidean',
                return_per_sample: bool = False,
                normalize: bool = True,
-               adjust_for_random: bool = False
+               adjust_for_random: bool = False,
+               cache: Optional[dict] = None,
 ) -> Union[float, Tuple[float, np.ndarray]]:
     """
     Compute (normalized and optionally adjusted) continuity between high-D and embedded space.
+
+    Uses compute_knn (FAISS-accelerated) instead of pairwise_distances for O(n*k) vs O(n^2).
 
     Parameters:
     - embeddings: low-dimensional embedding (n_samples, d)
     - dataset: object with .data attribute (high-dimensional data, n_samples, D)
     - n_neighbors: size of the neighborhood (K')
-    - metric: distance metric
+    - metric: distance metric (unused — compute_knn uses L2)
     - return_per_sample: if True, also return pointwise overlap values per sample
-    - normalize: if True, apply Equation (9) normalization (divide by n_neighbors)
-    - adjust_for_random: if True, apply Equation (10) adjustment for expected random overlap
+    - normalize: if True, divide overlap by n_neighbors
+    - adjust_for_random: if True, subtract expected random overlap
+    - cache: Optional shared cache dict. Passed through to compute_knn().
 
     Returns:
     - continuity_score: mean continuity (scalar)
@@ -35,17 +39,8 @@ def Continuity(embeddings: np.ndarray,
     X_low = embeddings
     n = X_high.shape[0]
 
-    # Compute pairwise distances
-    dist_high = pairwise_distances(X_high, metric=metric)
-    dist_low = pairwise_distances(X_low, metric=metric)
-
-    # Exclude self from neighborhoods
-    np.fill_diagonal(dist_high, np.inf)
-    np.fill_diagonal(dist_low, np.inf)
-
-    # Get indices of k nearest neighbors in both spaces
-    knn_high = np.argsort(dist_high, axis=1)[:, :n_neighbors]
-    knn_low = np.argsort(dist_low, axis=1)[:, :n_neighbors]
+    _, knn_high = compute_knn(X_high, k=n_neighbors, include_self=False, cache=cache)
+    _, knn_low = compute_knn(X_low, k=n_neighbors, include_self=False, cache=cache)
 
     # Compute pointwise neighborhood overlaps
     pointwise_overlap = np.array([

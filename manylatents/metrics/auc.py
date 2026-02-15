@@ -31,7 +31,7 @@ def AUC(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[object] = None,
-    _knn_cache: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    cache: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
     Compute Area Under ROC Curve from predictions and labels.
@@ -40,7 +40,7 @@ def AUC(
         embeddings: Predictions of shape (N,) or (N, 1). Should be P(y=1|x).
         dataset: Dataset with get_labels() method returning binary labels.
         module: Provided for protocol compliance (unused).
-        _knn_cache: Provided for protocol compliance (unused).
+        cache: Optional shared cache dict (unused).
 
     Returns:
         Dict with "auc" key containing the AUC score.

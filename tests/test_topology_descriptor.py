@@ -8,7 +8,7 @@ def test_topology_descriptor_returns_dict():
     from manylatents.metrics.dataset_topology_descriptor import DatasetTopologyDescriptor
 
     A = np.eye(5) * np.arange(1, 6)
-    cache = {(True, None): np.sort(np.diag(A))[::-1]}
+    cache = {"eigenvalues": np.sort(np.diag(A))[::-1]}
 
     class FakeDataset:
         metadata = np.arange(5)
@@ -24,7 +24,7 @@ def test_topology_descriptor_returns_dict():
         embeddings=np.zeros((5, 2)),
         dataset=FakeDataset(),
         module=FakeModule(),
-        _eigenvalue_cache=cache,
+        cache=cache,
     )
     assert isinstance(result, dict)
     assert "spectral_gap" in result

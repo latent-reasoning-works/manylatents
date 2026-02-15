@@ -169,60 +169,51 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
 === "Caching"
 
-    ## Shared Caches
+    ## Shared Cache
 
-    Several metrics need k-nearest neighbors or SVD decompositions. Computing these per-metric would be redundant. manyLatents computes them once and shares the results.
+    Several metrics need k-nearest neighbors, SVD decompositions, or eigenvalue computations. Computing these per-metric would be redundant. manyLatents pre-warms a shared `cache` dict and passes it to all metrics.
 
-    ### kNN Cache
+    ### How It Works
 
-    `evaluate_embeddings()` extracts all `k` and `n_neighbors` values from metric configs, computes kNN once with `max(k)`, and passes the cache to metrics that accept `_knn_cache`:
+    `evaluate_embeddings()` uses the config sleuther (`extract_k_requirements`) to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` to compute kNN and eigenvalues once with `max(k)`:
 
     ```python
-    # 1. Extract all k values from metric configs
-    k_values = _extract_k_values(metric_cfgs)  # e.g., {5, 10, 20}
+    # 1. Sleuther extracts requirements from metric configs
+    reqs = extract_k_requirements(metric_cfgs)
+    # reqs = {"emb_k": {5, 10, 25}, "data_k": {10, 25}, "spectral": True}
 
-    # 2. Compute kNN once with max(k)
-    knn_cache = compute_knn(embeddings, k=max(k_values), include_self=True)
+    # 2. Pre-warm cache with optimal k values
+    cache = prewarm_cache(metric_cfgs, embeddings, dataset, module)
+    # cache is keyed by id(data) for kNN, "eigenvalues" for spectral
 
-    # 3. Pass to metrics that accept it
-    if "_knn_cache" in sig.parameters:
-        call_kwargs["_knn_cache"] = knn_cache
+    # 3. All metrics receive the same cache dict
+    result = metric_fn(embeddings=emb, dataset=ds, module=module, cache=cache)
+    ```
+
+    ### compute_knn with cache
+
+    `compute_knn()` uses the `cache` dict to avoid redundant computation. If a cached result exists with `k >= requested k`, it slices and returns immediately:
+
+    ```python
+    from manylatents.utils.metrics import compute_knn
+
+    cache = {}
+    # First call: computes kNN with k=25
+    dists, idxs = compute_knn(data, k=25, cache=cache)
+
+    # Second call: reuses cached result, slices to k=10
+    dists, idxs = compute_knn(data, k=10, cache=cache)  # instant
     ```
 
     `compute_knn()` automatically selects the fastest backend: FAISS-GPU > FAISS-CPU > sklearn.
 
     ### SVD Cache
 
-    For metrics like participation ratio and tangent space alignment that need local SVD:
+    `compute_svd_cache()` batches local SVD computation with GPU acceleration (torch) when CUDA is available, falling back to CPU numpy. Results are stored in the same `cache` dict.
 
-    ```python
-    # Discover metrics accepting _svd_cache
-    for metric_cfg in metric_cfgs.values():
-        sig = inspect.signature(hydra.utils.instantiate(metric_cfg))
-        if "_svd_cache" in sig.parameters:
-            svd_k_values.add(...)
+    ### Metric Protocol
 
-    # Compute once
-    svd_cache = compute_svd_cache(embeddings, knn_indices, svd_k_values)
-    ```
-
-    `compute_svd_cache()` batches SVD computation with GPU acceleration (torch) when CUDA is available, falling back to numpy.
-
-    ### Cache Injection
-
-    Caches are injected only into metrics whose signatures accept them — metrics that don't need caches are unaffected:
-
-    ```python
-    sig = inspect.signature(metric_fn)
-    call_kwargs = dict(embeddings=emb_sub, dataset=ds_sub, module=module)
-
-    if "_knn_cache" in sig.parameters and knn_cache is not None:
-        call_kwargs["_knn_cache"] = knn_cache
-    if "_svd_cache" in sig.parameters and svd_cache is not None:
-        call_kwargs["_svd_cache"] = svd_cache
-
-    result = metric_fn(**call_kwargs)
-    ```
+    All metrics receive `cache=` as a keyword argument. Metrics that need kNN call `compute_knn(..., cache=cache)` internally — the cache ensures no redundant computation. Extension metrics that don't accept `cache=` are handled gracefully via a `TypeError` fallback.
 
     ### Metric Expansion
 

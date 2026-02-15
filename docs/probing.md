@@ -10,7 +10,7 @@ Representation probing extracts activations from model layers at configurable po
 - `LayerSpec` - Specifies which layer to probe
 - `ActivationExtractor` - Hooks into the model to capture activations
 - `DiffusionGauge` - Converts activations to diffusion operators
-- `RepresentationProbeCallback` - Orchestrates probing during Lightning training
+- `ActivationTrajectoryCallback` - Orchestrates probing during Lightning training
 
 ## Quick Start
 
@@ -134,7 +134,7 @@ This logs:
 Access probe results after training:
 
 ```python
-from manylatents.lightning.callbacks.probing import RepresentationProbeCallback
+from manylatents.lightning.callbacks.activation_tracker import ActivationTrajectoryCallback
 
 # After trainer.fit()
 callback = trainer.callbacks[0]  # Get probe callback
@@ -149,7 +149,7 @@ for step, diffusion_op in trajectory:
 Extend `DiffusionGauge` for custom probe computations:
 
 ```python
-from manylatents.callbacks.probing import DiffusionGauge
+from manylatents.callbacks.diffusion_operator import DiffusionGauge
 import numpy as np
 
 class MyGauge(DiffusionGauge):
@@ -202,8 +202,8 @@ See `configs/sweep/representation_probe_convergence.yaml` for a full sweep examp
 | File | Description |
 |------|-------------|
 | `lightning/hooks.py` | LayerSpec, ActivationExtractor |
-| `lightning/callbacks/probing.py` | RepresentationProbeCallback, ProbeTrigger |
-| `callbacks/probing.py` | DiffusionGauge, probe dispatch |
+| `lightning/callbacks/activation_tracker.py` | ActivationTrajectoryCallback, ProbeTrigger |
+| `callbacks/diffusion_operator.py` | DiffusionGauge, build_diffusion_operator |
 | `lightning/callbacks/wandb_probe.py` | WandB logging |
 | `configs/callbacks/trainer/probe.yaml` | Default probe config |
 | `configs/experiment/representation_probe.yaml` | Full experiment config |

@@ -212,26 +212,26 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
 
     Trainer callbacks extend `lightning.Callback` and run during the training loop. They are passed to `Trainer(callbacks=[...])`.
 
-    ### RepresentationProbeCallback
+    ### ActivationTrajectoryCallback
 
     The primary trainer callback. Extracts activations from model layers at configurable triggers and computes diffusion operators to track representation geometry.
 
     ```yaml
     # configs/callbacks/trainer/probe.yaml
     probe:
-      _target_: manylatents.lightning.callbacks.probing.RepresentationProbeCallback
+      _target_: manylatents.lightning.callbacks.activation_tracker.ActivationTrajectoryCallback
       layer_specs:
         - _target_: manylatents.lightning.hooks.LayerSpec
           path: "transformer.h[-1]"
           extraction_point: "output"
           reduce: "mean"
       trigger:
-        _target_: manylatents.lightning.callbacks.probing.ProbeTrigger
+        _target_: manylatents.lightning.callbacks.activation_tracker.ProbeTrigger
         every_n_steps: 500
         on_checkpoint: true
         on_validation_end: true
       gauge:
-        _target_: manylatents.callbacks.probing.DiffusionGauge
+        _target_: manylatents.callbacks.diffusion_operator.DiffusionGauge
         knn: 15
         alpha: 1.0
         symmetric: false

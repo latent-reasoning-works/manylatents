@@ -1,4 +1,4 @@
-"""Representation probing callback for Lightning."""
+"""Activation trajectory tracking callback for Lightning."""
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,7 +11,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 
 from manylatents.lightning.hooks import ActivationExtractor, LayerSpec
-from manylatents.callbacks.probing import DiffusionGauge
+from manylatents.callbacks.diffusion_operator import DiffusionGauge
 from manylatents.lightning.callbacks.wandb_probe import WandbProbeLogger
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class TrajectoryPoint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class RepresentationProbeCallback(Callback):
+class ActivationTrajectoryCallback(Callback):
     """Callback that extracts activations and computes diffusion operators.
 
     At configurable triggers during training, this callback:
@@ -80,14 +80,14 @@ class RepresentationProbeCallback(Callback):
 
     Usage:
         # Option 1: Pass probe_loader directly (for testing)
-        callback = RepresentationProbeCallback(
+        callback = ActivationTrajectoryCallback(
             probe_loader=probe_loader,
             layer_specs=[LayerSpec("transformer.h[-1]")],
             trigger=ProbeTrigger(every_n_steps=100),
         )
 
         # Option 2: Let callback fetch from datamodule (for experiments)
-        callback = RepresentationProbeCallback(
+        callback = ActivationTrajectoryCallback(
             layer_specs=[LayerSpec("transformer.h[-1]")],
             trigger=ProbeTrigger(every_n_steps=100),
         )
@@ -129,7 +129,7 @@ class RepresentationProbeCallback(Callback):
 
     def on_fit_start(self, trainer: Trainer, pl_module: LightningModule):
         """Fetch probe_loader from datamodule if not provided."""
-        logger.info("RepresentationProbeCallback.on_fit_start called")
+        logger.info("ActivationTrajectoryCallback.on_fit_start called")
         if self.probe_loader is None:
             dm = trainer.datamodule
             if dm is not None and hasattr(dm, 'probe_dataloader'):
@@ -138,7 +138,7 @@ class RepresentationProbeCallback(Callback):
             else:
                 raise ValueError(
                     "probe_loader not provided and datamodule has no probe_dataloader() method. "
-                    "Either pass probe_loader to RepresentationProbeCallback or use a datamodule "
+                    "Either pass probe_loader to ActivationTrajectoryCallback or use a datamodule "
                     "with probe_dataloader() (e.g., TextDataModule)."
                 )
 

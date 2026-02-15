@@ -1,5 +1,4 @@
 import functools
-import inspect
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -20,7 +19,7 @@ from torch.utils.data import DataLoader
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
-from manylatents.utils.metrics import compute_knn, compute_svd_cache, flatten_and_unroll_metrics
+from manylatents.utils.metrics import compute_knn, compute_eigenvalues, flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -147,74 +146,96 @@ def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
         f"{type(algorithm)}! (kwargs: {kwargs})"
     )
 
-def _extract_k_values(metric_cfgs: Dict[str, DictConfig]) -> set:
-    """
-    Extract all k/n_neighbors values from metric configs for shared kNN computation.
+# --- Config sleuther ---
 
-    Looks for 'k' and 'n_neighbors' parameters in flattened metric configs.
-    Returns a set of all unique k values found.
+# Metrics known to need dataset-space kNN (not just embedding-space)
+_DATA_KNN_METRICS = frozenset({
+    "manylatents.metrics.knn_preservation.KNNPreservation",
+    "manylatents.metrics.trustworthiness.Trustworthiness",
+    "manylatents.metrics.continuity.Continuity",
+})
+
+# Metrics known to need eigendecomposition of module affinity matrix
+_SPECTRAL_METRICS = frozenset({
+    "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
+    "manylatents.metrics.spectral_decay_rate.SpectralDecayRate",
+    "manylatents.metrics.affinity_spectrum.AffinitySpectrum",
+    "manylatents.metrics.dataset_topology_descriptor.DatasetTopologyDescriptor",
+})
+
+
+def extract_k_requirements(metric_cfgs: Dict[str, DictConfig]) -> dict:
+    """Scan metric configs for kNN and spectral requirements.
+
+    Args:
+        metric_cfgs: Flattened metric configs from flatten_and_unroll_metrics().
+
+    Returns:
+        Dict with keys:
+            emb_k: set of k values needed on embeddings
+            data_k: set of k values needed on original data
+            spectral: whether eigendecomposition is needed
     """
-    k_values = set()
+    emb_k: set[int] = set()
+    data_k: set[int] = set()
+    spectral = False
+
     for metric_cfg in metric_cfgs.values():
-        # Check common parameter names for kNN
-        for param in ['k', 'n_neighbors']:
+        target = getattr(metric_cfg, "_target_", "")
+
+        # Extract k value
+        k_val = None
+        for param in ("k", "n_neighbors"):
             if hasattr(metric_cfg, param):
                 val = getattr(metric_cfg, param)
                 if isinstance(val, (int, float)) and val > 0:
-                    k_values.add(int(val))
-    return k_values
+                    k_val = int(val)
+                    break
+
+        if k_val is not None:
+            emb_k.add(k_val)
+            if target in _DATA_KNN_METRICS:
+                data_k.add(k_val)
+
+        if target in _SPECTRAL_METRICS:
+            spectral = True
+
+    return {"emb_k": emb_k, "data_k": data_k, "spectral": spectral}
 
 
-def _compute_knn_cache(
+def prewarm_cache(
+    metric_cfgs: Dict[str, DictConfig],
     embeddings: np.ndarray,
-    max_k: int,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Compute kNN once for shared use across multiple metrics.
-
-    Uses FAISS when available for ~10-50x speedup on large datasets,
-    falls back to sklearn.
+    dataset,
+    module=None,
+) -> dict:
+    """Pre-compute kNN and eigenvalues based on metric requirements.
 
     Args:
-        embeddings: (n_samples, n_features) array
-        max_k: Maximum k value needed (will compute max_k+1 neighbors to include self)
+        metric_cfgs: Flattened metric configs.
+        embeddings: Embedding array.
+        dataset: Dataset object with .data attribute.
+        module: Optional fitted LatentModule.
 
     Returns:
-        Tuple of (distances, indices) arrays, each shape (n_samples, max_k+1)
+        Populated cache dict.
     """
-    return compute_knn(embeddings, k=max_k, include_self=True)
+    reqs = extract_k_requirements(metric_cfgs)
+    cache: dict = {}
 
+    if reqs["emb_k"]:
+        max_k = max(reqs["emb_k"])
+        logger.info(f"Pre-warming cache: embedding kNN with max_k={max_k}")
+        compute_knn(embeddings, k=max_k, cache=cache)
 
-def _compute_eigenvalue_cache(
-    module,
-    top_k_values: set[int | None],
-) -> dict[tuple[bool, int | None], np.ndarray]:
-    """Compute eigenvalues of affinity matrix for sharing across metrics.
+    if reqs["data_k"] and dataset is not None and hasattr(dataset, "data"):
+        max_k = max(reqs["data_k"])
+        logger.info(f"Pre-warming cache: dataset kNN with max_k={max_k}")
+        compute_knn(dataset.data, k=max_k, cache=cache)
 
-    Args:
-        module: Fitted LatentModule with affinity_matrix() method.
-        top_k_values: Set of top_k values requested by metrics. None means all.
-
-    Returns:
-        Dict keyed by (use_symmetric, top_k) -> sorted eigenvalues (descending).
-    """
-    cache = {}
-
-    try:
-        affinity = module.affinity_matrix(use_symmetric=True)
-    except (NotImplementedError, AttributeError):
-        logger.warning("Module does not expose affinity_matrix; eigenvalue cache empty.")
-        return cache
-
-    # Compute full eigenvalue spectrum once
-    eigenvalues = np.linalg.eigvalsh(affinity)
-    eigenvalues_sorted = np.sort(eigenvalues)[::-1]
-
-    for top_k in top_k_values:
-        if top_k is None:
-            cache[(True, None)] = eigenvalues_sorted
-        else:
-            cache[(True, top_k)] = eigenvalues_sorted[:top_k]
+    if reqs["spectral"] and module is not None:
+        logger.info("Pre-warming cache: eigenvalue decomposition")
+        compute_eigenvalues(module, cache=cache)
 
     return cache
 
@@ -244,10 +265,9 @@ def evaluate_embeddings(
     if mode == "split":
         ds = datamodule.test_dataset
     else:
-        ds = datamodule.train_dataset ## defaults to full dataset on full runs
+        ds = datamodule.train_dataset  # defaults to full dataset on full runs
 
     logger.info(f"Reference data shape: {ds.data.shape}")
-    logger.info(f"Computing embedding metrics for {ds.data.shape[0]} samples.")
 
     # Subsample for large datasets using pluggable sampling strategies
     ds_sub, emb_sub = ds, embeddings
@@ -266,67 +286,30 @@ def evaluate_embeddings(
 
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
-    # --- Shared kNN computation for efficiency ---
-    # Extract all k values and compute kNN once with max(k)
-    k_values = _extract_k_values(metric_cfgs)
-    knn_cache = None
-    if k_values:
-        max_k = max(k_values)
-        logger.info(f"Computing shared kNN with max_k={max_k} for {len(k_values)} unique k values: {sorted(k_values)}")
-        knn_cache = _compute_knn_cache(emb_sub, max_k)
-
-    # --- Shared SVD computation for metrics that need it (PR, TSA) ---
-    svd_cache = None
-    if knn_cache is not None:
-        # Discover which metrics accept _svd_cache and collect their k values
-        svd_k_values = set()
-        for metric_cfg in metric_cfgs.values():
-            metric_fn_probe = hydra.utils.instantiate(metric_cfg)
-            sig = inspect.signature(metric_fn_probe)
-            if "_svd_cache" in sig.parameters:
-                for param in ['k', 'n_neighbors']:
-                    if hasattr(metric_cfg, param):
-                        val = getattr(metric_cfg, param)
-                        if isinstance(val, (int, float)) and val > 0:
-                            svd_k_values.add(int(val))
-        if svd_k_values:
-            _, knn_indices = knn_cache
-            logger.info(f"Computing shared SVD cache for k values: {sorted(svd_k_values)}")
-            svd_cache = compute_svd_cache(emb_sub, knn_indices, svd_k_values)
-
-    # --- Shared eigenvalue computation for spectral metrics ---
-    eigenvalue_cache = None
-    if module is not None:
-        eig_k_values = set()
-        for metric_cfg in metric_cfgs.values():
-            metric_fn_probe = hydra.utils.instantiate(metric_cfg)
-            sig = inspect.signature(metric_fn_probe)
-            if "_eigenvalue_cache" in sig.parameters:
-                top_k = getattr(metric_cfg, 'top_k', None)
-                eig_k_values.add(top_k)
-        if eig_k_values:
-            logger.info(f"Computing shared eigenvalue cache for top_k values: {eig_k_values}")
-            eigenvalue_cache = _compute_eigenvalue_cache(module, eig_k_values)
+    # Pre-warm cache with optimal k values
+    cache = prewarm_cache(metric_cfgs, emb_sub, ds_sub, module)
 
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
         metric_fn = hydra.utils.instantiate(metric_cfg)
 
-        # Build kwargs, only passing caches the metric accepts
-        sig = inspect.signature(metric_fn)
-        call_kwargs: dict[str, Any] = dict(
-            embeddings=emb_sub,
-            dataset=ds_sub,
-            module=module,
-        )
-        if "_knn_cache" in sig.parameters and knn_cache is not None:
-            call_kwargs["_knn_cache"] = knn_cache
-        if "_svd_cache" in sig.parameters and svd_cache is not None:
-            call_kwargs["_svd_cache"] = svd_cache
-        if "_eigenvalue_cache" in sig.parameters and eigenvalue_cache is not None:
-            call_kwargs["_eigenvalue_cache"] = eigenvalue_cache
-
-        raw_result = metric_fn(**call_kwargs)
+        try:
+            raw_result = metric_fn(
+                embeddings=emb_sub,
+                dataset=ds_sub,
+                module=module,
+                cache=cache,
+            )
+        except TypeError:
+            logger.warning(
+                f"Metric '{metric_name}' does not accept cache=; "
+                "calling without it. Consider adding cache=None."
+            )
+            raw_result = metric_fn(
+                embeddings=emb_sub,
+                dataset=ds_sub,
+                module=module,
+            )
 
         # Unpack (value, ColormapInfo) tuples from metrics that provide viz metadata
         if (
@@ -337,7 +320,6 @@ def evaluate_embeddings(
             value, viz_info = raw_result
             results[metric_name] = value
             results[f"{metric_name}__viz"] = viz_info
-            logger.debug(f"Metric {metric_name} provided visualization metadata")
         else:
             results[metric_name] = raw_result
 
