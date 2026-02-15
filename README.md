@@ -1,13 +1,13 @@
 <div align="center">
 
 <pre>
-         · · ·
-      · · · · · ·               · · ·
-    · · · · · · · ·  ───────►  · · · · ·
-      · · · · · ·               · · ·
-         · · ·
+      . . . .
+    . . . . . .            . . .
+   . . . . . . . .  --->  . . . . .  --->  λ(·)
+    . . . . . .            . . .
+      . . . .
 
-         m a n y l a t e n t s
+        m a n y l a t e n t s
 
   one geometry, learned through many latents
 </pre>
