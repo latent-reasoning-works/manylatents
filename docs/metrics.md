@@ -2,46 +2,33 @@
 
 The evaluation system for manyLatents: a three-level architecture for measuring embedding quality, dataset properties, and algorithm internals.
 
-=== "Architecture"
+## Embedding Metrics
 
-    ## Three Metric Levels
+Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output.
 
-    ### 1. Dataset Metrics (`metrics/dataset/`)
+{{ metrics_table("embedding") }}
 
-    Evaluate properties of the **original high-dimensional data**. Run at the beginning of a run, before dimensionality reduction.
+Config pattern: `metrics/embedding=<name>`
 
-    - Intrinsic dimensionality estimation
-    - Population structure analysis (admixture, stratification)
-    - Sample identity verification
+## Module Metrics
 
-    Independent of the DR algorithm — computed once per dataset.
+Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity_matrix()` or `kernel_matrix()`.
 
-    {{ metrics_table("dataset") }}
+{{ metrics_table("module") }}
 
-    ### 2. Embedding Metrics (`metrics/embedding/`)
+Config pattern: `metrics/module=<name>`
 
-    Evaluate the **quality of low-dimensional embeddings**. Run after each dimensionality reduction step.
+## Dataset Metrics
 
-    - Neighborhood preservation (trustworthiness, continuity)
-    - Geometric properties (participation ratio, fractal dimension)
-    - Topology preservation (persistent homology)
-    - Distance preservation (kNN preservation, tangent space alignment)
+Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm.
 
-    Compare high-dimensional vs. low-dimensional representations. Need access to both original data and embeddings.
+{{ metrics_table("dataset") }}
 
-    {{ metrics_table("embedding") }}
+Config pattern: `metrics/dataset=<name>`
 
-    ### 3. Module Metrics (`metrics/module/`)
+---
 
-    Evaluate **algorithm-specific internal components**. Run after model fitting.
-
-    - Graph connectivity (connected components)
-    - Kernel/affinity matrix properties (spectrum, sparsity)
-    - Learned parameters (eigenvalues, loadings)
-
-    Require access to internal model state (the `module` parameter). Not applicable to all DR methods.
-
-    {{ metrics_table("module") }}
+=== "Protocol"
 
     ## Metric Protocol
 
@@ -76,19 +63,6 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
     n_neighbors: 5
     ```
 
-    Compose metrics hierarchically:
-
-    ```yaml
-    # configs/metrics/fidelity_metrics.yaml
-    defaults:
-      - dataset: null
-      - embedding:
-        - trustworthiness
-        - continuity
-        - knn_preservation
-      - module: null
-    ```
-
     ### Multi-Scale Expansion
 
     List-valued parameters expand via Cartesian product through `flatten_and_unroll_metrics()`:
@@ -102,6 +76,8 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
     ### Shared kNN Cache
 
     Metrics that need kNN graphs share a cache computed once with `max(k)` across all metrics, avoiding redundant computation.
+
+=== "Writing a New Metric"
 
     ## Writing a New Metric
 
