@@ -1,411 +1,237 @@
 <div align="center">
 
-# ManyLatents
+<pre>
+        ·  ·  ·
+      · · · · · ·                 · · ·
+     · · · · · · · ·  ────────► · · · · ·
+      · · · · · ·                 · · ·
+        ·  ·  ·
 
-**"One geometry, learned through many latents"**
+           m a n y l a t e n t s
 
-**Part of the [Latent Reasoning Works](https://github.com/latent-reasoning-works) ecosystem**
+    one geometry, learned through many latents
+</pre>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Hydra](https://img.shields.io/badge/Config-Hydra-blue)](https://hydra.cc/)
-[![Lightning](https://img.shields.io/badge/Framework-PyTorch%20Lightning-792ee5)](https://lightning.ai/)
-[![uv](https://img.shields.io/badge/Package-uv-DE5FE9)](https://docs.astral.sh/uv/)
+Dimensionality reduction and neural network analysis.
+Built on PyTorch Lightning + Hydra.
 
-*A unified framework for dimensionality reduction and neural network analysis on diverse datasets*
+[![license](https://img.shields.io/badge/license-MIT-a0a0a0.svg)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.10+-a0a0a0.svg)](https://www.python.org)
+[![uv](https://img.shields.io/badge/pkg-uv-a0a0a0.svg)](https://docs.astral.sh/uv/)
 
 </div>
 
 ---
 
-## 🌟 Overview
-
-**ManyLatents** is a comprehensive framework that bridges traditional dimensionality reduction techniques with modern neural networks. Built on **PyTorch Lightning** and **Hydra**, it provides a unified interface for:
-
-- **Traditional DR methods**: PCA, t-SNE, PHATE, UMAP
-- **Neural architectures**: Autoencoders, VAEs, and custom networks
-- **Diverse datasets**: Single-cell data, synthetic manifolds, genetics data (with extensions)
-- **🧬 Extensions**: Domain-specific packages like [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) for genomics
-
-### ✨ Key Features
-
-- 🔧 **Modular Architecture**: Unified `LatentModule` interface for all algorithms
-- ⚡ **Lightning Integration**: Seamless neural network training with PyTorch Lightning
-- 🎛️ **Hydra Configuration**: Flexible, composable experiment configurations
-- 📊 **Rich Evaluation**: 23+ metrics for embedding quality assessment
-- 🔌 **Python API**: Programmatic access for orchestration and workflow integration
-- 🖥️ **SLURM Support**: Multi-cluster job submission via [shop](https://github.com/latent-reasoning-works/shop)
-
----
-
-## 🚀 Quick Start
-
-### Installation
+## quickstart
 
 ```bash
-# Clone the repository
 git clone https://github.com/latent-reasoning-works/manylatents.git
-cd manylatents
+cd manylatents && uv sync
 
-# Install with uv
-uv sync
-source .venv/bin/activate
+# embed a swiss roll with UMAP
+uv run python -m manylatents.main algorithms/latent=umap data=swissroll
 
-# Optional: Install extensions for domain-specific functionality
-uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git  # Genomics support
+# add metrics, log to wandb
+uv run python -m manylatents.main \
+  algorithms/latent=umap data=swissroll \
+  metrics/embedding=trustworthiness logger=wandb
+
+# sweep algorithms and neighborhood sizes
+uv run python -m manylatents.main --multirun \
+  algorithms/latent=umap,phate,tsne \
+  neighborhood_size=5,10,15,30 \
+  data=swissroll metrics/embedding=trustworthiness
 ```
-
-### SLURM Cluster Support (Optional)
-
-For multi-cluster job submission via [shop](https://github.com/latent-reasoning-works/shop):
-
-```bash
-# Install with SLURM support
-uv sync --extra slurm
-
-# Submit to cluster
-python -m manylatents.main experiment=single_algorithm hydra/launcher=slurm_cluster
-```
-
-### Extensions
-
-manylatents supports domain-specific extensions that add specialized data loaders, metrics, and algorithms:
-
-- **🧬 [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics)**: Genetics and population genetics support
-  ```bash
-  uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
-  ```
-
-See [docs/extensions.md](docs/extensions.md) for full documentation on installing and using extensions.
-
-### Single Algorithm Usage
-
-```bash
-# Run pre-configured experiment (PCA on Swiss roll)
-python -m manylatents.main experiment=single_algorithm
-
-# Run custom algorithm combinations
-python -m manylatents.main \
-  algorithms/latent=pca \
-  data=swissroll \
-  algorithms.latent.n_components=3
-
-# Train an autoencoder
-python -m manylatents.main \
-  algorithms/lightning=ae_reconstruction \
-  data=swissroll \
-  trainer.max_epochs=50
-```
-
-### Python API Usage
-
-For programmatic access and workflow orchestration:
 
 ```python
 from manylatents.api import run
 
-# Run with experiment config
-result = run(experiment="single_algorithm", algorithms={"latent": {"n_components": 10}})
-
-# Run with direct config
 result = run(
-    algorithms={"latent": {"_target_": "manylatents.algorithms.latent.pca.PCAModule", "n_components": 2}},
-    data={"_target_": "manylatents.data.swissroll.SwissRollDataModule"},
-    metrics="test_metric"
+    data="swissroll",
+    algorithms={"latent": "pca"},
+    metrics={"embedding": {"trustworthiness": {
+        "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
+        "_partial_": True, "n_neighbors": 5
+    }}}
 )
 
-# Access results
-embeddings = result["embeddings"]  # numpy array
-scores = result["scores"]          # dict of metrics
-metadata = result["metadata"]      # dict of metadata
+embeddings = result["embeddings"]   # (n, d) ndarray
+scores     = result["scores"]       # {"embedding.trustworthiness": 0.95}
 
-# Chain algorithms by passing embeddings
+# chain: PCA 50d -> PHATE 2d
 result2 = run(input_data=result["embeddings"], algorithms={"latent": "phate"})
 ```
 
-**Key Features**:
-- 🔗 **In-memory data passing**: Pass numpy arrays between calls
-- 🚀 **No subprocess overhead**: Direct Python function calls
-- 📊 **Flexible metrics**: Returns float, tuple, or dict metric values
+---
 
-See [API Documentation](docs/api_usage.md) for complete reference.
+## architecture
+
+```
+┌────────────┐      ┌───────────────────┐      ┌────────────────┐
+│   Config   │─────►│    Algorithm      │─────►│ EmbeddingOutputs│
+│            │      │                   │      │                │
+│ algorithms │      │  LatentModule     │      │ dict[str, Any] │
+│ data       │      │    fit(x)         │      │ "embeddings"   │
+│ metrics    │      │    transform(x)   │      └───────┬────────┘
+│ callbacks  │      │                   │              │
+│ logger     │      │  LightningModule  │       ┌──────▼────────┐
+└────────────┘      │    trainer.fit()  │       │   Evaluate    │
+                    │    encode(x)      │       │               │
+                    └───────────────────┘       │ prewarm_cache │
+                                               │ compute_knn   │
+                                               │ metric_fn(    │
+                                               │  ...,         │
+                                               │  cache=cache) │
+                                               └───────────────┘
+```
+
+Two base classes, one decision rule:
+
+| if the algorithm... | use | interface |
+|---|---|---|
+| has no training loop | `LatentModule` | `fit(x)` / `transform(x)` |
+| trains with backprop | `LightningModule` | `trainer.fit()` / `encode(x)` |
+
+Both produce `EmbeddingOutputs` — a dict keyed by `"embeddings"`. All metrics receive a shared `cache` dict for deduplicated kNN and eigenvalue computation.
 
 ---
 
-## 🏗️ Architecture
+## algorithms
 
-### Core Components
+> 8 latent modules, 4 lightning modules
 
-```
-manylatents/
-├── algorithms/           # Algorithm implementations
-│   ├── latent_module_base.py    # Base LatentModule class
-│   ├── pca.py, umap.py, ...     # Traditional DR methods
-│   └── networks/                # Neural network modules
-├── configs/              # Hydra configurations
-│   ├── experiment/              # Pre-defined experiments
-│   ├── algorithm/               # Algorithm configs
-│   └── data/                   # Dataset configurations
-├── data/                # Dataset loaders and processors
-├── metrics/             # Evaluation metrics
-└── main.py             # Unified experiment pipeline
-```
+| algorithm | type | config | neighborhood param |
+|---|---|---|---|
+| PCA | latent | `algorithms/latent=pca` | -- |
+| t-SNE | latent | `algorithms/latent=tsne` | `perplexity` |
+| UMAP | latent | `algorithms/latent=umap` | `n_neighbors` |
+| PHATE | latent | `algorithms/latent=phate` | `knn` |
+| DiffusionMap | latent | `algorithms/latent=diffusionmap` | `knn` |
+| MDS | latent | `algorithms/latent=mds` | -- |
+| Archetypes | latent | `algorithms/latent=aa` | -- |
+| MultiscalePHATE | latent | `algorithms/latent=multiscale_phate` | `knn` |
+| Autoencoder | lightning | `algorithms/lightning=ae_reconstruction` | -- |
+| AANet | lightning | `algorithms/lightning=aanet_reconstruction` | -- |
+| LatentODE | lightning | `algorithms/lightning=latent_ode` | -- |
+| HF Trainer | lightning | `algorithms/lightning=hf_trainer` | -- |
 
-### Algorithm Types
-
-- **`LatentModule`**: Traditional DR with `fit()`/`transform()` interface
-- **`LightningModule`**: Neural networks with full training loops
+`neighborhood_size=k` sweeps kNN uniformly across algorithms. Maps to each algorithm's native parameter (UMAP `n_neighbors`, PHATE `knn`, t-SNE `perplexity * 3`).
 
 ---
 
-## 🧪 Supported Algorithms & Datasets
+## metrics
 
-### Dimensionality Reduction
-- ✅ **PCA** - Principal Component Analysis
-- ✅ **t-SNE** - t-distributed Stochastic Neighbor Embedding  
-- ✅ **PHATE** - Potential of Heat-diffusion Affinity-based Transition Embedding
-- ✅ **UMAP** - Uniform Manifold Approximation and Projection
+> 20+ metrics across three evaluation contexts
 
-### Neural Networks
-- ✅ **Autoencoder** - Reconstruction-based dimensionality reduction
-- ✅ **VAE** - Variational Autoencoder (coming soon)
-- ✅ **Custom architectures** - Extensible neural network support
+### embedding metrics
 
-### Datasets
-- 🔬 **Single-cell**: Anndata, scRNA-seq data in h5ad format
-- 📐 **Synthetic**: Swiss roll, saddle surface, custom manifolds
-- 🧪 **Test data**: Built-in synthetic datasets for validation
-- 🧬 **Genomics**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) extension (HGDP, AOU, UKBB)
+Compare high-dimensional input to low-dimensional output.
 
----
+| metric | config | measures |
+|---|---|---|
+| Trustworthiness | `trustworthiness` | local neighborhood preservation |
+| Continuity | `continuity` | reverse neighborhood preservation |
+| kNN Preservation | `knn_preservation` | kNN graph overlap |
+| Local Intrinsic Dim | `local_intrinsic_dimensionality` | per-point dimensionality |
+| Participation Ratio | `participation_ratio` | effective dimensionality |
+| Fractal Dimension | `fractal_dimension` | box-counting dimension |
+| Tangent Space | `tangent_space` | local manifold alignment |
+| Persistent Homology | `persistent_homology` | topological features (via ripser) |
+| Diffusion Spectral Entropy | `diffusion_spectral_entropy` | spectral complexity |
+| Diffusion Curvature | `diffusion_curvature` | local curvature |
+| Anisotropy | `anisotropy` | embedding uniformity |
+| Pearson Correlation | `pearson_correlation` | distance correlation |
 
-## 🔧 Adding New Components
+Config pattern: `metrics/embedding=<name>`
 
-### New Algorithm (Traditional DR)
+### module metrics
 
-1. **Create algorithm class**:
-```python
-# manylatents/algorithms/myalgo.py
-from manylatents.algorithms.latent_module_base import LatentModule
+Evaluate algorithm internals. Require a fitted module exposing `affinity_matrix()` or `kernel_matrix()`.
 
-class MyAlgorithm(LatentModule):
-    def __init__(self, n_components=2):
-        super().__init__()
-        self.n_components = n_components
-    
-    def fit(self, x):
-        # Implementation here
-        return self
-    
-    def transform(self, x):
-        # Transform implementation
-        return transformed_x
-```
+| metric | config | measures |
+|---|---|---|
+| AffinitySpectrum | `affinity_spectrum` | top-k eigenvalues |
+| SpectralGapRatio | `spectral_gap_ratio` | lambda_1 / lambda_2 |
+| SpectralDecayRate | `spectral_decay_rate` | log-eigenvalue slope |
+| Connected Components | `connected_components` | graph connectivity |
+| Kernel Sparsity | `kernel_matrix_sparsity` | kernel matrix density |
+| DiffusionMap Correlation | `diffusion_map_correlation` | diffusion distance fidelity |
 
-2. **Add Hydra config**:
-```yaml
-# manylatents/configs/algorithm/latent/myalgo.yaml
-_target_: manylatents.algorithms.myalgo.MyAlgorithm
-n_components: 2
-```
+Config pattern: `metrics/module=<name>`
 
-3. **Run compliance test**:
-```bash
-pytest manylatents/tests/algorithms/dr_compliance_test.py
-```
+### dataset metrics
 
-### New Neural Network
+Evaluate original data properties, independent of embedding.
 
-1. **Create Lightning module**:
-```python
-# manylatents/algorithms/networks/mynet.py  
-from lightning import LightningModule
+| metric | config | measures |
+|---|---|---|
+| Stratification | `stratification` | population structure |
+| Admixture Laplacian | `admixture_laplacian` | admixture gradients |
 
-class MyNetwork(LightningModule):
-    def __init__(self, input_dim, latent_dim):
-        super().__init__()
-        # Network definition
-    
-    def training_step(self, batch, batch_idx):
-        # Training logic
-        return loss
-```
+Config pattern: `metrics/dataset=<name>`
 
-2. **Add to CI matrix** (`.github/workflows/build.yml`):
-```yaml
-- name: "mynet-test"
-  algorithm: "lightning/mynet"
-  data: "swissroll"
-  metrics: "synthetic_data_metrics"
-  timeout: 10
-```
+### sampling
+
+Large datasets are subsampled before metric evaluation.
+
+| strategy | config | method |
+|---|---|---|
+| Random | `sampling/random` | uniform without replacement |
+| Stratified | `sampling/stratified` | preserves label distribution |
+| Farthest Point | `sampling/farthest_point` | maximum coverage of embedding space |
 
 ---
 
-## 🧪 Testing & CI
+## cache protocol
 
-### Local Testing
-```bash
-# Full test suite
-pytest
-
-# Test single algorithm
-python -m manylatents.main experiment=single_algorithm
-
-# Quick smoke test with minimal data
-python -m manylatents.main \
-  experiment=single_algorithm \
-  metrics=test_metric \
-  callbacks/embedding=minimal
-
-# Test specific combination
-python -m manylatents.main \
-  algorithms/latent=pca \
-  data=swissroll \
-  trainer.max_epochs=1
-```
-
-### GitHub Actions Matrix
-Our CI runs comprehensive testing across algorithm-dataset combinations:
-- **Smoke tests**: Basic functionality validation
-- **Traditional DR**: PCA, UMAP on synthetic data
-- **Neural networks**: Autoencoder training validation
-- **Integration tests**: End-to-end testing
-
-See [Testing Documentation](docs/testing.md) for detailed information.
-
----
-
-## 📊 Evaluation & Metrics
-
-### Embedding Quality Metrics (23+ available)
-
-**Neighborhood Preservation:**
-- **Trustworthiness**: Local neighborhood preservation in embedding
-- **Continuity**: Reverse trustworthiness (embedding → original space)
-- **k-NN Preservation**: k-nearest neighbor graph preservation
-
-**Dimensionality Analysis:**
-- **Local Intrinsic Dimensionality (LID)**: Per-point dimensionality estimation
-- **Participation Ratio**: Effective dimensionality via eigenvalue analysis
-- **Fractal Dimension**: Box-counting dimension estimation
-- **Tangent Space Approximation**: Local manifold dimension
-
-**Topological & Geometric:**
-- **Persistent Homology**: Topological feature counting via ripser
-- **Diffusion Spectral Entropy**: Spectral complexity measure
-- **Diffusion Curvature**: Local curvature estimation
-- **Reeb Graph**: Topological skeleton analysis
-- **Anisotropy**: Embedding uniformity measure
-
-### Sampling Strategies
-
-For large datasets, pluggable sampling strategies reduce computation:
+All metrics share a single `cache` dict. The config sleuther discovers k-values from metric configs and pre-warms kNN and eigenvalues before any metric runs.
 
 ```python
-# In config
-metrics:
-  sampling:
-    _target_: manylatents.utils.sampling.RandomSampling
-    fraction: 0.1
-    seed: 42
+# this happens automatically inside evaluate_embeddings()
+cache = {}
+compute_knn(high_dim_data, k=25, cache=cache)    # computed once
+compute_knn(embeddings,     k=25, cache=cache)    # computed once
+compute_eigenvalues(module, cache=cache)           # computed once
+
+# every metric reuses the same cache — zero redundant work
+trustworthiness(emb, dataset=ds, cache=cache)
+continuity(emb, dataset=ds, cache=cache)
 ```
 
-Available strategies: `RandomSampling`, `StratifiedSampling`, `FarthestPointSampling`, `FixedIndexSampling`
-
-### Dataset-Specific Metrics
-- **Single-cell**: Cell type separation, trajectory preservation
-- **Synthetic**: Ground-truth manifold recovery
-- **Genomic data**: Available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) (geographic preservation, admixture analysis)
-
-### Usage
-```bash
-python -m manylatents.main \
-  experiment=single_algorithm \
-  metrics=synthetic_data_metrics
-```
+`compute_knn` selects the fastest available backend: FAISS-GPU > FAISS-CPU > sklearn.
 
 ---
 
-## 🛠️ Development
+## data
 
-### Code Quality
-```bash
-# Run test suite
-pytest
+| dataset | config | geometry |
+|---|---|---|
+| Swiss Roll | `data=swissroll` | 3D spiral manifold |
+| Torus | `data=torus` | toroidal surface |
+| Saddle Surface | `data=saddle_surface` | hyperbolic paraboloid |
+| Gaussian Blobs | `data=gaussian_blobs` | isotropic clusters |
+| DLA Tree | `data=dla_tree` | diffusion-limited aggregation |
+| Precomputed | `data=precomputed` | load from .npy / .npz |
 
-# Linting and formatting (if pre-commit is configured)
-pre-commit run --all-files
-```
-
-### Project Structure
-```bash
-# View project structure
-tree -I '__pycache__|*.pyc|.git|outputs|.venv'
-```
+Domain-specific datasets (genomics, single-cell) available via [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics).
 
 ---
 
-## 📚 Documentation
+## extensions
 
-- 📖 **[Full Documentation](docs/)**: Comprehensive guides and API reference
-- 🧪 **[Testing Strategy](docs/testing.md)**: CI/CD and local testing practices  
-- 🔧 **[Configuration Guide](manylatents/configs/)**: Hydra configuration examples
-- 🎯 **[Examples](experiments/)**: Pre-configured experiment templates
+Namespace packages that add algorithms, metrics, and data modules to the `manylatents` namespace. Core never imports from extensions; extensions import from core.
 
----
+| extension | adds | install |
+|---|---|---|
+| [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) | foundation encoders, population genetics metrics, single-cell data | `uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git` |
 
-## 🤝 Contributing
-
-We welcome contributions! Please:
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Write** tests for your changes
-4. **Ensure** CI passes (`pytest` and GitHub Actions)
-5. **Submit** a pull request
-
-### Development Setup
-```bash
-git clone https://github.com/latent-reasoning-works/manylatents.git
-cd manylatents
-uv sync
-source .venv/bin/activate
-pre-commit install
-```
-
----
-
-## 🌐 LRW Ecosystem
-
-ManyLatents is part of the **Latent Reasoning Works** suite of tools:
-
-| Project | Description |
-|---------|-------------|
-| [manylatents](https://github.com/latent-reasoning-works/manylatents) | Core DR framework (this repo) |
-| [manylatents-omics](https://github.com/latent-reasoning-works/manylatents-omics) | Genomics & population genetics extensions |
-| [shop](https://github.com/latent-reasoning-works/shop) | Multi-cluster SLURM job management |
-
----
-
-## 📜 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- **Authors**: César Miguel Valdez Córdova, Shuang Ni, Matthew Scicluna
-- **Affiliation**: Mila - Quebec AI Institute
-- **Built with**: PyTorch Lightning, Hydra, uv dependency manager
+See [docs/extensions.md](docs/extensions.md) for creating your own.
 
 ---
 
 <div align="center">
 
-**🚀 Ready to explore the latent space? Get started with ManyLatents!**
-
-[📖 Documentation](docs/) • [🐛 Issues](https://github.com/latent-reasoning-works/manylatents/issues) • [💬 Discussions](https://github.com/latent-reasoning-works/manylatents/discussions)
+MIT License -- Cesar Miguel Valdez Cordova, Matthew Scicluna, Shuang Ni, and contributors -- [Mila](https://mila.quebec)
 
 </div>
