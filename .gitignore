@@ -94,7 +94,7 @@ _*
 !__init__.py
 
 ## AI Agents
-# CLAUDE.md is now tracked for documentationlogs/
+MEMORY.md
 logs/
 checkpoints/
 site/

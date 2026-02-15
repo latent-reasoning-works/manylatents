@@ -56,7 +56,6 @@ dependencies = [
     "pyproj>=3.6",
     # Utilities
     "heatgeo",
-    "scprep", # TODO: remove after issue #182 (plotting replacement)
     "requests>=2.25",
     "rootutils>=1.0",
     "tqdm>=4.67",
