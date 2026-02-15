@@ -67,3 +67,8 @@ class Config:
     
     pretrained_ckpt: Optional[str] = None
     """If specified, load a pretrained checkpoint to compute embeddings instead of training a new model."""
+
+    neighborhood_size: Optional[int] = None
+    """Unified neighborhood parameter. When set, overrides algorithm-specific kNN params
+    (n_neighbors for UMAP, knn for PHATE/DiffusionMap, perplexity*3 for t-SNE).
+    Algorithm-specific params still win if set explicitly via config override."""

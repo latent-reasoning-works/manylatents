@@ -26,13 +26,15 @@ class PHATEModule(LatentModule):
         random_landmarking: bool = False,
         backend: str | None = None,
         device: str | None = None,
+        neighborhood_size: Optional[int] = None,
         **kwargs
     ):
         super().__init__(
             n_components=n_components, init_seed=random_state,
-            backend=backend, device=device, **kwargs,
+            backend=backend, device=device,
+            neighborhood_size=neighborhood_size, **kwargs,
         )
-        self.knn = knn
+        self.knn = neighborhood_size if neighborhood_size is not None else knn
         self.t = t
         self.decay = decay
         self.gamma = gamma
