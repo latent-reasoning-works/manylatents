@@ -1,14 +1,25 @@
 [project]
-name = "ManyLatents"
+name = "manylatents"
 version = "0.1.0"
-description = "a hydra enabled dimensionality reduction framework for the analysis of high dimensional data"
+description = "Unified dimensionality reduction and neural network analysis framework"
+license = "MIT"
 authors = [
     { name = "César Miguel Valdez Córdova", email = "cesar.valdez@mila.quebec" },
-    { name = "Shuang Ni", email = "shuang.ni@mila.quebec"},
-    { name = "Matthew Scicluna", email = "matthew.scicluna@mila.quebec"}
+    { name = "Matthew Scicluna", email = "matthew.scicluna@mila.quebec" },
+    { name = "Shuang Ni", email = "shuang.ni@mila.quebec" },
 ]
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
+keywords = ["dimensionality-reduction", "embeddings", "manifold-learning", "pytorch-lightning", "hydra"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 
 dependencies = [
     # Core scientific stack
@@ -75,6 +86,12 @@ torchdr = [
 ]
 # Central dogma foundation model encoders (ESM3, Orthrus, Evo2)
 # dogma = ["manylatents-omics[dogma]"]  # TODO: re-enable after fixing circular dependency
+
+[project.urls]
+Homepage = "https://github.com/latent-reasoning-works/manylatents"
+Documentation = "https://latent-reasoning-works.github.io/manylatents/"
+Repository = "https://github.com/latent-reasoning-works/manylatents"
+Issues = "https://github.com/latent-reasoning-works/manylatents/issues"
 
 [project.entry-points."hydra.searchpath"]
 manylatents = "manylatents.plugins:ManylatentsSearchPathPlugin"

@@ -4,7 +4,7 @@
 
 ### Add Lightning Module CLI Test
 **Priority**: High (blocking release)
-**Status**: Not started
+**Status**: COMPLETED
 
 Add a CLI test for Lightning modules (e.g., autoencoder) to validate training works.
 

@@ -69,10 +69,17 @@ jobs:
           chmod +x .github/workflows/scripts/test_latent_algorithms.sh
           .github/workflows/scripts/test_latent_algorithms.sh
 
-  # TODO: Add comprehensive integration tests with algorithm/data/metric matrix
-  # TODO: Add Lightning module tests with trainer.fast_dev_run=true
-  #
-  # Current coverage: All LatentModule algorithms with minimal smoke tests
+      - name: Test CLI - Lightning Module
+        run: |
+          source .venv/bin/activate
+          python -m manylatents.main \
+            algorithms/lightning=ae_reconstruction \
+            data=swissroll \
+            metrics=test_metric \
+            callbacks/embedding=minimal \
+            trainer.max_epochs=2 \
+            trainer.fast_dev_run=true \
+            logger=none
 
   # Note on namespace package integration testing:
   # CI cannot test with the private manylatents-omics repo due to free org plan limitations.

@@ -1,32 +1,16 @@
-# Ignore everything in the paths folder
-# except for __init__.py and default.yaml
-# (privacy reasons)
-
-src/configs/paths/*
-!src/configs/paths/__init__.py
-!src/configs/paths/default.yaml
-
-# similarly for data,
-data/*
-!data/**/__init__.py
-
-# and outputs.
-outputs/*
-!outputs/**/__init__.py
+# Data and outputs
+data/
+outputs/
 
 # python cache files.
 __pycache__/
 *.pyc
 *.pyo
 
-#notebooks
-notebooks/debug.ipynb
-notebooks/plots.ipynb
-notebooks/artifacts/*
+# Jupyter
 .ipynb_checkpoints/
 
-#local scripts and their logs
-scripts/run_sweep.sh
+# SLURM logs
 slurm-*.out
 
 #vscode files
