@@ -211,6 +211,38 @@ def compute_knn(
     return distances, indices
 
 
+def compute_eigenvalues(
+    module,
+    cache: Optional[dict] = None,
+) -> Optional[np.ndarray]:
+    """Compute sorted eigenvalues of module's symmetric affinity matrix.
+
+    Args:
+        module: Fitted LatentModule with affinity_matrix() method, or None.
+        cache: Optional dict. Stores result under key "eigenvalues".
+
+    Returns:
+        Eigenvalues sorted descending, or None if unavailable.
+    """
+    if module is None:
+        return None
+
+    if cache is not None and "eigenvalues" in cache:
+        return cache["eigenvalues"]
+
+    try:
+        A = module.affinity_matrix(use_symmetric=True)
+    except (NotImplementedError, AttributeError):
+        return None
+
+    eigenvalues = np.sort(np.linalg.eigvalsh(A))[::-1]
+
+    if cache is not None:
+        cache["eigenvalues"] = eigenvalues
+
+    return eigenvalues
+
+
 def flatten_and_unroll_metrics(
     all_metrics: DictConfig
 ) -> Dict[str, DictConfig]:
