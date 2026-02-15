@@ -1,25 +1,16 @@
-<div align="center">
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner.svg">
+    <img alt="manyLatents" src="docs/assets/banner.svg" width="100%">
+  </picture>
+</p>
 
-<pre>
-        ·  ·  ·
-      · · · · · ·                 · · ·
-     · · · · · · · ·  ────────► · · · · ·
-      · · · · · ·                 · · ·
-        ·  ·  ·
-
-           m a n y l a t e n t s
-
-    one geometry, learned through many latents
-</pre>
-
-Dimensionality reduction and neural network analysis.
-Built on PyTorch Lightning + Hydra.
-
-[![license](https://img.shields.io/badge/license-MIT-a0a0a0.svg)](LICENSE)
-[![python](https://img.shields.io/badge/python-3.10+-a0a0a0.svg)](https://www.python.org)
-[![uv](https://img.shields.io/badge/pkg-uv-a0a0a0.svg)](https://docs.astral.sh/uv/)
-
-</div>
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8B949E.svg" alt="license"></a>
+  <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.11+-8B949E.svg" alt="python"></a>
+  <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/pkg-uv-8B949E.svg" alt="uv"></a>
+</p>
 
 ---
 
@@ -135,12 +126,6 @@ Domain-specific datasets (genomics, single-cell) available via extensions.
 
 <br><br>
 
-<div align="center">
-<sub>
-
-MIT License -- César Miguel Valdez Córdova, Matthew Scicluna, Shuang Ni, and contributors
-
-[Latent Reasoning Works](https://github.com/latent-reasoning-works)
-
-</sub>
-</div>
+<p align="center">
+<sub>MIT License &middot; <a href="https://github.com/latent-reasoning-works">Latent Reasoning Works</a></sub>
+</p>
