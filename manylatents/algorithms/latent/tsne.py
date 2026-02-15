@@ -44,13 +44,16 @@ class TSNEModule(LatentModule):
         fit_fraction: float = 1.0,
         backend: str | None = None,
         device: str | None = None,
+        neighborhood_size: Optional[int] = None,
         **kwargs
     ):
         super().__init__(
             n_components=n_components, init_seed=random_state,
-            backend=backend, device=device, **kwargs,
+            backend=backend, device=device,
+            neighborhood_size=neighborhood_size, **kwargs,
         )
-        self.perplexity = perplexity
+        # perplexity ~ 3 * knn (entropy-calibrated effective neighborhood)
+        self.perplexity = float(neighborhood_size * 3) if neighborhood_size is not None else perplexity
         self.n_iter_early = n_iter_early
         self.n_iter_late = n_iter_late
         self.learning_rate = learning_rate

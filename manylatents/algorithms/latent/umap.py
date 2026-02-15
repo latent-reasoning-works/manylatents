@@ -23,13 +23,15 @@ class UMAPModule(LatentModule):
         fit_fraction: float = 1.0,
         backend: str | None = None,
         device: str | None = None,
+        neighborhood_size: Optional[int] = None,
         **kwargs
     ):
         super().__init__(
             n_components=n_components, init_seed=random_state,
-            backend=backend, device=device, **kwargs,
+            backend=backend, device=device,
+            neighborhood_size=neighborhood_size, **kwargs,
         )
-        self.n_neighbors = n_neighbors
+        self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors
         self.min_dist = min_dist
         self.metric = metric
         self.n_epochs = n_epochs

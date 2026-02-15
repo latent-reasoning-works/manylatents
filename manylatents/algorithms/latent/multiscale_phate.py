@@ -59,14 +59,16 @@ class MultiscalePHATEModule(LatentModule):
         n_pca: Optional[int] = None,
         n_jobs: int = 1,
         random_state: Optional[int] = 42,
+        neighborhood_size: Optional[int] = None,
         **kwargs,
     ):
-        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
+        super().__init__(n_components=n_components, init_seed=random_state,
+                         neighborhood_size=neighborhood_size, **kwargs)
 
         self.scale = scale
         self.granularity = granularity
         self.landmarks = landmarks
-        self.knn = knn
+        self.knn = neighborhood_size if neighborhood_size is not None else knn
         self.decay = decay
         self.gamma = gamma
         self.n_pca = n_pca
@@ -77,7 +79,7 @@ class MultiscalePHATEModule(LatentModule):
             scale=scale,
             granularity=granularity,
             landmarks=landmarks,
-            knn=knn,
+            knn=self.knn,
             decay=decay,
             gamma=gamma,
             n_pca=n_pca,

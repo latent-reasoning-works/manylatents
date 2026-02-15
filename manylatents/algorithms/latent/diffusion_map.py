@@ -431,13 +431,16 @@ class DiffusionMapModule(LatentModule):
         n_jobs: Optional[int] = -1,
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
+        neighborhood_size: Optional[int] = None,
         **kwargs
     ):
-        super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
+        super().__init__(n_components=n_components, init_seed=random_state,
+                         neighborhood_size=neighborhood_size, **kwargs)
         self.fit_fraction = fit_fraction
-        self.model = DiffusionMap(n_components=n_components, 
+        resolved_knn = neighborhood_size if neighborhood_size is not None else knn
+        self.model = DiffusionMap(n_components=n_components,
                                   random_state=random_state,
-                                  knn=knn,
+                                  knn=resolved_knn,
                                   t=t,
                                   decay=decay,
                                   n_pca=n_pca,

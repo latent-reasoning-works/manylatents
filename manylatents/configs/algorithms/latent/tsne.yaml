@@ -8,5 +8,6 @@ learning_rate: 'auto'
 metric: "euclidean"
 initialization: "pca"
 fit_fraction: 1.0
+neighborhood_size: ${neighborhood_size}
 backend: null
 device: null
