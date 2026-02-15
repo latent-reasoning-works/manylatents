@@ -5,7 +5,7 @@ defaults:
   - override /algorithms/latent: pca
   - override /data: swissroll
   - override /callbacks/embedding: default
-  - override /metrics: test_metric
+  - override /metrics: noop
 
 seed: 42
 project: your_project

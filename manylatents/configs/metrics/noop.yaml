@@ -9,9 +9,9 @@
 
 defaults:
   - dataset:
-    - test_metric
+    - noop
   - embedding:
-    - test_metric
+    - noop
   - module:
-    - test_metric
+    - noop
   - _self_

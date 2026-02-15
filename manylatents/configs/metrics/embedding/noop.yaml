@@ -1,4 +1,4 @@
-test_metric:
+noop:
   _target_: manylatents.metrics.noop.TestMetric
   _partial_: True
   k: 25
