@@ -42,9 +42,11 @@ def __call__(
     embeddings: np.ndarray,
     dataset=None,
     module=None,
-    _knn_cache=None,
+    cache=None,
 ) -> float | tuple[float, np.ndarray] | dict[str, Any]
 ```
+
+All metrics receive a shared `cache` dict that `compute_knn()` and `compute_eigenvalues()` use for deduplication. The config sleuther (`extract_k_requirements` + `prewarm_cache` in `experiment.py`) pre-warms this cache before metrics run.
 
 Three evaluation contexts: `dataset`, `embedding`, `module`. Registered via Hydra `_target_` with `_partial_: True`. Parameters (like `return_per_sample`, `k`, `n_neighbors`) are set in Hydra config, not at call time.
 
