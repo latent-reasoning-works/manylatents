@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Protocol, Union, runtime_checkable
 
 import numpy as np
 from torch import Tensor
-from manylatents.callbacks.base import BaseCallback
+from manylatents.callbacks.callback import BaseCallback
 
 logger = logging.getLogger(__name__)
 
