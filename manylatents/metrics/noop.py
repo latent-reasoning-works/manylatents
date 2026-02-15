@@ -3,7 +3,7 @@ from typing import Optional, Union, List
 import numpy as np
 
 
-def TestMetric(embeddings: np.ndarray,
+def NoOp(embeddings: np.ndarray,
                dataset: Optional[object] = None,
                module: Optional[object] = None,
                k: Union[int, List[int]] = 25,
