@@ -201,6 +201,24 @@ continuity(emb, dataset=ds, cache=cache)
 
 `compute_knn` selects the fastest available backend: FAISS-GPU > FAISS-CPU > sklearn.
 
+### metric expansion
+
+List-valued parameters expand via Cartesian product through `flatten_and_unroll_metrics()`:
+
+```yaml
+trustworthiness:
+  _target_: manylatents.metrics.trustworthiness.Trustworthiness
+  _partial_: true
+  n_neighbors: [5, 10, 20]
+
+# expands to three evaluations:
+# embedding.trustworthiness__n_neighbors_5
+# embedding.trustworthiness__n_neighbors_10
+# embedding.trustworthiness__n_neighbors_20
+```
+
+All expanded k-values contribute to the shared cache — one kNN computation covers the entire sweep.
+
 ---
 
 ## data
