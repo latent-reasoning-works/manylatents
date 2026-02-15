@@ -1,20 +1,20 @@
 <div align="center">
 
 <pre>
-        ·  ·  ·
-      · · · · · ·                 · · ·
-     · · · · · · · ·  ────────► · · · · ·
-      · · · · · ·                 · · ·
-        ·  ·  ·
+       · · · ·
+     · · · · · ·                · · ·
+    · · · · · · · ·  ───────►  · · · · ·
+     · · · · · ·                · · ·
+       · · · ·
 
-           m a n y l a t e n t s
+          m a n y l a t e n t s
 
-    one geometry, learned through many latents
+   one geometry, learned through many latents
 </pre>
 
-[![license](https://img.shields.io/badge/license-MIT-22D3EE.svg)](LICENSE)
-[![python](https://img.shields.io/badge/python-3.11+-22D3EE.svg)](https://www.python.org)
-[![uv](https://img.shields.io/badge/pkg-uv-22D3EE.svg)](https://docs.astral.sh/uv/)
+[![license](https://img.shields.io/badge/license-MIT-2DD4BF.svg)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.11+-2DD4BF.svg)](https://www.python.org)
+[![uv](https://img.shields.io/badge/pkg-uv-2DD4BF.svg)](https://docs.astral.sh/uv/)
 
 </div>
 
