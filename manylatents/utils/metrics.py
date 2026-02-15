@@ -1,7 +1,7 @@
 import copy
 import logging
 from itertools import product
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 from omegaconf import DictConfig, ListConfig
@@ -131,6 +131,7 @@ def compute_knn(
     data: np.ndarray,
     k: int,
     include_self: bool = True,
+    cache: Optional[dict] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Compute k-nearest neighbors using FAISS-GPU > FAISS-CPU > sklearn.
 
@@ -144,11 +145,26 @@ def compute_knn(
         k: Number of neighbors (excluding self).
         include_self: If True, returns k+1 columns with self at index 0.
             If False, returns k columns (self excluded).
+        cache: Optional dict for caching. Keyed by id(data).
+            If a cached result exists with k >= requested k, slices and returns.
+            Otherwise computes and stores the result.
 
     Returns:
         (distances, indices) — both shape (n_samples, k+1) if include_self,
         or (n_samples, k) if not.
     """
+    # Check cache for a usable superset
+    if cache is not None:
+        key = id(data)
+        if key in cache:
+            cached_k, cached_dists, cached_idxs = cache[key]
+            if cached_k >= k:
+                n = k + 1  # cached always includes self
+                dists, idxs = cached_dists[:, :n], cached_idxs[:, :n]
+                if not include_self:
+                    dists, idxs = dists[:, 1:], idxs[:, 1:]
+                return dists, idxs
+
     data = np.ascontiguousarray(data, dtype=np.float32)
     n_neighbors = k + 1  # always query k+1 to include self, then trim
 
@@ -183,6 +199,10 @@ def compute_knn(
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)
         distances, indices = nbrs.kneighbors(data)
         logger.info(f"compute_knn: sklearn, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+
+    # Store in cache (always with self included)
+    if cache is not None:
+        cache[id(data)] = (k, distances, indices)
 
     if not include_self:
         distances = distances[:, 1:]
