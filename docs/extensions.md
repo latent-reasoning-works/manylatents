@@ -228,7 +228,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     | `dataset` | - | Source dataset | - | Stratification, admixture |
     | `module` | - | Source dataset | Fitted LatentModule | Affinity spectrum, kernel sparsity |
 
-    List-valued parameters in configs expand via Cartesian product through `flatten_and_unroll_metrics()`. Metrics sharing kNN graphs use a shared `_knn_cache`.
+    List-valued parameters in configs expand via Cartesian product through `flatten_and_unroll_metrics()`. Metrics sharing kNN graphs use a shared `cache`.
 
     ### 3. Data Modules
 

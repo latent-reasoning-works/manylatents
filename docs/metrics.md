@@ -47,7 +47,7 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
         embeddings: np.ndarray,
         dataset=None,
         module=None,
-        _knn_cache=None,
+        cache=None,
     ) -> float | tuple[float, np.ndarray] | dict[str, Any]
     ```
 
@@ -108,7 +108,7 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
         dataset=None,
         module=None,
         k: int = 10,
-        _knn_cache=None,
+        cache=None,
     ) -> float:
         # Your computation
         return score
