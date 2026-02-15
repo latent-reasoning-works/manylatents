@@ -635,6 +635,19 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
 
     logger.info("Experiment complete.")
 
+    # Auto-log scores to wandb if active (works online and offline)
+    if wandb_run is not None and embeddings.get("scores"):
+        scores = embeddings["scores"]
+        scalar_metrics = {}
+        for name, val in scores.items():
+            if isinstance(val, tuple) and len(val) == 2:
+                scalar_metrics[f"metrics/{name}"] = float(val[0])
+            elif np.ndim(val) == 0:
+                scalar_metrics[f"metrics/{name}"] = float(val)
+        if scalar_metrics:
+            wandb.log(scalar_metrics)
+            logger.info(f"Auto-logged {len(scalar_metrics)} metrics to wandb: {list(scalar_metrics.keys())}")
+
     # Clean up wandb run if it was initialized
     if wandb_run is not None:
         wandb.finish()
@@ -860,6 +873,19 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
             logger.info(f"Added callback outputs to embeddings: {list(callback_outputs.keys())}")
 
         logger.info("Pipeline workflow complete.")
+
+        # Auto-log scores to wandb if active (works online and offline)
+        if wandb.run and embeddings.get("scores"):
+            scores = embeddings["scores"]
+            scalar_metrics = {}
+            for name, val in scores.items():
+                if isinstance(val, tuple) and len(val) == 2:
+                    scalar_metrics[f"metrics/{name}"] = float(val[0])
+                elif np.ndim(val) == 0:
+                    scalar_metrics[f"metrics/{name}"] = float(val)
+            if scalar_metrics:
+                wandb.log(scalar_metrics)
+                logger.info(f"Auto-logged {len(scalar_metrics)} metrics to wandb: {list(scalar_metrics.keys())}")
 
         if wandb.run:
             wandb.finish()
