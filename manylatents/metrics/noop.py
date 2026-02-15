@@ -6,7 +6,8 @@ import numpy as np
 def TestMetric(embeddings: np.ndarray,
                dataset: Optional[object] = None,
                module: Optional[object] = None,
-               k: Union[int, List[int]] = 25
+               k: Union[int, List[int]] = 25,
+               cache: Optional[dict] = None,
             ) -> tuple[float, np.ndarray]:
         """
         A test-specific metric that always returns 0.0 for both scalar and per-sample scores.
