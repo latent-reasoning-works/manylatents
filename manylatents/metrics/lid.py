@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import numpy as np
 
@@ -20,7 +20,7 @@ def LocalIntrinsicDimensionality(
     module: Optional[object] = None,
     k: int = 20,
     return_per_sample: bool = False,
-    _knn_cache: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    cache: Optional[dict] = None,
 ) -> Union[float, np.ndarray]:
     """
     Compute the Local Intrinsic Dimensionality (LID) for the embedding.
@@ -34,21 +34,13 @@ def LocalIntrinsicDimensionality(
       - module: Provided for protocol compliance (unused).
       - k: The number of nearest neighbors to consider.
       - return_per_sample: If True, return per-sample LID values; else return mean.
-      - _knn_cache: Optional (distances, indices) tuple from precomputed kNN.
-                    Distances should be shape (n_samples, max_k+1) including self.
+      - cache: Optional shared cache dict. Passed through to compute_knn().
 
     Returns:
       - float: Mean LID (if return_per_sample=False)
       - np.ndarray: Per-sample LID values (if return_per_sample=True)
     """
-    if _knn_cache is not None:
-        # Use precomputed kNN, slice to required k
-        distances, _ = _knn_cache
-        # distances includes self-distance at index 0, slice [1:k+1]
-        distances = distances[:, 1:k + 1]
-    else:
-        # Compute kNN (FAISS if available, sklearn fallback)
-        distances, _ = compute_knn(embeddings, k=k, include_self=False)
+    distances, _ = compute_knn(embeddings, k=k, include_self=False, cache=cache)
 
     # LID computation: MLE estimator
     r_k = distances[:, -1]

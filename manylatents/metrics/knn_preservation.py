@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import numpy as np
 
@@ -13,7 +13,7 @@ def KNNPreservation(
     n_neighbors: int = 10,
     metric: str = 'euclidean',
     return_per_sample: bool = False,
-    _knn_cache: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    cache: Optional[dict] = None,
 ) -> Union[float, np.ndarray]:
     """
     Compute the average k-NN preservation between high-dimensional data and its low-dimensional embedding.
@@ -29,8 +29,7 @@ def KNNPreservation(
         n_neighbors: Number of neighbors to consider for kNN graph.
         metric: Distance metric to use for NearestNeighbors.
         return_per_sample: If True, return per-sample overlap scores.
-        _knn_cache: Optional precomputed (distances, indices) for embeddings.
-            Note: Only used for embeddings; high-dim kNN is always computed.
+        cache: Optional shared cache dict. Passed through to compute_knn().
 
     Returns:
         float: Mean k-NN overlap score (between 0 and 1).
@@ -38,18 +37,9 @@ def KNNPreservation(
     """
     n_samples = dataset.data.shape[0]
 
-    # High-dimensional kNN (always computed - no cache for high-dim)
-    _, neighbors_high = compute_knn(dataset.data, k=n_neighbors, include_self=False)
+    _, neighbors_high = compute_knn(dataset.data, k=n_neighbors, include_self=False, cache=cache)
+    _, neighbors_low = compute_knn(embeddings, k=n_neighbors, include_self=False, cache=cache)
 
-    # Low-dimensional (embedding) kNN - use cache if available
-    if _knn_cache is not None:
-        _, indices = _knn_cache
-        # Slice to required k (indices includes self at 0)
-        neighbors_low = indices[:, 1:n_neighbors + 1]
-    else:
-        _, neighbors_low = compute_knn(embeddings, k=n_neighbors, include_self=False)
-
-    # Compute per-sample neighbor overlap
     overlap_scores = np.array([
         len(set(neighbors_high[i]) & set(neighbors_low[i])) / n_neighbors
         for i in range(n_samples)
