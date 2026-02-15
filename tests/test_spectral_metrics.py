@@ -23,13 +23,13 @@ def test_spectral_gap_ratio_basic():
 
 
 def test_spectral_gap_ratio_uses_cache():
-    """SpectralGapRatio uses _eigenvalue_cache when provided."""
+    """SpectralGapRatio uses cache when provided."""
     from manylatents.metrics.spectral_gap_ratio import SpectralGapRatio
 
-    cache = {(True, None): np.array([10.0, 2.0, 1.0])}
+    cache = {"eigenvalues": np.array([10.0, 2.0, 1.0])}
     result = SpectralGapRatio(
         embeddings=np.zeros((3, 2)),
-        _eigenvalue_cache=cache,
+        cache=cache,
     )
     np.testing.assert_allclose(result, 5.0)
 
@@ -48,11 +48,11 @@ def test_spectral_decay_rate_basic():
 
     # Create eigenvalues that decay exponentially: exp(-0.5 * i)
     eigs = np.exp(-0.5 * np.arange(20))
-    cache = {(True, 20): eigs}
+    cache = {"eigenvalues": eigs}
 
     result = SpectralDecayRate(
         embeddings=np.zeros((20, 2)),
-        _eigenvalue_cache=cache,
+        cache=cache,
         top_k=20,
     )
     assert isinstance(result, float)

@@ -14,22 +14,7 @@ def test_full_pipeline_cpu():
     from manylatents.metrics.spectral_gap_ratio import SpectralGapRatio
     from manylatents.metrics.spectral_decay_rate import SpectralDecayRate
     from manylatents.metrics.silhouette import SilhouetteScore
-
-    # Need to mock dogma for experiment import
-    import sys
-    if "manylatents.dogma" not in sys.modules:
-        import types
-        dogma_mock = types.ModuleType("manylatents.dogma")
-        dogma_encoders = types.ModuleType("manylatents.dogma.encoders")
-        dogma_base = types.ModuleType("manylatents.dogma.encoders.base")
-        dogma_base.FoundationEncoder = type("FoundationEncoder", (), {})
-        dogma_mock.encoders = dogma_encoders
-        dogma_encoders.base = dogma_base
-        sys.modules["manylatents.dogma"] = dogma_mock
-        sys.modules["manylatents.dogma.encoders"] = dogma_encoders
-        sys.modules["manylatents.dogma.encoders.base"] = dogma_base
-
-    from manylatents.experiment import _compute_eigenvalue_cache
+    from manylatents.utils.metrics import compute_eigenvalues
 
     # Generate simple data
     x = torch.randn(100, 10)
@@ -40,16 +25,16 @@ def test_full_pipeline_cpu():
     emb_np = emb.numpy()
 
     # Compute eigenvalue cache
-    cache = _compute_eigenvalue_cache(m, top_k_values={None, 20})
-    assert (True, None) in cache
-    assert (True, 20) in cache
+    cache = {}
+    compute_eigenvalues(m, cache=cache)
+    assert "eigenvalues" in cache
 
-    # Run spectral metrics
-    gap = SpectralGapRatio(emb_np, module=m, _eigenvalue_cache=cache)
+    # Run spectral metrics with shared cache
+    gap = SpectralGapRatio(emb_np, module=m, cache=cache)
     assert isinstance(gap, float)
     assert not np.isnan(gap)
 
-    decay = SpectralDecayRate(emb_np, module=m, _eigenvalue_cache=cache, top_k=20)
+    decay = SpectralDecayRate(emb_np, module=m, cache=cache, top_k=20)
     assert isinstance(decay, float)
 
     # Silhouette with fake labels
