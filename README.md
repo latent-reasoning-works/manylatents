@@ -139,8 +139,14 @@ Domain-specific datasets (genomics, single-cell) available via extensions.
 
 ---
 
+<br><br>
+
 <div align="center">
+<sub>
 
-MIT License -- César Miguel Valdez Córdova, Matthew Scicluna, Shuang Ni, and contributors -- [Latent Reasoning Works](https://github.com/latent-reasoning-works)
+MIT License -- César Miguel Valdez Córdova, Matthew Scicluna, Shuang Ni, and contributors
 
+[Latent Reasoning Works](https://github.com/latent-reasoning-works)
+
+</sub>
 </div>
