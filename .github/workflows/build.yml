@@ -79,3 +79,76 @@ jobs:
   # Instead, namespace integration is tested locally using a mock package.
   # See: python tests/test_namespace_integration.py
   # This validates that the namespace package architecture works correctly.
+
+  # Docs build verification and coverage check
+  docs:
+    name: Docs Build & Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install UV package manager
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: 'latest'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          uv sync
+
+      - name: Check docs coverage
+        run: |
+          source .venv/bin/activate
+          python scripts/check_docs_coverage.py
+
+      - name: Build docs (strict)
+        run: |
+          source .venv/bin/activate
+          mkdocs build --strict
+
+  # Deploy docs to GitHub Pages (main branch only, after repo is public)
+  # docs-deploy:
+  #   name: Deploy Docs
+  #   needs: [build-and-test, docs]
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 10
+  #   permissions:
+  #     contents: write
+  #
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.10'
+  #
+  #     - name: Install UV package manager
+  #       uses: astral-sh/setup-uv@v5
+  #       with:
+  #         version: 'latest'
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m venv .venv
+  #         source .venv/bin/activate
+  #         uv sync
+  #
+  #     - name: Deploy to GitHub Pages
+  #       run: |
+  #         source .venv/bin/activate
+  #         mkdocs gh-deploy --force
