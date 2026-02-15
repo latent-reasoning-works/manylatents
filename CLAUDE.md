@@ -87,7 +87,7 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 | `metrics/metric.py` | Metric protocol definition |
 | `metrics/registry.py` | `@register_metric` decorator, `list_metrics()` |
 | `utils/metrics.py` | `compute_knn()`, `compute_svd_cache()` — shared cache infrastructure |
-| `plugins/search_path.py` | Hydra SearchPathPlugin for config discovery |
+| `configs/__init__.py` | Hydra SearchPathPlugin + ConfigStore registration |
 | `data/capabilities.py` | Dataset capability detection |
 
 ## Gotchas

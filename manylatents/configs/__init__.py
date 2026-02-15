@@ -1,5 +1,6 @@
 from hydra.core.config_store import ConfigStore
-from omegaconf import OmegaConf
+from hydra.core.plugins import Plugins
+from hydra.plugins.search_path_plugin import SearchPathPlugin
 
 from .config import Config
 
@@ -7,21 +8,21 @@ from .config import Config
 cs = ConfigStore.instance()
 cs.store(name="base_config", node=Config)
 
-## Auto-register SearchPathPlugin when configs module is imported
-## Entry-points don't work with Hydra 1.3 (it only scans hydra_plugins namespace)
-def _register_search_path_plugin():
-    """Register ManylatentsSearchPathPlugin with Hydra."""
-    from hydra.core.plugins import Plugins
-    from hydra.plugins.search_path_plugin import SearchPathPlugin
-    from manylatents.plugins.search_path import ManylatentsSearchPathPlugin
 
-    plugins = Plugins.instance()
-    existing = list(plugins.discover(SearchPathPlugin))
-    if ManylatentsSearchPathPlugin not in existing:
-        plugins.register(ManylatentsSearchPathPlugin)
+class ManylatentsSearchPathPlugin(SearchPathPlugin):
+    """Registers manylatents config paths with Hydra."""
 
-_register_search_path_plugin()
+    def manipulate_search_path(self, search_path):
+        search_path.append(provider="manylatents", path="pkg://manylatents.configs")
+
+
+## Entry-points don't work with Hydra 1.3 (it only scans hydra_plugins namespace),
+## so we register manually on import.
+_plugins = Plugins.instance()
+if ManylatentsSearchPathPlugin not in list(_plugins.discover(SearchPathPlugin)):
+    _plugins.register(ManylatentsSearchPathPlugin)
 
 __all__ = [
     "Config",
+    "ManylatentsSearchPathPlugin",
 ]
