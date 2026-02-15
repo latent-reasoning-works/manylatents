@@ -14,23 +14,15 @@ All contributions must pass automated tests on every pull request. CI validates:
 
 ## Adding New Metrics
 
-### Overview
+Every new metric follows 4 steps: **wrapper → register → config → smoke test**.
 
-Metrics are organized into three evaluation contexts:
-
-- **`metrics/dataset/`** — properties of the original high-dimensional data
-- **`metrics/embedding/`** — quality of low-dimensional embeddings
-- **`metrics/module/`** — algorithm internals (graphs, kernels, spectra)
-
-See the [Metrics docs](https://latent-reasoning-works.github.io/manylatents/metrics/) for the full reference.
-
-### Step 1: Implement Your Metric
+### Step 1: Write the Wrapper
 
 Follow the `Metric` protocol — `embeddings` first, then `dataset`, `module`, your params, and `cache`:
 
 ```python
 # manylatents/metrics/your_metric.py
-from typing import Optional, Any
+from typing import Optional
 import numpy as np
 
 from manylatents.metrics.registry import register_metric
@@ -49,69 +41,53 @@ def YourMetric(
     k: int = 25,
     cache: Optional[dict] = None,
 ) -> float:
-    """Compute your metric.
-
-    Args:
-        embeddings: Low-dimensional embedding array (n, d).
-        dataset: Dataset object with .data attribute.
-        module: Fitted algorithm module.
-        k: Number of neighbors.
-        cache: Shared kNN/eigenvalue cache dict.
-
-    Returns:
-        Scalar score.
-    """
     # Use compute_knn with cache for shared kNN computation
     dists, indices = compute_knn(embeddings, k=k, cache=cache)
-
     score = ...  # your computation
     return float(score)
 ```
 
-**Return types:**
+**Return types:** `float`, `tuple[float, np.ndarray]` (scalar + per-sample), or `dict[str, Any]` (structured).
 
-| Type | Use case |
-|------|----------|
-| `float` | Simple scalar |
-| `tuple[float, np.ndarray]` | Scalar + per-sample values (enables wandb table logging) |
-| `dict[str, Any]` | Structured output (multiple values, arrays) |
-
-### Step 2: Create Config
-
-```yaml
-# manylatents/configs/metrics/embedding/your_metric.yaml
-_target_: manylatents.metrics.your_metric.YourMetric
-_partial_: true
-k: 25
-```
-
-Note: configs are **flat** — `_target_` at the top level, not nested under a key.
-
-**Choosing the right directory:**
+**Evaluation context** determines the config directory:
 
 - Only needs original data? → `metrics/dataset/`
 - Compares original vs. reduced? → `metrics/embedding/`
-- Needs algorithm internals? → `metrics/module/`
+- Needs algorithm internals (graph, kernel)? → `metrics/module/`
 
-### Step 3: Test Locally
+### Step 2: Register It
+
+The `@register_metric` decorator (shown above) adds your metric to the dynamic registry with aliases, default params, and a description. This powers `list_metrics()`, auto-generated docs tables, and programmatic discovery.
+
+Import your metric in `manylatents/metrics/__init__.py` so the decorator fires at import time.
+
+### Step 3: Create the Config
+
+```yaml
+# manylatents/configs/metrics/embedding/your_metric.yaml
+your_metric:
+  _target_: manylatents.metrics.your_metric.YourMetric
+  _partial_: True
+  k: 25
+```
+
+Configs are **nested under the metric name** with `_partial_: True` so Hydra binds the params at config time and the engine calls it with `embeddings`, `dataset`, `module`, and `cache` at runtime.
+
+### Step 4: E2E Smoke Test
 
 ```bash
+# Verify your metric runs end-to-end
 uv run python -m manylatents.main \
   algorithms/latent=pca data=test_data \
   metrics/embedding=your_metric logger=none
-```
 
-### Step 4: Verify CI Passes
-
-```bash
-# smoke test (what CI runs)
+# Full CI smoke test
 uv run python -m manylatents.main \
   experiment=single_algorithm metrics=test_metric \
   callbacks/embedding=minimal logger=none
-
-# docs coverage (checks _target_ paths are importable)
-uv run python scripts/check_docs_coverage.py
 ```
+
+CI will validate on every PR that all configs instantiate and all `_target_` paths resolve.
 
 ---
 
@@ -233,24 +209,19 @@ Two jobs run on every PR:
 
 **build-and-test:**
 - Installs dependencies with uv
-- CLI smoke test with `experiment=single_algorithm`
+- CLI smoke test: LatentModule path (`experiment=single_algorithm`)
+- CLI smoke test: LightningModule path (`algorithms/lightning=ae_reconstruction`, `trainer.fast_dev_run=true`)
 - Smoke tests all LatentModule algorithms (if `algorithms/latent/` files changed)
 
 **docs:**
-- Runs `scripts/check_docs_coverage.py` — verifies all `_target_` paths are importable
+- Runs `scripts/check_docs_coverage.py` — verifies all `_target_` paths in configs are importable
 - Runs `mkdocs build --strict` — verifies docs site builds cleanly
 
 ### Local Pre-submission Checklist
 
-- [ ] Component works in isolation
-- [ ] CI smoke test passes:
-  ```bash
-  uv run python -m manylatents.main \
-    experiment=single_algorithm metrics=test_metric \
-    callbacks/embedding=minimal logger=none
-  ```
-- [ ] Docs build: `uv run mkdocs build --strict`
-- [ ] Tests pass: `uv run pytest tests/ -v`
+- [ ] Your component works end-to-end via CLI
+- [ ] `uv run pytest tests/ -v`
+- [ ] `uv run mkdocs build --strict`
 
 ---
 
