@@ -25,19 +25,7 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
 
     ### Available Algorithms
 
-    | Algorithm | Class | Config | Key Parameters |
-    |-----------|-------|--------|----------------|
-    | PCA | `PCAModule` | `algorithms/latent=pca` | `n_components`, `random_state` |
-    | t-SNE | `TSNEModule` | `algorithms/latent=tsne` | `n_components`, `perplexity`, `learning_rate`, `metric` |
-    | UMAP | `UMAPModule` | `algorithms/latent=umap` | `n_components`, `n_neighbors`, `min_dist`, `metric` |
-    | PHATE | `PHATEModule` | `algorithms/latent=phate` | `n_components`, `knn`, `gamma` |
-    | MultiscalePHATE | `MultiscalePHATEModule` | `algorithms/latent=multiscale_phate` | `n_components`, `knn` |
-    | DiffusionMap | `DiffusionMapModule` | `algorithms/latent=diffusionmap` | `n_components`, `knn`, `decay` |
-    | MDS | `MDSModule` | `algorithms/latent=mds` | `n_components` |
-    | Archetypes | `AAModule` | `algorithms/latent=aa` | `n_components` |
-    | Classifier | `ClassifierModule` | `algorithms/latent=classifier` | Supervised; uses labels |
-    | Noop | `DRNoop` | `algorithms/latent=noop` | Passthrough (identity) |
-    | MergingModule | `MergingModule` | `algorithms/latent=merging` | `strategy`, `target_dim` |
+    {{ algorithm_table("latent") }}
 
     ### FoundationEncoder Pattern
 
@@ -80,12 +68,7 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
 
     ### Available Algorithms
 
-    | Algorithm | Class | Config | Description |
-    |-----------|-------|--------|-------------|
-    | Reconstruction | `Reconstruction` | `algorithms/lightning=ae_reconstruction` | Autoencoder reconstruction |
-    | AANet Reconstruction | (uses Reconstruction) | `algorithms/lightning=aanet_reconstruction` | Archetypal network |
-    | LatentODE | `LatentODE` | `algorithms/lightning=latent_ode` | Neural ODE in latent space |
-    | HF Trainer | `HFTrainerModule` | `algorithms/lightning=hf_trainer` | HuggingFace model training |
+    {{ algorithm_table("lightning") }}
 
     ### Pattern
 

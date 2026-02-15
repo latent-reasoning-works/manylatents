@@ -16,6 +16,8 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
 
     Independent of the DR algorithm — computed once per dataset.
 
+    {{ metrics_table("dataset") }}
+
     ### 2. Embedding Metrics (`metrics/embedding/`)
 
     Evaluate the **quality of low-dimensional embeddings**. Run after each dimensionality reduction step.
@@ -27,6 +29,8 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
 
     Compare high-dimensional vs. low-dimensional representations. Need access to both original data and embeddings.
 
+    {{ metrics_table("embedding") }}
+
     ### 3. Module Metrics (`metrics/module/`)
 
     Evaluate **algorithm-specific internal components**. Run after model fitting.
@@ -36,6 +40,8 @@ The evaluation system for manyLatents: a three-level architecture for measuring 
     - Learned parameters (eigenvalues, loadings)
 
     Require access to internal model state (the `module` parameter). Not applicable to all DR methods.
+
+    {{ metrics_table("module") }}
 
     ## Metric Protocol
 
