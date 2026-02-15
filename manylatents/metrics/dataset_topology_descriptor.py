@@ -4,13 +4,13 @@ Aggregates spectral and topological properties of a dataset+module combination
 into a descriptive dictionary. Uses eigenvalue cache and dataset capabilities.
 """
 import logging
-import warnings
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.data.capabilities import get_capabilities
+from manylatents.utils.metrics import compute_eigenvalues
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def DatasetTopologyDescriptor(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
-    _eigenvalue_cache: Optional[Dict[Tuple, np.ndarray]] = None,
+    cache: Optional[dict] = None,
 ) -> dict:
     """Compute a descriptor of the dataset's topological properties.
 
@@ -27,7 +27,7 @@ def DatasetTopologyDescriptor(
         embeddings: Low-dimensional embeddings (used for dimensionality).
         dataset: Dataset object for capabilities inspection.
         module: Fitted LatentModule with affinity_matrix().
-        _eigenvalue_cache: Shared eigenvalue cache.
+        cache: Shared cache dict. Pass through to compute_eigenvalues().
 
     Returns:
         dict with keys: spectral_gap, effective_dim, gt_type, n_samples, n_features.
@@ -49,7 +49,7 @@ def DatasetTopologyDescriptor(
         result["has_gt_dists"] = False
 
     # Spectral properties from eigenvalue cache
-    eigenvalues = _get_eigenvalues(module, _eigenvalue_cache)
+    eigenvalues = compute_eigenvalues(module, cache=cache)
     if eigenvalues is not None and len(eigenvalues) >= 2:
         result["spectral_gap"] = float(eigenvalues[0] / eigenvalues[1]) if eigenvalues[1] != 0 else float("inf")
 
@@ -69,26 +69,3 @@ def DatasetTopologyDescriptor(
 
     logger.info(f"DatasetTopologyDescriptor: {result}")
     return result
-
-
-def _get_eigenvalues(
-    module: Optional[LatentModule],
-    cache: Optional[Dict[Tuple, np.ndarray]],
-) -> Optional[np.ndarray]:
-    """Get eigenvalues from cache or compute from module."""
-    if cache is not None:
-        for key in [(True, None), (True, 25)]:
-            if key in cache:
-                return cache[key]
-        if cache:
-            return next(iter(cache.values()))
-
-    if module is not None:
-        try:
-            A = module.affinity_matrix(use_symmetric=True)
-            eigs = np.linalg.eigvalsh(A)
-            return np.sort(eigs)[::-1]
-        except (NotImplementedError, AttributeError):
-            pass
-
-    return None

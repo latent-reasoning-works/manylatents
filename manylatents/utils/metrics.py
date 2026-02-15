@@ -224,11 +224,12 @@ def compute_eigenvalues(
     Returns:
         Eigenvalues sorted descending, or None if unavailable.
     """
-    if module is None:
-        return None
-
+    # Check cache first — pre-warmed cache works even without a module
     if cache is not None and "eigenvalues" in cache:
         return cache["eigenvalues"]
+
+    if module is None:
+        return None
 
     try:
         A = module.affinity_matrix(use_symmetric=True)
