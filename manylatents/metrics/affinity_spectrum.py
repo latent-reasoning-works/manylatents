@@ -32,7 +32,8 @@ def affinity_spectrum(affinity_matrix: np.ndarray, top_k: int = 25) -> np.ndarra
 # Single-Value Wrappers (conform to Metric(Protocol))
 ##############################################################################
 
-def AffinitySpectrum(dataset, embeddings: np.ndarray, module: LatentModule,
+def AffinitySpectrum(embeddings: np.ndarray, dataset=None,
+                     module: Optional[LatentModule] = None,
                      top_k: int = 25, cache: Optional[dict] = None) -> np.ndarray:
     """
     Compute affinity spectrum from the module's symmetric affinity matrix.
@@ -40,8 +41,8 @@ def AffinitySpectrum(dataset, embeddings: np.ndarray, module: LatentModule,
     Uses compute_eigenvalues with cache for shared eigendecomposition.
 
     Args:
-        dataset: Dataset object (unused).
         embeddings: Low-dimensional embeddings (unused).
+        dataset: Dataset object (unused).
         module: LatentModule instance with affinity_matrix method.
         top_k: Number of top eigenvalues to return.
         cache: Shared cache dict. Pass through to compute_eigenvalues().
@@ -49,6 +50,9 @@ def AffinitySpectrum(dataset, embeddings: np.ndarray, module: LatentModule,
     Returns:
         Array of top_k eigenvalues, or [nan] if affinity matrix not available.
     """
+    if module is None:
+        return np.array([np.nan])
+
     eigenvalues = compute_eigenvalues(module, cache=cache)
     if eigenvalues is not None:
         return eigenvalues[:top_k]
