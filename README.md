@@ -97,7 +97,7 @@ Both produce `EmbeddingOutputs` — a dict keyed by `"embeddings"`. All metrics 
 
 ---
 
-## algorithms
+## [algorithms](https://latent-reasoning-works.github.io/manylatents/algorithms/)
 
 > 12 algorithms -- 8 latent modules, 4 lightning modules
 
@@ -106,11 +106,9 @@ Autoencoder, AANet, LatentODE, HF Trainer.
 
 `neighborhood_size=k` sweeps kNN uniformly across algorithms.
 
-[Full reference](https://latent-reasoning-works.github.io/manylatents/algorithms/)
-
 ---
 
-## metrics
+## [metrics](https://latent-reasoning-works.github.io/manylatents/metrics/)
 
 > 20+ metrics across three evaluation contexts
 
@@ -124,18 +122,14 @@ one kNN computation covers the entire sweep.
 
 Config pattern: `metrics/embedding=<name>`, `metrics/module=<name>`, `metrics/dataset=<name>`
 
-[Full reference](https://latent-reasoning-works.github.io/manylatents/metrics/)
-
 ---
 
-## data
+## [data](https://latent-reasoning-works.github.io/manylatents/data/)
 
 > 6 synthetic manifolds + precomputed loader
 
 Swiss roll, torus, saddle surface, gaussian blobs, DLA tree, and custom `.npy`/`.npz` files.
 Domain-specific datasets (genomics, single-cell) available via extensions.
-
-[Full reference](https://latent-reasoning-works.github.io/manylatents/data/)
 
 ---
 
