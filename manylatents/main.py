@@ -37,6 +37,10 @@ try:
 except ImportError:
     pass  # shop not installed - SLURM launchers and dynamic search path won't be available
 
+# Auto-discover extension plugins (e.g. manylatents-omics)
+from manylatents.extensions import discover_extensions
+discover_extensions()
+
 
 @hydra.main(config_path=None, config_name="config", version_base=None)
 def main(cfg: DictConfig) -> Dict[str, Any]:

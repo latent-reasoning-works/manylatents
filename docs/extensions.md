@@ -28,12 +28,6 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     uv add git+https://github.com/latent-reasoning-works/manylatents-omics.git
     ```
 
-    ### Interactive Setup
-
-    ```bash
-    bash setup_extensions.sh
-    ```
-
     ### Using Git Submodules
 
     For contributors working on both core and extensions:
@@ -50,9 +44,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     ```bash
     cd manylatents-omics
     uv sync  # Pulls manylatents from git automatically
-
-    # IMPORTANT: Use omics entry point for omics configs
-    uv run python -m manylatents.omics.main experiment=single_algorithm
+    uv run python -m manylatents.main experiment=single_algorithm
     ```
 
     **Working FROM the manylatents repo (core development only):**
@@ -63,7 +55,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     uv run python -m manylatents.main experiment=single_algorithm
     ```
 
-    For omics experiments, always work from the omics repo and use `manylatents.omics.main`. The omics entry point registers configs before Hydra initializes.
+    Extensions are auto-discovered via entry-points. Use `manylatents.main` regardless of which repo you're working from.
 
     ## Using Extensions in Code
 
@@ -370,37 +362,19 @@ The genomics, population genetics, and single-cell extension for manyLatents.
 
     Use `prepend()` if your configs should override core configs with the same name, `append()` if core should take precedence.
 
-    ### Entry Point Registration
+    ### Entry Point Registration (Recommended)
 
-    In `pyproject.toml`:
+    Core auto-discovers extensions via the `manylatents.extensions` entry-point group.
+    Add this to your `pyproject.toml`:
 
     ```toml
-    [project.entry-points."hydra.searchpath"]
-    manylatents-yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
+    [project.entry-points."manylatents.extensions"]
+    yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
     ```
 
-    Hydra 1.3 doesn't reliably discover entry-point plugins. You should also auto-register in your package's `__init__.py` or provide an alternative entry point.
-
-    ### Alternative Entry Point (Recommended)
-
-    Create `manylatents/yourext/main.py`:
-
-    ```python
-    # Register SearchPathPlugin BEFORE importing manylatents.main
-    from hydra.core.plugins import Plugins
-    from hydra.plugins.search_path_plugin import SearchPathPlugin
-    from manylatents.yourext_plugin import YourExtSearchPathPlugin
-
-    plugins = Plugins.instance()
-    existing = list(plugins.discover(SearchPathPlugin))
-    if YourExtSearchPathPlugin not in existing:
-        plugins.register(YourExtSearchPathPlugin)
-
-    from manylatents.main import main
-
-    if __name__ == "__main__":
-        main()
-    ```
+    When your extension is installed (`uv pip install -e .`, `uv add`, or `pip install`),
+    core's `manylatents.main` will automatically discover and register your plugin at startup.
+    No custom entry point needed.
 
     ### pyproject.toml
 
@@ -414,8 +388,8 @@ The genomics, population genetics, and single-cell extension for manyLatents.
         "manylatents",
     ]
 
-    [project.entry-points."hydra.searchpath"]
-    manylatents-yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
+    [project.entry-points."manylatents.extensions"]
+    yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
 
     [build-system]
     requires = ["hatchling"]
@@ -616,7 +590,8 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     - [ ] Core manylatents still importable
 
     ### Hydra Config
-    - [ ] SearchPathPlugin registered (entry-point + manual)
+    - [ ] SearchPathPlugin registered via entry-point in `pyproject.toml`
+    - [ ] Verify auto-discovery: `python -c "from manylatents.extensions import discover_extensions; discover_extensions()"`
     - [ ] All configs have valid `_target_` paths
     - [ ] Metrics use `_partial_: true`
     - [ ] Experiment configs use `# @package _global_`
@@ -634,20 +609,32 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     ## Quick Reference
 
     ```bash
-    # Using extension entry point (recommended)
-    uv run python -m manylatents.yourext.main experiment=your_experiment
-
-    # Using environment variable (requires shop)
-    HYDRA_SEARCH_PACKAGES="manylatents.configs:manylatents.yourext.configs" \
-        uv run python -m manylatents.main experiment=your_experiment
+    # Core entry point with auto-discovery
+    uv run python -m manylatents.main experiment=your_experiment
     ```
 
-    ### Debugging Config Discovery
+    ### Troubleshooting Auto-Discovery
+
+    **Check installed entry-points:**
 
     ```python
+    from importlib.metadata import entry_points
+    eps = entry_points(group="manylatents.extensions")
+    print([(ep.name, ep.value) for ep in eps])
+    ```
+
+    **Verify plugin registration:**
+
+    ```python
+    from manylatents.extensions import discover_extensions
+    discover_extensions()
     from hydra.core.plugins import Plugins
     from hydra.plugins.search_path_plugin import SearchPathPlugin
-
-    plugins = list(Plugins.instance().discover(SearchPathPlugin))
-    print([p.__name__ for p in plugins])
+    print([p.__name__ for p in Plugins.instance().discover(SearchPathPlugin)])
     ```
+
+    **Extension not showing up?**
+
+    - Ensure the package is installed (not just cloned): `uv pip install -e .`
+    - Check `pyproject.toml` has `[project.entry-points."manylatents.extensions"]`
+    - Reinstall after editing `pyproject.toml` — entry-points come from package metadata

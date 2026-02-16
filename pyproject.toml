@@ -92,9 +92,6 @@ Documentation = "https://latent-reasoning-works.github.io/manylatents/"
 Repository = "https://github.com/latent-reasoning-works/manylatents"
 Issues = "https://github.com/latent-reasoning-works/manylatents/issues"
 
-[project.entry-points."hydra.searchpath"]
-manylatents = "manylatents.configs:ManylatentsSearchPathPlugin"
-
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
