@@ -111,8 +111,7 @@ managed = true
 [tool.uv.sources]
 manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
 
-# shop is optional - install with: uv sync --extra slurm
-# shop = { git = "https://github.com/latent-reasoning-works/shop.git" }  # private repo
+shop = { path = "../shop", editable = true }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
