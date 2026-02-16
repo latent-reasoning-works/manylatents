@@ -28,9 +28,11 @@ from manylatents.experiment import run_algorithm, run_pipeline
 # Import shop utilities (optional - for SLURM job submission and dynamic config discovery)
 try:
     import shop  # noqa: F401
+    # Register shop's cluster/resource configs (tamia, narval, etc.)
+    from shop.hydra import register_shop_configs, register_dynamic_search_path
+    register_shop_configs()
     # Register DynamicSearchPathPlugin to discover pkg:// configs via HYDRA_SEARCH_PACKAGES env var
     # This enables experimentStash to specify search packages without hardcoding them here
-    from shop.hydra import register_dynamic_search_path
     register_dynamic_search_path()
 except ImportError:
     pass  # shop not installed - SLURM launchers and dynamic search path won't be available
