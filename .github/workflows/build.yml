@@ -58,6 +58,7 @@ jobs:
             data=swissroll \
             metrics=noop \
             callbacks/embedding=minimal \
+            trainer=default \
             trainer.max_epochs=2 \
             trainer.fast_dev_run=true \
             logger=none

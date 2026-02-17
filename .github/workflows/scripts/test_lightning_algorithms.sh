@@ -27,6 +27,7 @@ for algo in "${ALGORITHMS[@]}"; do
         data.rotate_to_dim=50 \
         metrics=noop \
         callbacks/embedding=minimal \
+        trainer=default \
         trainer.max_epochs=1 \
         trainer.fast_dev_run=true \
         logger=none"
