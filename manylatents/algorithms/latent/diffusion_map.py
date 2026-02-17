@@ -104,19 +104,19 @@ def compute_dm(K, alpha=0., verbose=0):
     if verbose > 0:
         neg_evals = evals < 0
         if neg_evals.sum() > 0:
-            print("{} eigenvalues are negative: min={}".format(len(evals[neg_evals]),
-                                                               evals[neg_evals].min()))
+            logger.warning("%d eigenvalues are negative: min=%s", len(evals[neg_evals]),
+                           evals[neg_evals].min())
         one_evals = np.isclose(evals, 1).sum()
         if one_evals > 1:
-            print("{} eigenvalues are 1".format(one_evals))
+            logger.warning("%d eigenvalues are 1", one_evals)
         if not np.allclose(evecs_left[:,0]/evecs_left.sum(), d_alpha/d_alpha.sum()):
-            print("left evec not exactly stationary dist. Proceed with caution!")
+            logger.warning("left evec not exactly stationary dist. Proceed with caution!")
         # First right eigenvector is all 1s
         if not  np.allclose(evecs_right[:,0], 1):
-            print("right evec not trivial (1s)! Proceed with caution!")
+            logger.warning("right evec not trivial (1s)! Proceed with caution!")
         # Decomposition is correct
         if not np.allclose(L, evecs_right@np.diag(evals)@evecs_left.T):
-            print("evals/evecs dont exactly match with diffusion operator. Proceed with caution!")
+            logger.warning("evals/evecs dont exactly match with diffusion operator. Proceed with caution!")
 
     #diffusion_coords = evecs_right@np.diag(evals)
 

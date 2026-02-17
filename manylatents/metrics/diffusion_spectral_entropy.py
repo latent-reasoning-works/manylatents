@@ -1,10 +1,14 @@
-import numpy as np
-from sklearn.metrics import pairwise_distances
+import logging
 import os
 import random
 from typing import Optional
 
+import numpy as np
+from sklearn.metrics import pairwise_distances
+
 from manylatents.metrics.registry import register_metric
+
+logger = logging.getLogger(__name__)
 
 
 def exact_eigvals(K: np.ndarray) -> np.ndarray:
@@ -182,27 +186,27 @@ def diffusion_spectral_entropy(embedding_vectors: np.array,
             if eigval_save_path is not None and os.path.exists(
                     eigval_save_path):
                 if verbose:
-                    print('Loading pre-computed eigenvalues from %s' %
-                          eigval_save_path)
+                    logger.info('Loading pre-computed eigenvalues from %s',
+                                eigval_save_path)
                 eigvals = np.load(eigval_save_path)['eigvals']
                 eigvals = eigvals.astype(
                     np.float64)  # mitigate rounding error.
-                if verbose: print('Pre-computed eigenvalues loaded.')
+                if verbose: logger.info('Pre-computed eigenvalues loaded.')
 
             else:
-                if verbose: print('Computing diffusion matrix.')
+                if verbose: logger.info('Computing diffusion matrix.')
                 # Note that `K` is a symmetric matrix with the same eigenvalues as the diffusion matrix `P`.
                 K = compute_diffusion_matrix(embedding_vectors,
                                              sigma=gaussian_kernel_sigma)
-                if verbose: print('Diffusion matrix computed.')
+                if verbose: logger.info('Diffusion matrix computed.')
 
-                if verbose: print('Computing eigenvalues.')
+                if verbose: logger.info('Computing eigenvalues.')
                 if chebyshev_approx:
-                    if verbose: print('Using Chebyshev approximation.')
+                    if verbose: logger.info('Using Chebyshev approximation.')
                     eigvals = approx_eigvals(K)
                 else:
                     eigvals = exact_eigvals(K)
-                if verbose: print('Eigenvalues computed.')
+                if verbose: logger.info('Eigenvalues computed.')
 
                 if eigval_save_path is not None:
                     os.makedirs(os.path.dirname(eigval_save_path),
@@ -213,7 +217,7 @@ def diffusion_spectral_entropy(embedding_vectors: np.array,
                     with open(eigval_save_path, 'wb+') as f:
                         np.savez(f, eigvals=eigvals)
                     if verbose:
-                        print('Eigenvalues saved to %s' % eigval_save_path)
+                        logger.info('Eigenvalues saved to %s', eigval_save_path)
 
             # Eigenvalues may be negative. Only care about the magnitude, not the sign.
             eigvals = np.abs(eigvals)

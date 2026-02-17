@@ -8,7 +8,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import wandb
+try:
+    import wandb
+    wandb.init  # verify real package, not wandb/ output dir
+except (ImportError, AttributeError):
+    wandb = None
 from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_embedding_outputs
 from manylatents.utils.utils import save_embeddings
 
@@ -300,7 +304,7 @@ class SaveEmbeddings(EmbeddingCallback):
             else:
                 logger.warning("No scores found in embeddings. Skipping metric table save.")
 
-        run = wandb.run
+        run = wandb.run if wandb is not None else None
         if run is not None:
             rel_path = os.path.relpath(self.save_path, start=os.getcwd())
             wandb.save(rel_path, base_path=os.getcwd())

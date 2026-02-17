@@ -4,7 +4,11 @@ import re
 import numpy as np
 import pandas as pd
 
-import wandb
+try:
+    import wandb
+    wandb.init  # verify real package, not wandb/ output dir
+except (ImportError, AttributeError):
+    wandb = None
 from manylatents.callbacks.embedding.base import EmbeddingCallback
 
 logger = logging.getLogger(__name__)

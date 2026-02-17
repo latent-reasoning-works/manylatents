@@ -8,6 +8,16 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 import pytest
 
+try:
+    import wandb as _wandb
+    _wandb.init  # verify real package
+    _has_wandb = True
+except (ImportError, AttributeError):
+    _has_wandb = False
+
+# No-op decorator when wandb is not installed (patch target doesn't exist)
+_disable_wandb = patch("wandb.run", None) if _has_wandb else lambda f: f
+
 from manylatents.callbacks.embedding.base import ColormapInfo, ColormapProvider
 from manylatents.callbacks.embedding.plot_embeddings import PlotEmbeddings
 from matplotlib.colors import ListedColormap
@@ -301,7 +311,7 @@ class TestApplyDictColormap:
 class TestOnLatentEnd:
     """Integration tests for full callback execution."""
 
-    @patch("wandb.run", None)  # Disable wandb
+    @_disable_wandb
     def test_full_pipeline(self):
         """Test complete callback execution."""
         dataset = MockDataset(np.array([0, 1, 0, 1]))
@@ -320,7 +330,7 @@ class TestOnLatentEnd:
             assert os.path.exists(result["embedding_plot_path"])
             assert result["embedding_plot_path"].endswith(".png")
 
-    @patch("wandb.run", None)
+    @_disable_wandb
     def test_full_pipeline_with_legend(self):
         """Test callback with legend enabled."""
         dataset = MockDataset(np.array([0, 1, 2]))
@@ -337,7 +347,7 @@ class TestOnLatentEnd:
             assert "embedding_plot_path" in result
             assert os.path.exists(result["embedding_plot_path"])
 
-    @patch("wandb.run", None)
+    @_disable_wandb
     def test_full_pipeline_with_colormap_provider(self):
         """Test callback with dataset implementing ColormapProvider."""
         custom_cmap = ColormapInfo(
@@ -374,7 +384,10 @@ class TestBackwardCompatibility:
         with tempfile.TemporaryDirectory() as tmpdir:
             callback = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
 
-            with patch("wandb.run", None):
+            if _has_wandb:
+                with patch("wandb.run", None):
+                    result = callback.on_latent_end(dataset, embeddings)
+            else:
                 result = callback.on_latent_end(dataset, embeddings)
 
             assert isinstance(result, dict)

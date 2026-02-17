@@ -23,7 +23,7 @@ BASE_CMD="python -m manylatents.main \
     data.n_distributions=10 \
     data.n_points_per_distribution=20 \
     data.rotate_to_dim=50 \
-    metrics=test_metric \
+    metrics=noop \
     callbacks/embedding=minimal \
     logger=none"
 

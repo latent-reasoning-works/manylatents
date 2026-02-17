@@ -20,26 +20,46 @@
 
 ---
 
+## install
+
+```bash
+pip install manylatents
+```
+
+Optional extras:
+
+```bash
+pip install manylatents[tracking]   # wandb experiment tracking
+pip install manylatents[topology]   # persistent homology metrics
+pip install manylatents[hf]         # HuggingFace trainer
+pip install manylatents[all]        # everything
+```
+
 ## quickstart
+
+```bash
+# embed a swiss roll with UMAP
+manylatents algorithms/latent=umap data=swissroll
+
+# add metrics
+manylatents algorithms/latent=umap data=swissroll \
+  metrics/embedding=trustworthiness
+
+# sweep algorithms
+manylatents --multirun \
+  algorithms/latent=umap,phate,tsne \
+  data=swissroll metrics/embedding=trustworthiness
+```
+
+<details>
+<summary>development install</summary>
 
 ```bash
 git clone https://github.com/latent-reasoning-works/manylatents.git
 cd manylatents && uv sync
-
-# embed a swiss roll with UMAP
-uv run python -m manylatents.main algorithms/latent=umap data=swissroll
-
-# add metrics, log to wandb
-uv run python -m manylatents.main \
-  algorithms/latent=umap data=swissroll \
-  metrics/embedding=trustworthiness logger=wandb
-
-# sweep algorithms and neighborhood sizes
-uv run python -m manylatents.main --multirun \
-  algorithms/latent=umap,phate,tsne \
-  neighborhood_size=5,10,15,30 \
-  data=swissroll metrics/embedding=trustworthiness
 ```
+
+</details>
 
 ```python
 from manylatents.api import run

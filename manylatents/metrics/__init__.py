@@ -37,8 +37,11 @@ from manylatents.metrics.registry import (
 from manylatents.metrics.metric import Metric
 
 # Import all metric modules to trigger registration
-# Core G-vector metrics
-from manylatents.metrics.persistent_homology import PersistentHomology
+# Core G-vector metrics (ripser is optional)
+try:
+    from manylatents.metrics.persistent_homology import PersistentHomology
+except ImportError:
+    pass
 from manylatents.metrics.participation_ratio import ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
 from manylatents.metrics.trustworthiness import Trustworthiness

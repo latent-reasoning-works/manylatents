@@ -17,8 +17,19 @@ Usage:
     trainer.fit(model, datamodule)
 """
 
-from typing import Any, Dict, Mapping, Optional, Union
-import wandb
+from __future__ import annotations
+
+from typing import Any, Dict, Mapping, Optional, TYPE_CHECKING, Union
+
+try:
+    import wandb
+    wandb.init  # verify real package, not wandb/ output dir
+except (ImportError, AttributeError):
+    wandb = None
+
+if TYPE_CHECKING:
+    import wandb as wandb_types
+
 from lightning.pytorch.loggers.logger import Logger, rank_zero_experiment
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 

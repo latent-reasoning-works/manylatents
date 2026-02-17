@@ -30,7 +30,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
-import torch
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig, OmegaConf
 

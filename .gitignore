@@ -92,6 +92,7 @@ venv.bak/
 ## handle for local folders
 _*
 !__init__.py
+!__main__.py
 
 ## AI Agents
 MEMORY.md

@@ -1,9 +1,15 @@
 # tests/metrics/test_registry.py
 """Tests for the metric registry."""
+import importlib
+
 import numpy as np
 import pytest
 
+_has_ripser = importlib.util.find_spec("ripser") is not None
+needs_ripser = pytest.mark.skipif(not _has_ripser, reason="ripser not installed")
 
+
+@needs_ripser
 def test_registry_has_beta_aliases():
     """Registry contains beta_0 and beta_1 aliases."""
     from manylatents.metrics import get_metric_registry
@@ -39,6 +45,7 @@ def test_registry_has_lid():
     assert registry["lid"].func.__name__ == "LocalIntrinsicDimensionality"
 
 
+@needs_ripser
 def test_resolve_metric():
     """resolve_metric returns function and params."""
     from manylatents.metrics import resolve_metric
@@ -51,6 +58,7 @@ def test_resolve_metric():
     assert params == {"homology_dim": 1}
 
 
+@needs_ripser
 def test_list_metrics():
     """list_metrics returns sorted list of all metric names."""
     from manylatents.metrics import list_metrics
@@ -65,6 +73,7 @@ def test_list_metrics():
     assert metrics == sorted(metrics)  # Sorted
 
 
+@needs_ripser
 def test_get_metric():
     """get_metric returns callable MetricSpec."""
     from manylatents.metrics import get_metric
@@ -82,6 +91,7 @@ def test_get_metric_raises_on_unknown():
         get_metric("nonexistent_metric")
 
 
+@needs_ripser
 def test_compute_metric_beta_0():
     """compute_metric works for beta_0."""
     from manylatents.metrics import compute_metric

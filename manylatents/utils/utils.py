@@ -1,17 +1,14 @@
-import csv
 import logging
 import os
 import pickle
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
-import h5py
 import numpy as np
 import pandas as pd
 import rich
 import rich.logging
 import torch
-from lightning.pytorch import Trainer
 from omegaconf import DictConfig, OmegaConf
 
 logger = logging.getLogger(__name__)
@@ -80,51 +77,6 @@ def create_results_dataframe(results):
     # Convert to DataFrame
     return pd.DataFrame(normalized_results)
 
-def detect_separator(file_path: str, sample_size: int = 1024) -> Optional[str]:
-    """
-    Detects the delimiter of a file using csv.Sniffer.
-
-    Args:
-        file_path (str): Path to the file.
-        sample_size (int): Number of bytes to read for detection.
-
-    Returns:
-        Optional[str]: Detected delimiter or None if detection fails.
-    """
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            sample = f.read(sample_size)
-            sniffer = csv.Sniffer()
-            dialect = sniffer.sniff(sample)
-            delimiter = dialect.delimiter
-            logging.info(f"Detected delimiter '{delimiter}' for file '{file_path}'.")
-            return delimiter
-    except Exception as e:
-        logging.warning(f"Could not detect delimiter for file '{file_path}': {e}")
-        return None
-
-def instantiate_trainer(
-    cfg: DictConfig,
-    lightning_callbacks: Optional[List] = None,
-    loggers:            Optional[List] = None,
-) -> Trainer:
-    """
-    Dynamically instantiate the PL Trainer from cfg.trainer,
-    injecting `callbacks` and `logger` lists as overrides.
-    """
-    # Turn the trainer sub‐config into a plain dict:
-    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
-    # Remove the entries we want to override:
-    trainer_kwargs.pop("callbacks", None)
-    trainer_kwargs.pop("logger",    None)
-
-    if lightning_callbacks:
-        trainer_kwargs["callbacks"] = lightning_callbacks
-    if loggers:
-        trainer_kwargs["logger"] = loggers
-
-    return Trainer(**trainer_kwargs)
-
 def save_embeddings(embeddings, path, format='npy', metadata=None):
     """
     Saves embeddings in the specified format.
@@ -150,6 +102,7 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
     elif format == 'pt':
         torch.save(embeddings, path)
     elif format == 'h5':
+        import h5py
         with h5py.File(path, 'w') as f:
             f.create_dataset('embeddings', data=embeddings)
     else:

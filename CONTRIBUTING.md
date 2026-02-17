@@ -6,9 +6,22 @@ Guidelines for adding new components and ensuring they integrate correctly with 
 
 All contributions must pass automated tests on every pull request. CI validates:
 
-1. **CLI functionality** — your component works via `uv run python -m manylatents.main`
-2. **Integration** — works with existing data/algorithm/metric combinations
-3. **Docs build** — `mkdocs build --strict` passes, docs coverage checker finds no stale targets
+1. **Unit tests** — `pytest tests/` runs the full test suite
+2. **CLI smoke tests** — default LatentModule and LightningModule paths work
+3. **Component discovery** — if your PR touches algorithms, metrics, or data configs, CI auto-discovers all configs in that group and runs each one end-to-end
+4. **Docs build** — `mkdocs build --strict` passes
+
+### How CI detects what to test
+
+CI uses **path-based filtering**. If your PR modifies files under a component directory, the corresponding discovery test runs automatically:
+
+| Files changed | CI runs |
+|---|---|
+| `manylatents/algorithms/latent/**` or `configs/algorithms/latent/**` | Discovers and smoke-tests **every** LatentModule config |
+| `manylatents/algorithms/lightning/**` or `configs/algorithms/lightning/**` | Discovers and smoke-tests **every** LightningModule config |
+| `manylatents/metrics/**` or `configs/metrics/**` | Discovers and smoke-tests **every** metric config |
+
+This means: if you add a new config YAML and its `_target_` doesn't resolve, or the algorithm crashes on synthetic data, CI will catch it.
 
 ---
 
@@ -77,17 +90,11 @@ Configs are **nested under the metric name** with `_partial_: True` so Hydra bin
 
 ```bash
 # Verify your metric runs end-to-end
-uv run python -m manylatents.main \
-  algorithms/latent=pca data=test_data \
+manylatents algorithms/latent=pca data=swissroll \
   metrics/embedding=your_metric logger=none
-
-# Full CI smoke test
-uv run python -m manylatents.main \
-  experiment=single_algorithm metrics=test_metric \
-  callbacks/embedding=minimal logger=none
 ```
 
-CI will validate on every PR that all configs instantiate and all `_target_` paths resolve.
+CI will auto-discover your new config and test it if `manylatents/metrics/` or `configs/metrics/` files are changed.
 
 ---
 
@@ -155,15 +162,15 @@ n_components: 2
 
 ```bash
 # LatentModule
-uv run python -m manylatents.main \
-  algorithms/latent=your_algorithm data=test_data \
-  metrics=test_metric logger=none
+manylatents algorithms/latent=your_algorithm data=swissroll \
+  metrics=noop logger=none
 
 # LightningModule
-uv run python -m manylatents.main \
-  algorithms/lightning=your_network data=swissroll \
-  trainer.fast_dev_run=true logger=none
+manylatents algorithms/lightning=your_network data=swissroll \
+  trainer.fast_dev_run=true metrics=noop logger=none
 ```
+
+CI will auto-discover your new config and test it when you open a PR.
 
 ---
 
@@ -196,32 +203,55 @@ batch_size: 32
 ```
 
 ```bash
-uv run python -m manylatents.main \
-  data=your_dataset algorithms/latent=pca \
-  metrics=test_metric logger=none
+manylatents data=your_dataset algorithms/latent=pca \
+  metrics=noop logger=none
 ```
 
 ---
 
 ## CI Pipeline
 
-Two jobs run on every PR:
+Three jobs run on every PR:
 
-**build-and-test:**
-- Installs dependencies with uv
+**test** (Python 3.11 + 3.12 matrix):
+- `pytest tests/` — full unit test suite
 - CLI smoke test: LatentModule path (`experiment=single_algorithm`)
 - CLI smoke test: LightningModule path (`algorithms/lightning=ae_reconstruction`, `trainer.fast_dev_run=true`)
-- Smoke tests all LatentModule algorithms (if `algorithms/latent/` files changed)
+- If `algorithms/latent/` changed → discovers and tests **all** LatentModule configs
+- If `algorithms/lightning/` changed → discovers and tests **all** LightningModule configs
+- If `metrics/` changed → discovers and tests **all** metric configs
 
 **docs:**
-- Runs `scripts/check_docs_coverage.py` — verifies all `_target_` paths in configs are importable
-- Runs `mkdocs build --strict` — verifies docs site builds cleanly
+- `scripts/check_docs_coverage.py` — verifies all `_target_` paths in configs are importable
+- `mkdocs build --strict` — verifies docs site builds cleanly
+
+**publish** (tags only):
+- Builds sdist + wheel, publishes to PyPI via trusted publishing
 
 ### Local Pre-submission Checklist
 
-- [ ] Your component works end-to-end via CLI
-- [ ] `uv run pytest tests/ -v`
-- [ ] `uv run mkdocs build --strict`
+```bash
+# Run unit tests
+pytest tests/ -x -q
+
+# Smoke test your component
+manylatents algorithms/latent=your_algo data=swissroll metrics=noop logger=none
+
+# Docs build (optional)
+mkdocs build --strict
+```
+
+---
+
+## Optional Dependencies
+
+Some features require optional extras. If your contribution uses an optional dependency:
+
+1. Add it to the appropriate `[project.optional-dependencies]` group in `pyproject.toml`
+2. Use lazy imports (`try/except ImportError`) so the core package doesn't break without it
+3. Add `pytest.importorskip()` or `@pytest.mark.skipif` to tests that need the dep
+
+Current extras: `tracking` (wandb), `hf` (transformers), `dynamics` (torchdiffeq/torchsde), `transport` (POT), `topology` (ripser), `cluster` (submitit), `torchdr`, `docs`.
 
 ---
 

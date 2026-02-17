@@ -32,57 +32,54 @@ dependencies = [
     "torch>=2.3,<3.0",
     "lightning>=2.5",
     "torchmetrics>=1.6",
-    "transformers>=4.40",
-    "torchdiffeq>=0.2",
-    # Optimal transport (for DiffusionMerging)
-    "POT>=0.9",
     # Hydra configuration
     "hydra-core>=1.3",
     "hydra-zen>=0.13",
-    "hydra-submitit-launcher>=1.2",
     # Dimensionality reduction algorithms
     "phate>=2.0",
     "umap-learn>=0.5",
     "opentsne>=1.0",
     "multiscale-phate",
     "archetypes>=0.6",
-    # Graph/topology tools
+    # Graph tools (used by phate/graphtools)
     "graphtools>=2.0",
-    "ripser>=0.6",
-    "PyGSP>=0.5",
-    # Single-cell / genomics
-    "scanpy>=1.10",
-    "pyplink>=1.3",
-    "pyproj>=3.6",
     # Utilities
-    "heatgeo",
-    "requests>=2.25",
-    "rootutils>=1.0",
     "tqdm>=4.67",
     "rich>=13.9",
-    "pydantic>=2.9",
     "Deprecated>=1.2",
-    # Experiment tracking & docs
-    "wandb>=0.19",
-    "gsutil>=5.33",
-    "mkdocs>=1.6",
-    "mkdocs-material>=9.6",
-    "mkdocs-macros-plugin>=1.0",
-    # Testing
-    "pytest>=8.3",
-    "datasets>=4.5.0",
 ]
 
 [project.optional-dependencies]
-# Neural SDE support (future)
-dynamics = ["torchsde>=0.2"]
+# Experiment tracking (wandb)
+tracking = ["wandb>=0.19"]
+# HuggingFace trainer support
+hf = ["transformers>=4.40"]
+# Neural ODE / SDE dynamics
+dynamics = ["torchdiffeq>=0.2", "torchsde>=0.2"]
+# Optimal transport (DiffusionMerging)
+transport = ["POT>=0.9"]
+# Persistent homology / topological metrics
+topology = ["ripser>=0.6"]
+# SLURM cluster submission
+cluster = ["hydra-submitit-launcher>=1.2"]
 # GPU-accelerated DR via TorchDR
 torchdr = [
     "torchdr>=0.3,<0.4",
     "faiss-cpu",
 ]
-# Central dogma foundation model encoders (ESM3, Orthrus, Evo2)
-# dogma = ["manylatents-omics[dogma]"]  # TODO: re-enable after fixing circular dependency
+# Documentation building
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.6",
+    "mkdocs-macros-plugin>=1.0",
+]
+# All optional extras (excluding docs/dev)
+all = [
+    "manylatents[tracking,hf,dynamics,transport,topology,cluster,torchdr]",
+]
+
+[project.scripts]
+manylatents = "manylatents.main:main"
 
 [project.urls]
 Homepage = "https://github.com/latent-reasoning-works/manylatents"
@@ -91,11 +88,8 @@ Repository = "https://github.com/latent-reasoning-works/manylatents"
 Issues = "https://github.com/latent-reasoning-works/manylatents/issues"
 
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["manylatents"]
@@ -104,7 +98,10 @@ packages = ["manylatents"]
 managed = true
 
 [dependency-groups]
-dev = ["shop"]
+dev = [
+    "pytest>=8.3",
+    "shop",
+]
 
 [tool.uv.sources]
 manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
@@ -112,22 +109,12 @@ shop = { path = "../shop", editable = true }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["manylatents"]
+testpaths = ["tests", "manylatents"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 
 [[tool.uv.dependency-metadata]]
-name = "heatgeo"
-version = "0.0.1"
-requires-dist = ["numpy>=1.25"]
-
-[[tool.uv.dependency-metadata]]
 name = "archetypes"
 version = "0.11.1"
 requires-dist = ["scipy>=1.8,<1.15"]
-
-[[tool.uv.dependency-metadata]]
-name = "magnipy"
-version = "0.1.0"
-requires-dist = ["torch>=2.4.1,<3.0.0", "scipy>=1.13.0,<1.15"]

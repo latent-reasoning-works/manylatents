@@ -9,7 +9,11 @@ import numpy as np
 from matplotlib.colors import ListedColormap, Normalize
 from matplotlib.patches import Patch
 
-import wandb
+try:
+    import wandb
+    wandb.init  # verify real package, not wandb/ output dir
+except (ImportError, AttributeError):
+    wandb = None
 from manylatents.callbacks.embedding.base import (
     EmbeddingCallback,
     ColormapInfo,

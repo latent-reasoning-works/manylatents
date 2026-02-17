@@ -5,6 +5,8 @@ import functools
 import pytest
 import torch
 
+torchdiffeq = pytest.importorskip("torchdiffeq")
+
 
 class TestLatentODENetwork:
     """Tests for the LatentODENetwork nn.Module."""

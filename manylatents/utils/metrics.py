@@ -342,7 +342,7 @@ def compute_geodesic_distances(embedding, k=10, metric='euclidean', verbose=0):
     n_components, labels = connected_components(knn_graph, directed=False)
     if n_components > 1:
         if verbose:
-            print(f"Disconnected KNN graph (n_components={n_components}). Returning None.")
+            logger.warning("Disconnected KNN graph (n_components=%d). Returning None.", n_components)
         return None
 
     dist_matrix = shortest_path(knn_graph, directed=False, method='D')

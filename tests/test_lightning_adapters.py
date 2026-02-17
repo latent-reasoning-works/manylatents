@@ -4,6 +4,8 @@ Tests for PyTorch Lightning logger adapters.
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
+
+wandb = pytest.importorskip("wandb")
 from manylatents.utils.lightning_adapters import WandbRunAdapter
 
 

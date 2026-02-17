@@ -6,7 +6,11 @@ import hydra
 import lightning
 import numpy as np
 import torch
-import wandb
+try:
+    import wandb
+    wandb.init  # verify real package, not wandb/ output dir
+except (ImportError, AttributeError):
+    wandb = None
 from lightning import (
     Callback,
     LightningDataModule,
@@ -18,7 +22,7 @@ from torch.utils.data import DataLoader
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
-from manylatents.utils.data import subsample_data_and_dataset, determine_data_source
+from manylatents.utils.data import determine_data_source
 from manylatents.utils.metrics import compute_knn, compute_eigenvalues, flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
 
@@ -458,7 +462,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
 
     # Initialize wandb if logger config is provided and not disabled
     wandb_run = None
-    wandb_disabled = should_disable_wandb(cfg)
+    wandb_disabled = should_disable_wandb(cfg) or wandb is None
 
     if not wandb_disabled and cfg.logger is not None:
         logger.info(f"Initializing wandb logger: {OmegaConf.to_yaml(cfg.logger)}")
@@ -647,27 +651,29 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         raise ValueError("No pipeline configuration found. Use run_algorithm() for single runs.")
 
     # Determine if WandB should be disabled using centralized check
-    wandb_disabled = should_disable_wandb(cfg)
+    wandb_disabled = should_disable_wandb(cfg) or wandb is None
 
     # Initialize WandB based on configuration (respects logger=None, debug=True, and WANDB_MODE)
-    if wandb_disabled:
-        # Use disabled mode - wandb.init() will return a no-op run
-        logger.info("Initializing WandB in disabled mode")
-        wandb_context = wandb.init(
-            project=cfg.project,
-            name=cfg.name,
-            config=OmegaConf.to_container(cfg, resolve=True),
-            mode="disabled",
-        )
+    if wandb is not None:
+        if wandb_disabled:
+            logger.info("Initializing WandB in disabled mode")
+            wandb_context = wandb.init(
+                project=cfg.project,
+                name=cfg.name,
+                config=OmegaConf.to_container(cfg, resolve=True),
+                mode="disabled",
+            )
+        else:
+            logger.info("Initializing WandB in online mode")
+            wandb_context = wandb.init(
+                project=cfg.project,
+                name=cfg.name,
+                config=OmegaConf.to_container(cfg, resolve=True),
+                mode="online",
+            )
     else:
-        # Normal WandB initialization
-        logger.info("Initializing WandB in online mode")
-        wandb_context = wandb.init(
-            project=cfg.project,
-            name=cfg.name,
-            config=OmegaConf.to_container(cfg, resolve=True),
-            mode="online",
-        )
+        from contextlib import nullcontext
+        wandb_context = nullcontext()
 
     with wandb_context as run:
         lightning.seed_everything(cfg.seed, workers=True)
@@ -846,7 +852,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         logger.info("Pipeline workflow complete.")
 
         # Auto-log scores to wandb if active (works online and offline)
-        if wandb.run and embeddings.get("scores"):
+        if wandb is not None and wandb.run and embeddings.get("scores"):
             scores = embeddings["scores"]
             scalar_metrics = {}
             for name, val in scores.items():
@@ -858,7 +864,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
                 wandb.log(scalar_metrics)
                 logger.info(f"Auto-logged {len(scalar_metrics)} metrics to wandb: {list(scalar_metrics.keys())}")
 
-        if wandb.run:
+        if wandb is not None and wandb.run:
             wandb.finish()
 
         return embeddings

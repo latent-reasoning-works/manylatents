@@ -1,57 +1,69 @@
-name: Build and Integration Tests
+name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  # Core build and unit tests
-  build-and-test:
-    name: Build & Unit Tests
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install UV package manager
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           version: 'latest'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          uv sync
+        run: uv sync --no-dev
 
-      - name: Test CLI - Single Algorithm
+      - name: Install test dependencies
+        run: uv pip install pytest
+
+      - name: Run unit tests
         run: |
           source .venv/bin/activate
-          # Validate CLI works with minimal config (PCA)
-          # Use logger=none to skip wandb initialization entirely
+          pytest tests/ -x -q --tb=short
+
+      - name: Smoke test — LatentModule CLI
+        run: |
+          source .venv/bin/activate
           python -m manylatents.main \
             experiment=single_algorithm \
-            metrics=test_metric \
+            metrics=noop \
             callbacks/embedding=minimal \
             logger=none
 
-      - name: Check for LatentModule changes
+      - name: Smoke test — LightningModule CLI
+        run: |
+          source .venv/bin/activate
+          python -m manylatents.main \
+            algorithms/lightning=ae_reconstruction \
+            data=swissroll \
+            metrics=noop \
+            callbacks/embedding=minimal \
+            trainer.max_epochs=2 \
+            trainer.fast_dev_run=true \
+            logger=none
+
+      - name: Detect changed components
         uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -59,60 +71,53 @@ jobs:
             latent:
               - 'manylatents/algorithms/latent/**'
               - 'manylatents/configs/algorithms/latent/**'
+            lightning:
+              - 'manylatents/algorithms/lightning/**'
+              - 'manylatents/configs/algorithms/lightning/**'
+            metrics:
+              - 'manylatents/metrics/**'
+              - 'manylatents/configs/metrics/**'
 
-      - name: Smoke Test All LatentModule Algorithms
+      - name: Smoke test — all LatentModule algorithms
         if: steps.filter.outputs.latent == 'true'
         run: |
           source .venv/bin/activate
-          # Dynamically discover and test all LatentModule configs
-          # Ensures new algorithms added in PRs are automatically validated
           chmod +x .github/workflows/scripts/test_latent_algorithms.sh
           .github/workflows/scripts/test_latent_algorithms.sh
 
-      - name: Test CLI - Lightning Module
+      - name: Smoke test — all LightningModule algorithms
+        if: steps.filter.outputs.lightning == 'true'
         run: |
           source .venv/bin/activate
-          python -m manylatents.main \
-            algorithms/lightning=ae_reconstruction \
-            data=swissroll \
-            metrics=test_metric \
-            callbacks/embedding=minimal \
-            trainer.max_epochs=2 \
-            trainer.fast_dev_run=true \
-            logger=none
+          chmod +x .github/workflows/scripts/test_lightning_algorithms.sh
+          .github/workflows/scripts/test_lightning_algorithms.sh
 
-  # Note on namespace package integration testing:
-  # CI cannot test with the private manylatents-omics repo due to free org plan limitations.
-  # Instead, namespace integration is tested locally using a mock package.
-  # See: python tests/test_namespace_integration.py
-  # This validates that the namespace package architecture works correctly.
+      - name: Smoke test — all metric configs
+        if: steps.filter.outputs.metrics == 'true'
+        run: |
+          source .venv/bin/activate
+          chmod +x .github/workflows/scripts/test_metrics.sh
+          .github/workflows/scripts/test_metrics.sh
 
-  # Docs build verification and coverage check
   docs:
-    name: Docs Build & Coverage
+    name: Docs Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install UV package manager
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           version: 'latest'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          uv sync
+        run: uv sync --no-dev --extra docs
 
       - name: Check docs coverage
         run: |
@@ -124,11 +129,9 @@ jobs:
           source .venv/bin/activate
           mkdocs build --strict
 
-  # Deploy docs to GitHub Pages (main branch only)
-  # Will auto-activate once repo is public and GitHub Pages is enabled
   docs-deploy:
     name: Deploy Docs
-    needs: [build-and-test, docs]
+    needs: [test, docs]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -136,25 +139,19 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: Install UV package manager
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           version: 'latest'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          uv sync
+        run: uv sync --no-dev --extra docs
 
       - name: Deploy to GitHub Pages
         run: |

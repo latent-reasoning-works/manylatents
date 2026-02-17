@@ -11,7 +11,6 @@ import torch
 import tqdm
 from hydra.utils import to_absolute_path
 from lightning import LightningDataModule
-from pyplink import PyPlink
 from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger(__name__)
@@ -208,6 +207,7 @@ def convert_plink_to_npy(plink_prefix: str, fname: str, fit_idx: np.array, trans
         fit_idx (np.array): Boolean array indicating samples to fit on.
         trans_idx (np.array): Boolean array indicating samples to transform on.
     """
+    from pyplink import PyPlink
     pedfile = PyPlink(plink_prefix)
     genotypes_array = np.zeros([pedfile.get_nb_samples(), pedfile.get_nb_markers()], dtype=np.int8)
 
