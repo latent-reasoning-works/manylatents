@@ -150,6 +150,22 @@ Domain-specific datasets (genomics, single-cell) available via extensions.
 
 ---
 
+## citing
+
+If manylatents was useful in your research, a citation goes a long way:
+
+```bibtex
+@software{manylatents2026,
+  title     = {manyLatents: Unified Dimensionality Reduction and Neural Network Analysis},
+  author    = {Valdez C{\'o}rdova, C{\'e}sar Miguel and Scicluna, Matthew and Ni, Shuang},
+  year      = {2026},
+  url       = {https://github.com/latent-reasoning-works/manylatents},
+  license   = {MIT}
+}
+```
+
+---
+
 <br><br>
 
 <p align="center">
