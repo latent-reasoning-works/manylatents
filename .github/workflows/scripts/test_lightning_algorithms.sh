@@ -8,7 +8,11 @@ echo "Smoke Testing All LightningModule Algorithms"
 echo "=========================================="
 
 ALGO_DIR="manylatents/configs/algorithms/lightning"
-ALGORITHMS=($(ls -1 "$ALGO_DIR"/*.yaml 2>/dev/null | xargs -n1 basename | sed 's/.yaml$//' | grep -v __init__))
+# Exclude configs incompatible with swissroll smoke test:
+#   default      — no _target_
+#   hf_trainer   — needs text data (wikitext), not numeric
+#   aanet_reconstruction — AANet forward() returns tuple, needs custom shared_step
+ALGORITHMS=($(ls -1 "$ALGO_DIR"/*.yaml 2>/dev/null | xargs -n1 basename | sed 's/.yaml$//' | grep -v __init__ | grep -v default | grep -v hf_trainer | grep -v aanet_reconstruction))
 
 echo "Discovered ${#ALGORITHMS[@]} algorithms from $ALGO_DIR:"
 printf '  - %s\n' "${ALGORITHMS[@]}"

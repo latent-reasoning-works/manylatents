@@ -102,7 +102,7 @@ class Reconstruction(LightningModule):
     def shared_step(self, batch, batch_idx, phase: str) -> dict:
         x       = batch["data"]
         outputs = self.network(x)
-        extras  = {"latent": self.network.encoder(x), "raw": x}
+        extras  = {"latent": self.network.encode(x), "raw": x}
 
         # if our loss has .components(), pull them out and log
         if hasattr(self.loss_fn, "components"):

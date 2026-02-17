@@ -1,10 +1,9 @@
-_target_: manylatents.algorithms.reconstruction.Reconstruction
+_target_: manylatents.algorithms.lightning.reconstruction.Reconstruction
 _recursive_: false
 datamodule: ${data}
 network:
-  _target_: manylatents.algorithms.networks.aanet.Vanilla
-  ## would a partial call work?
-  input_dim: null # must be currently specified from experiment 
+  _target_: manylatents.algorithms.lightning.networks.aanet.Vanilla
+  input_dim: null # inferred from data in setup()
   n_archetypes: 4
   layer_widths: [128, 128]
   activation_out: "tanh"
@@ -16,3 +15,5 @@ optimizer:
   _target_: torch.optim.Adam
   _partial_: true
   lr: 0.001
+loss:
+  _target_: manylatents.algorithms.lightning.losses.mse.MSELoss
