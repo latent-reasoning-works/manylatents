@@ -74,8 +74,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# SLURM job submission support (requires private repo access)
-slurm = ["shop"]
 # Neural SDE support (future)
 dynamics = ["torchsde>=0.2"]
 # GPU-accelerated DR via TorchDR
@@ -105,9 +103,11 @@ packages = ["manylatents"]
 [tool.uv]
 managed = true
 
+[dependency-groups]
+dev = ["shop"]
+
 [tool.uv.sources]
 manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
-
 shop = { path = "../shop", editable = true }
 
 [tool.pytest.ini_options]

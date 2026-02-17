@@ -13,16 +13,7 @@ from omegaconf import DictConfig
 import manylatents.configs  # noqa: F401 — registers SearchPathPlugin on import
 from manylatents.experiment import run_algorithm
 
-# Shop: SLURM launchers and cluster configs (optional)
-try:
-    import shop  # noqa: F401
-    from shop.hydra import register_shop_configs, register_dynamic_search_path
-    register_shop_configs()
-    register_dynamic_search_path()
-except ImportError:
-    pass
-
-# Auto-discover extension plugins (e.g. manylatents-omics)
+# Auto-discover extension plugins (shop, omics, etc.)
 from manylatents.extensions import discover_extensions
 discover_extensions()
 
