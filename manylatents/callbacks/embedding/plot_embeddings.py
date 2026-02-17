@@ -342,7 +342,7 @@ class PlotEmbeddings(EmbeddingCallback):
 
     def _upload_to_wandb(self) -> None:
         """Upload plot to WandB if enabled and run is active."""
-        if self.enable_wandb_upload and wandb.run is not None:
+        if self.enable_wandb_upload and wandb is not None and wandb.run is not None:
             wandb.log({self.log_key: wandb.Image(self.save_path)})
             logger.info(f"Uploaded plot to WandB with key: {self.log_key}")
         elif not self.enable_wandb_upload:

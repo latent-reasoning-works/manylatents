@@ -1,4 +1,5 @@
 _target_: manylatents.algorithms.lightning.latent_ode.LatentODE
+_recursive_: false
 datamodule: ${data}
 network:
   _target_: manylatents.algorithms.lightning.networks.latent_ode.LatentODENetwork
