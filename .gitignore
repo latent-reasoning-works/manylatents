@@ -1,6 +1,6 @@
-# Data and outputs
-data/
-outputs/
+# Data and outputs (anchored to repo root so manylatents/data/ is not excluded)
+/data/
+/outputs/
 
 # python cache files.
 __pycache__/
