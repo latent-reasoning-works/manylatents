@@ -32,10 +32,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: uv sync --no-dev
-
-      - name: Install test dependencies
-        run: uv pip install pytest
+        run: |
+          uv venv
+          uv pip install ".[all]" pytest
 
       - name: Run unit tests
         run: |
@@ -117,7 +116,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: uv sync --no-dev --extra docs
+        run: |
+          uv venv
+          uv pip install ".[docs]"
 
       - name: Check docs coverage
         run: |
@@ -151,7 +152,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
-        run: uv sync --no-dev --extra docs
+        run: |
+          uv venv
+          uv pip install ".[docs]"
 
       - name: Deploy to GitHub Pages
         run: |
