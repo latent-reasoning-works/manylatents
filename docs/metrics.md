@@ -113,10 +113,10 @@ Config pattern: `metrics/dataset=<name>`
 
     ### Testing
 
-    Use `metrics=test_metric` to verify integration:
+    Use `metrics=noop` to verify integration:
 
     ```bash
-    uv run python -m manylatents.main data=swissroll algorithms/latent=pca metrics=test_metric
+    uv run python -m manylatents.main data=swissroll algorithms/latent=pca metrics=noop
     ```
 
 === "Running Without Metrics"
@@ -136,7 +136,7 @@ Config pattern: `metrics/dataset=<name>`
     uv run python -m manylatents.main data=swissroll algorithms/latent=pca
 
     # With metrics (explicit opt-in)
-    uv run python -m manylatents.main data=swissroll algorithms/latent=pca metrics=test_metric
+    uv run python -m manylatents.main data=swissroll algorithms/latent=pca metrics=noop
     ```
 
     ### Experiment Configs
@@ -181,7 +181,7 @@ Config pattern: `metrics/dataset=<name>`
     ```yaml
     # configs/experiment/single_algorithm.yaml
     defaults:
-      - override /metrics: test_metric  # Opt in for this experiment
+      - override /metrics: noop  # Opt in for this experiment
     ```
 
     ## Hydra Limitation

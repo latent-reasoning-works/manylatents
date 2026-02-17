@@ -167,12 +167,12 @@ Run probing sweeps on cluster:
 ```bash
 uv run python -m manylatents.main -m \
     experiment=representation_probe \
-    hydra/launcher=mila_cluster \
+    cluster=mila \
     algorithms.lightning.config.model_name_or_path=gpt2,gpt2-medium \
     callbacks.trainer.probe.gauge.knn=10,15,25
 ```
 
-See `configs/sweep/representation_probe_convergence.yaml` for a full sweep example.
+See `configs/experiment/representation_probe.yaml` for a full experiment example.
 
 ## Architecture
 

@@ -15,6 +15,7 @@
 [![license](https://img.shields.io/badge/license-MIT-2DD4BF.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.11+-2DD4BF.svg)](https://www.python.org)
 [![uv](https://img.shields.io/badge/pkg-uv-2DD4BF.svg)](https://docs.astral.sh/uv/)
+[![PyPI](https://img.shields.io/badge/PyPI-manylatents-2DD4BF.svg)](https://pypi.org/project/manylatents/)
 
 </div>
 
@@ -23,17 +24,26 @@
 ## install
 
 ```bash
-pip install manylatents
+uv add manylatents
 ```
 
 Optional extras:
 
 ```bash
-pip install manylatents[tracking]   # wandb experiment tracking
-pip install manylatents[topology]   # persistent homology metrics
-pip install manylatents[hf]         # HuggingFace trainer
-pip install manylatents[all]        # everything
+uv add manylatents[tracking]   # wandb experiment tracking
+uv add manylatents[topology]   # persistent homology metrics
+uv add manylatents[hf]         # HuggingFace trainer
+uv add manylatents[all]        # everything
 ```
+
+<details>
+<summary>pip also works</summary>
+
+```bash
+pip install manylatents
+```
+
+</details>
 
 ## quickstart
 

@@ -17,7 +17,7 @@ Add a CLI test for Lightning modules (e.g., autoencoder) to validate training wo
     uv run python -m manylatents.main \
       algorithms/lightning=ae_reconstruction \
       data=swissroll \
-      metrics=test_metric \
+      metrics=noop \
       callbacks/embedding=minimal \
       trainer.max_epochs=2 \
       trainer.fast_dev_run=true

@@ -38,7 +38,7 @@ def check_metric_configs():
             continue
 
         for path in sorted(config_dir.glob("*.yaml")):
-            if path.name.startswith("_") or path.name == "test_metric.yaml":
+            if path.name.startswith("_") or path.name == "noop.yaml":
                 continue
 
             with open(path) as f:

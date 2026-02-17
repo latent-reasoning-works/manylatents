@@ -1,5 +1,5 @@
-_target_: manylatents.algorithms.networks.aanet.Vanilla
-input_shape: null # must be currently specified from experiment 
+_target_: manylatents.algorithms.lightning.networks.aanet.Vanilla
+input_dim: null # inferred from data in setup()
 n_archetypes: 4
 layer_widths: [128, 128]
 activation_out: "tanh"

@@ -196,10 +196,22 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     ```yaml
     # configs/algorithms/lightning/ae_reconstruction.yaml
     _target_: manylatents.algorithms.lightning.reconstruction.Reconstruction
-    init_seed: 42
-
-    defaults:
-      - network: autoencoder
-      - optimizer: adam
-      - loss: default
+    _recursive_: false
+    datamodule: ${data}
+    network:
+      _target_: manylatents.algorithms.lightning.networks.autoencoder.Autoencoder
+      input_dim: null  # inferred from data in setup()
+      hidden_dims: [512, 256, 128]
+      latent_dim: 50
+      activation: relu
+      batchnorm: true
+      dropout: 0.1
+    optimizer:
+      _target_: torch.optim.Adam
+      _partial_: true
+      lr: 0.001
+    loss:
+      _target_: manylatents.algorithms.lightning.losses.mse.MSELoss
     ```
+
+    `_recursive_: false` prevents Hydra from eagerly instantiating nested configs — the `Reconstruction` module handles deferred instantiation in `setup()` once `input_dim` is known from the datamodule.
