@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 title: "manyLatents: Unified Dimensionality Reduction and Neural Network Analysis"
 type: software
 version: 0.1.0
-date-released: 2026-02-17
+date-released: 2026-02-20
 license: MIT
 url: "https://github.com/latent-reasoning-works/manylatents"
 repository-code: "https://github.com/latent-reasoning-works/manylatents"
