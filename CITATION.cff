@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "manyLatents: Unified Dimensionality Reduction and Neural Network Analysis"
+type: software
+version: 0.1.0
+date-released: 2026-02-17
+license: MIT
+url: "https://github.com/latent-reasoning-works/manylatents"
+repository-code: "https://github.com/latent-reasoning-works/manylatents"
+authors:
+  - family-names: Valdez Córdova
+    given-names: César Miguel
+    email: cesar.valdez@mila.quebec
+    affiliation: Mila - Quebec AI Institute
+  - family-names: Scicluna
+    given-names: Matthew
+    email: matthew.scicluna@mila.quebec
+    affiliation: Mila - Quebec AI Institute
+  - family-names: Ni
+    given-names: Shuang
+    email: shuang.ni@mila.quebec
+    affiliation: Mila - Quebec AI Institute
+keywords:
+  - dimensionality-reduction
+  - embeddings
+  - manifold-learning
+  - pytorch-lightning
+  - hydra

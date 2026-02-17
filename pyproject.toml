@@ -86,6 +86,7 @@ Homepage = "https://github.com/latent-reasoning-works/manylatents"
 Documentation = "https://latent-reasoning-works.github.io/manylatents/"
 Repository = "https://github.com/latent-reasoning-works/manylatents"
 Issues = "https://github.com/latent-reasoning-works/manylatents/issues"
+Changelog = "https://github.com/latent-reasoning-works/manylatents/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]
