@@ -34,7 +34,7 @@ Add a CLI test for Lightning modules (e.g., autoencoder) to validate training wo
 
 ### Module Instantiation Sweep Test
 **Priority**: High
-**Status**: Not started
+**Status**: COMPLETED
 
 Add pytest that sweeps through all algorithm modules and validates they can be instantiated.
 
