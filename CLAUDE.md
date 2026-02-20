@@ -137,6 +137,10 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 | `configs/__init__.py` | Hydra SearchPathPlugin + ConfigStore registration |
 | `data/capabilities.py` | Dataset capability detection |
 
+## Running Experiments
+
+**Always run experiment submissions as background tasks.** SLURM submissions and multirun sweeps can take time to dispatch — use `run_in_background: true` on the Bash tool so the conversation isn't blocked waiting. This applies to any `uv run python -m manylatents.main` invocation that submits to a cluster or runs a sweep.
+
 ## Gotchas
 
 - **`uv run`, not `python`** — always prefix with `uv run` or activate the venv.

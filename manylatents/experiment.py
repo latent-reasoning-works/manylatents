@@ -1,5 +1,6 @@
 import functools
 import logging
+import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
@@ -46,8 +47,6 @@ def should_disable_wandb(cfg: DictConfig) -> bool:
     Returns:
         True if WandB should be disabled, False otherwise
     """
-    import os
-
     # Check explicit logger=None (orchestrated mode)
     if cfg.logger is None:
         logger.info("WandB disabled: logger=None (orchestrated by parent)")
@@ -472,6 +471,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             name=cfg.logger.get("name", cfg.name),
             config=OmegaConf.to_container(cfg, resolve=True),
             mode=cfg.logger.get("mode", "online"),
+            dir=os.environ.get("WANDB_DIR", "logs"),
         )
     else:
         logger.info("WandB logging disabled - skipping wandb initialization")
@@ -662,6 +662,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
                 name=cfg.name,
                 config=OmegaConf.to_container(cfg, resolve=True),
                 mode="disabled",
+                dir=os.environ.get("WANDB_DIR", "logs"),
             )
         else:
             logger.info("Initializing WandB in online mode")
@@ -670,6 +671,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
                 name=cfg.name,
                 config=OmegaConf.to_container(cfg, resolve=True),
                 mode="online",
+                dir=os.environ.get("WANDB_DIR", "logs"),
             )
     else:
         from contextlib import nullcontext
