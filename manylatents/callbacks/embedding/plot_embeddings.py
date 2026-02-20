@@ -187,8 +187,13 @@ class PlotEmbeddings(EmbeddingCallback):
         else:
             emb_np = np.asarray(emb)
 
-        # Take first 2 dimensions for plotting
-        embeddings_to_plot = emb_np[:, :2] if emb_np.shape[1] > 2 else emb_np
+        # Ensure 2D for plotting: take first 2 dims, or pad if only 1
+        if emb_np.shape[1] > 2:
+            embeddings_to_plot = emb_np[:, :2]
+        elif emb_np.shape[1] == 1:
+            embeddings_to_plot = np.column_stack([emb_np[:, 0], np.zeros(len(emb_np))])
+        else:
+            embeddings_to_plot = emb_np
 
         return embeddings_to_plot
 
