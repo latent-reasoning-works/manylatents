@@ -49,7 +49,7 @@ All metrics share a `cache` dict for deduplicated kNN/eigenvalue computation. Th
 Hydra config groups under `manylatents/configs/`:
 
 ```
-algorithms/latent/      pca, umap, tsne, phate, diffusionmap, mds, aa, multiscale_phate, noop, classifier
+algorithms/latent/      pca, umap, tsne, phate, diffusionmap, mds, aa, multiscale_phate, noop, classifier, leiden
 algorithms/lightning/   ae_reconstruction, aanet_reconstruction, latent_ode, hf_trainer
 data/                   swissroll, torus, saddle_surface, gaussian_blobs, dla_tree, precomputed, test_data
 metrics/embedding/      trustworthiness, continuity, knn_preservation, persistent_homology, fractal_dimension, anisotropy, ...
@@ -73,7 +73,33 @@ trustworthiness:
 **New metric**: wrapper function → `@register_metric` decorator → config YAML → import in `__init__.py` → CI smoke test.
 See `CONTRIBUTING.md` for the full 4-step pipeline.
 
-**New LatentModule**: subclass `LatentModule` → implement `fit(x)` + `transform(x)` → config YAML → import in `__init__.py`.
+**New LatentModule** — there are exactly 4 files to touch:
+
+1. **Module**: `manylatents/algorithms/latent/<name>.py`
+   - Subclass `LatentModule`
+   - Accept `n_components`, `random_state`, `neighborhood_size`, `backend`, `device`, `**kwargs` and pass them to `super().__init__()`
+   - `neighborhood_size` overrides any module-specific neighbor count (e.g. `self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors`)
+   - `fit(x: Tensor)` — fit on data, set `self._is_fitted = True`
+   - `transform(x: Tensor) -> Tensor` — return embeddings
+   - Use shared infra: `compute_knn()` from `utils/metrics.py` (FAISS-GPU cache), not sklearn directly
+   - Keep third-party imports **lazy** (inside methods) if the dep is optional — the module file must import cleanly without the optional dep installed
+
+2. **Export**: `manylatents/algorithms/latent/__init__.py`
+   - Add `from .<name> import <Name>Module` and add to `__all__`
+   - No try/except guard — lazy imports in the module file handle missing optional deps
+
+3. **Hydra config**: `manylatents/configs/algorithms/latent/<name>.yaml`
+   - `_target_: manylatents.algorithms.latent.<name>.<Name>Module`
+   - Include `random_state: ${seed}` and `neighborhood_size: ${neighborhood_size}`
+   - Set `backend: null` and `device: null` for TorchDR-capable modules
+
+4. **Test**: `tests/test_<name>.py`
+   - Use `pytest.importorskip("<optional_dep>")` at module level for optional deps
+   - Test `fit_transform()` returns correct shape
+   - Test the module `isinstance(m, LatentModule)`
+   - Test determinism (same seed → same output)
+
+**Do NOT** create new top-level packages (like `analysis/`) for algorithms. Everything that takes data and produces an output goes through the LatentModule or LightningModule interface.
 
 **New LightningModule**: subclass → implement `setup()` + `training_step()` + `encode()` + `configure_optimizers()` → config YAML.
 
