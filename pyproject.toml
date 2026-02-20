@@ -67,6 +67,8 @@ torchdr = [
     "torchdr>=0.3,<0.4",
     "faiss-cpu",
 ]
+# Leiden community detection for clustering analysis
+clustering = ["leidenalg>=0.10", "python-igraph>=1.0"]
 # Documentation building
 docs = [
     "mkdocs>=1.6",
@@ -75,7 +77,7 @@ docs = [
 ]
 # All optional extras (excluding docs/dev)
 all = [
-    "manylatents[tracking,hf,dynamics,transport,topology,cluster,torchdr]",
+    "manylatents[tracking,hf,dynamics,transport,topology,cluster,torchdr,clustering]",
 ]
 
 [project.scripts]
