@@ -89,6 +89,15 @@ trustworthiness:
   n_neighbors: 25
 ```
 
+**Metric parameter sweeps use `flatten_and_unroll_metrics()`.** To sweep a metric parameter (e.g. `k`), set it to a list in the config — `flatten_and_unroll_metrics` does Cartesian expansion automatically. Never create separate YAML files per parameter value.
+```yaml
+# Sweeps k over 3 values, producing 3 metric evaluations
+local_intrinsic_dimensionality:
+  _target_: manylatents.metrics.local_intrinsic_dimensionality.LocalIntrinsicDimensionality
+  _partial_: True
+  k: [15, 50, 100]
+```
+
 ## Adding New Components
 
 **New metric**: wrapper function → `@register_metric` decorator → config YAML → import in `__init__.py` → CI smoke test.
