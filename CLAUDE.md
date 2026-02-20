@@ -2,21 +2,29 @@
 
 Unified dimensionality reduction and neural network analysis. PyTorch Lightning + Hydra + uv.
 
-## Entry Points
+## Execution — ALWAYS through SLURM
+
+**NEVER run compute on a login node.** All runs — including single dry-runs, validation, and sweeps — go through the submitit plugin via `cluster=mila`.
 
 ```bash
-# CLI — primary interface
-uv run python -m manylatents.main algorithms/latent=pca data=swissroll metrics/embedding=trustworthiness
+# Single run (CPU)
+uv run python -m manylatents.main cluster=mila resources=cpu_light \
+    algorithms/latent=pca data=swissroll metrics/embedding=trustworthiness
 
-# LightningModule path
-uv run python -m manylatents.main algorithms/lightning=ae_reconstruction data=swissroll trainer.fast_dev_run=true
+# Single run (GPU)
+uv run python -m manylatents.main cluster=mila resources=gpu \
+    algorithms/latent=umap data=swissroll
 
-# Multirun sweep
-uv run python -m manylatents.main --multirun algorithms/latent=umap,phate,tsne data=swissroll metrics/embedding=trustworthiness
+# Multirun sweep (each combo = separate SLURM job)
+uv run python -m manylatents.main -m cluster=mila resources=cpu_light \
+    algorithms/latent=umap,phate,tsne data=swissroll metrics/embedding=trustworthiness
 
-# SLURM submission
-uv run python -m manylatents.main -m cluster=mila resources=gpu algorithms/latent=umap data=swissroll
+# Experiment config (sweep defined in YAML)
+uv run python -m manylatents.main -m experiment=artifact_grid_sweep \
+    cluster=mila resources=cpu_light
 ```
+
+See `shop/CLAUDE.md` for cluster configs, resource profiles, and QOS limits.
 
 ```python
 from manylatents.api import run
@@ -67,6 +75,22 @@ trustworthiness:
   _partial_: True
   n_neighbors: 25
 ```
+
+## Experiment Configs
+
+Experiment configs live in `manylatents/configs/experiment/` and bundle data + algorithm + metrics + sweep params into a single YAML. Submit via:
+
+```bash
+uv run python -m manylatents.main -m experiment=<name> cluster=mila resources=cpu_light
+```
+
+| Config | What it sweeps | Jobs |
+|--------|---------------|------|
+| `artifact_grid_sweep` | UMAP: neighborhood_size(6) × min_dist(5) × seed(3) | 90 |
+| `artifact_leiden_sweep` | Leiden: neighborhood_size(6) × seed(3) | 18 |
+| `torchdr_parameter_sweep` | TorchDR backends × algorithms | varies |
+
+Artifact sweeps require preprocessed data — run `scripts/prep_embryoid_body_pca.py` first.
 
 ## Adding New Components
 

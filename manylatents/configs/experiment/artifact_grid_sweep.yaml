@@ -1,0 +1,38 @@
+# @package _global_
+#
+# Embedding artifact grid sweep: k × min_dist on embryoid body PCA(50).
+# Each (k, min_dist, seed) triple becomes a SLURM job via cluster=mila.
+#
+# Requires: data/scRNAseq/EBT_2k_hvg_pca50.npy (run scripts/prep_embryoid_body_pca.py)
+#
+# Submit to cluster:
+#   uv run python -m manylatents.main -m experiment=artifact_grid_sweep \
+#       cluster=mila resources=cpu_light
+#
+# Local dry-run (single setting):
+#   uv run python -m manylatents.main experiment=artifact_grid_sweep \
+#       neighborhood_size=15 algorithms.latent.min_dist=0.5 logger=none
+#
+name: artifact_grid_sweep
+
+defaults:
+  - override /data: precomputed
+  - override /algorithms/latent: umap
+  - override /metrics/embedding: [trustworthiness, continuity, knn_preservation]
+  - override /callbacks/embedding: minimal
+
+seed: 42
+project: artifact_grid_sweep
+
+data:
+  path: ${data_dir}/scRNAseq/EBT_2k_hvg_pca50.npy
+  labels_path: ${data_dir}/scRNAseq/EBT_2k_hvg_labels.npy
+  mode: full
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      neighborhood_size: 5,10,15,25,50,100
+      algorithms.latent.min_dist: 0.01,0.1,0.3,0.5,0.8
+      seed: 42,43,44

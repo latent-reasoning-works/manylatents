@@ -1,0 +1,33 @@
+# @package _global_
+#
+# Leiden clustering sweep: k × resolution on embryoid body PCA(50).
+# Companion to artifact_grid_sweep — provides cluster labels for DE analysis.
+#
+# Requires: data/scRNAseq/EBT_2k_hvg_pca50.npy (run scripts/prep_embryoid_body_pca.py)
+#
+# Submit to cluster:
+#   uv run python -m manylatents.main -m experiment=artifact_leiden_sweep \
+#       cluster=mila resources=cpu_light
+#
+name: artifact_leiden_sweep
+
+defaults:
+  - override /data: precomputed
+  - override /algorithms/latent: leiden
+  - override /metrics: noop
+  - override /callbacks/embedding: minimal
+
+seed: 42
+project: artifact_grid_sweep
+
+data:
+  path: ${data_dir}/scRNAseq/EBT_2k_hvg_pca50.npy
+  labels_path: ${data_dir}/scRNAseq/EBT_2k_hvg_labels.npy
+  mode: full
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      neighborhood_size: 5,10,15,25,50,100
+      seed: 42,43,44
