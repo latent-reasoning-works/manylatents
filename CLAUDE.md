@@ -2,6 +2,27 @@
 
 Unified dimensionality reduction and neural network analysis. PyTorch Lightning + Hydra + uv.
 
+## What belongs here
+
+This is a **public** repo. Only core infrastructure goes here:
+- New LatentModules, metrics, callbacks, data modules
+- Bug fixes, performance improvements, refactoring
+- Generic config groups (algorithms, data, metrics, callbacks, cluster, resources)
+
+Hydra instantiation configs (algorithm, data, metric, callback YAMLs) belong here — they're part of the core and CI depends on them.
+
+**Do NOT push** experiment configs (sweep definitions), analysis scripts, data prep scripts, or project-specific sweeps. Those belong in the downstream repo that consumes manylatents (expaper repos, practitioner repos, etc.) — each has its own `experiments/configs/manylatents/experiment/` directory and a local manylatents pin.
+
+## Pre-push checklist
+
+**CI must pass before pushing to main.** Run:
+
+```bash
+uv run pytest tests/ -x -q && uv run pytest manylatents/callbacks/tests/ -x -q
+```
+
+If CI fails after pushing, fix immediately — do not leave main broken.
+
 ## Entry Points
 
 ```bash
