@@ -42,6 +42,7 @@ class PrecomputedDataModule(LightningDataModule):
         channels: Optional[List[str]] = None,
         batch_size: int = 128,
         num_workers: int = 0,
+        shuffle_traindata: bool = False,
         label_col: str = None,
         labels_path: Optional[str] = None,
         metadata_path: Optional[str] = None,
