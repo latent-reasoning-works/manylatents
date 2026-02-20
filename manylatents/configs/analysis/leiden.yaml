@@ -1,4 +1,0 @@
-_target_: manylatents.analysis.clustering.LeidenClustering
-resolution: 0.5
-n_neighbors: 15
-random_state: 42

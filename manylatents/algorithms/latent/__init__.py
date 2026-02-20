@@ -8,6 +8,7 @@ from .diffusion_map import DiffusionMapModule
 from .multi_dimensional_scaling import MDSModule
 from .merging import MergingModule, ChannelLoadings
 from .classifier import ClassifierModule
+from .leiden import LeidenModule
 
 __all__ = [
     "PCAModule",
@@ -20,4 +21,5 @@ __all__ = [
     "MergingModule",
     "ChannelLoadings",
     "ClassifierModule",
+    "LeidenModule",
 ]
