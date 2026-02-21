@@ -70,7 +70,7 @@ All metrics share a `cache` dict for deduplicated kNN/eigenvalue computation. Th
 Hydra config groups under `manylatents/configs/`:
 
 ```
-algorithms/latent/      pca, umap, tsne, phate, diffusionmap, mds, aa, multiscale_phate, noop, classifier, leiden
+algorithms/latent/      pca, umap, tsne, phate, diffusionmap, mds, aa, multiscale_phate, noop, classifier, leiden, spectral_clustering
 algorithms/lightning/   ae_reconstruction, aanet_reconstruction, latent_ode, hf_trainer
 data/                   swissroll, torus, saddle_surface, gaussian_blobs, dla_tree, precomputed, test_data
 metrics/embedding/      trustworthiness, continuity, knn_preservation, persistent_homology, fractal_dimension, anisotropy, ...

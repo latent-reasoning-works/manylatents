@@ -432,11 +432,19 @@ class DiffusionMapModule(LatentModule):
         verbose = False,
         fit_fraction: float = 1.0,  # Fraction of data used for fitting
         neighborhood_size: Optional[int] = None,
+        mode: str = "embed",
+        n_clusters: Union[int, str] = "auto",
         **kwargs
     ):
         super().__init__(n_components=n_components, init_seed=random_state,
                          neighborhood_size=neighborhood_size, **kwargs)
+        if mode not in ("embed", "cluster"):
+            raise ValueError(f"mode must be 'embed' or 'cluster', got '{mode}'")
+        self.mode = mode
+        self.n_clusters = n_clusters
         self.fit_fraction = fit_fraction
+        self._labels = None
+        self._n_clusters_detected = None
         resolved_knn = neighborhood_size if neighborhood_size is not None else knn
         self.model = DiffusionMap(n_components=n_components,
                                   random_state=random_state,
@@ -448,6 +456,21 @@ class DiffusionMapModule(LatentModule):
                                   n_jobs=n_jobs,
                                   verbose=verbose)
 
+    def _detect_n_clusters(self, evals: np.ndarray) -> int:
+        """Detect number of clusters from the eigenvalue gap.
+
+        Counts eigenvalues close to 1.0 (within a relative threshold),
+        then verifies there is a clear gap to the next eigenvalue.
+        The number of eigenvalues near 1.0 equals the number of
+        connected components / clusters in the graph.
+        """
+        evals_abs = np.abs(evals)
+        # Count eigenvalues within 5% of 1.0
+        near_one = evals_abs > 0.95
+        k = int(np.sum(near_one))
+        # Must have at least 1 cluster
+        return max(k, 1)
+
     def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits DiffusionMap on a subset of data."""
         x_np = x.detach().cpu().numpy()
@@ -456,14 +479,55 @@ class DiffusionMapModule(LatentModule):
         self.model.fit(x_np[:n_fit])
         self._is_fitted = True
 
+        if self.mode == "cluster":
+            self._fit_clusters()
+
+    def _fit_clusters(self) -> None:
+        """Run k-means on unscaled eigenvectors to produce cluster labels."""
+        from sklearn.cluster import KMeans
+
+        evals = self.model.evals
+        evecs = self.model.evecs_right
+
+        if isinstance(self.n_clusters, str) and self.n_clusters == "auto":
+            k = self._detect_n_clusters(evals)
+        else:
+            k = int(self.n_clusters)
+
+        self._n_clusters_detected = k
+
+        # Use eigenvectors 1..k (skip trivial eigenvector 0)
+        # No eigenvalue scaling — pure spectral clustering
+        features = evecs[:, 1:k + 1]
+
+        km = KMeans(n_clusters=k, random_state=self.model.random_state, n_init=10)
+        self._labels = km.fit_predict(features)
+
     def transform(self, x: Tensor) -> Tensor:
         """Transforms data using the fitted DiffusionMap model."""
         if not self._is_fitted:
             raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
-        
+
+        if self.mode == "cluster":
+            labels = torch.from_numpy(self._labels.reshape(-1, 1)).float()
+            if isinstance(x, Tensor):
+                labels = labels.to(device=x.device)
+            return labels
+
         x_np = x.detach().cpu().numpy()
         embedding = self.model.transform(x_np)
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+
+    def predict_labels(self) -> np.ndarray:
+        """Return integer cluster assignments.
+
+        Only available when mode='cluster'. Call fit() first.
+        """
+        if self.mode != "cluster":
+            raise RuntimeError("predict_labels() is only available in mode='cluster'")
+        if self._labels is None:
+            raise RuntimeError("Model is not fitted. Call fit() first.")
+        return self._labels.copy()
 
     def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """

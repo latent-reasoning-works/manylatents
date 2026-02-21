@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
     default_params={"n_box_sizes": 10},
     description="Correlation fractal dimension of embedding",
 )
-def FractalDimension(dataset, embeddings: np.ndarray, n_box_sizes: int = 10, cache: Optional[dict] = None) -> float:
+def FractalDimension(embeddings: np.ndarray, dataset=None, module=None, n_box_sizes: int = 10, cache: Optional[dict] = None) -> float:
     """
     Estimate the fractal (box-counting) dimension of the embedding.
     

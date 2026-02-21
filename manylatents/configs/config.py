@@ -35,7 +35,7 @@ class Config:
     metrics: Optional[Any] = None
     """Configuration for metrics used during training and evaluation."""
     
-    log_level: str = "info"
+    log_level: str = "warning"
     """Logging level (one of: "debug", "info", "warning", "error", "critical")."""
 
     seed: int = field(default_factory=lambda: random.randint(0, int(1e5)))

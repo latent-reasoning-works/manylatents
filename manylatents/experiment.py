@@ -456,7 +456,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
     Returns:
         A dictionary with keys: embeddings, label, metadata, scores
     """
-    setup_logging(debug=cfg.debug)
+    setup_logging(debug=cfg.debug, log_level=getattr(cfg, "log_level", "warning"))
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
 
     # Initialize wandb if logger config is provided and not disabled
@@ -654,7 +654,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
     Returns:
         Dictionary with keys: embeddings, label, metadata, scores (from final step)
     """
-    setup_logging(debug=cfg.debug)
+    setup_logging(debug=cfg.debug, log_level=getattr(cfg, "log_level", "warning"))
     logger.info("Pipeline Config:\n" + OmegaConf.to_yaml(cfg))
 
     if not hasattr(cfg, 'pipeline') or cfg.pipeline is None or len(cfg.pipeline) == 0:

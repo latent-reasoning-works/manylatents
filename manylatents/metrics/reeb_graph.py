@@ -3,10 +3,8 @@ from typing import Optional, Dict, List
 
 import numpy as np
 import networkx as nx
-from ripser import ripser
 from sklearn.metrics import pairwise_distances
 from sklearn.decomposition import PCA
-import gudhi as gd
 
 from manylatents.metrics.registry import register_metric
 
@@ -14,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 class DecoratedReebGraph:
     def __init__(self, data, function=None, distance_matrix=False):
+        from ripser import ripser
+
         self.data = data
         self.function = function if function is not None else data[:, 0]
         self.distance_matrix = distance_matrix
@@ -56,6 +56,9 @@ class DecoratedReebGraph:
 
 
 def Vietoris_Rips(D, min_rad_factor=1.5, max_dim=2, sparse=0.5, min_rad=None):
+    from ripser import ripser
+    import gudhi as gd
+
     if min_rad is None:
         min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
     radius = min_rad_factor * min_rad
@@ -116,7 +119,8 @@ def ReebGraphNodesEdges(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[object] = None,
-    n_bins: int = 10
+    n_bins: int = 10,
+    cache: Optional[dict] = None,
 ) -> Dict[str, List]:
     """
     Compute a decorated Reeb graph on `embeddings` and return lists of nodes and edges.
@@ -124,6 +128,14 @@ def ReebGraphNodesEdges(
     Returns:
       dict with keys 'nodes' and 'edges'.
     """
+    try:
+        from ripser import ripser  # noqa: F401
+        import gudhi  # noqa: F401
+    except ImportError:
+        import warnings
+        warnings.warn("ripser/gudhi not installed — ReebGraphNodesEdges returning empty", RuntimeWarning)
+        return {'nodes': [], 'edges': []}
+
     drg = DecoratedReebGraph(data=embeddings, function=embeddings[:, 0])
     drg.fit_Reeb(n_bins=n_bins)
 
