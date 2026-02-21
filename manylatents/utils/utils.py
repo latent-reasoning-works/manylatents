@@ -108,17 +108,28 @@ def save_embeddings(embeddings, path, format='npy', metadata=None):
     else:
         raise ValueError(f"Unsupported format: {format}")
     
-def setup_logging(debug: bool = False) -> None:
+def setup_logging(debug: bool = False, log_level: str = "warning") -> None:
     """
-    Set up rich-formatted console logging.
-    Debug=True -> DEBUG level, Debug=False -> INFO level.
-    """
-    # Reset root logger handlers to avoid duplicates
-    root = logging.getLogger()
-    root.handlers.clear()
+    Set up rich-formatted console logging on the ``manylatents`` logger only.
 
-    level = logging.DEBUG if debug else logging.INFO
-    root.setLevel(level)
+    The root logger is left untouched so downstream consumers (shop.harness,
+    etc.) are not flooded with internal noise.
+
+    Args:
+        debug: If True, override *log_level* to DEBUG.
+        log_level: One of "debug", "info", "warning", "error", "critical".
+                   Default is "warning" — verbose output only when requested.
+    """
+    if debug:
+        level = logging.DEBUG
+    else:
+        level = getattr(logging, log_level.upper(), logging.WARNING)
+
+    ml_logger = logging.getLogger("manylatents")
+    # Avoid stacking duplicate handlers on repeated calls
+    ml_logger.handlers.clear()
+    ml_logger.setLevel(level)
+    ml_logger.propagate = False  # Don't bubble up to root
 
     console = rich.logging.RichHandler(
         markup=True,
@@ -127,7 +138,7 @@ def setup_logging(debug: bool = False) -> None:
         tracebacks_show_locals=False,
     )
     console.setLevel(level)
-    root.addHandler(console)
+    ml_logger.addHandler(console)
 
 def is_numeric(value: str) -> bool:
     try:

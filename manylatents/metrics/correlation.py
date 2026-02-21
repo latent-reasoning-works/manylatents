@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
     default_params={"num_dists": 100, "random_state": 42},
     description="Pearson correlation between pairwise distances",
 )
-def PearsonCorrelation(dataset, embeddings: np.ndarray,
+def PearsonCorrelation(embeddings: np.ndarray, dataset=None, module=None,
                        return_per_sample: bool = False,
                        num_dists: int = 100,
                        random_state: int = 42,

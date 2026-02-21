@@ -45,9 +45,9 @@ def diffusion_curvature(P: np.ndarray, t: int = 3, percentile: float = 5) -> np.
     description="Diffusion curvature of embedding manifold",
 )
 def DiffusionCurvature(
-    dataset,
     embeddings: np.ndarray,
-    module: LatentModule,
+    dataset=None,
+    module: Optional[LatentModule] = None,
     t: int = 3,
     percentile: float = 5,
     cache: Optional[dict] = None,

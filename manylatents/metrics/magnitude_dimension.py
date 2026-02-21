@@ -1,7 +1,6 @@
 # manylatents/metrics/magnipy_metric.py
 import numpy as np
 from typing import Optional, Any
-from magnipy.magnipy import Magnipy
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
 
@@ -12,8 +11,8 @@ from manylatents.metrics.registry import register_metric
     description="Magnitude-based effective dimensionality",
 )
 def MagnitudeDimension(
-    embeddings: np.ndarray, 
-    dataset: Any, 
+    embeddings: np.ndarray,
+    dataset: Any = None,
     module: Optional[LatentModule] = None,
     n_ts: int = 50,
     log_scale: bool = False,
@@ -26,7 +25,8 @@ def MagnitudeDimension(
     one_point_property: bool = True,
     perturb_singularities: bool = True,
     positive_magnitude: bool = False,
-    exact: bool = False
+    exact: bool = False,
+    cache: Optional[dict] = None,
 ) -> float:
     """
     Computes the maximum magnitude dimension from an embedding.
@@ -54,7 +54,14 @@ def MagnitudeDimension(
     """
     if embeddings is None or embeddings.size == 0:
         return np.nan
-        
+
+    try:
+        from magnipy.magnipy import Magnipy
+    except ImportError:
+        import warnings
+        warnings.warn("magnipy not installed — MagnitudeDimension returning nan", RuntimeWarning)
+        return np.nan
+
     # Instantiate Magnipy with the embedding and desired parameters.
     # Note: this recomputes the distance matrix every time this metric is called.
     mag_obj = Magnipy(

@@ -52,14 +52,9 @@ def AUC(
     predictions = embeddings.flatten()
 
     # Get labels from dataset
-    if dataset is None:
-        raise ValueError("AUC metric requires a dataset with labels")
-
-    if not hasattr(dataset, "get_labels"):
-        raise ValueError(
-            f"Dataset {type(dataset).__name__} has no get_labels() method. "
-            "AUC metric requires labels for evaluation."
-        )
+    if dataset is None or not hasattr(dataset, "get_labels"):
+        logger.warning("AUC metric requires a dataset with get_labels(). Skipping.")
+        return {"auc": float("nan")}
 
     labels = dataset.get_labels()
     if isinstance(labels, (list, tuple)):
@@ -67,10 +62,11 @@ def AUC(
 
     # Validate
     if len(predictions) != len(labels):
-        raise ValueError(
-            f"Predictions ({len(predictions)}) and labels ({len(labels)}) "
-            "must have same length"
+        logger.warning(
+            "AUC: predictions (%d) and labels (%d) length mismatch. Skipping.",
+            len(predictions), len(labels),
         )
+        return {"auc": float("nan")}
 
     unique_labels = np.unique(labels)
     if len(unique_labels) < 2:
