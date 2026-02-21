@@ -1,6 +1,6 @@
 import functools
 import logging
-import os
+import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import hydra
@@ -562,6 +562,8 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
         )
 
         # Execute the algorithm step
+        t_total_start = time.perf_counter()
+        t_step_start = time.perf_counter()
         latents = execute_step(
             algorithm=algorithm,
             train_tensor=train_tensor,
@@ -571,6 +573,7 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             datamodule=datamodule,
             train_labels=train_labels,
         )
+        step_time = time.perf_counter() - t_step_start
 
         # --- Unified embedding wrapping ---
         if latents is not None:
@@ -581,17 +584,24 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
                     "source": "single_algorithm",
                     "algorithm_type": type(algorithm).__name__,
                     "data_shape": test_tensor.shape,
+                    "step_time": step_time,
                 },
             }
 
             # Evaluate embeddings
             logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
+            t_eval_start = time.perf_counter()
             embeddings["scores"] = evaluate(
                 embeddings,
                 cfg=cfg,
                 datamodule=datamodule,
                 module=algorithm if isinstance(algorithm, LatentModule) else None
             )
+            eval_time = time.perf_counter() - t_eval_start
+            total_time = time.perf_counter() - t_total_start
+
+            embeddings["metadata"]["eval_time"] = eval_time
+            embeddings["metadata"]["total_time"] = total_time
 
     # --- Callback processing ---
     callback_outputs = {}
@@ -743,6 +753,9 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
         final_algorithm = None
 
         # --- Loop through pipeline steps ---
+        step_snapshots = []
+        step_times = []
+        t_total_start = time.perf_counter()
         logger.info(f"Starting pipeline with {len(cfg.pipeline)} steps...\n")
 
         for step_idx, step in enumerate(cfg.pipeline):
@@ -772,6 +785,7 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
             logger.info(f"Algorithm: {type(algorithm).__name__}")
 
             # Execute the step with current tensors
+            t_step_start = time.perf_counter()
             latents = execute_step(
                 algorithm=algorithm,
                 train_tensor=current_train_tensor,
@@ -781,6 +795,8 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
                 datamodule=current_datamodule,
                 train_labels=current_train_labels,
             )
+            step_time = time.perf_counter() - t_step_start
+            step_times.append(step_time)
 
             if latents is None:
                 raise RuntimeError(
@@ -804,6 +820,18 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
 
             logger.info(f"Step {step_idx + 1} complete. Output shape: {current_test_tensor.shape}\n")
 
+            snapshot_np = (current_test_tensor.detach().cpu().numpy()
+                           if isinstance(current_test_tensor, torch.Tensor)
+                           else np.asarray(current_test_tensor))
+            step_snapshots.append({
+                "step_index": step_idx,
+                "step_name": step_name,
+                "algorithm": type(algorithm).__name__,
+                "output_shape": list(snapshot_np.shape),
+                "embedding": snapshot_np,
+                "step_time": step_time,
+            })
+
             # Track final algorithm for metadata
             final_algorithm = algorithm
 
@@ -824,16 +852,24 @@ def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> D
                 "input_shape": initial_test_tensor.shape,
                 "output_shape": final_latents.shape,
             },
+            "step_snapshots": step_snapshots,
         }
 
         # Evaluate final embeddings
         logger.info("Evaluating final embeddings from pipeline...")
+        t_eval_start = time.perf_counter()
         embeddings["scores"] = evaluate(
             embeddings,
             cfg=cfg,
             datamodule=initial_datamodule,
             module=final_algorithm if isinstance(final_algorithm, LatentModule) else None
         )
+        eval_time = time.perf_counter() - t_eval_start
+        total_time = time.perf_counter() - t_total_start
+
+        embeddings["metadata"]["step_times"] = step_times
+        embeddings["metadata"]["eval_time"] = eval_time
+        embeddings["metadata"]["total_time"] = total_time
 
         # --- Callback processing ---
         callback_outputs = {}
