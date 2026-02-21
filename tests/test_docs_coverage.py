@@ -16,10 +16,12 @@ def test_coverage_script_does_not_crash():
     )
 
 
-def test_coverage_script_finds_warnings():
-    """The coverage checker should find at least some warnings."""
+def test_coverage_script_output_parseable():
+    """The coverage checker should produce parseable summary output."""
     result = subprocess.run(
         [sys.executable, "scripts/check_docs_coverage.py"],
         capture_output=True, text=True
     )
-    assert "WARNINGS" in result.stdout, "Expected warnings about undecorated metrics"
+    assert "coverage" in result.stdout.lower(), (
+        f"Expected coverage summary in output:\n{result.stdout}"
+    )

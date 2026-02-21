@@ -94,9 +94,9 @@ class ClassifierModule(LatentModule):
 
         x_np = x.detach().cpu().numpy() if isinstance(x, Tensor) else x
 
-        # Get probability of positive class
+        # Get probability of positive class, return as (N, 1)
         proba = self._clf.predict_proba(x_np)[:, 1]
-        return torch.from_numpy(proba).float().to(x.device if isinstance(x, Tensor) else "cpu")
+        return torch.from_numpy(proba.reshape(-1, 1)).float().to(x.device if isinstance(x, Tensor) else "cpu")
 
     def get_loadings(self) -> np.ndarray:
         """Return classifier coefficients for interpretability.
