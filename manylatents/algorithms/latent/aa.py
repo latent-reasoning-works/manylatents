@@ -1,5 +1,4 @@
 import torch
-from archetypes import AA
 from torch import Tensor
 
 from .latent_module_base import LatentModule
@@ -24,6 +23,8 @@ class ArchetypalAnalysisModule(LatentModule):
 
     def fit(self, x: Tensor, y: Tensor | None = None) -> None:
         """Fits the archetypal analysis model to the input data."""
+        from archetypes import AA
+
         x_np = x.detach().cpu().numpy()
         method_kwargs = {"max_iter_optimizer": self.max_iter}
 

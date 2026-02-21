@@ -9,7 +9,6 @@ from typing import List, Optional
 
 import numpy as np
 import torch
-from multiscale_phate import Multiscale_PHATE
 from torch import Tensor
 
 from .latent_module_base import LatentModule
@@ -75,6 +74,8 @@ class MultiscalePHATEModule(LatentModule):
         self.n_jobs = n_jobs
         self.random_state = random_state
 
+        from multiscale_phate import Multiscale_PHATE
+
         self.model = Multiscale_PHATE(
             scale=scale,
             granularity=granularity,
@@ -102,6 +103,7 @@ class MultiscalePHATEModule(LatentModule):
             Input data of shape (n_samples, n_features).
         """
         x_np = x.detach().cpu().numpy()
+        self._n_input = x_np.shape[0]
         self.embedding_, self.clusters_, self.sizes_ = self.model.fit_transform(x_np)
         self._is_fitted = True
 
@@ -109,24 +111,33 @@ class MultiscalePHATEModule(LatentModule):
         """
         Return the embedding at finest resolution.
 
-        Note: Multiscale PHATE computes the embedding during fit.
-        This method returns the precomputed embedding. The returned
-        embedding may have fewer points than the input due to merging.
+        Multiscale PHATE computes the embedding during fit. Condensation may
+        merge nearby points, producing fewer rows than the input. When that
+        happens, the embedding is padded with zeros so the output shape matches
+        the input (required by downstream callbacks like PlotEmbeddings).
 
         Parameters
         ----------
         x : Tensor
-            Input data (used only for device/dtype information).
+            Input data (used for device/dtype and expected row count).
 
         Returns
         -------
         Tensor
-            2D embedding of shape (n_aggregated_points, n_components).
+            2D embedding of shape (n_samples, n_components).
         """
         if not self._is_fitted:
             raise RuntimeError(
                 "Multiscale PHATE model is not fitted yet. Call `fit` first."
             )
+        n_expected = x.shape[0]
+        n_emb = self.embedding_.shape[0]
+        if n_emb < n_expected:
+            # Pad: assign condensed-away points the mean embedding
+            padded = np.zeros((n_expected, self.embedding_.shape[1]))
+            padded[:n_emb] = self.embedding_
+            padded[n_emb:] = self.embedding_.mean(axis=0)
+            return torch.tensor(padded, device=x.device, dtype=x.dtype)
         return torch.tensor(self.embedding_, device=x.device, dtype=x.dtype)
 
     def get_n_components_per_scale(self) -> np.ndarray:
