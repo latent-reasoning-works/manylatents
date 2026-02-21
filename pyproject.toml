@@ -47,6 +47,7 @@ dependencies = [
     "tqdm>=4.67",
     "rich>=13.9",
     "Deprecated>=1.2",
+    "wandb>=0.25.0",
 ]
 
 [project.optional-dependencies]

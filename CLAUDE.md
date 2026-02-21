@@ -89,6 +89,15 @@ trustworthiness:
   n_neighbors: 25
 ```
 
+**Metric parameter sweeps use `flatten_and_unroll_metrics()`.** To sweep a metric parameter (e.g. `k`), set it to a list in the config — `flatten_and_unroll_metrics` does Cartesian expansion automatically. Never create separate YAML files per parameter value.
+```yaml
+# Sweeps k over 3 values, producing 3 metric evaluations
+local_intrinsic_dimensionality:
+  _target_: manylatents.metrics.local_intrinsic_dimensionality.LocalIntrinsicDimensionality
+  _partial_: True
+  k: [15, 50, 100]
+```
+
 ## Adding New Components
 
 **New metric**: wrapper function → `@register_metric` decorator → config YAML → import in `__init__.py` → CI smoke test.
@@ -136,6 +145,10 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 | `utils/metrics.py` | `compute_knn()`, `compute_svd_cache()` — shared cache infrastructure |
 | `configs/__init__.py` | Hydra SearchPathPlugin + ConfigStore registration |
 | `data/capabilities.py` | Dataset capability detection |
+
+## Running Experiments
+
+**Always run experiment submissions as background tasks.** SLURM submissions and multirun sweeps can take time to dispatch — use `run_in_background: true` on the Bash tool so the conversation isn't blocked waiting. This applies to any `uv run python -m manylatents.main` invocation that submits to a cluster or runs a sweep.
 
 ## Gotchas
 
