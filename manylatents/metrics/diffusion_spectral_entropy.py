@@ -1,14 +1,10 @@
-import logging
-import os
+import numpy as np
+from sklearn.metrics import pairwise_distances
 import random
 from typing import Optional
 
-import numpy as np
-from sklearn.metrics import pairwise_distances
-
 from manylatents.metrics.registry import register_metric
-
-logger = logging.getLogger(__name__)
+from manylatents.utils.kernel_utils import symmetric_diffusion_operator
 
 
 def exact_eigvals(K: np.ndarray) -> np.ndarray:
@@ -46,213 +42,77 @@ def approx_eigvals(K: np.ndarray, exact_threshold: int = 1000) -> np.ndarray:
         return exact_eigvals(K)
 
 
-def compute_diffusion_matrix(X: np.array, sigma: float = 10.0):
+def compute_diffusion_matrix(X: np.array, sigma: float = 10.0, alpha: float = 0.5):
     '''
+    Given input X returns a symmetric diffusion operator S with the same
+    eigenvalues as the row-stochastic diffusion matrix P.
+
     Adapted from
     https://github.com/professorwug/diffusion_curvature/blob/master/diffusion_curvature/core.py
 
-    Given input X returns a diffusion matrix P, as an numpy ndarray.
-    Using the "anisotropic" kernel
     Inputs:
         X: a numpy array of size n x d
-        sigma: a float
-            conceptually, the neighborhood size of Gaussian kernel.
+        sigma: bandwidth of the Gaussian kernel
+        alpha: density normalization power (0=graph Laplacian, 0.5=Fokker-Planck, 1=Laplace-Beltrami)
+
     Returns:
-        K: a numpy array of size n x n that has the same eigenvalues as the diffusion matrix.
+        S: symmetric (n, n) matrix with same eigenvalues as the diffusion matrix P.
     '''
-
-    # Construct the distance matrix.
     D = pairwise_distances(X)
-
-    # Gaussian kernel
     G = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp((-D**2) / (2 * sigma**2))
+    S = symmetric_diffusion_operator(G, alpha=alpha)
+    return S
 
-    # Anisotropic density normalization.
-    Deg = np.diag(1 / np.sum(G, axis=1)**0.5)
-    K = Deg @ G @ Deg
 
-    # Now K has the exact same eigenvalues as the diffusion matrix `P`
-    # which is defined as `P = D^{-1} K`, with `D = np.diag(np.sum(K, axis=1))`.
+def compute_diffusion_matrix_knn(
+    distances: np.ndarray,
+    indices: np.ndarray,
+    alpha: float = 1.0,
+) -> np.ndarray:
+    """Build diffusion operator from kNN graph with adaptive bandwidth.
 
-    return K
+    Uses Zelnik-Manor & Perona (2004) adaptive bandwidth: sigma_i = distance
+    to the k-th neighbor. Builds a sparse Gaussian kernel, symmetrizes via
+    union of neighborhoods, then normalizes with symmetric_diffusion_operator.
 
-def diffusion_spectral_entropy(embedding_vectors: np.array,
-                               gaussian_kernel_sigma: float = 10,
-                               t: int = 1,
-                               max_N: int = 10000,
-                               chebyshev_approx: bool = False,
-                               eigval_save_path: str = None,
-                               eigval_save_precision: np.dtype = np.float16,
-                               classic_shannon_entropy: bool = False,
-                               matrix_entry_entropy: bool = False,
-                               num_bins_per_dim: int = 2,
-                               random_seed: int = 0,
-                               verbose: bool = False):
-    '''
-    >>> If `classic_shannon_entropy` is False (default)
+    Args:
+        distances: (n, k+1) from compute_knn, self at index 0.
+        indices: (n, k+1) from compute_knn, self at index 0.
+        alpha: Density normalization power.
+            0 = graph Laplacian, 0.5 = Fokker-Planck, 1.0 = Laplace-Beltrami.
 
-    Diffusion Spectral Entropy over a set of N vectors, each of D dimensions.
+    Returns:
+        (n, n) symmetric diffusion operator (dense, for eigendecomposition).
+    """
+    n = distances.shape[0]
 
-    DSE = - sum_i [eig_i^t log eig_i^t]
-        where each `eig_i` is an eigenvalue of `P`,
-        where `P` is the diffusion matrix computed on the data graph of the [N, D] vectors.
+    # Adaptive bandwidth: distance to k-th neighbor (last column)
+    sigma = distances[:, -1].copy()
+    sigma[sigma == 0] = 1e-10  # guard against zero distance
 
-    >>> If `classic_shannon_entropy` is True
+    # Build sparse Gaussian kernel from kNN edges
+    K = np.zeros((n, n))
+    for i in range(n):
+        for j_idx in range(1, distances.shape[1]):  # skip self at index 0
+            j = indices[i, j_idx]
+            d = distances[i, j_idx]
+            K[i, j] = np.exp(-(d ** 2) / (sigma[i] * sigma[j]))
 
-    Classic Shannon Entropy over a set of N vectors, each of D dimensions.
+    # Symmetrize: union of neighborhoods
+    K = np.maximum(K, K.T)
 
-    CSE = - sum_i [p(x) log p(x)]
-        where each p(x) is the probability density of a histogram bin, after some sort of binning.
+    # Fill diagonal (self-affinity = 1)
+    np.fill_diagonal(K, 1.0)
 
-    args:
-        embedding_vectors: np.array of shape [N, D]
-            N: number of data points / samples
-            D: number of feature dimensions of the neural representation
+    # Apply alpha-normalization via shared utility
+    S = symmetric_diffusion_operator(K, alpha=alpha)
 
-        gaussian_kernel_sigma: float
-            The bandwidth of Gaussian kernel (for computation of the diffusion matrix)
-            Can be adjusted per the dataset.
-            Increase if the data points are very far away from each other.
+    return S
 
-        t: int
-            Power of diffusion matrix (equivalent to power of diffusion eigenvalues)
-            <-> Iteration of diffusion process
-            Usually small, e.g., 1 or 2.
-            Can be adjusted per dataset.
-            Rule of thumb: after powering eigenvalues to `t`, there should be approximately
-                           1 percent of eigenvalues that remain larger than 0.01
-
-        max_N: int
-            Max number of data points / samples used for computation.
-
-        chebyshev_approx: bool
-            Whether or not to use Chebyshev moments for faster approximation of eigenvalues.
-            Currently we DO NOT RECOMMEND USING THIS. Eigenvalues may be changed quite a bit.
-
-        eigval_save_path: str
-            If provided,
-                (1) If running for the first time, will save the computed eigenvalues in this location.
-                (2) Otherwise, if the file already exists, skip eigenvalue computation and load from this file.
-
-        eigval_save_precision: np.dtype
-            We use `np.float16` by default to reduce storage space required.
-            For best precision, use `np.float64` instead.
-
-        classic_shannon_entropy: bool
-            Toggle between DSE and CSE. False (default) == DSE.
-
-        matrix_entry_entropy: bool
-            An alternative formulation where, instead of computing the entropy on
-            diffusion matrix eigenvalues, we compute the entropy on diffusion matrix entries.
-            Only relevant to DSE.
-
-        num_bins_per_dim: int
-            Number of bins per feature dim.
-            Only relevant to CSE (i.e., `classic_shannon_entropy` is True).
-
-        verbose: bool
-            Whether or not to print progress to console.
-    '''
-
-    # Subsample embedding vectors if number of data sample is too large.
-    if max_N is not None and embedding_vectors is not None and len(
-            embedding_vectors) > max_N:
-        if random_seed is not None:
-            random.seed(random_seed)
-        rand_inds = np.array(
-            random.sample(range(len(embedding_vectors)), k=max_N))
-        embedding_vectors = embedding_vectors[rand_inds, :]
-
-    if not classic_shannon_entropy:
-        # Computing Diffusion Spectral Entropy.
-        if verbose: print('Computing Diffusion Spectral Entropy...')
-
-        if matrix_entry_entropy:
-            if verbose: print('Computing diffusion matrix.')
-            # Compute diffusion matrix `P`.
-            K = compute_diffusion_matrix(embedding_vectors,
-                                         sigma=gaussian_kernel_sigma)
-            # Row normalize to get proper row stochastic matrix P
-            D_inv = np.diag(1.0 / np.sum(K, axis=1))
-            P = D_inv @ K
-
-            if verbose: print('Diffusion matrix computed.')
-
-            entries = P.reshape(-1)
-            entries = np.abs(entries)
-            prob = entries / entries.sum()
-
-        else:
-            if eigval_save_path is not None and os.path.exists(
-                    eigval_save_path):
-                if verbose:
-                    logger.info('Loading pre-computed eigenvalues from %s',
-                                eigval_save_path)
-                eigvals = np.load(eigval_save_path)['eigvals']
-                eigvals = eigvals.astype(
-                    np.float64)  # mitigate rounding error.
-                if verbose: logger.info('Pre-computed eigenvalues loaded.')
-
-            else:
-                if verbose: logger.info('Computing diffusion matrix.')
-                # Note that `K` is a symmetric matrix with the same eigenvalues as the diffusion matrix `P`.
-                K = compute_diffusion_matrix(embedding_vectors,
-                                             sigma=gaussian_kernel_sigma)
-                if verbose: logger.info('Diffusion matrix computed.')
-
-                if verbose: logger.info('Computing eigenvalues.')
-                if chebyshev_approx:
-                    if verbose: logger.info('Using Chebyshev approximation.')
-                    eigvals = approx_eigvals(K)
-                else:
-                    eigvals = exact_eigvals(K)
-                if verbose: logger.info('Eigenvalues computed.')
-
-                if eigval_save_path is not None:
-                    os.makedirs(os.path.dirname(eigval_save_path),
-                                exist_ok=True)
-                    # Save eigenvalues.
-                    eigvals = eigvals.astype(
-                        eigval_save_precision)  # reduce storage space.
-                    with open(eigval_save_path, 'wb+') as f:
-                        np.savez(f, eigvals=eigvals)
-                    if verbose:
-                        logger.info('Eigenvalues saved to %s', eigval_save_path)
-
-            # Eigenvalues may be negative. Only care about the magnitude, not the sign.
-            eigvals = np.abs(eigvals)
-
-            # Power eigenvalues to `t` to mitigate effect of noise.
-            eigvals = eigvals**t
-
-            prob = eigvals / eigvals.sum()
-
-    else:
-        # Computing Classic Shannon Entropy.
-        if verbose: print('Computing Classic Shannon Entropy...')
-
-        vecs = embedding_vectors.copy()
-
-        # Min-Max scale each dimension.
-        vecs = (vecs - np.min(vecs, axis=0)) / (np.max(vecs, axis=0) -
-                                                np.min(vecs, axis=0))
-
-        # Bin along each dimension.
-        bins = np.linspace(0, 1, num_bins_per_dim + 1)[:-1]
-        vecs = np.digitize(vecs, bins=bins)
-
-        # Count probability.
-        counts = np.unique(vecs, axis=0, return_counts=True)[1]
-        prob = counts / np.sum(counts)
-
-    prob = prob + np.finfo(float).eps
-    entropy = -np.sum(prob * np.log2(prob))
-
-    return entropy
 
 @register_metric(
     aliases=["diffusion_spectral_entropy", "dse"],
-    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0},
+    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0, "kernel": "knn", "k": 15, "alpha": 1.0},
     description="Diffusion spectral entropy (eigenvalue count at diffusion time t)",
 )
 def DiffusionSpectralEntropy(
@@ -267,63 +127,61 @@ def DiffusionSpectralEntropy(
     max_N: int = 10000,
     random_seed: int = 0,
     cache: Optional[dict] = None,
+    kernel: str = "knn",
+    k: int = 15,
+    alpha: float = 1.0,
 ) -> float:
     """
-    Wrapper for diffusion_spectral_entropy.
+    Diffusion spectral entropy and eigenvalue counting on embedding data.
+
+    Builds a diffusion operator from the embeddings, computes its eigenvalues,
+    and returns either entropy or eigenvalue counts at a given diffusion time.
 
     Parameters:
-        embeddings: Input data array
+        embeddings: Input data array (n_samples, n_features)
         dataset: Provided for protocol compliance (unused)
         module: Provided for protocol compliance (unused)
         t: Diffusion time for entropy mode
-        gaussian_kernel_sigma: Bandwidth of Gaussian kernel
-        output_mode: "entropy" (default) or "eigenvalue_count"
+        gaussian_kernel_sigma: Bandwidth of Gaussian kernel (dense mode only)
+        output_mode: "entropy", "eigenvalue_count", "eigenvalue_count_full", "eigenvalue_count_sweep"
         t_high: High diffusion time for asymptotic eigenvalue counting
-        numerical_floor: Numerical noise floor for eigenvalue counting (not methodological)
-        max_N: Max samples for eigenvalue computation (default 10000). Subsample if larger.
+        numerical_floor: Noise floor for eigenvalue counting
+        max_N: Max samples (subsample if larger)
         random_seed: Seed for reproducible subsampling
-
-    output_mode options:
-        "entropy": Return DSE value using parameter t
-        "eigenvalue_count": Return count of eigenvalues that persist at high diffusion time.
-                           At high t, only eigenvalues for disconnected components persist
-                           (don't decay to 0). This sidesteps threshold-picking by relying
-                           on asymptotic behavior. The numerical_floor is just to filter
-                           floating-point noise, not a methodological parameter.
-        "eigenvalue_count_full": Same as eigenvalue_count but returns dict with spectrum
-                                for debugging/logging (e.g., WandB histogram).
-        "eigenvalue_count_sweep": Sweep across multiple t values efficiently.
-                                 Computes eigenvalues once, then powers to each t.
-                                 Returns dict with counts for each t value.
-                                 Pass t_high as a list: [10, 50, 100, 200, 500]
+        cache: Shared cache dict for kNN reuse
+        kernel: "knn" (adaptive bandwidth, default) or "dense" (global Gaussian)
+        k: Neighborhood size for knn kernel (default 15)
+        alpha: Density normalization (0=graph Laplacian, 0.5=Fokker-Planck, 1.0=Laplace-Beltrami)
     """
-    # Subsample if too large (O(n²) memory for diffusion matrix)
+    # Subsample if too large
     X = embeddings
     if max_N is not None and len(X) > max_N:
         random.seed(random_seed)
         rand_inds = np.array(random.sample(range(len(X)), k=max_N))
         X = X[rand_inds, :]
 
+    # Dispatch kernel construction
+    if kernel == "knn":
+        from manylatents.utils.metrics import compute_knn
+        distances, indices = compute_knn(X, k=k, cache=cache)
+        K = compute_diffusion_matrix_knn(distances, indices, alpha=alpha)
+    else:
+        K = compute_diffusion_matrix(X, sigma=gaussian_kernel_sigma, alpha=alpha)
+
     if output_mode in ("eigenvalue_count", "eigenvalue_count_full", "eigenvalue_count_sweep"):
-        # Compute diffusion matrix and eigenvalues (reuse existing functions)
-        K = compute_diffusion_matrix(X, sigma=gaussian_kernel_sigma)
         eigvals = exact_eigvals(K)
         eigvals = np.abs(eigvals)
 
         if output_mode == "eigenvalue_count_sweep":
-            # Sweep across multiple t values efficiently
-            # Returns flat keys for WandB logging compatibility
             t_values = t_high if isinstance(t_high, (list, tuple)) else [t_high]
             results = {"raw_eigvals": eigvals}
             for t_val in t_values:
                 eigvals_powered = eigvals ** t_val
                 count = float(np.sum(eigvals_powered > numerical_floor))
-                # Flat keys: count_t10, count_t50, spectrum_t10, spectrum_t50, ...
                 results[f"count_t{t_val}"] = count
                 results[f"spectrum_t{t_val}"] = eigvals_powered
             return results
 
-        # Single t_high value
         eigvals_powered = eigvals ** t_high
         count = float(np.sum(eigvals_powered > numerical_floor))
 
@@ -335,5 +193,11 @@ def DiffusionSpectralEntropy(
             }
         return count
 
-    # Default: return entropy (pass max_N to internal function for consistency)
-    return diffusion_spectral_entropy(embeddings, t=t, gaussian_kernel_sigma=gaussian_kernel_sigma, max_N=max_N, random_seed=random_seed)
+    # Default: entropy mode
+    eigvals = exact_eigvals(K)
+    eigvals = np.abs(eigvals)
+    eigvals = eigvals ** t
+    prob = eigvals / eigvals.sum()
+    prob = prob + np.finfo(float).eps
+    entropy = -np.sum(prob * np.log2(prob))
+    return entropy
