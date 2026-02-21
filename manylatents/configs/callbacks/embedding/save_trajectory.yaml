@@ -1,0 +1,4 @@
+save_trajectory:
+  _target_: manylatents.callbacks.embedding.save_trajectory.SaveTrajectory
+  save_dir: ${hydra:runtime.output_dir}
+  experiment_name: ${name}
