@@ -4,6 +4,7 @@ import types
 import numpy as np
 import pytest
 from omegaconf import OmegaConf
+from manylatents.utils.metrics import _content_key
 
 # Mock dogma namespace if not installed
 if "manylatents.dogma" not in sys.modules:
@@ -44,7 +45,7 @@ def test_extract_k_requirements_and_prewarm():
 
     cache = prewarm_cache(cfgs, emb, FakeDS())
     # Should have pre-warmed with max_k=20
-    cached_k, _, _ = cache[id(emb)]
+    cached_k, _, _ = cache[_content_key(emb)]
     assert cached_k == 20
 
 
@@ -92,8 +93,8 @@ def test_full_pipeline_with_cache():
     # Prewarm populates cache
     module = FakeModule()
     cache = prewarm_cache(cfgs, emb, FakeDS(), module=module)
-    assert id(emb) in cache
-    assert id(high_dim) in cache
+    assert _content_key(emb) in cache
+    assert _content_key(high_dim) in cache
     assert "eigenvalues" in cache
 
     # Metrics use shared cache — no recomputation

@@ -1,7 +1,7 @@
 """Tests for cache-aware compute_knn."""
 import numpy as np
 import pytest
-from manylatents.utils.metrics import compute_knn
+from manylatents.utils.metrics import _content_key, compute_knn
 
 
 @pytest.fixture
@@ -21,8 +21,8 @@ def test_compute_knn_cache_populates(sample_data):
     """First call populates the cache."""
     cache = {}
     compute_knn(sample_data, k=10, cache=cache)
-    assert id(sample_data) in cache
-    cached_k, _, _ = cache[id(sample_data)]
+    assert _content_key(sample_data) in cache
+    cached_k, _, _ = cache[_content_key(sample_data)]
     assert cached_k == 10
 
 
@@ -43,7 +43,7 @@ def test_compute_knn_cache_recomputes_larger_k(sample_data):
     dists, idxs = compute_knn(sample_data, k=15, cache=cache)
     assert dists.shape == (50, 16)
     # Cache should now have the larger k
-    cached_k, _, _ = cache[id(sample_data)]
+    cached_k, _, _ = cache[_content_key(sample_data)]
     assert cached_k == 15
 
 
@@ -82,3 +82,39 @@ def test_compute_knn_k_equals_n_samples():
     with pytest.warns(UserWarning, match="Clamping k"):
         dists, idxs = compute_knn(data, k=5)
     assert dists.shape[0] == 5
+
+
+def test_compute_knn_content_key_matches(sample_data):
+    """A copy of the array shares the same cache entry."""
+    cache = {}
+    compute_knn(sample_data, k=10, cache=cache)
+    data_copy = sample_data.copy()
+    dists, idxs = compute_knn(data_copy, k=5, cache=cache)
+    # Should reuse cached result (k=10 >= k=5), not recompute
+    assert len(cache) == 1
+    assert dists.shape == (50, 6)  # k+1 with self
+
+
+def test_disk_cache_roundtrip(sample_data, tmp_path):
+    """Disk cache saves and loads dataset kNN correctly."""
+    from types import SimpleNamespace
+    from manylatents.experiment import prewarm_cache
+
+    metric_cfgs = {
+        "embedding.trustworthiness": SimpleNamespace(
+            _target_="manylatents.metrics.trustworthiness.Trustworthiness",
+            n_neighbors=10,
+        ),
+    }
+    dataset = SimpleNamespace(data=sample_data)
+
+    # First call: computes and saves to disk
+    cache1 = prewarm_cache(metric_cfgs, sample_data, dataset, knn_cache_dir=str(tmp_path))
+    npz_files = list((tmp_path / "knn").glob("*.npz"))
+    assert len(npz_files) == 1
+
+    # Second call: loads from disk
+    cache2 = prewarm_cache(metric_cfgs, sample_data, dataset, knn_cache_dir=str(tmp_path))
+    key = _content_key(sample_data)
+    np.testing.assert_array_equal(cache1[key][1], cache2[key][1])
+    np.testing.assert_array_equal(cache1[key][2], cache2[key][2])

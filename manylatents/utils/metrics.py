@@ -11,6 +11,16 @@ from sklearn.neighbors import kneighbors_graph
 logger = logging.getLogger(__name__)
 
 
+def _content_key(data: np.ndarray) -> str:
+    """O(1) content hash: shape + dtype + first/last row bytes."""
+    import hashlib
+    h = hashlib.sha256()
+    h.update(f"{data.shape}{data.dtype}".encode())
+    h.update(data[0].tobytes())
+    h.update(data[-1].tobytes())
+    return h.hexdigest()[:16]
+
+
 def _svd_gpu(
     embeddings: np.ndarray,
     idx: np.ndarray,
@@ -155,7 +165,7 @@ def compute_knn(
     """
     # Check cache for a usable superset
     if cache is not None:
-        key = id(data)
+        key = _content_key(data)
         if key in cache:
             cached_k, cached_dists, cached_idxs = cache[key]
             if cached_k >= k:
@@ -213,7 +223,7 @@ def compute_knn(
 
     # Store in cache (always with self included)
     if cache is not None:
-        cache[id(data)] = (k, distances, indices)
+        cache[_content_key(data)] = (k, distances, indices)
 
     if not include_self:
         distances = distances[:, 1:]

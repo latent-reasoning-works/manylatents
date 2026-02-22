@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import determine_data_source
-from manylatents.utils.metrics import compute_knn, compute_eigenvalues, flatten_and_unroll_metrics
+from manylatents.utils.metrics import _content_key, compute_knn, compute_eigenvalues, flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
 
 logger = logging.getLogger(__name__)
@@ -212,6 +212,7 @@ def prewarm_cache(
     embeddings: np.ndarray,
     dataset,
     module=None,
+    knn_cache_dir=None,
 ) -> dict:
     """Pre-compute kNN and eigenvalues based on metric requirements.
 
@@ -220,6 +221,7 @@ def prewarm_cache(
         embeddings: Embedding array.
         dataset: Dataset object with .data attribute.
         module: Optional fitted LatentModule.
+        knn_cache_dir: Optional directory for disk-persisted dataset kNN.
 
     Returns:
         Populated cache dict.
@@ -234,8 +236,32 @@ def prewarm_cache(
 
     if reqs["data_k"] and dataset is not None and hasattr(dataset, "data"):
         max_k = max(reqs["data_k"])
-        logger.info(f"Pre-warming cache: dataset kNN with max_k={max_k}")
-        compute_knn(dataset.data, k=max_k, cache=cache)
+        content_hash = _content_key(dataset.data)
+
+        # Try loading from disk cache
+        loaded = False
+        if knn_cache_dir is not None:
+            from pathlib import Path
+            npz_path = Path(knn_cache_dir) / "knn" / f"{content_hash}_k{max_k}.npz"
+            if npz_path.exists():
+                saved = np.load(npz_path)
+                cache[content_hash] = (max_k, saved["distances"], saved["indices"])
+                logger.info(f"Loaded dataset kNN from disk cache: {npz_path}")
+                loaded = True
+
+        if not loaded:
+            logger.info(f"Pre-warming cache: dataset kNN with max_k={max_k}")
+            compute_knn(dataset.data, k=max_k, cache=cache)
+
+            # Save to disk cache
+            if knn_cache_dir is not None:
+                from pathlib import Path
+                knn_dir = Path(knn_cache_dir) / "knn"
+                knn_dir.mkdir(parents=True, exist_ok=True)
+                npz_path = knn_dir / f"{content_hash}_k{max_k}.npz"
+                _, dists, idxs = cache[content_hash]
+                np.savez(npz_path, distances=dists, indices=idxs)
+                logger.info(f"Saved dataset kNN to disk cache: {npz_path}")
 
     if reqs["spectral"] and module is not None:
         logger.info("Pre-warming cache: eigenvalue decomposition")
@@ -291,7 +317,8 @@ def evaluate_embeddings(
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
     # Pre-warm cache with optimal k values
-    cache = prewarm_cache(metric_cfgs, emb_sub, ds_sub, module)
+    knn_cache_dir = getattr(cfg, "cache_dir", None)
+    cache = prewarm_cache(metric_cfgs, emb_sub, ds_sub, module, knn_cache_dir=knn_cache_dir)
 
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():

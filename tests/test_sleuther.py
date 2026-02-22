@@ -4,6 +4,7 @@ import types
 import numpy as np
 import pytest
 from omegaconf import OmegaConf
+from manylatents.utils.metrics import _content_key
 
 # Mock the manylatents.dogma namespace extension if not installed
 if "manylatents.dogma" not in sys.modules:
@@ -94,8 +95,8 @@ def test_prewarm_cache_populates():
     })
     cache = prewarm_cache(cfgs, emb, ds)
     # Should have pre-warmed both embedding and dataset kNN
-    assert id(emb) in cache
-    assert id(data) in cache
+    assert _content_key(emb) in cache
+    assert _content_key(data) in cache
 
 
 def test_prewarm_cache_uses_max_k():
@@ -118,7 +119,7 @@ def test_prewarm_cache_uses_max_k():
     })
     cache = prewarm_cache(cfgs, emb, FakeDataset())
     # Should have pre-warmed with max_k=20
-    cached_k, _, _ = cache[id(emb)]
+    cached_k, _, _ = cache[_content_key(emb)]
     assert cached_k == 20
 
 
@@ -161,4 +162,4 @@ def test_prewarm_cache_no_data_attribute():
         },
     })
     cache = prewarm_cache(cfgs, emb, NoDataDataset())
-    assert id(emb) in cache  # embedding kNN still warmed
+    assert _content_key(emb) in cache  # embedding kNN still warmed
