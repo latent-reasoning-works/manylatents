@@ -1,0 +1,14 @@
+# DSE with kNN adaptive-bandwidth kernel.
+# k tracks neighborhood_size so the diagnostic matches the DR algorithm's kNN.
+# t_high is a list — flatten_and_unroll_metrics expands it into separate evaluations,
+# each returning a scalar eigenvalue count.
+
+dse_knn:
+  _target_: manylatents.metrics.diffusion_spectral_entropy.DiffusionSpectralEntropy
+  _partial_: True
+  output_mode: eigenvalue_count
+  t_high: [10, 50, 100, 200, 500]
+  numerical_floor: 1.0e-6
+  kernel: knn
+  k: ${neighborhood_size}
+  alpha: 1.0

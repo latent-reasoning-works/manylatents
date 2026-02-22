@@ -1,0 +1,12 @@
+# DSE with dense Gaussian kernel (fixed bandwidth).
+# Baseline: spectral structure at fixed sigma, independent of algorithm's k.
+# t_high list expands via flatten_and_unroll_metrics into scalar evaluations.
+
+dse_dense:
+  _target_: manylatents.metrics.diffusion_spectral_entropy.DiffusionSpectralEntropy
+  _partial_: True
+  output_mode: eigenvalue_count
+  t_high: [10, 50, 100, 200, 500]
+  numerical_floor: 1.0e-6
+  kernel: dense
+  gaussian_kernel_sigma: 10
