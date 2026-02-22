@@ -3,4 +3,5 @@ wandb_log_scores:
       log_summary:    true
       log_table:      true
       log_k_curve_table: true
+      log_scree_plot: true
       include_labels: false

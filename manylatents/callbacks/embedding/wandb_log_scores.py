@@ -1,6 +1,7 @@
 import logging
 import re
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -19,17 +20,21 @@ class WandbLogScores(EmbeddingCallback):
     2) per-sample table → key "DR/per_sample_metrics"
     3) k-curve tables → keys like "DR/continuity__k_curve_table"
     """
+    _SPECTRUM_PATTERNS = re.compile(r"spectrum|eigenvalue", re.IGNORECASE)
+
     def __init__(
         self,
         log_summary:         bool = True,
         log_table:           bool = True,
         log_k_curve_table:   bool = True,
+        log_scree_plot:      bool = True,
         include_labels:      bool = False,
     ):
         super().__init__()
         self.log_summary       = log_summary
         self.log_table         = log_table
         self.log_k_curve_table = log_k_curve_table
+        self.log_scree_plot    = log_scree_plot
         self.include_labels    = include_labels
 
         # matches "foo__n_neighbors_15" etc.
@@ -67,8 +72,25 @@ class WandbLogScores(EmbeddingCallback):
             wandb.log(scalar_summary, commit=False)
             logger.info(f"Logged scalars for {tag}: {list(scalar_summary)}")
 
-        # 2) per-sample table (1-D arrays) - handle variable lengths
-        array_keys = [k for k, v in scores.items() if np.ndim(v) == 1]
+        # 2a) scree plots for spectrum/eigenvalue arrays
+        all_1d_keys = [k for k, v in scores.items() if np.ndim(v) == 1]
+        spectrum_keys = [k for k in all_1d_keys if self._SPECTRUM_PATTERNS.search(k)]
+        if self.log_scree_plot and spectrum_keys:
+            for name in spectrum_keys:
+                eigenvalues = np.asarray(scores[name])
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.plot(range(len(eigenvalues)), eigenvalues, "o-", markersize=4)
+                ax.set_yscale("log")
+                ax.set_xlabel("Index")
+                ax.set_ylabel("Eigenvalue")
+                ax.set_title(f"{name}")
+                fig.tight_layout()
+                wandb.log({f"{tag}/{name}_scree": wandb.Image(fig)}, commit=False)
+                plt.close(fig)
+                logger.info(f"Logged scree plot {tag}/{name}_scree")
+
+        # 2b) per-sample table (1-D arrays, excluding spectra) - handle variable lengths
+        array_keys = [k for k in all_1d_keys if k not in spectrum_keys]
         if self.log_table and array_keys:
             # Find the maximum length among all arrays
             lengths = [len(scores[k]) for k in array_keys]
