@@ -78,9 +78,11 @@ docs = [
     "mkdocs-material>=9.6",
     "mkdocs-macros-plugin>=1.0",
 ]
+# Biological extensions (popgen, single-cell, foundation model encoders)
+omics = ["manylatents-omics"]
 # All optional extras (excluding docs/dev)
 all = [
-    "manylatents[hf,torchdr,jax]",
+    "manylatents[hf,torchdr,jax,omics]",
 ]
 
 [project.scripts]
