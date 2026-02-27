@@ -1,6 +1,6 @@
 [project]
 name = "manylatents"
-version = "0.1.1"
+version = "0.1.2"
 description = "Unified dimensionality reduction and neural network analysis framework"
 license = "MIT"
 authors = [
