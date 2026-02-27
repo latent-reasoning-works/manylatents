@@ -373,3 +373,216 @@ class TestComputeProbMatrix:
 
         with pytest.raises(ValueError, match="Unknown kernel_method"):
             compute_prob_matrix(torch.randn(4, 2), kernel_method="bad")
+
+
+# ---------------------------------------------------------------------------
+# IndexedDatasetWrapper tests
+# ---------------------------------------------------------------------------
+
+phate = pytest.importorskip("phate")
+
+
+class TestIndexedDatasetWrapper:
+    """Tests for the IndexedDatasetWrapper."""
+
+    def test_adds_index_to_dict_dataset(self):
+        """Wrapper adds 'index' key to dict-returning datasets."""
+        from manylatents.algorithms.lightning.gaga import IndexedDatasetWrapper
+
+        class DictDataset(torch.utils.data.Dataset):
+            def __len__(self):
+                return 10
+
+            def __getitem__(self, idx):
+                return {"data": torch.randn(5), "metadata": torch.tensor(0)}
+
+        ds = IndexedDatasetWrapper(DictDataset())
+        item = ds[3]
+        assert "index" in item
+        assert item["index"] == 3
+
+    def test_preserves_original_data(self):
+        """Original data keys are preserved."""
+        from manylatents.algorithms.lightning.gaga import IndexedDatasetWrapper
+
+        class DictDataset(torch.utils.data.Dataset):
+            def __len__(self):
+                return 5
+
+            def __getitem__(self, idx):
+                return {"data": torch.ones(3) * idx, "metadata": torch.tensor(idx)}
+
+        ds = IndexedDatasetWrapper(DictDataset())
+        item = ds[2]
+        assert "data" in item
+        assert "metadata" in item
+        assert torch.allclose(item["data"], torch.ones(3) * 2)
+
+    def test_length_unchanged(self):
+        """Wrapper doesn't change dataset length."""
+        from manylatents.algorithms.lightning.gaga import IndexedDatasetWrapper
+
+        class DictDataset(torch.utils.data.Dataset):
+            def __len__(self):
+                return 42
+
+            def __getitem__(self, idx):
+                return {"data": torch.randn(3)}
+
+        ds = IndexedDatasetWrapper(DictDataset())
+        assert len(ds) == 42
+
+
+# ---------------------------------------------------------------------------
+# GAGA LightningModule tests
+# ---------------------------------------------------------------------------
+
+
+def _make_gaga(mode="distance"):
+    """Build a minimal GAGA model with a small SwissRoll datamodule."""
+    from manylatents.algorithms.lightning.gaga import GAGA
+    from manylatents.data.swissroll import SwissRollDataModule
+
+    dm = SwissRollDataModule(
+        batch_size=64,
+        n_distributions=5,
+        n_points_per_distribution=20,  # 100 total points
+        noise=0.1,
+        manifold_noise=0.1,
+    )
+    dm.setup()
+
+    network_config = {
+        "_target_": "manylatents.algorithms.lightning.networks.gaga_net.GAGANetwork",
+        "input_dim": None,  # inferred in setup
+        "latent_dim": 2,
+        "hidden_dims": [32, 16],
+        "activation": "relu",
+    }
+    optimizer_config = {
+        "_target_": "torch.optim.Adam",
+        "_partial_": True,
+        "lr": 0.001,
+    }
+    model = GAGA(
+        network=network_config,
+        optimizer=optimizer_config,
+        datamodule=dm,
+        mode=mode,
+        phate_knn=5,
+    )
+    return model, dm
+
+
+class TestGAGALightningModule:
+    """Tests for the GAGA LightningModule."""
+
+    def test_instantiation_distance_mode(self):
+        """GAGA can be instantiated in distance mode."""
+        from manylatents.algorithms.lightning.gaga import GAGA
+
+        model = GAGA(
+            network={"_target_": "manylatents.algorithms.lightning.networks.gaga_net.GAGANetwork"},
+            optimizer={"_target_": "torch.optim.Adam", "_partial_": True, "lr": 1e-3},
+            mode="distance",
+        )
+        assert model.mode == "distance"
+        assert model.automatic_optimization is False
+        assert model.network is None
+
+    def test_instantiation_affinity_mode(self):
+        """GAGA can be instantiated in affinity mode."""
+        from manylatents.algorithms.lightning.gaga import GAGA
+
+        model = GAGA(
+            network={"_target_": "manylatents.algorithms.lightning.networks.gaga_net.GAGANetwork"},
+            optimizer={"_target_": "torch.optim.Adam", "_partial_": True, "lr": 1e-3},
+            mode="affinity",
+        )
+        assert model.mode == "affinity"
+        assert model.automatic_optimization is False
+
+    def test_setup_distance_mode(self):
+        """setup() computes PHATE distances and wraps dataset."""
+        model, dm = _make_gaga(mode="distance")
+        model.setup()
+
+        # Network should be instantiated
+        assert model.network is not None
+        # Preprocessor should exist
+        assert model._preprocessor is not None
+        # Ground-truth distance matrix should be set
+        assert model._gt_distances is not None
+        n = len(dm.train_dataset)  # wrapped now
+        assert model._gt_distances.shape == (n, n)
+        # Dataset should be wrapped with IndexedDatasetWrapper
+        from manylatents.algorithms.lightning.gaga import IndexedDatasetWrapper
+        assert isinstance(dm.train_dataset, IndexedDatasetWrapper)
+
+    def test_setup_affinity_mode(self):
+        """setup() computes PHATE transition matrix."""
+        model, dm = _make_gaga(mode="affinity")
+        model.setup()
+
+        assert model.network is not None
+        assert model._preprocessor is not None
+        assert model._gt_prob_matrix is not None
+        n = len(dm.train_dataset)  # wrapped now
+        assert model._gt_prob_matrix.shape == (n, n)
+        # All training data stored for epoch-end pass
+        assert model._all_train_data is not None
+        assert model._all_train_data.shape[0] == n
+
+    def test_setup_idempotent(self):
+        """Calling setup() twice does not rebuild the network."""
+        model, dm = _make_gaga(mode="distance")
+        model.setup()
+        net_id = id(model.network)
+        model.setup()
+        assert id(model.network) == net_id
+
+    def test_encode_shape(self):
+        """encode() returns correct shape after setup."""
+        model, dm = _make_gaga(mode="distance")
+        model.setup()
+
+        x = torch.randn(10, 3)  # SwissRoll is 3D
+        z = model.encode(x)
+        assert z.shape == (10, 2)  # latent_dim=2
+
+    def test_encode_no_grad(self):
+        """encode() does not create a computation graph."""
+        model, _ = _make_gaga(mode="distance")
+        model.setup()
+        x = torch.randn(5, 3)
+        z = model.encode(x)
+        assert not z.requires_grad
+
+    def test_fast_dev_run_distance(self):
+        """Distance mode trains without error in fast_dev_run."""
+        from lightning.pytorch import Trainer
+
+        model, dm = _make_gaga(mode="distance")
+        trainer = Trainer(
+            fast_dev_run=True,
+            enable_checkpointing=False,
+            enable_progress_bar=False,
+            logger=False,
+        )
+        trainer.fit(model, datamodule=dm)
+        # Network should be built after fit
+        assert model.network is not None
+
+    def test_fast_dev_run_affinity(self):
+        """Affinity mode trains without error in fast_dev_run."""
+        from lightning.pytorch import Trainer
+
+        model, dm = _make_gaga(mode="affinity")
+        trainer = Trainer(
+            fast_dev_run=True,
+            enable_checkpointing=False,
+            enable_progress_bar=False,
+            logger=False,
+        )
+        trainer.fit(model, datamodule=dm)
+        assert model.network is not None
