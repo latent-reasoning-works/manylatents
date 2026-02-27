@@ -1,0 +1,26 @@
+_target_: manylatents.algorithms.lightning.gaga.GAGA
+_recursive_: false
+datamodule: ${data}
+network:
+  _target_: manylatents.algorithms.lightning.networks.gaga_net.GAGANetwork
+  input_dim: null # inferred from data in setup()
+  latent_dim: 2
+  hidden_dims: [256, 128, 64]
+  activation: relu
+  batchnorm: false
+  dropout: 0.0
+  spectral_norm: false
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+mode: distance
+# PHATE parameters
+phate_knn: 5
+phate_t: auto
+phate_n_landmark: 5000
+# Distance mode loss weights
+dist_weight: 0.9
+reconstr_weight: 0.1
+cycle_weight: 0.0
+dist_mse_decay: 0.0
