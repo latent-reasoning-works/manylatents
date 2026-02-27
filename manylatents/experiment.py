@@ -584,6 +584,14 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
                 },
             }
 
+            # Attach trajectories if the algorithm produced them
+            traj = getattr(algorithm, "trajectories", None)
+            if traj is not None:
+                if isinstance(traj, torch.Tensor):
+                    traj = traj.detach().cpu().numpy()
+                embeddings["trajectories"] = traj
+                logger.info(f"Trajectories attached: shape={traj.shape}")
+
             # Evaluate embeddings
             logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
             embeddings["scores"] = evaluate(
