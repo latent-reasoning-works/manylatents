@@ -70,6 +70,10 @@ torchdr = [
 ]
 # Leiden community detection for clustering analysis
 clustering = ["leidenalg>=0.10", "python-igraph>=1.0"]
+# MIOFlow trajectory inference (PyTorch)
+mioflow = ["torchdiffeq>=0.2", "POT>=0.9"]
+# MIOFlow trajectory inference (JAX)
+mioflow-jax = ["jax[cpu]", "diffrax>=0.6", "optax>=0.2", "ott-jax>=0.4"]
 # Documentation building
 docs = [
     "mkdocs>=1.6",
