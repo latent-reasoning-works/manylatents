@@ -67,7 +67,7 @@ result["scores"]      # {"embedding.trustworthiness": 0.95}
 | is self-contained | `LatentModule` (`algorithms.latent.latent_module_base`) | `fit(x)` / `transform(x)` |
 | needs Lightning Trainer features (callbacks, logging, checkpointing, multi-GPU) | `LightningModule` (`algorithms.lightning.*`) | `trainer.fit()` / `encode(x)` |
 
-A LatentModule may use gradients internally (e.g. MIOFlow JAX) — the distinction is API surface, not whether backprop is involved.
+A LatentModule may use gradients internally — the distinction is API surface, not whether backprop is involved.
 
 **Metric protocol** (`manylatents.metrics.metric`):
 

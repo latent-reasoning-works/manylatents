@@ -113,7 +113,7 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
     | `"scores"` | `dict` | Evaluation metrics |
     | `"metadata"` | `dict` | Algorithm info and runtime metadata |
 
-    The `"embeddings"` key is the standard primary output used by metrics, plotting, and pipeline chaining. Trajectory methods (e.g., MIOFlow) populate both `"embeddings"` (e.g., endpoint positions) and `"trajectories"` for the full flow data.
+    The `"embeddings"` key is the standard primary output used by metrics, plotting, and pipeline chaining. Trajectory methods populate both `"embeddings"` (e.g., endpoint positions) and `"trajectories"` for the full flow data.
 
     `SaveEmbeddings` automatically persists any additional keys as separate `.npy` or `.json` files when `save_additional_outputs: true`.
 

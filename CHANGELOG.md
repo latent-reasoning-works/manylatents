@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.1] - 2026-02-27
 
+### Removed
+- GAGA and MIOFlow algorithms (source, configs, tests) — moved to `dev` branch for further testing
+
 ### Fixed
-- Trainer default config: `gradient_clip_val: null` instead of `1.0` — fixes GAGA and MIOFlow LightningModules that use manual optimization
+- Trainer default config: `gradient_clip_val: null` instead of `1.0`
 
 ### Changed
 - Absorbed lightweight extras into core dependencies: `torchdiffeq`, `torchsde`, `POT`, `ripser`, `hydra-submitit-launcher`, `leidenalg`, `python-igraph`

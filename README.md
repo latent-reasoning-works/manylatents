@@ -32,7 +32,7 @@ Optional extras:
 ```bash
 uv add manylatents[hf]         # HuggingFace trainer
 uv add manylatents[torchdr]    # GPU-accelerated DR via TorchDR
-uv add manylatents[jax]        # JAX backend (MIOFlow JAX, diffrax)
+uv add manylatents[jax]        # JAX backend (diffrax)
 uv add manylatents[all]        # everything
 ```
 

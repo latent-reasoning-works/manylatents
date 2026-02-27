@@ -70,7 +70,7 @@ torchdr = [
     "torchdr>=0.3,<0.4",
     "faiss-cpu",
 ]
-# JAX backend (MIOFlow JAX, diffrax)
+# JAX backend (diffrax)
 jax = ["jax", "diffrax>=0.6", "optax>=0.2", "ott-jax>=0.4"]
 # Documentation building
 docs = [
