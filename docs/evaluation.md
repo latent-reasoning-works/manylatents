@@ -51,7 +51,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
         raise NotImplementedError(...)
 
     @evaluate.register(dict)
-    def evaluate_embeddings(EmbeddingOutputs: dict, *, cfg, datamodule, **kwargs):
+    def evaluate_embeddings(latent_outputs: dict, *, cfg, datamodule, **kwargs):
         # Handles embedding-level metrics (trustworthiness, continuity, etc.)
         ...
 
@@ -63,7 +63,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     | Dispatch Type | Handler | Evaluates |
     |---------------|---------|-----------|
-    | `dict` (EmbeddingOutputs) | `evaluate_embeddings()` | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
+    | `dict` (LatentOutputs) | `evaluate_embeddings()` | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
     | `LightningModule` | `evaluate_lightningmodule()` | `trainer.test()` results + custom model metrics |
 
     Both paths are called during a LightningModule run: first `evaluate_lightningmodule` during `execute_step()`, then `evaluate_embeddings` on the extracted embeddings.

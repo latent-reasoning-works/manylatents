@@ -1,5 +1,5 @@
 """
-Atomic file writing utilities for EmbeddingOutputs.
+Atomic file writing utilities for LatentOutputs.
 
 Ensures multi-process writes don't corrupt data on cluster nodes.
 """
@@ -13,12 +13,12 @@ from typing import Dict, Any
 
 def serialize_embedding_outputs(outputs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Serialize EmbeddingOutputs dict for JSON storage.
+    Serialize LatentOutputs dict for JSON storage.
     
     Separates numpy arrays (saved as .npy) from metadata (saved as JSON).
     
     Args:
-        outputs: EmbeddingOutputs dict containing embeddings, scores, metadata, config
+        outputs: LatentOutputs dict containing embeddings, scores, metadata, config
         
     Returns:
         Serializable dict with embeddings metadata
@@ -43,13 +43,13 @@ def write_embedding_outputs_atomic(
     save_embeddings: bool = True
 ) -> None:
     """
-    Atomically write EmbeddingOutputs to avoid corruption from concurrent processes.
+    Atomically write LatentOutputs to avoid corruption from concurrent processes.
     
     Uses the atomic rename pattern (write to temp, then rename) which is
     atomic on POSIX filesystems (cluster nodes).
     
     Args:
-        outputs: EmbeddingOutputs dict containing:
+        outputs: LatentOutputs dict containing:
             - embeddings: np.ndarray
             - scores: dict of metrics
             - metadata: dict of timing/shape info
@@ -61,7 +61,7 @@ def write_embedding_outputs_atomic(
         ValueError: If outputs missing required keys
     """
     if 'embeddings' not in outputs:
-        raise ValueError("EmbeddingOutputs must contain 'embeddings' key")
+        raise ValueError("LatentOutputs must contain 'embeddings' key")
     
     # Create parent directory if needed
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,7 +102,7 @@ def write_embedding_outputs_atomic(
 
 def load_embedding_outputs(output_path: Path) -> Dict[str, Any]:
     """
-    Load EmbeddingOutputs from atomically written files.
+    Load LatentOutputs from atomically written files.
     
     Args:
         output_path: Path to JSON metadata file (outputs.json)
@@ -140,7 +140,7 @@ def write_step_outputs(
     Write outputs for a workflow step with standardized naming.
     
     Args:
-        outputs: EmbeddingOutputs dict
+        outputs: LatentOutputs dict
         step_dir: Directory for this step's outputs
         step_idx: Step index
         step_name: Step name

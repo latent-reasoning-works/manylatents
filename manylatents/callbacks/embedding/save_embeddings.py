@@ -13,7 +13,7 @@ try:
     wandb.init  # verify real package, not wandb/ output dir
 except (ImportError, AttributeError):
     wandb = None
-from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_embedding_outputs
+from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_latent_outputs
 from manylatents.utils.utils import save_embeddings
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class SaveEmbeddings(EmbeddingCallback):
                  save_additional_outputs: bool = False,
                  save_metric_tables: bool = False) -> None:
         """
-        SaveEmbeddings callback that saves EmbeddingOutputs and optionally metric tables.
+        SaveEmbeddings callback that saves LatentOutputs and optionally metric tables.
 
         Args:
             save_dir: Base directory for saving outputs (Hydra will create subdirs)
@@ -68,8 +68,8 @@ class SaveEmbeddings(EmbeddingCallback):
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
     def save_embeddings(self, embeddings: dict) -> None:
-        """Save EmbeddingOutputs - main embeddings + optionally additional outputs."""
-        embeddings = validate_embedding_outputs(embeddings)
+        """Save LatentOutputs - main embeddings + optionally additional outputs."""
+        embeddings = validate_latent_outputs(embeddings)
 
         base_name = self._get_base_filename()
         self._save_main_embeddings(embeddings, base_name)
@@ -269,7 +269,7 @@ class SaveEmbeddings(EmbeddingCallback):
                     logger.info(f"Writing to shared metrics directory: {step_dir}")
                     write_embedding_outputs_atomic(embeddings, step_dir / "outputs.json")
                     LoggingContext.write_completion_marker(step_dir)
-                    logger.info(f"Successfully wrote EmbeddingOutputs to {step_dir}")
+                    logger.info(f"Successfully wrote LatentOutputs to {step_dir}")
             except Exception as e:
                 logger.warning(f"Failed to write to shared metrics directory: {e}")
                 # Continue - don't fail the whole callback if shared logging fails

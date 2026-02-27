@@ -306,8 +306,8 @@ def determine_data_source(loader) -> Tuple[str, str]:
     elif "data" in first_batch and first_batch["data"] is not None:
         return "data", "using unified data"
     elif "embeddings" in first_batch and first_batch["embeddings"] is not None:
-        # New EmbeddingOutputs format from PrecomputedDataset
-        return "embeddings", "using precomputed embeddings from EmbeddingOutputs"
+        # New LatentOutputs format from PrecomputedDataset
+        return "embeddings", "using precomputed embeddings from LatentOutputs"
     else:
         # Try to find any tensor field as fallback
         for key, value in first_batch.items():

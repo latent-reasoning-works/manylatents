@@ -79,7 +79,7 @@ class PrecomputedDataModule(LightningDataModule):
 
     def setup(self, stage: str = None):
         if self.data_tensor is not None:
-            # In-memory data path: use InMemoryDataset for EmbeddingOutputs compatibility
+            # In-memory data path: use InMemoryDataset for LatentOutputs compatibility
             full_dataset = InMemoryDataset(self.data_tensor)
         elif self.channels is not None:
             # Multi-channel mode: load each channel from path

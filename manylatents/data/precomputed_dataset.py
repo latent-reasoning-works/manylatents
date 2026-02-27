@@ -15,10 +15,10 @@ class InMemoryDataset(Dataset):
     """
     PyTorch Dataset for in-memory numpy arrays.
 
-    This dataset wraps a numpy array and returns samples in the EmbeddingOutputs format,
+    This dataset wraps a numpy array and returns samples in the LatentOutputs format,
     ensuring compatibility with the rest of the manyLatents pipeline.
 
-    EmbeddingOutputs format:
+    LatentOutputs format:
         {
             "embeddings": tensor,  # Main embeddings data
             "data": tensor,        # Compatibility alias for embeddings
@@ -41,7 +41,7 @@ class InMemoryDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        """Return sample from EmbeddingOutputs format."""
+        """Return sample from LatentOutputs format."""
         sample = {}
         for key, value in self.embedding_outputs.items():
             if isinstance(value, torch.Tensor):
@@ -71,7 +71,7 @@ class PrecomputedDataset(Dataset):
     - Single files: .csv or .npy (legacy format)
     - Multiple files: from SaveEmbeddings with save_additional_outputs=True
 
-    Always returns EmbeddingOutputs format in __getitem__.
+    Always returns LatentOutputs format in __getitem__.
     """
     def __init__(self, path: str, label_col: str = None):
         """
@@ -85,7 +85,7 @@ class PrecomputedDataset(Dataset):
         self._load_data()
 
     def _load_data(self):
-        """Load data and convert to EmbeddingOutputs format."""
+        """Load data and convert to LatentOutputs format."""
         logger.info(f"Loading precomputed data from: {self.path}")
 
         if os.path.isfile(self.path):
@@ -169,7 +169,7 @@ class PrecomputedDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        """Return sample from EmbeddingOutputs format."""
+        """Return sample from LatentOutputs format."""
         # Build sample dictionary with indexed data
         sample = {}
         for key, value in self.embedding_outputs.items():
@@ -198,7 +198,7 @@ class MultiChannelDataset(Dataset):
     PyTorch Dataset for multi-channel precomputed embeddings.
 
     Stores multiple embedding channels and provides samples with all channels
-    concatenated. Supports the EmbeddingOutputs format.
+    concatenated. Supports the LatentOutputs format.
 
     Example:
         >>> channels = {"dna": dna_tensor, "protein": protein_tensor}

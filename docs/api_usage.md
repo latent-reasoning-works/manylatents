@@ -151,7 +151,7 @@ print(f"Final shape: {current_data['embeddings'].shape}")
 
 The in-memory data pipeline uses:
 - `PrecomputedDataModule`: Accepts `data` parameter for numpy arrays
-- `InMemoryDataset`: Wraps arrays in EmbeddingOutputs format
+- `InMemoryDataset`: Wraps arrays in LatentOutputs format
 - Compatible with all ManyLatents metrics, callbacks, and visualizations
 
 ## Troubleshooting
