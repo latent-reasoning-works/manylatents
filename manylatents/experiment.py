@@ -246,17 +246,17 @@ def prewarm_cache(
 
 @evaluate.register(dict)
 def evaluate_embeddings(
-    EmbeddingOutputs: dict,
+    latent_outputs: dict,
     *,
     cfg: DictConfig,
     datamodule,
     **kwargs,
 ) -> dict:
-    if EmbeddingOutputs is None or EmbeddingOutputs.get("embeddings") is None:
+    if latent_outputs is None or latent_outputs.get("embeddings") is None:
         logger.warning("No embeddings available for evaluation.")
         return {}
 
-    embeddings = EmbeddingOutputs.get("embeddings")
+    embeddings = latent_outputs.get("embeddings")
 
     # Ensure embeddings are numpy arrays (metrics and sampling require numpy)
     if torch.is_tensor(embeddings):

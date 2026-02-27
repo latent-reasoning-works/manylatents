@@ -68,27 +68,32 @@ class ColormapProvider(Protocol):
         """
         ...
 
-EmbeddingOutputs = dict[str, Any]
+LatentOutputs = dict[str, Any]
 """
-Standard data interchange format for manyLatents pipeline.
+Standard data interchange format for the manylatents pipeline.
 
 Required:
-    embeddings (np.ndarray): Primary reduced dimensionality output
+    embeddings (np.ndarray): Primary reduced dimensionality output, shape (n, d)
 
 Standard optional keys:
     label: Labels/targets for data samples
     metadata: Algorithm parameters and info
     scores: Evaluation metrics
 
-Custom keys are encouraged for algorithm-specific outputs.
+Custom keys are encouraged for algorithm-specific outputs
+(e.g., trajectories, cluster assignments, velocity fields).
 """
 
-def validate_embedding_outputs(outputs: EmbeddingOutputs) -> EmbeddingOutputs:
+# Backward-compatible alias (deprecated)
+EmbeddingOutputs = LatentOutputs
+
+
+def validate_latent_outputs(outputs: LatentOutputs) -> LatentOutputs:
     """
-    Validates that EmbeddingOutputs contains the required 'embeddings' key.
+    Validates that LatentOutputs contains the required 'embeddings' key.
 
     Args:
-        outputs: Dictionary containing embedding outputs
+        outputs: Dictionary containing latent outputs
 
     Returns:
         The validated outputs dictionary
@@ -97,12 +102,16 @@ def validate_embedding_outputs(outputs: EmbeddingOutputs) -> EmbeddingOutputs:
         ValueError: If not a dictionary or missing 'embeddings' key
     """
     if not isinstance(outputs, dict):
-        raise ValueError("EmbeddingOutputs must be a dictionary")
+        raise ValueError("LatentOutputs must be a dictionary")
 
     if "embeddings" not in outputs:
-        raise ValueError("EmbeddingOutputs must contain an 'embeddings' key")
+        raise ValueError("LatentOutputs must contain an 'embeddings' key")
 
     return outputs
+
+
+# Backward-compatible alias (deprecated)
+validate_embedding_outputs = validate_latent_outputs
     
 class EmbeddingCallback(BaseCallback, ABC):
     
@@ -116,7 +125,7 @@ class EmbeddingCallback(BaseCallback, ABC):
         logger.info(f"Output registered under key: {key}")
 
     @abstractmethod
-    def on_latent_end(self, dataset: Any, embeddings: EmbeddingOutputs) -> Any:
+    def on_latent_end(self, dataset: Any, embeddings: LatentOutputs) -> Any:
         """
         Called when the latent process is complete.
         

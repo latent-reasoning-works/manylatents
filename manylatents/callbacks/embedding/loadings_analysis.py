@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from manylatents.callbacks.embedding.base import EmbeddingCallback, EmbeddingOutputs
+from manylatents.callbacks.embedding.base import EmbeddingCallback, LatentOutputs
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class LoadingsAnalysisCallback(EmbeddingCallback):
     def on_latent_end(
         self,
         dataset: Any,
-        embeddings: EmbeddingOutputs,
+        embeddings: LatentOutputs,
         module: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
@@ -151,7 +151,7 @@ class LoadingsAnalysisCallback(EmbeddingCallback):
 
         Args:
             dataset: Dataset object (unused).
-            embeddings: EmbeddingOutputs dict.
+            embeddings: LatentOutputs dict.
             module: LatentModule with get_loadings() method.
 
         Returns:

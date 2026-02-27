@@ -63,7 +63,7 @@ def metric_fn(embeddings: np.ndarray, dataset=None, module=None, cache=None) -> 
 
 All metrics share a `cache` dict for deduplicated kNN/eigenvalue computation. Three evaluation contexts: `embedding`, `dataset`, `module`.
 
-**Data contract**: `EmbeddingOutputs = dict[str, Any]` — required key `"embeddings"`, optional `"scores"`, `"label"`, `"metadata"`.
+**Data contract**: `LatentOutputs = dict[str, Any]` — required key `"embeddings"`, optional `"scores"`, `"label"`, `"metadata"`. (`EmbeddingOutputs` is a deprecated alias.)
 
 ## Config System
 
