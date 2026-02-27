@@ -412,6 +412,17 @@ class GAGA(LightningModule):
             on_epoch=True,
         )
 
+    def test_step(self, batch, batch_idx):
+        """Compute reconstruction loss on test data."""
+        from .networks.gaga_net import gaga_reconstruction_loss
+
+        x = batch["data"] if isinstance(batch, dict) else batch[0]
+        x_norm = self._preprocessor.normalize(x)
+        x_hat_norm, z = self.network(x_norm)
+        loss = gaga_reconstruction_loss(x_hat_norm, x_norm)
+        self.log("test_loss", loss, prog_bar=True, on_epoch=True)
+        return {"loss": loss}
+
     # ------------------------------------------------------------------
     # Inference
     # ------------------------------------------------------------------
