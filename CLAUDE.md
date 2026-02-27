@@ -21,6 +21,18 @@ Hydra instantiation configs (algorithm, data, metric, callback YAMLs) belong her
 uv run pytest tests/ -x -q && uv run pytest manylatents/callbacks/tests/ -x -q
 ```
 
+If `gh` CLI is available, run CI locally **before pushing** to catch runner-specific failures early:
+
+```bash
+gh act -W .github/workflows/ci.yml   # run CI workflow locally via act
+```
+
+If `act` is not installed, at minimum verify checks immediately after push and fix before merging:
+
+```bash
+gh run watch   # watch the CI run after pushing
+```
+
 If CI fails after pushing, fix immediately — do not leave main broken.
 
 ## Entry Points
@@ -52,8 +64,10 @@ result["scores"]      # {"embedding.trustworthiness": 0.95}
 
 | If the algorithm... | Use | Interface |
 |---|---|---|
-| has no training loop | `LatentModule` (`algorithms.latent.latent_module_base`) | `fit(x)` / `transform(x)` |
-| trains with backprop | `LightningModule` (`algorithms.lightning.*`) | `trainer.fit()` / `encode(x)` |
+| is self-contained | `LatentModule` (`algorithms.latent.latent_module_base`) | `fit(x)` / `transform(x)` |
+| needs Lightning Trainer features (callbacks, logging, checkpointing, multi-GPU) | `LightningModule` (`algorithms.lightning.*`) | `trainer.fit()` / `encode(x)` |
+
+A LatentModule may use gradients internally (e.g. MIOFlow JAX) — the distinction is API surface, not whether backprop is involved.
 
 **Metric protocol** (`manylatents.metrics.metric`):
 
