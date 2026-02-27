@@ -60,7 +60,7 @@ class Preprocessor(nn.Module):
         return d / self.dist_std
 
 
-class GAGAAutoencoder(nn.Module):
+class GAGANetwork(nn.Module):
     """MLP autoencoder with optional spectral normalization.
 
     Mirrors the ``Autoencoder`` in ``autoencoder.py`` but always returns

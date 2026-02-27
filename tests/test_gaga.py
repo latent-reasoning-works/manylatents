@@ -57,14 +57,14 @@ class TestPreprocessor:
         assert "mean" in sd and "std" in sd and "dist_std" in sd
 
 
-class TestGAGAAutoencoder:
-    """Tests for the GAGAAutoencoder network."""
+class TestGAGANetwork:
+    """Tests for the GAGANetwork."""
 
     def test_forward_shape(self):
         """forward returns (x_hat, z) with correct shapes."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(input_dim=50, latent_dim=2, hidden_dims=[32, 16])
+        net = GAGANetwork(input_dim=50, latent_dim=2, hidden_dims=[32, 16])
         x = torch.randn(20, 50)
         x_hat, z = net(x)
         assert x_hat.shape == (20, 50)
@@ -72,27 +72,27 @@ class TestGAGAAutoencoder:
 
     def test_encode_shape(self):
         """encode returns correct latent shape."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(input_dim=30, latent_dim=3, hidden_dims=64)
+        net = GAGANetwork(input_dim=30, latent_dim=3, hidden_dims=64)
         x = torch.randn(10, 30)
         z = net.encode(x)
         assert z.shape == (10, 3)
 
     def test_decode_shape(self):
         """decode returns correct reconstruction shape."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(input_dim=30, latent_dim=3, hidden_dims=64)
+        net = GAGANetwork(input_dim=30, latent_dim=3, hidden_dims=64)
         z = torch.randn(10, 3)
         x_hat = net.decode(z)
         assert x_hat.shape == (10, 30)
 
     def test_single_hidden_dim_int(self):
         """A scalar hidden_dims is accepted and produces correct shapes."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(input_dim=20, latent_dim=2, hidden_dims=32)
+        net = GAGANetwork(input_dim=20, latent_dim=2, hidden_dims=32)
         x = torch.randn(5, 20)
         x_hat, z = net(x)
         assert x_hat.shape == (5, 20)
@@ -100,9 +100,9 @@ class TestGAGAAutoencoder:
 
     def test_batchnorm_and_dropout(self):
         """Network constructs and runs with batchnorm + dropout enabled."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(
+        net = GAGANetwork(
             input_dim=20,
             latent_dim=2,
             hidden_dims=[16, 8],
@@ -115,9 +115,9 @@ class TestGAGAAutoencoder:
 
     def test_spectral_norm(self):
         """Spectral norm wraps Linear layers (weight_orig present)."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(
+        net = GAGANetwork(
             input_dim=20, latent_dim=2, hidden_dims=[16], spectral_norm=True
         )
         # Spectral norm replaces weight with weight_orig + weight_v
@@ -126,10 +126,10 @@ class TestGAGAAutoencoder:
 
     def test_activations(self):
         """All supported activations produce valid output."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
         for act in ("relu", "tanh", "sigmoid"):
-            net = GAGAAutoencoder(
+            net = GAGANetwork(
                 input_dim=10, latent_dim=2, hidden_dims=8, activation=act
             )
             x_hat, z = net(torch.randn(4, 10))
@@ -137,9 +137,9 @@ class TestGAGAAutoencoder:
 
     def test_gradients_flow(self):
         """Gradients propagate through encode -> decode."""
-        from manylatents.algorithms.lightning.networks.gaga_net import GAGAAutoencoder
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork
 
-        net = GAGAAutoencoder(input_dim=10, latent_dim=2, hidden_dims=8)
+        net = GAGANetwork(input_dim=10, latent_dim=2, hidden_dims=8)
         x = torch.randn(4, 10)
         x_hat, z = net(x)
         loss = x_hat.sum()
