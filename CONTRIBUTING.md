@@ -251,7 +251,7 @@ Some features require optional extras. If your contribution uses an optional dep
 2. Use lazy imports (`try/except ImportError`) so the core package doesn't break without it
 3. Add `pytest.importorskip()` or `@pytest.mark.skipif` to tests that need the dep
 
-Current extras: `tracking` (wandb), `hf` (transformers), `dynamics` (torchdiffeq/torchsde), `transport` (POT), `topology` (ripser), `cluster` (submitit), `torchdr`, `docs`.
+Current extras: `hf` (transformers), `torchdr` (TorchDR + faiss), `jax` (JAX + diffrax + optax + ott-jax), `docs`.
 
 ---
 

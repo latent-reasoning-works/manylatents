@@ -1,6 +1,6 @@
 [project]
 name = "manylatents"
-version = "0.1.0"
+version = "0.1.1"
 description = "Unified dimensionality reduction and neural network analysis framework"
 license = "MIT"
 authors = [
@@ -48,32 +48,30 @@ dependencies = [
     "rich>=13.9",
     "Deprecated>=1.2",
     "wandb>=0.25.0",
+    # Dynamics (Neural ODE / SDE)
+    "torchdiffeq>=0.2",
+    "torchsde>=0.2",
+    # Optimal transport
+    "POT>=0.9",
+    # Persistent homology
+    "ripser>=0.6",
+    # SLURM cluster submission
+    "hydra-submitit-launcher>=1.2",
+    # Community detection
+    "leidenalg>=0.10",
+    "python-igraph>=1.0",
 ]
 
 [project.optional-dependencies]
-# Experiment tracking (wandb)
-tracking = ["wandb>=0.19"]
 # HuggingFace trainer support
 hf = ["transformers>=4.40"]
-# Neural ODE / SDE dynamics
-dynamics = ["torchdiffeq>=0.2", "torchsde>=0.2"]
-# Optimal transport (DiffusionMerging)
-transport = ["POT>=0.9"]
-# Persistent homology / topological metrics
-topology = ["ripser>=0.6"]
-# SLURM cluster submission
-cluster = ["hydra-submitit-launcher>=1.2"]
 # GPU-accelerated DR via TorchDR
 torchdr = [
     "torchdr>=0.3,<0.4",
     "faiss-cpu",
 ]
-# Leiden community detection for clustering analysis
-clustering = ["leidenalg>=0.10", "python-igraph>=1.0"]
-# MIOFlow trajectory inference (PyTorch)
-mioflow = ["torchdiffeq>=0.2", "POT>=0.9"]
-# MIOFlow trajectory inference (JAX)
-mioflow-jax = ["jax[cpu]", "diffrax>=0.6", "optax>=0.2", "ott-jax>=0.4"]
+# JAX backend (MIOFlow JAX, diffrax)
+jax = ["jax", "diffrax>=0.6", "optax>=0.2", "ott-jax>=0.4"]
 # Documentation building
 docs = [
     "mkdocs>=1.6",
@@ -82,7 +80,7 @@ docs = [
 ]
 # All optional extras (excluding docs/dev)
 all = [
-    "manylatents[tracking,hf,dynamics,transport,topology,cluster,torchdr,clustering]",
+    "manylatents[hf,torchdr,jax]",
 ]
 
 [project.scripts]
@@ -107,7 +105,9 @@ managed = true
 
 [dependency-groups]
 dev = [
+    "anndata>=0.12.6",
     "pytest>=8.3",
+    "scanpy>=1.11.5",
     "shop",
 ]
 

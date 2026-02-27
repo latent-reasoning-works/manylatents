@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-02-27
+
+### Fixed
+- Trainer default config: `gradient_clip_val: null` instead of `1.0` — fixes GAGA and MIOFlow LightningModules that use manual optimization
+
+### Changed
+- Absorbed lightweight extras into core dependencies: `torchdiffeq`, `torchsde`, `POT`, `ripser`, `hydra-submitit-launcher`, `leidenalg`, `python-igraph`
+- Renamed `mioflow-jax` extra to `jax` (bare `jax`, no `[cpu]` pin)
+- Removed dead extras: `tracking`, `dynamics`, `transport`, `topology`, `cluster`, `clustering`, `mioflow`
+- `all` extra now installs `manylatents[hf,torchdr,jax]`
+
 ## [0.1.0] - 2026-02-17
 
 ### Added
