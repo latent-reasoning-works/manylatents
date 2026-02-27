@@ -76,7 +76,7 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
     1. Callbacks instantiated from config
     2. Lightning callbacks passed to `Trainer(callbacks=[...])`
     3. Algorithm executes (fit/transform or trainer.fit)
-    4. Embeddings wrapped as `EmbeddingOutputs` dict
+    4. Embeddings wrapped as `LatentOutputs` dict
     5. Metrics evaluated
     6. Each embedding callback's `on_latent_end()` called with dataset + embeddings
     7. Callback outputs merged into the embeddings dict
@@ -88,17 +88,34 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
             callback_outputs.update(cb_result)
     ```
 
-    ## EmbeddingOutputs
+    ## LatentOutputs
 
     The standard interchange format passed to all embedding callbacks:
 
     ```python
-    EmbeddingOutputs = dict[str, Any]
-    # Required: "embeddings" (np.ndarray)
+    LatentOutputs = dict[str, Any]
+    # Required: "embeddings" (np.ndarray) — shape (n, d)
     # Optional: "label", "metadata", "scores", "callback_outputs"
+    # Custom keys: "trajectories", cluster assignments, velocity fields, etc.
     ```
 
-    `validate_embedding_outputs()` checks the required key exists.
+    `validate_latent_outputs()` checks the required key exists.
+
+    ### Output Types
+
+    Algorithms populate different keys depending on what they produce:
+
+    | Key | Shape | Description |
+    |-----|-------|-------------|
+    | `"embeddings"` | `(n, d)` | Point cloud in latent space (default, chainable in pipelines) |
+    | `"trajectories"` | `(n_bins, n_traj, d)` | Flow paths from trajectory inference methods |
+    | `"label"` | `(n,)` | Ground truth labels |
+    | `"scores"` | `dict` | Evaluation metrics |
+    | `"metadata"` | `dict` | Algorithm info and runtime metadata |
+
+    The `"embeddings"` key is the standard primary output used by metrics, plotting, and pipeline chaining. Trajectory methods (e.g., MIOFlow) populate both `"embeddings"` (e.g., endpoint positions) and `"trajectories"` for the full flow data.
+
+    `SaveEmbeddings` automatically persists any additional keys as separate `.npy` or `.json` files when `save_additional_outputs: true`.
 
 === "Embedding Callbacks"
 

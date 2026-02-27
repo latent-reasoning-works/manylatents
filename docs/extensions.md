@@ -144,7 +144,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
 
     This constraint shapes everything:
 
-    - **EmbeddingOutputs** is a `dict[str, Any]`, not a dataclass. When a new metric injects a custom field, every downstream consumer still works without schema migration.
+    - **LatentOutputs** is a `dict[str, Any]`, not a dataclass. When a new metric injects a custom field, every downstream consumer still works without schema migration.
     - **Metrics** are registered via Hydra configs with `_target_` and `_partial_: True`. Parameters are bound at config time, not at call time, so the evaluation engine doesn't need to know what parameters each metric takes.
     - **Algorithms** are either `LatentModule` (fit/transform) or `LightningModule` subclasses (training loops). The execution engine dispatches on type, not on name.
 

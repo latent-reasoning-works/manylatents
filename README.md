@@ -96,7 +96,7 @@ result2 = run(input_data=result["embeddings"], algorithms={"latent": "phate"})
 
 ```
 ┌────────────┐      ┌───────────────────┐      ┌────────────────┐
-│   Config   │─────►│    Algorithm      │─────►│ EmbeddingOutputs│
+│   Config   │─────►│    Algorithm      │─────►│  LatentOutputs  │
 │            │      │                   │      │                │
 │ algorithms │      │  LatentModule     │      │ dict[str, Any] │
 │ data       │      │    fit(x)         │      │ "embeddings"   │
@@ -120,7 +120,7 @@ Two base classes, one decision rule:
 | has no training loop | `LatentModule` | `fit(x)` / `transform(x)` |
 | trains with backprop | `LightningModule` | `trainer.fit()` / `encode(x)` |
 
-Both produce `EmbeddingOutputs` — a dict keyed by `"embeddings"`. All metrics receive a shared `cache` dict for deduplicated kNN and eigenvalue computation.
+Both produce `LatentOutputs` — a dict keyed by `"embeddings"`. All metrics receive a shared `cache` dict for deduplicated kNN and eigenvalue computation.
 
 ---
 
