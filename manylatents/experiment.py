@@ -197,9 +197,11 @@ def extract_k_requirements(metric_cfgs: Dict[str, DictConfig]) -> dict:
                     break
 
         if k_val is not None:
-            emb_k.add(k_val)
-            if target in _DATA_KNN_METRICS:
+            input_space = getattr(metric_cfg, "input_space", "embedding")
+            if input_space == "dataset" or target in _DATA_KNN_METRICS:
                 data_k.add(k_val)
+            if input_space != "dataset":
+                emb_k.add(k_val)
 
         if target in _SPECTRAL_METRICS:
             spectral = True
