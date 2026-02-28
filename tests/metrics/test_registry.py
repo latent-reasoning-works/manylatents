@@ -19,8 +19,8 @@ def test_registry_has_beta_aliases():
     assert "beta_0" in registry
     assert "beta_1" in registry
     assert registry["beta_0"].func.__name__ == "PersistentHomology"
-    assert registry["beta_0"].params == {"homology_dim": 0}
-    assert registry["beta_1"].params == {"homology_dim": 1}
+    assert registry["beta_0"].params == {"homology_dim": 0, "max_N": 2000, "random_seed": 0}
+    assert registry["beta_1"].params == {"homology_dim": 1, "max_N": 2000, "random_seed": 0}
 
 
 def test_registry_has_participation_ratio():
@@ -52,10 +52,10 @@ def test_resolve_metric():
 
     fn, params = resolve_metric("beta_0")
     assert fn.__name__ == "PersistentHomology"
-    assert params == {"homology_dim": 0}
+    assert params == {"homology_dim": 0, "max_N": 2000, "random_seed": 0}
 
     fn, params = resolve_metric("beta_1")
-    assert params == {"homology_dim": 1}
+    assert params == {"homology_dim": 1, "max_N": 2000, "random_seed": 0}
 
 
 @needs_ripser
@@ -80,7 +80,7 @@ def test_get_metric():
 
     spec = get_metric("beta_0")
     assert callable(spec)
-    assert spec.params == {"homology_dim": 0}
+    assert spec.params == {"homology_dim": 0, "max_N": 2000, "random_seed": 0}
 
 
 def test_get_metric_raises_on_unknown():
