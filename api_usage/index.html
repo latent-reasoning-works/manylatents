@@ -1,0 +1,1176 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://latent-reasoning-works.github.io/manylatents/api_usage/">
+      
+      
+        <link rel="prev" href="../extensions/">
+      
+      
+        <link rel="next" href="../probing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>API - manylatents</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-usage-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="manylatents" class="md-header__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            manylatents
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="manylatents" class="md-nav__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    manylatents
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chained-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chained Workflows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dimensionality-reduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dimensionality Reduction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runinput_datanone-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run(input_data=None, **overrides)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disabling-features-for-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling Features for Speed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-format-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Format Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-step-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Step Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Details
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#chained-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chained Workflows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dimensionality-reduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dimensionality Reduction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="API Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runinput_datanone-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run(input_data=None, **overrides)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disabling-features-for-speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling Features for Speed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-format-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Format Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-step-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Step Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Details
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="api-usage-guide">API Usage Guide</h1>
+<p>The ManyLatents programmatic API enables workflow integration and in-memory data chaining.</p>
+<h2 id="quick-start">Quick Start</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+
+<span class="c1"># Single algorithm run</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="s1">&#39;manylatents.algorithms.latent.pca.PCAModule&#39;</span><span class="p">,</span> <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">}}</span>
+<span class="p">)</span>
+
+<span class="n">embeddings</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">]</span>  <span class="c1"># numpy array</span>
+<span class="n">scores</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;scores&#39;</span><span class="p">]</span>          <span class="c1"># dict of metrics</span>
+</code></pre></div>
+<h2 id="chained-workflows">Chained Workflows</h2>
+<p>Chain multiple algorithms by passing the output of one as input to another:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+
+<span class="c1"># Step 1: Initial dimensionality reduction</span>
+<span class="n">result1</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="s1">&#39;manylatents.algorithms.latent.pca.PCAModule&#39;</span><span class="p">,</span> <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="mi">50</span><span class="p">}}</span>
+<span class="p">)</span>
+
+<span class="c1"># Step 2: Chain to another algorithm</span>
+<span class="n">result2</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">input_data</span><span class="o">=</span><span class="n">result1</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">],</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="s1">&#39;manylatents.algorithms.latent.umap.UMAPModule&#39;</span><span class="p">,</span> <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}}</span>
+<span class="p">)</span>
+
+<span class="n">final_embeddings</span> <span class="o">=</span> <span class="n">result2</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">]</span>
+</code></pre></div>
+<p>Note: Embeddings are automatically converted to numpy arrays by the evaluation system.</p>
+<h2 id="available-algorithms">Available Algorithms</h2>
+<h3 id="dimensionality-reduction">Dimensionality Reduction</h3>
+<ul>
+<li><strong>PCA</strong>: <code>manylatents.algorithms.latent.pca.PCAModule</code></li>
+<li><strong>t-SNE</strong>: <code>manylatents.algorithms.latent.tsne.TSNEModule</code></li>
+<li><strong>UMAP</strong>: <code>manylatents.algorithms.latent.umap.UMAPModule</code></li>
+<li><strong>PHATE</strong>: <code>manylatents.algorithms.latent.phate.PHATEModule</code></li>
+</ul>
+<h2 id="api-reference">API Reference</h2>
+<h3 id="runinput_datanone-overrides"><code>run(input_data=None, **overrides)</code></h3>
+<p>Execute a dimensionality reduction algorithm.</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>input_data</code> (np.ndarray, optional): In-memory data array of shape <code>(n_samples, n_features)</code>. If provided, this data is used instead of loading from a dataset.</li>
+<li><code>**overrides</code>: Configuration overrides (e.g., <code>data='swissroll'</code>, <code>algorithms={...}</code>)</li>
+</ul>
+<p><strong>Returns:</strong></p>
+<p>Dictionary with keys:
+- <code>embeddings</code>: Computed embeddings (numpy array)
+- <code>label</code>: Labels from dataset (if available)
+- <code>metadata</code>: Run metadata dictionary
+- <code>scores</code>: Evaluation metrics (if enabled)</p>
+<p><strong>Examples:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Using a built-in dataset</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span> <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="s1">&#39;pca&#39;</span><span class="p">})</span>
+
+<span class="c1"># Using in-memory data</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="n">my_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">input_data</span><span class="o">=</span><span class="n">my_data</span><span class="p">,</span> <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="s1">&#39;pca&#39;</span><span class="p">})</span>
+
+<span class="c1"># Chaining algorithms</span>
+<span class="n">result2</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">input_data</span><span class="o">=</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">],</span> <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="s1">&#39;umap&#39;</span><span class="p">})</span>
+</code></pre></div>
+<h2 id="advanced-usage">Advanced Usage</h2>
+<h3 id="custom-configuration">Custom Configuration</h3>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span>
+        <span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="s1">&#39;manylatents.algorithms.latent.umap.UMAPModule&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="s1">&#39;n_neighbors&#39;</span><span class="p">:</span> <span class="mi">15</span><span class="p">,</span>
+            <span class="s1">&#39;min_dist&#39;</span><span class="p">:</span> <span class="mf">0.1</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+</code></pre></div>
+<h3 id="disabling-features-for-speed">Disabling Features for Speed</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Disable W&amp;B logging</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span> <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="s1">&#39;pca&#39;</span><span class="p">},</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Skip evaluation metrics</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span> <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="s1">&#39;pca&#39;</span><span class="p">},</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="data-format-requirements">Data Format Requirements</h2>
+<ul>
+<li><strong>Input</strong>: numpy.ndarray with dtype <code>float32</code> or <code>float64</code></li>
+<li><strong>Shape</strong>: <code>(n_samples, n_features)</code></li>
+<li><strong>Output</strong>: numpy array (tensor conversion is handled automatically)</li>
+</ul>
+<h2 id="multi-step-example">Multi-Step Example</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+
+<span class="c1"># Progressive dimensionality reduction</span>
+<span class="n">steps</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s1">&#39;PCA 100D&#39;</span><span class="p">,</span> <span class="s1">&#39;manylatents.algorithms.latent.pca.PCAModule&#39;</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;PCA 50D&#39;</span><span class="p">,</span> <span class="s1">&#39;manylatents.algorithms.latent.pca.PCAModule&#39;</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;UMAP 2D&#39;</span><span class="p">,</span> <span class="s1">&#39;manylatents.algorithms.latent.umap.UMAPModule&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="c1"># Initial data</span>
+<span class="n">current_data</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="n">steps</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="n">steps</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]}}</span>
+<span class="p">)</span>
+
+<span class="c1"># Chain subsequent steps</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">n_comp</span> <span class="ow">in</span> <span class="n">steps</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">current_data</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+        <span class="n">input_data</span><span class="o">=</span><span class="n">current_data</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">],</span>
+        <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="n">target</span><span class="p">,</span> <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="n">n_comp</span><span class="p">}}</span>
+    <span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final shape: </span><span class="si">{</span><span class="n">current_data</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="implementation-details">Implementation Details</h2>
+<p>The in-memory data pipeline uses:
+- <code>PrecomputedDataModule</code>: Accepts <code>data</code> parameter for numpy arrays
+- <code>InMemoryDataset</code>: Wraps arrays in LatentOutputs format
+- Compatible with all ManyLatents metrics, callbacks, and visualizations</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<p><strong>"PrecomputedDataModule requires either a 'path' or 'data' argument"</strong></p>
+<p>Provide either <code>data='dataset_name'</code> OR <code>input_data=array</code>, not both or neither.</p>
+<h2 id="see-also">See Also</h2>
+<ul>
+<li><a href="../testing/">Testing Guide</a></li>
+<li><a href="../metrics/">Metrics</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

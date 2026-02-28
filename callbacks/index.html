@@ -1,0 +1,1347 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://latent-reasoning-works.github.io/manylatents/callbacks/">
+      
+      
+        <link rel="prev" href="../cache/">
+      
+      
+        <link rel="next" href="../extensions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Callbacks - manylatents</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#callbacks" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="manylatents" class="md-header__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            manylatents
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Callbacks
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="manylatents" class="md-nav__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    manylatents
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#callback-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callback Hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instantiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantiation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#latentoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LatentOutputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LatentOutputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#output-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saveembeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SaveEmbeddings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plotembeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PlotEmbeddings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PlotEmbeddings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#colormap-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Colormap Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coloring-by-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coloring by Score
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wandblogscores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WandbLogScores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loadingsanalysiscallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoadingsAnalysisCallback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lightning-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lightning Callbacks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lightning Callbacks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#activationtrajectorycallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ActivationTrajectoryCallback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-trainer-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a Trainer Callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-an-embedding-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding an Embedding Callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#callback-hierarchy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Callback Hierarchy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instantiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantiation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#latentoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LatentOutputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LatentOutputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#output-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saveembeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SaveEmbeddings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plotembeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PlotEmbeddings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PlotEmbeddings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#colormap-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Colormap Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coloring-by-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coloring by Score
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wandblogscores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WandbLogScores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loadingsanalysiscallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoadingsAnalysisCallback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lightning-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lightning Callbacks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lightning Callbacks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#activationtrajectorycallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ActivationTrajectoryCallback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-trainer-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a Trainer Callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-an-embedding-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding an Embedding Callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="callbacks">Callbacks</h1>
+<p>manyLatents has two callback systems: <strong>embedding callbacks</strong> for post-embedding processing, and <strong>trainer callbacks</strong> (Lightning) for training-time hooks.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Architecture</label><label for="__tabbed_1_2">Embedding Callbacks</label><label for="__tabbed_1_3">Trainer Callbacks</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="callback-hierarchy">Callback Hierarchy</h2>
+<div class="highlight"><pre><span></span><code>BaseCallback (ABC)
+├── on_experiment_start(cfg)
+├── on_experiment_end()
+├── on_latent_end(dataset, embeddings)
+├── on_training_start()
+└── on_training_end()
+
+EmbeddingCallback(BaseCallback, ABC)
+├── on_latent_end(dataset, embeddings)  ← abstract, must implement
+├── register_output(key, output)        ← store results for downstream
+└── callback_outputs: dict              ← accumulated outputs
+
+lightning.Callback                      ← PyTorch Lightning&#39;s callback
+├── on_fit_start()
+├── on_train_batch_end()
+├── on_train_epoch_end()
+├── on_validation_end()
+└── ...
+</code></pre></div>
+<p><code>EmbeddingCallback</code> runs <strong>after</strong> embeddings are computed (for both LatentModule and LightningModule). Lightning <code>Callback</code> runs <strong>during</strong> training (LightningModule only).</p>
+<h2 id="instantiation">Instantiation</h2>
+<p>Callbacks are instantiated from two config groups and routed by type:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">instantiate_callbacks</span><span class="p">(</span><span class="n">trainer_cb_cfg</span><span class="p">,</span> <span class="n">embedding_cb_cfg</span><span class="p">):</span>
+    <span class="n">lightning_cbs</span><span class="p">,</span> <span class="n">embedding_cbs</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">cfg</span> <span class="ow">in</span> <span class="n">trainer_cb_cfg</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">cb</span> <span class="o">=</span> <span class="n">hydra</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">instantiate</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cb</span><span class="p">,</span> <span class="n">Callback</span><span class="p">):</span>
+            <span class="n">lightning_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cb</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">cfg</span> <span class="ow">in</span> <span class="n">embedding_cb_cfg</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">cb</span> <span class="o">=</span> <span class="n">hydra</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">instantiate</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cb</span><span class="p">,</span> <span class="n">EmbeddingCallback</span><span class="p">):</span>
+            <span class="n">embedding_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cb</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">lightning_cbs</span><span class="p">,</span> <span class="n">embedding_cbs</span>
+</code></pre></div>
+<h2 id="config-structure">Config Structure</h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/callbacks/default.yaml</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">trainer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">         </span><span class="c1"># Lightning callbacks (probing, etc.)</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">embedding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">       </span><span class="c1"># Embedding callbacks (save, plot, wandb)</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_self_</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/callbacks/embedding/default.yaml</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">save_embeddings</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">plot_embeddings</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wandb_log_scores</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">_self_</span>
+</code></pre></div>
+<h2 id="execution-flow">Execution Flow</h2>
+<p>In <code>run_algorithm()</code>:</p>
+<ol>
+<li>Callbacks instantiated from config</li>
+<li>Lightning callbacks passed to <code>Trainer(callbacks=[...])</code></li>
+<li>Algorithm executes (fit/transform or trainer.fit)</li>
+<li>Embeddings wrapped as <code>LatentOutputs</code> dict</li>
+<li>Metrics evaluated</li>
+<li>Each embedding callback's <code>on_latent_end()</code> called with dataset + embeddings</li>
+<li>Callback outputs merged into the embeddings dict</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">cb</span> <span class="ow">in</span> <span class="n">embedding_cbs</span><span class="p">:</span>
+    <span class="n">cb_result</span> <span class="o">=</span> <span class="n">cb</span><span class="o">.</span><span class="n">on_latent_end</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">datamodule</span><span class="o">.</span><span class="n">test_dataset</span><span class="p">,</span> <span class="n">embeddings</span><span class="o">=</span><span class="n">embeddings</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cb_result</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">callback_outputs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">cb_result</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="latentoutputs">LatentOutputs</h2>
+<p>The standard interchange format passed to all embedding callbacks:</p>
+<div class="highlight"><pre><span></span><code><span class="n">LatentOutputs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<span class="c1"># Required: &quot;embeddings&quot; (np.ndarray) — shape (n, d)</span>
+<span class="c1"># Optional: &quot;label&quot;, &quot;metadata&quot;, &quot;scores&quot;, &quot;callback_outputs&quot;</span>
+<span class="c1"># Custom keys: &quot;trajectories&quot;, cluster assignments, velocity fields, etc.</span>
+</code></pre></div>
+<p><code>validate_latent_outputs()</code> checks the required key exists.</p>
+<h3 id="output-types">Output Types</h3>
+<p>Algorithms populate different keys depending on what they produce:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Shape</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"embeddings"</code></td>
+<td><code>(n, d)</code></td>
+<td>Point cloud in latent space (default, chainable in pipelines)</td>
+</tr>
+<tr>
+<td><code>"trajectories"</code></td>
+<td><code>(n_bins, n_traj, d)</code></td>
+<td>Flow paths from trajectory inference methods</td>
+</tr>
+<tr>
+<td><code>"label"</code></td>
+<td><code>(n,)</code></td>
+<td>Ground truth labels</td>
+</tr>
+<tr>
+<td><code>"scores"</code></td>
+<td><code>dict</code></td>
+<td>Evaluation metrics</td>
+</tr>
+<tr>
+<td><code>"metadata"</code></td>
+<td><code>dict</code></td>
+<td>Algorithm info and runtime metadata</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>"embeddings"</code> key is the standard primary output used by metrics, plotting, and pipeline chaining. Trajectory methods populate both <code>"embeddings"</code> (e.g., endpoint positions) and <code>"trajectories"</code> for the full flow data.</p>
+<p><code>SaveEmbeddings</code> automatically persists any additional keys as separate <code>.npy</code> or <code>.json</code> files when <code>save_additional_outputs: true</code>.</p>
+</div>
+<div class="tabbed-block">
+<h2 id="saveembeddings">SaveEmbeddings</h2>
+<p>Saves embeddings to disk in CSV or NPY format. Optionally saves metric tables (scalar summary and per-sample).</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/callbacks/embedding/save_embeddings.yaml</span>
+<span class="nt">save_embeddings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.callbacks.embedding.save_embeddings.SaveEmbeddings</span>
+<span class="w">  </span><span class="nt">save_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${hydra:runtime.output_dir}</span>
+<span class="w">  </span><span class="nt">save_format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;csv&quot;</span>
+<span class="w">  </span><span class="nt">experiment_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${name}</span>
+<span class="w">  </span><span class="nt">save_metric_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>save_dir</code></td>
+<td>Hydra output dir</td>
+<td>Base directory for saved files</td>
+</tr>
+<tr>
+<td><code>save_format</code></td>
+<td><code>"csv"</code></td>
+<td>Format: <code>"csv"</code> or <code>"npy"</code></td>
+</tr>
+<tr>
+<td><code>save_metric_tables</code></td>
+<td><code>false</code></td>
+<td>Save separate scalar + per-sample metric CSVs</td>
+</tr>
+<tr>
+<td><code>save_additional_outputs</code></td>
+<td><code>false</code></td>
+<td>Save non-embedding keys as separate files</td>
+</tr>
+</tbody>
+</table>
+<p>When running under Geomancer orchestration, also writes to the shared metrics directory via <code>atomic_writer</code>.</p>
+<h2 id="plotembeddings">PlotEmbeddings</h2>
+<p>Creates 2D scatter plots of embeddings with customizable colormaps and optional WandB upload.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/callbacks/embedding/plot_embeddings.yaml</span>
+<span class="nt">plot_embeddings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.callbacks.embedding.plot_embeddings.PlotEmbeddings</span>
+<span class="w">  </span><span class="nt">save_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${hydra:runtime.output_dir}</span>
+<span class="w">  </span><span class="nt">experiment_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${name}.png&quot;</span>
+<span class="w">  </span><span class="nt">figsize</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">8</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">6</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">label_col</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Population</span>
+<span class="w">  </span><span class="nt">legend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">color_by_score</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+</code></pre></div>
+<h3 id="colormap-resolution">Colormap Resolution</h3>
+<p>PlotEmbeddings resolves colormaps from multiple sources (highest priority first):</p>
+<ol>
+<li><strong>User overrides</strong> — <code>cmap_override</code>, <code>is_categorical_override</code> in config</li>
+<li><strong>Metric-declared</strong> — <code>scores["&lt;metric&gt;__viz"]</code> containing a <code>ColormapInfo</code></li>
+<li><strong>Dataset-provided</strong> — via the <code>ColormapProvider</code> protocol</li>
+<li><strong>Defaults</strong> — <code>"viridis"</code></li>
+</ol>
+<p>Datasets can implement <code>ColormapProvider</code> to declare their preferred visualization:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MyDataset</span><span class="p">(</span><span class="n">ColormapProvider</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_colormap_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ColormapInfo</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ColormapInfo</span><span class="p">(</span>
+            <span class="n">cmap</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="s2">&quot;#ff0000&quot;</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="s2">&quot;#00ff00&quot;</span><span class="p">},</span>
+            <span class="n">label_names</span><span class="o">=</span><span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;Class A&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;Class B&quot;</span><span class="p">},</span>
+            <span class="n">is_categorical</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+<h3 id="coloring-by-score">Coloring by Score</h3>
+<p>Color points by a metric value instead of labels:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">plot_embeddings</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">color_by_score</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;embedding.local_intrinsic_dimensionality&quot;</span>
+<span class="w">  </span><span class="nt">legend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">  </span><span class="c1"># Uses colorbar instead</span>
+</code></pre></div>
+<h2 id="wandblogscores">WandbLogScores</h2>
+<p>Logs metric scores to WandB in three formats:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/callbacks/embedding/wandb_log_scores.yaml</span>
+<span class="nt">wandb_log_scores</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.callbacks.embedding.wandb_log_scores.WandbLogScores</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Log Type</th>
+<th>WandB Key</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Summary scalars</td>
+<td><code>{tag}/metric_name</code></td>
+<td>0-D metrics as <code>wandb.log()</code></td>
+</tr>
+<tr>
+<td>Per-sample table</td>
+<td><code>{tag}/per_sample_metrics</code></td>
+<td>1-D arrays as <code>wandb.Table</code></td>
+</tr>
+<tr>
+<td>k-curve tables</td>
+<td><code>{tag}/metric__k_curve_table</code></td>
+<td>Swept <code>n_neighbors</code> values grouped into tables</td>
+</tr>
+</tbody>
+</table>
+<p>k-curve tables automatically detect metrics swept over <code>n_neighbors</code> (e.g., <code>trustworthiness__n_neighbors_5</code>, <code>_10</code>, <code>_20</code>) and group them into a single curve.</p>
+<h2 id="loadingsanalysiscallback">LoadingsAnalysisCallback</h2>
+<p>Analyzes shared vs modality-specific components in multi-modal loadings (e.g., DNA + RNA + Protein fusion).</p>
+<div class="highlight"><pre><span></span><code><span class="nt">callbacks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">embedding</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">loadings</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.callbacks.embedding.loadings_analysis.LoadingsAnalysisCallback</span>
+<span class="w">      </span><span class="nt">modality_dims</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1920</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1536</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">modality_names</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">dna</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">rna</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">protein</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+</code></pre></div>
+<p>Requires the algorithm module to have a <code>get_loadings()</code> method (e.g., <code>MergingModule</code> with <code>concat_pca</code>).</p>
+</div>
+<div class="tabbed-block">
+<h2 id="lightning-callbacks">Lightning Callbacks</h2>
+<p>Trainer callbacks extend <code>lightning.Callback</code> and run during the training loop. They are passed to <code>Trainer(callbacks=[...])</code>.</p>
+<h3 id="activationtrajectorycallback">ActivationTrajectoryCallback</h3>
+<p>The primary trainer callback. Extracts activations from model layers at configurable triggers and computes diffusion operators to track representation geometry.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/callbacks/trainer/probe.yaml</span>
+<span class="nt">probe</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.lightning.callbacks.activation_tracker.ActivationTrajectoryCallback</span>
+<span class="w">  </span><span class="nt">layer_specs</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.lightning.hooks.LayerSpec</span>
+<span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;transformer.h[-1]&quot;</span>
+<span class="w">      </span><span class="nt">extraction_point</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output&quot;</span>
+<span class="w">      </span><span class="nt">reduce</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mean&quot;</span>
+<span class="w">  </span><span class="nt">trigger</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.lightning.callbacks.activation_tracker.ProbeTrigger</span>
+<span class="w">    </span><span class="nt">every_n_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500</span>
+<span class="w">    </span><span class="nt">on_checkpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">on_validation_end</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">gauge</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.callbacks.diffusion_operator.DiffusionGauge</span>
+<span class="w">    </span><span class="nt">knn</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span>
+<span class="w">    </span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+<span class="w">    </span><span class="nt">symmetric</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">log_to_wandb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>See <strong><a href="../probing/">Probing</a></strong> for full documentation of layer specs, triggers, gauge configuration, and programmatic access.</p>
+<h3 id="adding-a-trainer-callback">Adding a Trainer Callback</h3>
+<ol>
+<li>Create a class extending <code>lightning.Callback</code></li>
+<li>Implement the relevant hooks (<code>on_train_batch_end</code>, <code>on_train_epoch_end</code>, etc.)</li>
+<li>Create a config in <code>configs/callbacks/trainer/your_callback.yaml</code></li>
+<li>Add to your experiment config:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="nt">callbacks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">trainer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">your_callback</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.your_module.YourCallback</span>
+<span class="w">      </span><span class="nt">param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">value</span>
+</code></pre></div>
+<h3 id="adding-an-embedding-callback">Adding an Embedding Callback</h3>
+<ol>
+<li>Create a class extending <code>EmbeddingCallback</code></li>
+<li>Implement <code>on_latent_end(self, dataset, embeddings) -&gt; Any</code></li>
+<li>Use <code>self.register_output(key, value)</code> to store results</li>
+<li>Create a config in <code>configs/callbacks/embedding/your_callback.yaml</code></li>
+<li>Add to the embedding defaults or your experiment config</li>
+</ol>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

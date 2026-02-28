@@ -1,0 +1,1680 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://latent-reasoning-works.github.io/manylatents/metrics/">
+      
+      
+        <link rel="prev" href="../data/">
+      
+      
+        <link rel="next" href="../evaluation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Metrics - manylatents</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#metrics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="manylatents" class="md-header__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            manylatents
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Metrics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="manylatents" class="md-nav__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    manylatents
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#embedding-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedding Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Protocol
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metric Protocol">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#return-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-scale-expansion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Scale Expansion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-knn-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared kNN Cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-a-new-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a New Metric
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing a New Metric">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-the-right-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the Right Level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#null-metrics-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Null Metrics Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI (Default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experiment-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment Configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-opt-in-by-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design: Opt-In by Default
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hydra-limitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Limitation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#could-not-find-metricsnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Could not find 'metrics/none'"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics-still-being-computed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics Still Being Computed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#embedding-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Embedding Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Module Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dataset-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Protocol
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metric Protocol">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#return-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return Types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-scale-expansion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Scale Expansion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-knn-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared kNN Cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-a-new-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a New Metric
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing a New Metric">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choosing-the-right-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the Right Level
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#null-metrics-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Null Metrics Support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI (Default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experiment-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment Configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-opt-in-by-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design: Opt-In by Default
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hydra-limitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Limitation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#could-not-find-metricsnone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Could not find 'metrics/none'"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metrics-still-being-computed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics Still Being Computed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="metrics">Metrics</h1>
+<p>The evaluation system for manyLatents: a three-level architecture for measuring embedding quality, dataset properties, and algorithm internals.</p>
+<h2 id="embedding-metrics">Embedding Metrics</h2>
+<p>Evaluate the <strong>quality of low-dimensional embeddings</strong>. Compare high-dimensional input to low-dimensional output.</p>
+<table>
+<thead>
+<tr>
+<th>metric</th>
+<th>config</th>
+<th>defaults</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AlignmentScore</td>
+<td><code>metrics/embedding=alignment_score</code></td>
+<td>k=20, method=jaccard</td>
+<td>Compute composite per-variant alignment score.</td>
+</tr>
+<tr>
+<td>Anisotropy</td>
+<td><code>metrics/embedding=anisotropy</code></td>
+<td>--</td>
+<td>Anisotropy of embedding space</td>
+</tr>
+<tr>
+<td>AUC</td>
+<td><code>metrics/embedding=auc</code></td>
+<td>--</td>
+<td>Area Under ROC Curve for binary classification</td>
+</tr>
+<tr>
+<td>CKA</td>
+<td><code>metrics/embedding=cka</code></td>
+<td>kernel=linear</td>
+<td>Centered Kernel Alignment with linear kernel</td>
+</tr>
+<tr>
+<td>Continuity</td>
+<td><code>metrics/embedding=continuity</code></td>
+<td>return_per_sample=True</td>
+<td>Continuity of embedding (preservation of original neighborhoods)</td>
+</tr>
+<tr>
+<td>CrossModalJaccard</td>
+<td><code>metrics/embedding=cross_modal_jaccard</code></td>
+<td>k=20, metric=euclidean</td>
+<td>Cross-modal k-NN neighborhood Jaccard overlap</td>
+</tr>
+<tr>
+<td>DiffusionCondensation</td>
+<td><code>metrics/embedding=diffusion_condensation</code></td>
+<td>scale=1.025, granularity=0.1, knn=5, decay=40, n_pca=50, output_mode=stable</td>
+<td>Diffusion condensation score</td>
+</tr>
+<tr>
+<td>DiffusionCurvature</td>
+<td><code>metrics/embedding=diffusion_curvature</code></td>
+<td>t=3, percentile=5</td>
+<td>Diffusion curvature of embedding manifold</td>
+</tr>
+<tr>
+<td>DiffusionSpectralEntropy</td>
+<td><code>metrics/embedding=diffusion_spectral_entropy</code></td>
+<td>t=1, gaussian_kernel_sigma=10</td>
+<td>Diffusion spectral entropy (eigenvalue count at diffusion time t)</td>
+</tr>
+<tr>
+<td>DiffusionSpectralEntropy</td>
+<td><code>metrics/embedding=dse_dense</code></td>
+<td>output_mode=eigenvalue_count, t_high=[10, 50, 100, 200, 500], numerical_floor=1e-06, kernel=dense, gaussian_kernel_sigma=10</td>
+<td>Diffusion spectral entropy (eigenvalue count at diffusion time t)</td>
+</tr>
+<tr>
+<td>DiffusionSpectralEntropy</td>
+<td><code>metrics/embedding=dse_knn</code></td>
+<td>output_mode=eigenvalue_count, t_high=[10, 50, 100, 200, 500], numerical_floor=1e-06, kernel=knn, k=${neighborhood_size}, alpha=1.0</td>
+<td>Diffusion spectral entropy (eigenvalue count at diffusion time t)</td>
+</tr>
+<tr>
+<td>DiffusionSpectralEntropy</td>
+<td><code>metrics/embedding=dse_t_sweep</code></td>
+<td>output_mode=eigenvalue_count_sweep, t_high=[10, 50, 100, 200, 500], numerical_floor=1e-06, gaussian_kernel_sigma=10</td>
+<td>Diffusion spectral entropy (eigenvalue count at diffusion time t)</td>
+</tr>
+<tr>
+<td>FractalDimension</td>
+<td><code>metrics/embedding=fractal_dimension</code></td>
+<td>n_box_sizes=10</td>
+<td>Correlation fractal dimension of embedding</td>
+</tr>
+<tr>
+<td>KNNPreservation</td>
+<td><code>metrics/embedding=knn_preservation</code></td>
+<td>n_neighbors=10, metric=euclidean</td>
+<td>k-nearest neighbor preservation between original and embedded spaces</td>
+</tr>
+<tr>
+<td>LocalIntrinsicDimensionality</td>
+<td><code>metrics/embedding=local_intrinsic_dimensionality</code></td>
+<td>k=20</td>
+<td>Mean local intrinsic dimensionality of the embedding</td>
+</tr>
+<tr>
+<td>MagnitudeDimension</td>
+<td><code>metrics/embedding=magnitude_dimension</code></td>
+<td>n_ts=50, log_scale=False, scale_finding=convergence, target_prop=0.95, metric=euclidean, p=2, n_neighbors=12, method=cholesky, one_point_property=True, perturb_singularities=True, positive_magnitude=False, exact=False</td>
+<td>Magnitude-based effective dimensionality</td>
+</tr>
+<tr>
+<td>NoOp</td>
+<td><code>metrics/embedding=noop</code></td>
+<td>k=25</td>
+<td></td>
+</tr>
+<tr>
+<td>OutlierScore</td>
+<td><code>metrics/embedding=outlier_score</code></td>
+<td>k=20, return_scores=False</td>
+<td>Outlier scores using Local Outlier Factor</td>
+</tr>
+<tr>
+<td>ParticipationRatio</td>
+<td><code>metrics/embedding=participation_ratio</code></td>
+<td>n_neighbors=25, return_per_sample=True</td>
+<td>Local participation ratio measuring effective dimensionality</td>
+</tr>
+<tr>
+<td>PearsonCorrelation</td>
+<td><code>metrics/embedding=pearson_correlation</code></td>
+<td>return_per_sample=False, num_dists=100</td>
+<td>Pearson correlation between pairwise distances</td>
+</tr>
+<tr>
+<td>PersistentHomology</td>
+<td><code>metrics/embedding=persistent_homology</code></td>
+<td>homology_dim=1, persistence_threshold=0.1</td>
+<td>Count of loops/cycles (H1 Betti number)</td>
+</tr>
+<tr>
+<td>PersistentHomology</td>
+<td><code>metrics/embedding=persistent_homology_beta0</code></td>
+<td>homology_dim=0, persistence_threshold=3.0</td>
+<td>Count of loops/cycles (H1 Betti number)</td>
+</tr>
+<tr>
+<td>RankAgreement</td>
+<td><code>metrics/embedding=rank_agreement</code></td>
+<td>k=20, metric_fn=lid</td>
+<td>Rank-based agreement of LID/PR across modalities</td>
+</tr>
+<tr>
+<td>ReebGraphNodesEdges</td>
+<td><code>metrics/embedding=reeb_graph</code></td>
+<td>n_bins=10</td>
+<td>Reeb graph node and edge counts</td>
+</tr>
+<tr>
+<td>SilhouetteScore</td>
+<td><code>metrics/embedding=silhouette</code></td>
+<td>metric=euclidean</td>
+<td>Silhouette score for cluster separation in embedding</td>
+</tr>
+<tr>
+<td>TangentSpaceApproximation</td>
+<td><code>metrics/embedding=tangent_space</code></td>
+<td>n_neighbors=25, variance_threshold=0.95, return_per_sample=True</td>
+<td>Tangent space alignment between original and embedded spaces</td>
+</tr>
+<tr>
+<td>Trustworthiness</td>
+<td><code>metrics/embedding=trustworthiness</code></td>
+<td>n_neighbors=5, metric=euclidean</td>
+<td>Compute the trustworthiness of an embedding.</td>
+</tr>
+<tr>
+<td>Trustworthiness</td>
+<td><code>metrics/embedding=trustworthiness_k</code></td>
+<td>n_neighbors=[15, 25, 50, 100, 250], metric=euclidean</td>
+<td>Compute the trustworthiness of an embedding.</td>
+</tr>
+</tbody>
+</table>
+<p>Config pattern: <code>metrics/embedding=&lt;name&gt;</code></p>
+<h2 id="module-metrics">Module Metrics</h2>
+<p>Evaluate <strong>algorithm-specific internal components</strong>. Require a fitted module exposing <code>affinity_matrix()</code> or <code>kernel_matrix()</code>.</p>
+<table>
+<thead>
+<tr>
+<th>metric</th>
+<th>config</th>
+<th>defaults</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AffinitySpectrum</td>
+<td><code>metrics/module=affinity_spectrum</code></td>
+<td>--</td>
+<td>Top-k eigenvalues of the affinity matrix</td>
+</tr>
+<tr>
+<td>ConnectedComponents</td>
+<td><code>metrics/module=connected_components</code></td>
+<td>--</td>
+<td>Number of connected components in the kNN graph</td>
+</tr>
+<tr>
+<td>DatasetTopologyDescriptor</td>
+<td><code>metrics/module=dataset_topology_descriptor</code></td>
+<td>--</td>
+<td>Topological descriptor of the dataset structure</td>
+</tr>
+<tr>
+<td>DiffusionMapCorrelation</td>
+<td><code>metrics/module=diffusion_map_correlation</code></td>
+<td>dm_components=2, alpha=1.0, correlation_type=pearson</td>
+<td>Correlation between diffusion map and embedding distances</td>
+</tr>
+<tr>
+<td>KernelMatrixDensity</td>
+<td><code>metrics/module=kernel_matrix_density</code></td>
+<td>threshold=1e-10</td>
+<td>Density of the kernel/affinity matrix</td>
+</tr>
+<tr>
+<td>KernelMatrixSparsity</td>
+<td><code>metrics/module=kernel_matrix_sparsity</code></td>
+<td>threshold=1e-10</td>
+<td>Sparsity of the kernel/affinity matrix</td>
+</tr>
+<tr>
+<td>NoOp</td>
+<td><code>metrics/module=noop</code></td>
+<td>k=25</td>
+<td></td>
+</tr>
+<tr>
+<td>SpectralDecayRate</td>
+<td><code>metrics/module=spectral_decay_rate</code></td>
+<td>top_k=20</td>
+<td>Fit exponential decay to the eigenvalue spectrum.</td>
+</tr>
+<tr>
+<td>SpectralGapRatio</td>
+<td><code>metrics/module=spectral_gap_ratio</code></td>
+<td>--</td>
+<td>Ratio of first to second eigenvalue of the diffusion operator</td>
+</tr>
+</tbody>
+</table>
+<p>Config pattern: <code>metrics/module=&lt;name&gt;</code></p>
+<h2 id="dataset-metrics">Dataset Metrics</h2>
+<p>Evaluate properties of the <strong>original high-dimensional data</strong>, independent of the DR algorithm.</p>
+<table>
+<thead>
+<tr>
+<th>metric</th>
+<th>config</th>
+<th>defaults</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GroundTruthPreservation</td>
+<td><code>metrics/dataset=admixture_laplacian</code></td>
+<td>--</td>
+<td>Admixture Laplacian preservation score</td>
+</tr>
+<tr>
+<td>GeodesicDistanceCorrelation</td>
+<td><code>metrics/dataset=geodesic_distance_correlation</code></td>
+<td>correlation_type=spearman</td>
+<td>Correlation between geodesic and embedded distances</td>
+</tr>
+<tr>
+<td>NoOp</td>
+<td><code>metrics/dataset=noop</code></td>
+<td>k=25</td>
+<td></td>
+</tr>
+<tr>
+<td>kmeans_stratification</td>
+<td><code>metrics/dataset=stratification</code></td>
+<td>random_state=${seed}</td>
+<td>K-means stratification score for population structure</td>
+</tr>
+</tbody>
+</table>
+<p>Config pattern: <code>metrics/dataset=&lt;name&gt;</code></p>
+<hr />
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Protocol</label><label for="__tabbed_1_2">Writing a New Metric</label><label for="__tabbed_1_3">Running Without Metrics</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="metric-protocol">Metric Protocol</h2>
+<p>All metrics must match the <code>Metric</code> protocol (<code>manylatents/metrics/metric.py</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">embeddings</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">module</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">cache</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="return-types">Return Types</h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Use Case</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>float</code></td>
+<td>Simple scalar</td>
+<td>Trustworthiness: <code>0.95</code></td>
+</tr>
+<tr>
+<td><code>tuple[float, ndarray]</code></td>
+<td>Scalar + per-sample</td>
+<td>Continuity with <code>return_per_sample=True</code></td>
+</tr>
+<tr>
+<td><code>dict[str, Any]</code></td>
+<td>Structured output</td>
+<td>Persistent homology: <code>{'beta_0': ..., 'beta_1': ...}</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration">Configuration</h2>
+<p>Metrics use Hydra's <code>_partial_: True</code> for deferred parameter binding:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/metrics/embedding/trustworthiness.yaml</span>
+<span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.metrics.trustworthiness.Trustworthiness</span>
+<span class="nt">_partial_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">n_neighbors</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+</code></pre></div>
+<h3 id="multi-scale-expansion">Multi-Scale Expansion</h3>
+<p>List-valued parameters expand via Cartesian product through <code>flatten_and_unroll_metrics()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">n_neighbors</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">20</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Produces 3 separate evaluations</span>
+</code></pre></div>
+<p>Naming convention: <code>embedding.trustworthiness__n_neighbors_5</code>, <code>embedding.trustworthiness__n_neighbors_10</code>, etc.</p>
+<h3 id="shared-knn-cache">Shared kNN Cache</h3>
+<p>Metrics that need kNN graphs share a cache computed once with <code>max(k)</code> across all metrics, avoiding redundant computation.</p>
+</div>
+<div class="tabbed-block">
+<h2 id="writing-a-new-metric">Writing a New Metric</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">YourMetric</span><span class="p">(</span>
+    <span class="n">embeddings</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">module</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">k</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">cache</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="c1"># Your computation</span>
+    <span class="k">return</span> <span class="n">score</span>
+</code></pre></div>
+<h3 id="choosing-the-right-level">Choosing the Right Level</h3>
+<ul>
+<li>Only needs original data? → <code>metrics/dataset/</code></li>
+<li>Compares original vs. reduced? → <code>metrics/embedding/</code></li>
+<li>Needs algorithm internals? → <code>metrics/module/</code></li>
+</ul>
+<h3 id="config">Config</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/metrics/embedding/your_metric.yaml</span>
+<span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.metrics.your_metric.YourMetric</span>
+<span class="nt">_partial_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</code></pre></div>
+<h3 id="testing">Testing</h3>
+<p>Use <code>metrics=noop</code> to verify integration:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">data</span><span class="o">=</span>swissroll<span class="w"> </span>algorithms/latent<span class="o">=</span>pca<span class="w"> </span><span class="nv">metrics</span><span class="o">=</span>noop
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<h2 id="null-metrics-support">Null Metrics Support</h2>
+<p>manyLatents supports running experiments without metrics computation — useful for fast debugging, exploratory analysis, or workflows where metrics are computed separately.</p>
+<h2 id="usage">Usage</h2>
+<h3 id="cli-default">CLI (Default)</h3>
+<p>Metrics are null by default. Just don't specify them:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># No metrics (default)</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">data</span><span class="o">=</span>swissroll<span class="w"> </span>algorithms/latent<span class="o">=</span>pca
+
+<span class="c1"># With metrics (explicit opt-in)</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">data</span><span class="o">=</span>swissroll<span class="w"> </span>algorithms/latent<span class="o">=</span>pca<span class="w"> </span><span class="nv">metrics</span><span class="o">=</span>noop
+</code></pre></div>
+<h3 id="experiment-configs">Experiment Configs</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/experiment/my_experiment.yaml</span>
+<span class="c1"># @package _global_</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /algorithms/latent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pca</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /data</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swissroll</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /callbacks/embedding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">  </span><span class="c1"># No metrics override - stays null</span>
+</code></pre></div>
+<h3 id="python-api">Python API</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="s2">&quot;swissroll&quot;</span><span class="p">,</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="s1">&#39;pca&#39;</span><span class="p">},</span>
+    <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># Explicitly disable</span>
+<span class="p">)</span>
+</code></pre></div>
+<h2 id="expected-behavior">Expected Behavior</h2>
+<p>When <code>metrics=null</code>:</p>
+<ul>
+<li>Generates embeddings</li>
+<li>Saves embeddings to files</li>
+<li>Creates plots (if callbacks configured)</li>
+<li>Logs to wandb (if configured)</li>
+<li>Does NOT compute evaluation metrics</li>
+<li>Shows warning: "No scores found"</li>
+</ul>
+<h2 id="design-opt-in-by-default">Design: Opt-In by Default</h2>
+<p>The base config (<code>configs/config.yaml</code>) sets metrics to <code>null</code>. Experiment configs opt in:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/experiment/single_algorithm.yaml</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /metrics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">noop</span><span class="w">  </span><span class="c1"># Opt in for this experiment</span>
+</code></pre></div>
+<h2 id="hydra-limitation">Hydra Limitation</h2>
+<p>Hydra CLI does not support <code>null</code> as an override value. You <strong>cannot</strong> do <code>metrics=null</code> on the command line — Hydra's parser converts <code>"null"</code> to Python <code>None</code>, which its override validator rejects.</p>
+<p><strong>Workarounds</strong>:</p>
+<ul>
+<li>Use experiment configs without metrics specified</li>
+<li>Use the Python API with <code>metrics=None</code> (our code handles this)</li>
+<li>Use <code>metrics=null</code> config files (e.g., the base config already does this)</li>
+</ul>
+<p>The API intercepts <code>None</code> values before Hydra sees them and sets them after config composition via <code>OmegaConf.update()</code>.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="could-not-find-metricsnone">"Could not find 'metrics/none'"</h3>
+<p>You're trying <code>metrics=none</code> as a CLI override. Hydra interprets this as looking for <code>metrics/none.yaml</code>.</p>
+<p><strong>Fix</strong>: Use an experiment config, or the API with <code>metrics=None</code>.</p>
+<h3 id="metrics-still-being-computed">Metrics Still Being Computed</h3>
+<p>Check that:</p>
+<ol>
+<li>Your experiment config doesn't have <code>- override /metrics: ...</code> in defaults</li>
+<li>You're not passing <code>metrics=...</code> on the command line</li>
+<li>The final config shows <code>metrics: null</code></li>
+</ol>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

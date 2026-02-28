@@ -1,0 +1,1289 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://latent-reasoning-works.github.io/manylatents/evaluation/">
+      
+      
+        <link rel="prev" href="../metrics/">
+      
+      
+        <link rel="next" href="../cache/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Evaluation - manylatents</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#evaluation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="manylatents" class="md-header__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            manylatents
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Evaluation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="manylatents" class="md-nav__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    manylatents
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Dispatch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Algorithm Dispatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execution-execute_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution: execute_step()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-functoolssingledispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation: @functools.singledispatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sampling-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sampling Strategies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sampling Strategies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Strategies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deterministic-indices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic Indices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-sampling-integrates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Sampling Integrates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Cache
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Cache">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compute_knn-with-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_knn with cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#svd-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SVD Cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metric-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metric-expansion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Expansion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#algorithm-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Dispatch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Algorithm Dispatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execution-execute_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution: execute_step()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-functoolssingledispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation: @functools.singledispatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sampling-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sampling Strategies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sampling Strategies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#available-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Strategies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deterministic-indices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic Indices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-sampling-integrates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How Sampling Integrates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Cache
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Cache">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compute_knn-with-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_knn with cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#svd-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SVD Cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metric-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Protocol
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metric-expansion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Expansion
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="evaluation">Evaluation</h1>
+<p>How manyLatents dispatches, evaluates, and samples embeddings. The core engine lives in <code>experiment.py</code>.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Dispatch</label><label for="__tabbed_1_2">Sampling</label><label for="__tabbed_1_3">Caching</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="algorithm-dispatch">Algorithm Dispatch</h2>
+<p>manyLatents uses a two-level dispatch system to handle both LatentModule (fit/transform) and LightningModule (training loop) algorithms through a unified interface.</p>
+<h3 id="algorithm-resolution">Algorithm Resolution</h3>
+<p><code>run_algorithm()</code> determines which algorithm type to instantiate from the Hydra config:</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">algorithms</span><span class="p">,</span> <span class="s1">&#39;latent&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">cfg</span><span class="o">.</span><span class="n">algorithms</span><span class="o">.</span><span class="n">latent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">algorithm</span> <span class="o">=</span> <span class="n">instantiate_algorithm</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">algorithms</span><span class="o">.</span><span class="n">latent</span><span class="p">,</span> <span class="n">datamodule</span><span class="p">)</span>
+<span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">algorithms</span><span class="p">,</span> <span class="s1">&#39;lightning&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">cfg</span><span class="o">.</span><span class="n">algorithms</span><span class="o">.</span><span class="n">lightning</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">algorithm</span> <span class="o">=</span> <span class="n">instantiate_algorithm</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">algorithms</span><span class="o">.</span><span class="n">lightning</span><span class="p">,</span> <span class="n">datamodule</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No algorithm specified in configuration&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Only one of <code>algorithms/latent</code> or <code>algorithms/lightning</code> should be set per run. The config group determines which path is taken.</p>
+<h3 id="execution-execute_step">Execution: <code>execute_step()</code></h3>
+<p><code>execute_step()</code> routes via <code>isinstance()</code> checks:</p>
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">LatentModule</span><span class="p">):</span>
+    <span class="n">algorithm</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_tensor</span><span class="p">,</span> <span class="n">train_labels</span><span class="p">)</span>
+    <span class="n">latents</span> <span class="o">=</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">test_tensor</span><span class="p">)</span>
+
+<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">LightningModule</span><span class="p">):</span>
+    <span class="n">trainer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">datamodule</span><span class="o">=</span><span class="n">datamodule</span><span class="p">)</span>
+    <span class="n">latents</span> <span class="o">=</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">test_tensor</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>LatentModule path:</strong> Direct <code>fit()</code> on training data, then <code>transform()</code> on test data. Labels are passed for supervised modules (e.g., <code>ClassifierModule</code>) and ignored by unsupervised ones.</p>
+<p><strong>LightningModule path:</strong> Full Lightning training loop via <code>trainer.fit()</code>, optional pretrained checkpoint loading, model evaluation via <code>evaluate()</code>, then embedding extraction via <code>encode()</code>.</p>
+<h3 id="evaluation-functoolssingledispatch">Evaluation: <code>@functools.singledispatch</code></h3>
+<p>The <code>evaluate()</code> function uses Python's <code>@functools.singledispatch</code> to dispatch on the first argument's type:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@functools</span><span class="o">.</span><span class="n">singledispatch</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="n">algorithm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+
+<span class="nd">@evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">evaluate_embeddings</span><span class="p">(</span><span class="n">latent_outputs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cfg</span><span class="p">,</span> <span class="n">datamodule</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># Handles embedding-level metrics (trustworthiness, continuity, etc.)</span>
+    <span class="o">...</span>
+
+<span class="nd">@evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">LightningModule</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">evaluate_lightningmodule</span><span class="p">(</span><span class="n">algorithm</span><span class="p">:</span> <span class="n">LightningModule</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cfg</span><span class="p">,</span> <span class="n">trainer</span><span class="p">,</span> <span class="n">datamodule</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># Handles trainer.test() and model-specific metrics</span>
+    <span class="o">...</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Dispatch Type</th>
+<th>Handler</th>
+<th>Evaluates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dict</code> (LatentOutputs)</td>
+<td><code>evaluate_embeddings()</code></td>
+<td>Embedding metrics (trustworthiness, continuity, kNN preservation, etc.)</td>
+</tr>
+<tr>
+<td><code>LightningModule</code></td>
+<td><code>evaluate_lightningmodule()</code></td>
+<td><code>trainer.test()</code> results + custom model metrics</td>
+</tr>
+</tbody>
+</table>
+<p>Both paths are called during a LightningModule run: first <code>evaluate_lightningmodule</code> during <code>execute_step()</code>, then <code>evaluate_embeddings</code> on the extracted embeddings.</p>
+<h3 id="pipeline-mode">Pipeline Mode</h3>
+<p><code>run_pipeline()</code> chains multiple steps sequentially, where step N's output embeddings become step N+1's input. The dispatch logic is reused per step via <code>execute_step()</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># PCA (1000→50) → PHATE (50→2)</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">experiment</span><span class="o">=</span>my_pipeline
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<h2 id="sampling-strategies">Sampling Strategies</h2>
+<p>Large datasets can make metric computation expensive. manyLatents provides pluggable sampling strategies that subsample embeddings and datasets before evaluation.</p>
+<h3 id="protocol">Protocol</h3>
+<p>All strategies implement the <code>SamplingStrategy</code> protocol:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStrategy</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sample</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">embeddings</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span>
+        <span class="n">n_samples</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fraction</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">object</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+        <span class="c1"># Returns (subsampled_embeddings, subsampled_dataset, indices)</span>
+        <span class="o">...</span>
+</code></pre></div>
+<p>The returned dataset is a deep copy with subsampled <code>data</code>, <code>latitude</code>, <code>longitude</code>, and <code>population_label</code> attributes (when present).</p>
+<h3 id="available-strategies">Available Strategies</h3>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Config</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RandomSampling</code></td>
+<td><code>sampling/random</code></td>
+<td>Default. Uniform random without replacement</td>
+</tr>
+<tr>
+<td><code>StratifiedSampling</code></td>
+<td><code>sampling/stratified</code></td>
+<td>Preserves label distribution across strata</td>
+</tr>
+<tr>
+<td><code>FarthestPointSampling</code></td>
+<td><code>sampling/farthest_point</code></td>
+<td>Maximum coverage of embedding space</td>
+</tr>
+<tr>
+<td><code>FixedIndexSampling</code></td>
+<td>(programmatic)</td>
+<td>Reproducible cross-setting comparisons</td>
+</tr>
+</tbody>
+</table>
+<h3 id="configuration">Configuration</h3>
+<p>Sampling is configured under <code>metrics.sampling</code> in Hydra:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Random (default)</span>
+<span class="nt">metrics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">sampling</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.utils.sampling.RandomSampling</span>
+<span class="w">    </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">    </span><span class="nt">fraction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+
+<span class="c1"># Stratified by population label</span>
+<span class="nt">metrics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">sampling</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.utils.sampling.StratifiedSampling</span>
+<span class="w">    </span><span class="nt">stratify_by</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">population_label</span>
+<span class="w">    </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">    </span><span class="nt">fraction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+
+<span class="c1"># Farthest point (O(n*k) — slower but better coverage)</span>
+<span class="nt">metrics</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">sampling</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.utils.sampling.FarthestPointSampling</span>
+<span class="w">    </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+<span class="w">    </span><span class="nt">fraction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+</code></pre></div>
+<h3 id="deterministic-indices">Deterministic Indices</h3>
+<p><code>RandomSampling.get_indices()</code> precomputes indices without requiring data, enabling reproducible comparisons:</p>
+<div class="highlight"><pre><span></span><code><span class="n">sampler</span> <span class="o">=</span> <span class="n">RandomSampling</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">indices</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">get_indices</span><span class="p">(</span><span class="n">n_total</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;shared_indices.npy&#39;</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span>
+
+<span class="c1"># Reuse across runs</span>
+<span class="n">fixed</span> <span class="o">=</span> <span class="n">FixedIndexSampling</span><span class="p">(</span><span class="n">indices</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;shared_indices.npy&#39;</span><span class="p">))</span>
+<span class="n">emb_sub</span><span class="p">,</span> <span class="n">ds_sub</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">fixed</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">dataset</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="how-sampling-integrates">How Sampling Integrates</h3>
+<p>In <code>evaluate_embeddings()</code>, sampling runs before any metrics:</p>
+<div class="highlight"><pre><span></span><code><span class="n">sampling_cfg</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sampling&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">sampling_cfg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">sampler</span> <span class="o">=</span> <span class="n">hydra</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">instantiate</span><span class="p">(</span><span class="n">sampling_cfg</span><span class="p">)</span>
+    <span class="n">emb_sub</span><span class="p">,</span> <span class="n">ds_sub</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">sampler</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">ds</span><span class="p">)</span>
+</code></pre></div>
+<p>All metrics then operate on the subsampled data. If no sampling config is provided, metrics run on the full dataset.</p>
+</div>
+<div class="tabbed-block">
+<h2 id="shared-cache">Shared Cache</h2>
+<p>Several metrics need k-nearest neighbors, SVD decompositions, or eigenvalue computations. Computing these per-metric would be redundant. manyLatents pre-warms a shared <code>cache</code> dict and passes it to all metrics.</p>
+<h3 id="how-it-works">How It Works</h3>
+<p><code>evaluate_embeddings()</code> uses the config sleuther (<code>extract_k_requirements</code>) to discover all <code>k</code>/<code>n_neighbors</code> values from metric configs, then calls <code>prewarm_cache()</code> to compute kNN and eigenvalues once with <code>max(k)</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Sleuther extracts requirements from metric configs</span>
+<span class="n">reqs</span> <span class="o">=</span> <span class="n">extract_k_requirements</span><span class="p">(</span><span class="n">metric_cfgs</span><span class="p">)</span>
+<span class="c1"># reqs = {&quot;emb_k&quot;: {5, 10, 25}, &quot;data_k&quot;: {10, 25}, &quot;spectral&quot;: True}</span>
+
+<span class="c1"># 2. Pre-warm cache with optimal k values</span>
+<span class="n">cache</span> <span class="o">=</span> <span class="n">prewarm_cache</span><span class="p">(</span><span class="n">metric_cfgs</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">module</span><span class="p">)</span>
+<span class="c1"># cache is keyed by id(data) for kNN, &quot;eigenvalues&quot; for spectral</span>
+
+<span class="c1"># 3. All metrics receive the same cache dict</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">metric_fn</span><span class="p">(</span><span class="n">embeddings</span><span class="o">=</span><span class="n">emb</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="n">ds</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="n">module</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="compute_knn-with-cache">compute_knn with cache</h3>
+<p><code>compute_knn()</code> uses the <code>cache</code> dict to avoid redundant computation. If a cached result exists with <code>k &gt;= requested k</code>, it slices and returns immediately:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_knn</span>
+
+<span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="c1"># First call: computes kNN with k=25</span>
+<span class="n">dists</span><span class="p">,</span> <span class="n">idxs</span> <span class="o">=</span> <span class="n">compute_knn</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+
+<span class="c1"># Second call: reuses cached result, slices to k=10</span>
+<span class="n">dists</span><span class="p">,</span> <span class="n">idxs</span> <span class="o">=</span> <span class="n">compute_knn</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>  <span class="c1"># instant</span>
+</code></pre></div>
+<p><code>compute_knn()</code> automatically selects the fastest backend: FAISS-GPU &gt; FAISS-CPU &gt; sklearn.</p>
+<h3 id="svd-cache">SVD Cache</h3>
+<p><code>compute_svd_cache()</code> batches local SVD computation with GPU acceleration (torch) when CUDA is available, falling back to CPU numpy. Results are stored in the same <code>cache</code> dict.</p>
+<h3 id="metric-protocol">Metric Protocol</h3>
+<p>All metrics receive <code>cache=</code> as a keyword argument. Metrics that need kNN call <code>compute_knn(..., cache=cache)</code> internally — the cache ensures no redundant computation. Extension metrics that don't accept <code>cache=</code> are handled gracefully via a <code>TypeError</code> fallback.</p>
+<h3 id="metric-expansion">Metric Expansion</h3>
+<p><code>flatten_and_unroll_metrics()</code> handles list-valued parameters via Cartesian product:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># This config:</span>
+<span class="nt">trustworthiness</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.metrics.trustworthiness.Trustworthiness</span>
+<span class="w">  </span><span class="nt">_partial_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">n_neighbors</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">20</span><span class="p p-Indicator">]</span>
+
+<span class="c1"># Expands to three separate evaluations:</span>
+<span class="c1"># embedding.trustworthiness__n_neighbors_5</span>
+<span class="c1"># embedding.trustworthiness__n_neighbors_10</span>
+<span class="c1"># embedding.trustworthiness__n_neighbors_20</span>
+</code></pre></div>
+<p>This expansion happens before kNN extraction, so all k values from expanded metrics contribute to the shared cache.</p>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2357 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://latent-reasoning-works.github.io/manylatents/extensions/">
+      
+      
+        <link rel="prev" href="../callbacks/">
+      
+      
+        <link rel="next" href="../api_usage/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Extensions - manylatents</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#extensions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="manylatents" class="md-header__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            manylatents
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Extensions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="manylatents" class="md-nav__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    manylatents
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#available-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Extensions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Extensions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manylatents-omics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        manylatents-omics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-install-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Install (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-git-submodules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Git Submodules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-extensions-in-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Extensions in Code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-extensions-with-hydra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Extensions with Hydra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-whats-installed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking What's Installed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hydra-config-discovery-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Config Discovery Error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extension-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Not Found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-conflicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Conflicts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-philosophy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Philosophy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-execution-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two Execution Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#namespace-extension-via-pkgutil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace Extension via pkgutil
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#four-extension-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Four Extension Axes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Four Extension Axes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-data-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Data Modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-domain-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Domain Extensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hydra-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-an-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating an Extension
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating an Extension">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Package Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#critical-file-manylatents__init__py" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Critical File: manylatents/__init__.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hydra-config-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Config Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hydra Config Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#searchpathplugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SearchPathPlugin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entry-point-registration-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entry Point Registration (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyprojecttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyproject.toml
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-latentmodule-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom LatentModule (Algorithm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experiment-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#import-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#config-resolution-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Resolution Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-actions-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#namespace-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace Package
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hydra-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interface-compliance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface Compliance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-auto-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting Auto-Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#available-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Extensions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Available Extensions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manylatents-omics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        manylatents-omics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-install-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Install (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-git-submodules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Git Submodules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#development-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-extensions-in-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Extensions in Code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-extensions-with-hydra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Extensions with Hydra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-whats-installed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking What's Installed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hydra-config-discovery-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Config Discovery Error
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extension-not-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extension Not Found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-conflicts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Conflicts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-philosophy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design Philosophy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-execution-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two Execution Modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#namespace-extension-via-pkgutil" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace Extension via pkgutil
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#four-extension-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Four Extension Axes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Four Extension Axes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-data-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Data Modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-domain-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Domain Extensions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hydra-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-an-extension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating an Extension
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating an Extension">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package Structure
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Package Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#critical-file-manylatents__init__py" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Critical File: manylatents/__init__.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hydra-config-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Config Integration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hydra Config Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#searchpathplugin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SearchPathPlugin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entry-point-registration-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entry Point Registration (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyprojecttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyproject.toml
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#component-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Component Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Component Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#custom-latentmodule-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom LatentModule (Algorithm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-dataset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Dataset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom Metric
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#experiment-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Experiment Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CI Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#import-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#config-resolution-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Resolution Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github-actions-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing Checklist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Testing Checklist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#namespace-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Namespace Package
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hydra-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hydra Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interface-compliance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface Compliance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#troubleshooting-auto-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting Auto-Discovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="extensions">Extensions</h1>
+<p>manyLatents uses a modular extension system that allows domain-specific functionality to be installed as separate packages. Extensions integrate seamlessly through Python's namespace package system and Hydra's config composition.</p>
+<h2 id="available-extensions">Available Extensions</h2>
+<h3 id="manylatents-omics">manylatents-omics</h3>
+<p>The genomics, population genetics, and single-cell extension for manyLatents.</p>
+<p><strong>Repository</strong>: <a href="https://github.com/latent-reasoning-works/manylatents-omics">github.com/latent-reasoning-works/manylatents-omics</a></p>
+<p><strong>Adds three submodules:</strong></p>
+<ul>
+<li><code>manylatents.dogma</code> — Foundation model encoders (Evo2, ESM3, Orthrus, AlphaGenome) and fusion algorithms</li>
+<li><code>manylatents.popgen</code> — Population genetics data modules and metrics (GeographicPreservation, AdmixturePreservation)</li>
+<li><code>manylatents.singlecell</code> — Single-cell AnnData data modules</li>
+</ul>
+<hr />
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Usage</label><label for="__tabbed_1_2">Architecture</label><label for="__tabbed_1_3">Development</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="installing">Installing</h2>
+<h3 id="quick-install-recommended">Quick Install (Recommended)</h3>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>add<span class="w"> </span>git+https://github.com/latent-reasoning-works/manylatents-omics.git
+</code></pre></div>
+<h3 id="using-git-submodules">Using Git Submodules</h3>
+<p>For contributors working on both core and extensions:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>submodule<span class="w"> </span>add<span class="w"> </span>https://github.com/latent-reasoning-works/manylatents-omics.git<span class="w"> </span>extensions/manylatents-omics
+uv<span class="w"> </span>add<span class="w"> </span>git+file://extensions/manylatents-omics
+</code></pre></div>
+<h2 id="development-workflow">Development Workflow</h2>
+<p><strong>Working FROM the manylatents-omics repo (recommended for omics development):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>manylatents-omics
+uv<span class="w"> </span>sync<span class="w">  </span><span class="c1"># Pulls manylatents from git automatically</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">experiment</span><span class="o">=</span>single_algorithm
+</code></pre></div>
+<p><strong>Working FROM the manylatents repo (core development only):</strong></p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>manylatents
+uv<span class="w"> </span>sync
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">experiment</span><span class="o">=</span>single_algorithm
+</code></pre></div>
+<p>Extensions are auto-discovered via entry-points. Use <code>manylatents.main</code> regardless of which repo you're working from.</p>
+<h2 id="using-extensions-in-code">Using Extensions in Code</h2>
+<p>Once installed, extension features are available through the <code>manylatents</code> namespace:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Core imports (always available)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">SwissRoll</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.algorithms.latent</span><span class="w"> </span><span class="kn">import</span> <span class="n">PCAModule</span>
+
+<span class="c1"># Extension imports (available when manylatents-omics is installed)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.popgen.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">HGDPDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.popgen.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">GeographicPreservation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.dogma.encoders</span><span class="w"> </span><span class="kn">import</span> <span class="n">Evo2Encoder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.singlecell.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnnDataModule</span>
+</code></pre></div>
+<h2 id="using-extensions-with-hydra">Using Extensions with Hydra</h2>
+<p>Extensions integrate directly with Hydra configs:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">data</span><span class="o">=</span>hgdp_1kgp<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>algorithms/latent<span class="o">=</span>pca<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">metrics</span><span class="o">=</span>genetic_metrics<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">logger</span><span class="o">=</span>wandb
+</code></pre></div>
+<h2 id="checking-whats-installed">Checking What's Installed</h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pkgutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">manylatents</span>
+
+<span class="k">for</span> <span class="n">importer</span><span class="p">,</span> <span class="n">modname</span><span class="p">,</span> <span class="n">ispkg</span> <span class="ow">in</span> <span class="n">pkgutil</span><span class="o">.</span><span class="n">iter_modules</span><span class="p">(</span><span class="n">manylatents</span><span class="o">.</span><span class="n">__path__</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- </span><span class="si">{</span><span class="n">modname</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="hydra-config-discovery-error">Hydra Config Discovery Error</h3>
+<p><strong>Problem</strong>: <code>ConfigAttributeError: Key 'experiment' is not in struct</code></p>
+<p><strong>Cause</strong>: Hydra SearchPathPlugin not being discovered.</p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Ensure the extension is installed (not just cloned):
+    <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>add<span class="w"> </span>git+https://github.com/latent-reasoning-works/manylatents-omics.git
+</code></pre></div></li>
+<li>If developing both packages, work from the omics repo</li>
+<li>Verify plugin discovery:
+    <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">hydra.core.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">Plugins</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hydra.plugins.search_path_plugin</span><span class="w"> </span><span class="kn">import</span> <span class="n">SearchPathPlugin</span>
+<span class="n">plugins</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Plugins</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span><span class="o">.</span><span class="n">discover</span><span class="p">(</span><span class="n">SearchPathPlugin</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">([</span><span class="n">p</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">plugins</span><span class="p">])</span>
+</code></pre></div></li>
+</ol>
+<h3 id="extension-not-found">Extension Not Found</h3>
+<p><strong>Problem</strong>: <code>ModuleNotFoundError: No module named 'manylatents.omics'</code></p>
+<p><strong>Solution</strong>: Install the extension:
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>add<span class="w"> </span>git+https://github.com/latent-reasoning-works/manylatents-omics.git
+</code></pre></div></p>
+<h3 id="import-conflicts">Import Conflicts</h3>
+<p><strong>Problem</strong>: Namespace package not merging correctly.</p>
+<p><strong>Solution</strong>: Ensure both packages have the namespace declaration in <code>manylatents/__init__.py</code>:
+<div class="highlight"><pre><span></span><code><span class="n">__path__</span> <span class="o">=</span> <span class="nb">__import__</span><span class="p">(</span><span class="s1">&#39;pkgutil&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">extend_path</span><span class="p">(</span><span class="n">__path__</span><span class="p">,</span> <span class="vm">__name__</span><span class="p">)</span>
+</code></pre></div></p>
+</div>
+<div class="tabbed-block">
+<h2 id="design-philosophy">Design Philosophy</h2>
+<p>manyLatents is built around a simple idea: <strong>every interface between stages is a file with a known schema</strong>. This matters because the agents and scripts that compose manyLatents into larger workflows are stateless — they don't remember what happened in the last call. If the output of one step doesn't fully describe itself, the next step can't use it.</p>
+<p>This constraint shapes everything:</p>
+<ul>
+<li><strong>LatentOutputs</strong> is a <code>dict[str, Any]</code>, not a dataclass. When a new metric injects a custom field, every downstream consumer still works without schema migration.</li>
+<li><strong>Metrics</strong> are registered via Hydra configs with <code>_target_</code> and <code>_partial_: True</code>. Parameters are bound at config time, not at call time, so the evaluation engine doesn't need to know what parameters each metric takes.</li>
+<li><strong>Algorithms</strong> are either <code>LatentModule</code> (fit/transform) or <code>LightningModule</code> subclasses (training loops). The execution engine dispatches on type, not on name.</li>
+</ul>
+<p>The result is a system where you can add a new algorithm, metric, dataset, or entire domain extension without touching core code.</p>
+<h2 id="two-execution-modes">Two Execution Modes</h2>
+<p><strong>CLI</strong> (<code>uv run python -m manylatents.main</code>) executes a single step: one algorithm + metrics on one dataset. This is the primary user-facing interface and what SLURM jobs invoke.</p>
+<p><strong>Python API</strong> (<code>manylatents.api.run()</code>) is the programmatic interface designed for agent-driven workflows. It accepts <code>input_data</code> to chain the output of one call into the next, and supports <code>pipeline</code> configs for sequential steps within a single process.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+
+<span class="c1"># Single step</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="s1">&#39;swissroll&#39;</span><span class="p">,</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="s1">&#39;manylatents.algorithms.latent.pca.PCAModule&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="mi">50</span>
+    <span class="p">}}</span>
+<span class="p">)</span>
+
+<span class="c1"># Chaining: feed output of one step into the next</span>
+<span class="n">result2</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+    <span class="n">input_data</span><span class="o">=</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;embeddings&#39;</span><span class="p">],</span>
+    <span class="n">algorithms</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;latent&#39;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;_target_&#39;</span><span class="p">:</span> <span class="s1">&#39;manylatents.algorithms.latent.phate.PHATEModule&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;n_components&#39;</span><span class="p">:</span> <span class="mi">2</span>
+    <span class="p">}}</span>
+<span class="p">)</span>
+</code></pre></div>
+<h2 id="namespace-extension-via-pkgutil">Namespace Extension via pkgutil</h2>
+<p>The core package's <code>__init__.py</code> contains one line:</p>
+<div class="highlight"><pre><span></span><code><span class="n">__path__</span> <span class="o">=</span> <span class="nb">__import__</span><span class="p">(</span><span class="s1">&#39;pkgutil&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">extend_path</span><span class="p">(</span><span class="n">__path__</span><span class="p">,</span> <span class="vm">__name__</span><span class="p">)</span>
+</code></pre></div>
+<p>This tells Python: "if another installed package also defines a <code>manylatents</code> directory, merge its contents into mine." The rule is simple: <strong>core never imports from extensions; extensions import from core.</strong></p>
+<p>Extensions also register a Hydra <code>SearchPathPlugin</code> so their configs are discovered automatically:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OmicsSearchPathPlugin</span><span class="p">(</span><span class="n">SearchPathPlugin</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">manipulate_search_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">search_path</span><span class="p">):</span>
+        <span class="n">search_path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;manylatents-omics&quot;</span><span class="p">,</span>
+            <span class="n">path</span><span class="o">=</span><span class="s2">&quot;pkg://manylatents.dogma.configs&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+<h2 id="four-extension-axes">Four Extension Axes</h2>
+<h3 id="1-algorithms">1. Algorithms</h3>
+<p>Two base classes, binary decision rule:</p>
+<ul>
+<li><strong><code>LatentModule</code></strong> — fit/transform for non-neural algorithms (PCA, UMAP, PHATE, etc.). The <strong>FoundationEncoder pattern</strong> is a LatentModule where <code>fit()</code> is a no-op and <code>transform()</code> wraps a pretrained model.</li>
+<li><strong><code>LightningModule</code> subclasses</strong> — trainable neural networks with Lightning training loops (autoencoders, Latent ODEs).</li>
+</ul>
+<p>Optional methods <code>kernel_matrix()</code> and <code>affinity_matrix()</code> enable module-level metrics like <code>KernelMatrixSparsity</code> and <code>AffinitySpectrum</code>.</p>
+<h3 id="2-metrics">2. Metrics</h3>
+<p>Metrics follow the <code>Metric</code> protocol with three evaluation contexts:</p>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th><code>embeddings</code></th>
+<th><code>dataset</code></th>
+<th><code>module</code></th>
+<th>Use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>embedding</code></td>
+<td>Low-dim output</td>
+<td>Source dataset</td>
+<td>-</td>
+<td>Trustworthiness, continuity</td>
+</tr>
+<tr>
+<td><code>dataset</code></td>
+<td>-</td>
+<td>Source dataset</td>
+<td>-</td>
+<td>Stratification, admixture</td>
+</tr>
+<tr>
+<td><code>module</code></td>
+<td>-</td>
+<td>Source dataset</td>
+<td>Fitted LatentModule</td>
+<td>Affinity spectrum, kernel sparsity</td>
+</tr>
+</tbody>
+</table>
+<p>List-valued parameters in configs expand via Cartesian product through <code>flatten_and_unroll_metrics()</code>. Metrics sharing kNN graphs use a shared <code>cache</code>.</p>
+<h3 id="3-data-modules">3. Data Modules</h3>
+<p>Data modules provide <code>get_data()</code> and are auto-discovered at import time. Synthetic datasets generate on-the-fly; file-based datasets load from disk. For LightningModule algorithms, they also implement <code>LightningDataModule</code>.</p>
+<h3 id="4-domain-extensions">4. Domain Extensions</h3>
+<p>A domain extension is a separate installable package that adds algorithms, metrics, and data modules to the <code>manylatents</code> namespace. See the <strong>Development</strong> tab for how to create one.</p>
+<h2 id="hydra-configuration">Hydra Configuration</h2>
+<p>Every extensible component has a corresponding Hydra config group:</p>
+<div class="highlight"><pre><span></span><code>configs/
+  algorithms/
+    latent/         # LatentModule configs
+    lightning/      # LightningModule configs
+      loss/         # Loss function configs
+      network/      # Network architecture configs
+      optimizer/    # Optimizer configs
+  data/             # Dataset configs
+  metrics/
+    embedding/      # Embedding-level metric configs
+    dataset/        # Dataset-level metric configs
+    module/         # Module-level metric configs
+    sampling/       # Metric sampling strategies
+  callbacks/embedding/
+  experiment/       # Experiment preset configs
+  trainer/          # Lightning trainer configs
+  logger/           # Logger configs (none, wandb)
+  cluster/          # SLURM cluster configs (via Shop)
+  launcher/         # Job launcher configs (via Shop)
+</code></pre></div>
+<h2 id="scope-boundaries">Scope Boundaries</h2>
+<p>manyLatents owns single-step execution and the Python API for composable workflows. It does NOT own:</p>
+<ul>
+<li><strong>Multi-step orchestration</strong> — manyAgents calls <code>manylatents.api.run()</code> to compose steps</li>
+<li><strong>RL / reward-driven training</strong> — Geomancer</li>
+<li><strong>Cluster job submission</strong> — Shop provides Hydra launcher plugins</li>
+</ul>
+</div>
+<div class="tabbed-block">
+<h2 id="creating-an-extension">Creating an Extension</h2>
+<p>This guide documents how to create extension packages for manyLatents, following the patterns established by <code>manylatents-omics</code>.</p>
+<h3 id="architecture-overview">Architecture Overview</h3>
+<div class="highlight"><pre><span></span><code>┌─────────────────────────────────────────────────────────────┐
+│                    Your Application                          │
+├─────────────────────────────────────────────────────────────┤
+│  manylatents-yourextension   │   manylatents-omics          │
+│  (your namespace package)    │   (popgen, dogma, singlecell)│
+├─────────────────────────────────────────────────────────────┤
+│                        shop (optional)                       │
+│              (shared SLURM launchers, logging utils)         │
+├─────────────────────────────────────────────────────────────┤
+│                      manylatents (core)                      │
+│         (LatentModule, metrics, data, experiment runner)     │
+└─────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<h2 id="package-structure">Package Structure</h2>
+<div class="highlight"><pre><span></span><code>manylatents-yourextension/
+├── pyproject.toml
+├── README.md
+├── CLAUDE.md                    # AI assistant instructions
+├── manylatents/
+│   ├── __init__.py              # Namespace package declaration (CRITICAL)
+│   ├── yourext_plugin.py        # Hydra SearchPathPlugin
+│   └── yourext/
+│       ├── __init__.py
+│       ├── algorithms/
+│       │   ├── __init__.py
+│       │   └── your_algorithm.py
+│       ├── data/
+│       │   ├── __init__.py
+│       │   └── your_dataset.py
+│       ├── metrics/
+│       │   ├── __init__.py
+│       │   └── your_metric.py
+│       └── configs/
+│           ├── __init__.py      # Empty, required for pkg://
+│           ├── data/
+│           │   └── your_data.yaml
+│           ├── algorithms/
+│           │   └── latent/
+│           │       └── your_algo.yaml
+│           ├── metrics/
+│           │   └── dataset/
+│           │       └── your_metric.yaml
+│           └── experiment/
+│               └── your_experiment.yaml
+└── tests/
+    ├── __init__.py
+    ├── test_imports.py
+    └── test_config_e2e.py
+</code></pre></div>
+<h3 id="critical-file-manylatents__init__py">Critical File: <code>manylatents/__init__.py</code></h3>
+<p>This file MUST contain the namespace package declaration:</p>
+<div class="highlight"><pre><span></span><code><span class="n">__path__</span> <span class="o">=</span> <span class="nb">__import__</span><span class="p">(</span><span class="s1">&#39;pkgutil&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">extend_path</span><span class="p">(</span><span class="n">__path__</span><span class="p">,</span> <span class="vm">__name__</span><span class="p">)</span>
+</code></pre></div>
+<p>Without this, Python won't merge your package with core manyLatents.</p>
+<h2 id="hydra-config-integration">Hydra Config Integration</h2>
+<h3 id="searchpathplugin">SearchPathPlugin</h3>
+<p>Create <code>manylatents/yourext_plugin.py</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">hydra.core.config_search_path</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConfigSearchPath</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hydra.plugins.search_path_plugin</span><span class="w"> </span><span class="kn">import</span> <span class="n">SearchPathPlugin</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">YourExtSearchPathPlugin</span><span class="p">(</span><span class="n">SearchPathPlugin</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">manipulate_search_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">search_path</span><span class="p">:</span> <span class="n">ConfigSearchPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">search_path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;manylatents&quot;</span><span class="p">,</span>
+            <span class="n">path</span><span class="o">=</span><span class="s2">&quot;pkg://manylatents.configs&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># Higher priority for YOUR configs</span>
+        <span class="n">search_path</span><span class="o">.</span><span class="n">prepend</span><span class="p">(</span>
+            <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;manylatents-yourext&quot;</span><span class="p">,</span>
+            <span class="n">path</span><span class="o">=</span><span class="s2">&quot;pkg://manylatents.yourext.configs&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div>
+<p>Use <code>prepend()</code> if your configs should override core configs with the same name, <code>append()</code> if core should take precedence.</p>
+<h3 id="entry-point-registration-recommended">Entry Point Registration (Recommended)</h3>
+<p>Core auto-discovers extensions via the <code>manylatents.extensions</code> entry-point group.
+Add this to your <code>pyproject.toml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[project.entry-points.</span><span class="s2">&quot;manylatents.extensions&quot;</span><span class="k">]</span>
+<span class="n">yourext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;manylatents.yourext_plugin:YourExtSearchPathPlugin&quot;</span>
+</code></pre></div>
+<p>When your extension is installed (<code>uv pip install -e .</code>, <code>uv add</code>, or <code>pip install</code>),
+core's <code>manylatents.main</code> will automatically discover and register your plugin at startup.
+No custom entry point needed.</p>
+<h3 id="pyprojecttoml">pyproject.toml</h3>
+<div class="highlight"><pre><span></span><code><span class="k">[project]</span>
+<span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;manylatents-yourext&quot;</span>
+<span class="n">version</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;0.1.0&quot;</span>
+<span class="n">requires-python</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;&gt;=3.10, &lt;3.13&quot;</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;manylatents&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="k">[project.entry-points.</span><span class="s2">&quot;manylatents.extensions&quot;</span><span class="k">]</span>
+<span class="n">yourext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;manylatents.yourext_plugin:YourExtSearchPathPlugin&quot;</span>
+
+<span class="k">[build-system]</span>
+<span class="n">requires</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;hatchling&quot;</span><span class="p">]</span>
+<span class="n">build-backend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;hatchling.build&quot;</span>
+
+<span class="k">[tool.hatch.build.targets.wheel]</span>
+<span class="n">packages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;manylatents&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># CRITICAL: Package the manylatents/ directory</span>
+
+<span class="k">[tool.uv]</span>
+<span class="n">managed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+
+<span class="k">[tool.uv.sources]</span>
+<span class="n">manylatents</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">git</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;https://github.com/latent-reasoning-works/manylatents.git&quot;</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<h2 id="component-types">Component Types</h2>
+<h3 id="custom-latentmodule-algorithm">Custom LatentModule (Algorithm)</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.algorithms.latent.latent_module_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatentModule</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">YourAlgorithm</span><span class="p">(</span><span class="n">LatentModule</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">your_param</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">your_param</span> <span class="o">=</span> <span class="n">your_param</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">x_np</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="c1"># Your fitting logic</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Model not fitted. Call fit() first.&quot;</span><span class="p">)</span>
+        <span class="n">x_np</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">embedding</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># Your embedding computation</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">embedding</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+</code></pre></div>
+<p>Config: <code>manylatents/yourext/configs/algorithms/latent/your_algo.yaml</code></p>
+<div class="highlight"><pre><span></span><code><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.yourext.algorithms.YourAlgorithm</span>
+<span class="nt">n_components</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="nt">your_param</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+</code></pre></div>
+<h3 id="custom-dataset">Custom Dataset</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">YourDataset</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">n_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_path</span> <span class="o">=</span> <span class="n">data_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">data_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n_samples</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[:</span><span class="n">n_samples</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span>
+</code></pre></div>
+<p>Config: <code>manylatents/yourext/configs/data/your_data.yaml</code></p>
+<div class="highlight"><pre><span></span><code><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.yourext.data.YourDataset</span>
+<span class="nt">data_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${paths.data_dir}/your_data.npy</span>
+<span class="nt">n_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+</code></pre></div>
+<h3 id="custom-metric">Custom Metric</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.algorithms.latent.latent_module_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatentModule</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">YourMetric</span><span class="p">(</span>
+    <span class="n">embeddings</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">LatentModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+    <span class="n">return_per_sample</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># Your metric computation</span>
+    <span class="k">if</span> <span class="n">return_per_sample</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">scores</span><span class="p">)),</span> <span class="n">scores</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">scores</span><span class="p">))</span>
+</code></pre></div>
+<p>Config: <code>manylatents/yourext/configs/metrics/dataset/your_metric.yaml</code></p>
+<div class="highlight"><pre><span></span><code><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.yourext.metrics.YourMetric</span>
+<span class="nt">_partial_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># CRITICAL: deferred parameter binding</span>
+<span class="nt">threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<span class="nt">return_per_sample</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<h3 id="experiment-config">Experiment Config</h3>
+<p><code>manylatents/yourext/configs/experiment/your_experiment.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># @package _global_</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_experiment</span>
+<span class="nt">project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_project</span>
+
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /algorithms/latent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_algo</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /data</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">your_data</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /callbacks/embedding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override /metrics</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+
+<span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+</code></pre></div>
+<h2 id="ci-requirements">CI Requirements</h2>
+<h3 id="import-tests">Import Tests</h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">test_namespace_package</span><span class="p">():</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">manylatents.yourext</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.yourext.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">YourAlgorithm</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">SwissRoll</span>  <span class="c1"># Core still works</span>
+    <span class="k">assert</span> <span class="n">YourAlgorithm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_algorithm_interface</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.yourext.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">YourAlgorithm</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+
+    <span class="n">algo</span> <span class="o">=</span> <span class="n">YourAlgorithm</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="n">embedding</span> <span class="o">=</span> <span class="n">algo</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">embedding</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="config-resolution-tests">Config Resolution Tests</h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">omegaconf</span><span class="w"> </span><span class="kn">import</span> <span class="n">OmegaConf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="n">CONFIGS_DIR</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;manylatents&quot;</span> <span class="o">/</span> <span class="s2">&quot;yourext&quot;</span> <span class="o">/</span> <span class="s2">&quot;configs&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">test_all_targets_importable</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">config_file</span> <span class="ow">in</span> <span class="n">CONFIGS_DIR</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">&quot;*.yaml&quot;</span><span class="p">):</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="n">OmegaConf</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span> <span class="s2">&quot;_target_&quot;</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="n">cfg</span><span class="o">.</span><span class="n">_target_</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;manylatents&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="github-actions-workflow">GitHub Actions Workflow</h3>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CI</span>
+<span class="nt">on</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">push</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
+
+<span class="nt">jobs</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">test</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">python-version</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;3.10&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3.11&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3.12&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">astral-sh/setup-uv@v5</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">uv sync</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">uv run pytest tests/ -v</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no">uv run python -c &quot;</span>
+<span class="w">        </span><span class="no">import manylatents</span>
+<span class="w">        </span><span class="no">assert len(manylatents.__path__) &gt;= 2</span>
+<span class="w">        </span><span class="no">print(&#39;Namespace package OK&#39;)</span>
+<span class="w">        </span><span class="no">&quot;</span>
+</code></pre></div>
+<h2 id="testing-checklist">Testing Checklist</h2>
+<h3 id="namespace-package">Namespace Package</h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>manylatents/__init__.py</code> has <code>extend_path</code> line</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>import manylatents.yourext</code> works</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Core manylatents still importable</li>
+</ul>
+<h3 id="hydra-config">Hydra Config</h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> SearchPathPlugin registered via entry-point in <code>pyproject.toml</code></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Verify auto-discovery: <code>python -c "from manylatents.extensions import discover_extensions; discover_extensions()"</code></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All configs have valid <code>_target_</code> paths</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Metrics use <code>_partial_: true</code></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Experiment configs use <code># @package _global_</code></li>
+</ul>
+<h3 id="interface-compliance">Interface Compliance</h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> LatentModule subclasses implement <code>fit()</code> and <code>transform()</code></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Datasets have <code>get_data()</code> method</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Metrics accept <code>(embeddings, dataset, module, **kwargs)</code></li>
+</ul>
+<h3 id="ci">CI</h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Import tests pass on Python 3.10-3.12</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Config resolution tests pass</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Core tests still pass with extension installed</li>
+</ul>
+<h2 id="quick-reference">Quick Reference</h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># Core entry point with auto-discovery</span>
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>manylatents.main<span class="w"> </span><span class="nv">experiment</span><span class="o">=</span>your_experiment
+</code></pre></div>
+<h3 id="troubleshooting-auto-discovery">Troubleshooting Auto-Discovery</h3>
+<p><strong>Check installed entry-points:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">entry_points</span>
+<span class="n">eps</span> <span class="o">=</span> <span class="n">entry_points</span><span class="p">(</span><span class="n">group</span><span class="o">=</span><span class="s2">&quot;manylatents.extensions&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">([(</span><span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ep</span><span class="o">.</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">ep</span> <span class="ow">in</span> <span class="n">eps</span><span class="p">])</span>
+</code></pre></div>
+<p><strong>Verify plugin registration:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">discover_extensions</span>
+<span class="n">discover_extensions</span><span class="p">()</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hydra.core.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">Plugins</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">hydra.plugins.search_path_plugin</span><span class="w"> </span><span class="kn">import</span> <span class="n">SearchPathPlugin</span>
+<span class="nb">print</span><span class="p">([</span><span class="n">p</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">Plugins</span><span class="o">.</span><span class="n">instance</span><span class="p">()</span><span class="o">.</span><span class="n">discover</span><span class="p">(</span><span class="n">SearchPathPlugin</span><span class="p">)])</span>
+</code></pre></div>
+<p><strong>Extension not showing up?</strong></p>
+<ul>
+<li>Ensure the package is installed (not just cloned): <code>uv pip install -e .</code></li>
+<li>Check <code>pyproject.toml</code> has <code>[project.entry-points."manylatents.extensions"]</code></li>
+<li>Reinstall after editing <code>pyproject.toml</code> — entry-points come from package metadata</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

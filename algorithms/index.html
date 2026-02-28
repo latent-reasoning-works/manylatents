@@ -1,0 +1,1195 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://latent-reasoning-works.github.io/manylatents/algorithms/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Algorithms - manylatents</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#algorithms" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="manylatents" class="md-header__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            manylatents
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Algorithms
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="manylatents" class="md-nav__button md-logo" aria-label="manylatents" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    manylatents
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fittransform-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit/transform Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit/transform Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trainable-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trainable Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trainable Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-algorithms_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-architectures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network Architectures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Network Architectures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Networks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autoencoder-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autoencoder Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loss-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loss Functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimizer-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimizer Config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composing-a-full-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composing a Full Config
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../callbacks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Callbacks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extensions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extensions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fittransform-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit/transform Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit/transform Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trainable-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trainable Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trainable Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-algorithms_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-architectures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network Architectures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Network Architectures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available Networks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autoencoder-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autoencoder Config
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loss-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loss Functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimizer-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimizer Config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#composing-a-full-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composing a Full Config
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="algorithms">Algorithms</h1>
+<p>manyLatents provides two algorithm base classes. The decision rule is binary: if the algorithm trains with backprop, use LightningModule. If not, use LatentModule.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:1"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">LatentModule</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="fittransform-algorithms">fit/transform Algorithms</h2>
+<p><code>LatentModule</code> is the base class for non-neural algorithms. Subclass it, implement <code>fit()</code> and <code>transform()</code>, and you're done.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">manylatents.algorithms.latent.latent_module_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatentModule</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyAlgorithm</span><span class="p">(</span><span class="n">LatentModule</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">my_param</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">my_param</span> <span class="o">=</span> <span class="n">my_param</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">x</span><span class="p">[:,</span> <span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">n_components</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="available-algorithms">Available Algorithms</h3>
+<p>| algorithm | type | config | key params |</p>
+</div>
+</div>
+</div>
+<p>|---|---|---|---|
+| ArchetypalAnalysisModule | <code>latent</code> | <code>algorithms/latent=aa</code> | <code>method</code>, <code>max_iter</code> |
+| ClassifierModule | <code>latent</code> | <code>algorithms/latent=classifier</code> | <code>model</code>, <code>max_iter</code>, <code>init_seed</code> |
+| DiffusionMapModule | <code>latent</code> | <code>algorithms/latent=diffusionmap</code> | <code>t</code>, <code>knn</code>, <code>decay</code>, <code>n_pca</code> |
+| LeidenModule | <code>latent</code> | <code>algorithms/latent=leiden</code> | <code>resolution</code>, <code>n_neighbors</code>, <code>backend</code>, <code>device</code> |
+| MDSModule | <code>latent</code> | <code>algorithms/latent=mds</code> | <code>ndim</code>, <code>seed</code>, <code>how</code>, <code>solver</code> |
+| MultiscalePHATEModule | <code>latent</code> | <code>algorithms/latent=multiscale_phate</code> | <code>scale</code>, <code>granularity</code>, <code>landmarks</code>, <code>knn</code> |
+| NoOpModule | <code>latent</code> | <code>algorithms/latent=noop</code> | -- |
+| PCAModule | <code>latent</code> | <code>algorithms/latent=pca</code> | -- |
+| PHATEModule | <code>latent</code> | <code>algorithms/latent=phate</code> | <code>knn</code>, <code>t</code>, <code>gamma</code>, <code>decay</code> |
+| PHATEModule | <code>latent</code> | <code>algorithms/latent=phate_torchdr</code> | <code>knn</code>, <code>t</code>, <code>gamma</code>, <code>decay</code> |
+| DiffusionMapModule | <code>latent</code> | <code>algorithms/latent=spectral_clustering</code> | <code>t</code>, <code>knn</code>, <code>decay</code>, <code>n_pca</code> |
+| TSNEModule | <code>latent</code> | <code>algorithms/latent=tsne</code> | <code>perplexity</code>, <code>n_iter_early</code>, <code>n_iter_late</code>, <code>learning_rate</code> |
+| TSNEModule | <code>latent</code> | <code>algorithms/latent=tsne_torchdr</code> | <code>perplexity</code>, <code>fit_fraction</code>, <code>backend</code>, <code>device</code> |
+| UMAPModule | <code>latent</code> | <code>algorithms/latent=umap</code> | <code>n_neighbors</code>, <code>min_dist</code>, <code>n_epochs</code>, <code>metric</code> |
+| UMAPModule | <code>latent</code> | <code>algorithms/latent=umap_torchdr</code> | <code>n_neighbors</code>, <code>min_dist</code>, <code>fit_fraction</code>, <code>backend</code> |</p>
+<div class="highlight"><pre><span></span><code>### FoundationEncoder Pattern
+
+Frozen pretrained models also use LatentModule — `fit()` is a no-op and `transform()` wraps the model&#39;s forward pass. This is a usage convention, not a separate class. Implementations live in `manylatents-omics/manylatents/dogma/encoders/` (Evo2, ESM3, Orthrus, AlphaGenome).
+
+### Optional Methods
+
+If your algorithm uses a kernel-based approach, implement these to enable module-level metrics:
+
+```python
+def kernel_matrix(self, ignore_diagonal=False) -&gt; np.ndarray:
+    &quot;&quot;&quot;Raw similarity matrix (N x N).&quot;&quot;&quot;
+    ...
+
+def affinity_matrix(self, ignore_diagonal=False, use_symmetric=False) -&gt; np.ndarray:
+    &quot;&quot;&quot;Normalized transition matrix.&quot;&quot;&quot;
+    ...
+```
+
+This enables metrics like `KernelMatrixSparsity`, `AffinitySpectrum`, and `ConnectedComponents`.
+
+### Running
+
+```bash
+uv run python -m manylatents.main algorithms/latent=pca data=swissroll
+```
+
+### Adding a New LatentModule
+
+1. Create `manylatents/algorithms/latent/your_algo.py` inheriting from `LatentModule`
+2. Implement `fit(x, y=None)` and `transform(x)`
+3. Create `manylatents/configs/algorithms/latent/your_algo.yaml` with `_target_`
+4. Import in `manylatents/algorithms/latent/__init__.py`
+</code></pre></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:1"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">LightningModule</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="trainable-algorithms">Trainable Algorithms</h2>
+<p>Neural network algorithms use PyTorch Lightning's <code>LightningModule</code> with training loops. Implement <code>setup()</code>, <code>training_step()</code>, <code>encode()</code>, and <code>configure_optimizers()</code>.</p>
+<h3 id="available-algorithms_1">Available Algorithms</h3>
+<p>| algorithm | type | config | key params |</p>
+</div>
+</div>
+</div>
+<p>|---|---|---|---|
+| Reconstruction | <code>lightning</code> | <code>algorithms/lightning=aanet_reconstruction</code> | <code>datamodule</code>, <code>network</code>, <code>optimizer</code>, <code>loss</code> |
+| Reconstruction | <code>lightning</code> | <code>algorithms/lightning=ae_reconstruction</code> | <code>datamodule</code>, <code>network</code>, <code>optimizer</code>, <code>loss</code> |
+| HFTrainerModule | <code>lightning</code> | <code>algorithms/lightning=hf_trainer</code> | <code>config</code> |
+| LatentODE | <code>lightning</code> | <code>algorithms/lightning=latent_ode</code> | <code>datamodule</code>, <code>network</code>, <code>optimizer</code>, <code>loss</code> |</p>
+<div class="highlight"><pre><span></span><code>### Pattern
+
+All LightningModule algorithms follow the same pattern:
+
+```python
+class MyTrainableAlgorithm(LightningModule):
+    def __init__(self, network, optimizer, loss, datamodule=None, init_seed=42):
+        super().__init__()
+        self.save_hyperparameters(ignore=[&quot;datamodule&quot;, &quot;network&quot;, &quot;loss&quot;])
+        self.network_config = network
+        self.optimizer_config = optimizer
+        self.loss_fn = loss
+
+    def setup(self, stage=None):
+        # Deferred network construction — input_dim from datamodule
+        input_dim = self.trainer.datamodule.data_dim
+        self.network = hydra.utils.instantiate(self.network_config, input_dim=input_dim)
+
+    def training_step(self, batch, batch_idx):
+        outputs = self.network(batch)
+        return self.loss_fn(outputs, batch)
+
+    def encode(self, x):
+        return self.network.encode(x)
+
+    def configure_optimizers(self):
+        return hydra.utils.instantiate(self.optimizer_config, params=self.parameters())
+```
+
+Key conventions:
+
+- `save_hyperparameters(ignore=[&quot;datamodule&quot;, &quot;network&quot;, &quot;loss&quot;])` — Lightning can&#39;t serialize nn.Modules
+- `setup()` defers network construction until `input_dim` is known from the datamodule
+- `encode()` extracts embeddings for evaluation after training
+- Use the project&#39;s `MSELoss` from `manylatents.algorithms.lightning.losses.mse`, not `torch.nn.MSELoss`
+
+### Latent ODE
+
+The `LatentODE` algorithm integrates neural ODEs for learning continuous-time dynamics in latent space:
+
+```bash
+uv run python -m manylatents.main \
+  algorithms/lightning=latent_ode \
+  data=swissroll \
+  trainer.max_epochs=10
+```
+
+Configuration supports custom integration times and ODE solver options via `torchdiffeq`.
+
+### Running
+
+```bash
+uv run python -m manylatents.main \
+  algorithms/lightning=ae_reconstruction \
+  data=swissroll \
+  trainer.max_epochs=10
+
+# Fast dev run for testing
+uv run python -m manylatents.main \
+  algorithms/lightning=ae_reconstruction \
+  data=swissroll \
+  trainer.fast_dev_run=true
+```
+
+### Adding a New LightningModule
+
+1. Create `manylatents/algorithms/lightning/your_algo.py` inheriting from `LightningModule`
+2. Implement `setup()`, `training_step()`, `encode()`, `configure_optimizers()`
+3. Use `self.save_hyperparameters(ignore=[&quot;datamodule&quot;, &quot;network&quot;, &quot;loss&quot;])`
+4. Create config in `manylatents/configs/algorithms/lightning/your_algo.yaml`
+5. Test with `trainer.fast_dev_run=true`
+</code></pre></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:1"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Networks &amp; Losses</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<h2 id="network-architectures">Network Architectures</h2>
+<p>Networks are <code>nn.Module</code> classes used by LightningModule algorithms. They define the architecture; the LightningModule wraps the training logic.</p>
+<h3 id="available-networks">Available Networks</h3>
+<table>
+<thead>
+<tr>
+<th>Network</th>
+<th>Class</th>
+<th>Config</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Autoencoder</td>
+<td><code>Autoencoder</code></td>
+<td><code>algorithms/lightning/network=autoencoder</code></td>
+<td>Symmetric encoder-decoder with configurable layers</td>
+</tr>
+<tr>
+<td>AANet</td>
+<td><code>AANet</code></td>
+<td><code>algorithms/lightning/network=aanet</code></td>
+<td>Archetypal analysis network</td>
+</tr>
+<tr>
+<td>LatentODENetwork</td>
+<td><code>LatentODENetwork</code></td>
+<td>(configured via <code>latent_ode.yaml</code>)</td>
+<td>ODE function for continuous dynamics</td>
+</tr>
+</tbody>
+</table>
+<h3 id="autoencoder-config">Autoencoder Config</h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/algorithms/lightning/network/autoencoder.yaml</span>
+<span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.algorithms.lightning.networks.autoencoder.Autoencoder</span>
+<span class="nt">input_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">???</span><span class="w">  </span><span class="c1"># Set by setup() from datamodule</span>
+<span class="nt">hidden_dims</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">]</span>
+<span class="nt">latent_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="nt">activation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">relu</span>
+</code></pre></div>
+<h2 id="loss-functions">Loss Functions</h2>
+<p>Use the project's loss functions, not PyTorch's directly.</p>
+<table>
+<thead>
+<tr>
+<th>Loss</th>
+<th>Class</th>
+<th>Config</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MSELoss</td>
+<td><code>MSELoss</code></td>
+<td><code>algorithms/lightning/loss=default</code></td>
+<td>Reconstruction loss</td>
+</tr>
+<tr>
+<td>GeometricLoss</td>
+<td><code>GeometricLoss</code></td>
+<td><code>algorithms/lightning/loss=ae_dim</code></td>
+<td>Dimensionality-aware loss</td>
+</tr>
+<tr>
+<td>GeometricLoss</td>
+<td><code>GeometricLoss</code></td>
+<td><code>algorithms/lightning/loss=ae_neighbors</code></td>
+<td>Neighborhood-preserving loss</td>
+</tr>
+<tr>
+<td>GeometricLoss</td>
+<td><code>GeometricLoss</code></td>
+<td><code>algorithms/lightning/loss=ae_shape</code></td>
+<td>Shape-preserving loss</td>
+</tr>
+</tbody>
+</table>
+<p>The project's <code>MSELoss</code> (from <code>manylatents.algorithms.lightning.losses.mse</code>) accepts <code>(outputs, targets, **kwargs)</code>, unlike <code>torch.nn.MSELoss</code>. Always use the project's version.</p>
+<h2 id="optimizer-config">Optimizer Config</h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/algorithms/lightning/optimizer/adam.yaml</span>
+<span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">torch.optim.Adam</span>
+<span class="nt">_partial_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">lr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+</code></pre></div>
+<p>The <code>_partial_: true</code> flag creates a partial that receives <code>params=</code> from <code>configure_optimizers()</code>.</p>
+<h2 id="composing-a-full-config">Composing a Full Config</h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># configs/algorithms/lightning/ae_reconstruction.yaml</span>
+<span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.algorithms.lightning.reconstruction.Reconstruction</span>
+<span class="nt">_recursive_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">datamodule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${data}</span>
+<span class="nt">network</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.algorithms.lightning.networks.autoencoder.Autoencoder</span>
+<span class="w">  </span><span class="nt">input_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">  </span><span class="c1"># inferred from data in setup()</span>
+<span class="w">  </span><span class="nt">hidden_dims</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">512</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">latent_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<span class="w">  </span><span class="nt">activation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">relu</span>
+<span class="w">  </span><span class="nt">batchnorm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="nt">optimizer</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">torch.optim.Adam</span>
+<span class="w">  </span><span class="nt">_partial_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">lr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="nt">loss</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">_target_</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">manylatents.algorithms.lightning.losses.mse.MSELoss</span>
+</code></pre></div>
+<p><code>_recursive_: false</code> prevents Hydra from eagerly instantiating nested configs — the <code>Reconstruction</code> module handles deferred instantiation in <code>setup()</code> once <code>input_dim</code> is known from the datamodule.</p>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
