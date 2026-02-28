@@ -11,9 +11,12 @@ from sklearn.neighbors import kneighbors_graph
 logger = logging.getLogger(__name__)
 
 
-def _content_key(data: np.ndarray) -> str:
+def _content_key(data) -> str:
     """O(1) content hash: shape + dtype + first/last row bytes."""
     import hashlib
+    import torch
+    if isinstance(data, torch.Tensor):
+        data = data.numpy()
     h = hashlib.sha256()
     h.update(f"{data.shape}{data.dtype}".encode())
     h.update(data[0].tobytes())
@@ -163,6 +166,11 @@ def compute_knn(
         (distances, indices) — both shape (n_samples, k+1) if include_self,
         or (n_samples, k) if not.
     """
+    # Ensure numpy (LatentModule.transform() returns tensors)
+    import torch
+    if isinstance(data, torch.Tensor):
+        data = data.numpy()
+
     # Check cache for a usable superset
     if cache is not None:
         key = _content_key(data)
