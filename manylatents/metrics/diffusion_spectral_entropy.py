@@ -112,7 +112,7 @@ def compute_diffusion_matrix_knn(
 
 @register_metric(
     aliases=["diffusion_spectral_entropy", "dse"],
-    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0, "kernel": "knn", "k": 15, "alpha": 1.0},
+    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0, "kernel": "knn", "k": 15, "alpha": 1.0, "input_space": "embedding"},
     description="Diffusion spectral entropy (eigenvalue count at diffusion time t)",
 )
 def DiffusionSpectralEntropy(
@@ -130,6 +130,7 @@ def DiffusionSpectralEntropy(
     kernel: str = "knn",
     k: int = 15,
     alpha: float = 1.0,
+    input_space: str = "embedding",
 ) -> float:
     """
     Diffusion spectral entropy and eigenvalue counting on embedding data.
@@ -153,8 +154,15 @@ def DiffusionSpectralEntropy(
         k: Neighborhood size for knn kernel (default 15)
         alpha: Density normalization (0=graph Laplacian, 0.5=Fokker-Planck, 1.0=Laplace-Beltrami)
     """
+    # Select input space
+    if input_space == "dataset":
+        if dataset is None or not hasattr(dataset, "data"):
+            raise ValueError("input_space='dataset' requires dataset with .data")
+        X = dataset.data
+    else:
+        X = embeddings
+
     # Subsample if too large
-    X = embeddings
     if max_N is not None and len(X) > max_N:
         random.seed(random_seed)
         rand_inds = np.array(random.sample(range(len(X)), k=max_N))
