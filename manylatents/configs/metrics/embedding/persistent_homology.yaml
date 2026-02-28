@@ -3,3 +3,5 @@ persistent_homology:
   _partial_: True
   homology_dim: 1
   persistence_threshold: 0.1
+  max_N: 2000
+  random_seed: 0

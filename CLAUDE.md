@@ -72,10 +72,10 @@ A LatentModule may use gradients internally — the distinction is API surface, 
 **Metric protocol** (`manylatents.metrics.metric`):
 
 ```python
-def metric_fn(embeddings: np.ndarray, dataset=None, module=None, cache=None) -> float | dict
+def metric_fn(embeddings: np.ndarray, dataset=None, module=None, cache=None, **kwargs) -> float | dict
 ```
 
-All metrics share a `cache` dict for deduplicated kNN/eigenvalue computation. Three evaluation contexts: `embedding`, `dataset`, `module`.
+All metrics share a `cache` dict for deduplicated kNN/eigenvalue computation. Three evaluation contexts: `embedding`, `dataset`, `module`. Programmatic API: `compute_metric(name, embeddings=X, **kwargs)` — kwargs pass through the registry to the function signature. To add a parameter to a metric, add it to the function signature + `default_params` in `@register_metric` + config YAML.
 
 **Data contract**: `LatentOutputs = dict[str, Any]` — required key `"embeddings"`, optional `"scores"`, `"label"`, `"metadata"`. (`EmbeddingOutputs` is a deprecated alias.)
 
