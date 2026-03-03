@@ -115,7 +115,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
+manylatents-omics = { git = "https://github.com/latent-reasoning-works/manylatents-omics.git" }
 shop = { path = "../shop", editable = true }
 
 [tool.pytest.ini_options]
