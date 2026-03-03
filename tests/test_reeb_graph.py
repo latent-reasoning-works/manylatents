@@ -38,28 +38,26 @@ class TestReebGraphModule:
         assert result.shape[1] > 0  # M Reeb nodes
         assert result.shape[1] == m.kernel_matrix().shape[0]  # M matches adjacency
 
-    def test_hard_assignment(self):
-        """Each point belongs to at most one Reeb node (hard assignment)."""
+    def test_strict_single_membership(self):
+        """With overlap=0.0, each point belongs to at most one Reeb node."""
         from manylatents.algorithms.latent.reeb_graph import ReebGraphModule
 
         data = torch.from_numpy(_make_swissroll()).float()
-        # Even with overlap, assignment is hard — overlap only helps edge detection
-        m = ReebGraphModule(n_bins=5, overlap=0.5, random_state=42)
+        m = ReebGraphModule(n_bins=5, overlap=0.0, random_state=42)
         result = m.fit_transform(data)
         memberships_per_point = result.sum(dim=1)
         assert (memberships_per_point <= 1).all()
 
-    def test_overlap_improves_connectivity(self):
-        """Overlap>0 can produce more edges than overlap=0."""
+    def test_overlap_multi_membership(self):
+        """With overlap>0, some points belong to multiple Reeb nodes."""
         from manylatents.algorithms.latent.reeb_graph import ReebGraphModule
 
         data = torch.from_numpy(_make_swissroll()).float()
-        m_strict = ReebGraphModule(n_bins=8, overlap=0.0, random_state=42)
-        m_overlap = ReebGraphModule(n_bins=8, overlap=0.5, random_state=42)
-        m_strict.fit(data)
-        m_overlap.fit(data)
-        # Overlap should produce at least as many edges (more connectivity)
-        assert m_overlap.structural_summary["n_edges"] >= m_strict.structural_summary["n_edges"]
+        m = ReebGraphModule(n_bins=5, overlap=0.5, random_state=42)
+        result = m.fit_transform(data)
+        memberships_per_point = result.sum(dim=1)
+        # Some points should be in multiple Reeb nodes
+        assert (memberships_per_point > 1).any(), "Expected multi-membership with overlap=0.5"
 
     def test_membership_is_binary(self):
         """Membership matrix values are 0 or 1."""
