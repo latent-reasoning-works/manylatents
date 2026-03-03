@@ -626,6 +626,14 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
                 embeddings["trajectories"] = traj
                 logger.info(f"Trajectories attached: shape={traj.shape}")
 
+            # Attach affinity matrix if the algorithm exposes one
+            try:
+                aff = algorithm.affinity_matrix()
+                embeddings["affinity_matrix"] = aff
+                logger.info(f"Affinity matrix attached: shape={aff.shape}")
+            except (NotImplementedError, AttributeError):
+                pass
+
             # Evaluate embeddings
             logger.info(f"Evaluating embeddings from {type(algorithm).__name__}...")
             t_eval_start = time.perf_counter()
