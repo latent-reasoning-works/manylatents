@@ -77,12 +77,6 @@ from manylatents.metrics.diffusion_condensation import DiffusionCondensation
 from manylatents.metrics.diffusion_curvature import DiffusionCurvature
 from manylatents.metrics.diffusion_spectral_entropy import DiffusionSpectralEntropy
 
-# Topological metrics (optional deps: gudhi, ripser)
-try:
-    from manylatents.metrics.reeb_graph import ReebGraphNodesEdges
-except ImportError:
-    pass
-
 # Magnitude metrics (optional dep: magnipy)
 try:
     from manylatents.metrics.magnitude_dimension import MagnitudeDimension
@@ -148,8 +142,6 @@ __all__ = [
     "DiffusionCondensation",
     "DiffusionCurvature",
     "DiffusionSpectralEntropy",
-    # Topological metrics
-    "ReebGraphNodesEdges",
     # Magnitude metrics
     "MagnitudeDimension",
     # Embedding quality metrics

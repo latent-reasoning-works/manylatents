@@ -9,6 +9,7 @@ from .multi_dimensional_scaling import MDSModule
 from .merging import MergingModule, ChannelLoadings
 from .classifier import ClassifierModule
 from .leiden import LeidenModule
+from .reeb_graph import ReebGraphModule
 
 __all__ = [
     "PCAModule",
@@ -22,4 +23,5 @@ __all__ = [
     "ChannelLoadings",
     "ClassifierModule",
     "LeidenModule",
+    "ReebGraphModule",
 ]

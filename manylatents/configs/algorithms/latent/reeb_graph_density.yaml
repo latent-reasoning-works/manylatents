@@ -1,0 +1,10 @@
+_target_: manylatents.algorithms.latent.reeb_graph.ReebGraphModule
+n_components: 1
+n_bins: 10
+overlap: 0.25
+lens: density
+lens_k: 15
+random_state: ${seed}
+neighborhood_size: ${neighborhood_size}
+backend: null
+device: null
