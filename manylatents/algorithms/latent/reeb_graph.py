@@ -106,26 +106,25 @@ def _vr_to_graph(skeleta, function, with_weights=False):
 def _reeb_approx_graph(H, function, n_bins, overlap=0.0, density_factor=0.1):
     """Build the approximate Reeb graph.
 
-    Overlapping covers are used only for **edge detection** between adjacent
-    bins.  The final point-to-node assignment is hard: each point is assigned
-    to the Reeb node in the bin whose centre is closest to the point's lens
-    value (i.e. the "home" bin).
+    Each Reeb node is a connected component within a (possibly overlapping)
+    bin of the lens function.  A data point belongs to every Reeb node whose
+    bin contains it **and** whose connected component it falls in.  With
+    ``overlap > 0``, points near bin boundaries belong to multiple Reeb nodes.
 
     Parameters
     ----------
     overlap : float
-        Fraction of bin width to extend on each side for edge detection.
-        ``0.0`` gives strict non-overlapping bins; ``0.25`` extends each bin
-        by 25 % of its width on both sides so adjacent bins can share points
-        for connectivity testing.
+        Fraction of bin width to extend on each side.  ``0.0`` gives strict
+        non-overlapping bins; ``0.25`` extends each bin by 25 % of its width
+        on both sides so adjacent bins share a region.
 
     Returns
     -------
     G : nx.Graph
-        Reeb graph with ``indices`` attribute on each node (home-bin points only).
+        Reeb graph with ``indices`` attribute on each node.
     membership : np.ndarray, shape (N, M)
         Binary membership matrix — ``membership[i, j] == 1`` iff data point
-        *i* is assigned to Reeb node *j*. Each row sums to 0 or 1.
+        *i* belongs to Reeb node *j*.  Rows can sum to >1 when overlap > 0.
     """
     import networkx as nx
 
@@ -134,22 +133,12 @@ def _reeb_approx_graph(H, function, n_bins, overlap=0.0, density_factor=0.1):
     bin_width = (f_max - f_min) / n_bins
     ext = overlap * bin_width  # extension on each side
 
-    # Strict (home) bin boundaries — non-overlapping
-    strict_lo = np.array([f_min + i * bin_width for i in range(n_bins)])
-    strict_hi = np.array([f_min + (i + 1) * bin_width for i in range(n_bins)])
+    # Build (possibly overlapping) bin intervals
+    edges_lo = np.array([f_min + i * bin_width - ext for i in range(n_bins)])
+    edges_hi = np.array([f_min + (i + 1) * bin_width + ext for i in range(n_bins)])
 
-    # Extended bin boundaries — used for edge detection
-    ext_lo = strict_lo - ext
-    ext_hi = strict_hi + ext
-
-    # Points in the extended bins (for VR subgraph / edge detection)
-    ext_subsets = [
-        np.where((ext_lo[i] <= function) & (function < ext_hi[i]))[0]
-        for i in range(n_bins)
-    ]
-    # Points in the strict bins (for final node assignment)
-    strict_subsets = [
-        np.where((strict_lo[i] <= function) & (function < strict_hi[i]))[0]
+    subsets_idx = [
+        np.where((edges_lo[i] <= function) & (function < edges_hi[i]))[0]
         for i in range(n_bins)
     ]
 
@@ -157,46 +146,34 @@ def _reeb_approx_graph(H, function, n_bins, overlap=0.0, density_factor=0.1):
     node_counter = 0
     prev_components = []
     prev_node_ids = []
-    prev_ext_comps = []
-    point_to_node = np.full(n_points, -1, dtype=np.int64)
+    # Track which Reeb nodes each point belongs to (multi-label)
+    point_nodes: list[list[int]] = [[] for _ in range(n_points)]
 
-    for j in range(n_bins):
-        # Use the extended subset for connected-component detection
-        H_sub = H.subgraph(ext_subsets[j])
-        ext_comps = [
+    for j, subset in enumerate(subsets_idx):
+        H_sub = H.subgraph(subset)
+        comps = [
             list(c) for c in nx.connected_components(H_sub)
             if len(c) > n_points / n_bins * density_factor
         ]
-        # Strict points in this bin
-        strict_set = set(strict_subsets[j].tolist())
-
         curr_node_ids = []
-        curr_ext_comps = []
-        for k, ext_comp in enumerate(ext_comps):
-            # Only assign the strict-bin points to this Reeb node
-            home_points = [p for p in ext_comp if p in strict_set]
-            if len(home_points) == 0:
-                continue
-            G.add_node(node_counter, indices=home_points)
-            for pt in home_points:
-                point_to_node[pt] = node_counter
-            # Edge detection: connect to previous bin's components using
-            # the full extended components for connectivity testing
-            for prev_idx, prev_ext in enumerate(prev_ext_comps):
-                if nx.is_connected(H.subgraph(ext_comp + prev_ext)):
+        for k, comp in enumerate(comps):
+            G.add_node(node_counter, indices=comp)
+            for pt in comp:
+                point_nodes[pt].append(node_counter)
+            # Connect to previous bin's components if they share VR-connectivity
+            for prev_idx, prev in enumerate(prev_components):
+                if nx.is_connected(H.subgraph(comp + prev)):
                     G.add_edge(node_counter, prev_node_ids[prev_idx])
             curr_node_ids.append(node_counter)
-            curr_ext_comps.append(ext_comp)
             node_counter += 1
+        prev_components = comps
         prev_node_ids = curr_node_ids
-        prev_ext_comps = curr_ext_comps
 
     # Build (N, M) binary membership matrix
     m = G.number_of_nodes()
     membership = np.zeros((n_points, m), dtype=np.float32)
-    for i in range(n_points):
-        nid = point_to_node[i]
-        if nid >= 0:
+    for i, nodes in enumerate(point_nodes):
+        for nid in nodes:
             membership[i, nid] = 1.0
 
     return G, membership
