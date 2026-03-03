@@ -12,11 +12,16 @@ logger = logging.getLogger(__name__)
 
 
 def _content_key(data) -> str:
-    """O(1) content hash: shape + dtype + first/last row bytes."""
+    """O(1) content hash: shape + dtype + first/last row bytes.
+
+    Always normalizes to float32 contiguous so the hash is consistent
+    regardless of whether the caller passes the original or converted data.
+    """
     import hashlib
     import torch
     if isinstance(data, torch.Tensor):
-        data = data.numpy()
+        data = data.detach().cpu().numpy()
+    data = np.ascontiguousarray(data, dtype=np.float32)
     h = hashlib.sha256()
     h.update(f"{data.shape}{data.dtype}".encode())
     h.update(data[0].tobytes())
