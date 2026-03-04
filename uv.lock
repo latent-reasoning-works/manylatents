@@ -658,6 +658,22 @@ wheels = [
 ]
 
 [[package]]
+name = "gudhi"
+version = "3.11.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4b/44/0132401b791fe4a160776ea345f1f8251f273c9c8a6214f7e017b1506a01/gudhi-3.11.0-cp311-cp311-macosx_12_0_universal2.whl", hash = "sha256:3fa11f7b1df21ee0256fca386cb6b7bd1b98c4ee7cb75f45b81f6d9921ea5701", size = 9901454, upload-time = "2025-02-21T15:59:39.62Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/b7/7ff313e05644d9ea3a8a1e57345ab32becbb911bf02749dd2c62f716b56c/gudhi-3.11.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:498a3a080d1961f175509330caeb08f6d7a1713b8b43f5166bc47212e44da194", size = 4238257, upload-time = "2025-02-21T16:36:03.967Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/46/9790b020b768d5f2a81061e329429d1c5ea143258c4f19792dcdad83dda8/gudhi-3.11.0-cp311-cp311-win_amd64.whl", hash = "sha256:8655adec8d852ac8658d8a2f9cf6a8b9929a12bc0a3c7cc575116364c3e77509", size = 3391633, upload-time = "2025-02-21T16:16:56.467Z" },
+    { url = "https://files.pythonhosted.org/packages/85/51/251a4c50b6f13b62593f0a29cc52f4684ca03ee9fc2a50c0df344bc145b6/gudhi-3.11.0-cp312-cp312-macosx_12_0_universal2.whl", hash = "sha256:dd0361604fe4928144367d24507a8b571c1147a44b4e42fc4d655867d9411e1a", size = 9909179, upload-time = "2025-02-21T16:12:44.008Z" },
+    { url = "https://files.pythonhosted.org/packages/69/fd/3ee44efb409e203d5d21075ba6e0a4d07774e77e2a0c2b8486b846c3fa10/gudhi-3.11.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:9f8ba122d44709219331c678d0256d51a334be83e6a60de6e23ae0716fb3f29e", size = 4220019, upload-time = "2025-02-21T16:36:05.987Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/31/d80da0076d8f9470dd1dc28e36a6d629d7efc87e28d52d4a76fdb525deaf/gudhi-3.11.0-cp312-cp312-win_amd64.whl", hash = "sha256:0747bd4079e39e5a99c3d7b3631660faaa1a7a4ac70284d4bccff8cc87866149", size = 3394713, upload-time = "2025-02-21T16:13:10.785Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1080,12 +1096,13 @@ wheels = [
 
 [[package]]
 name = "manylatents"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "archetypes" },
     { name = "deprecated" },
     { name = "graphtools" },
+    { name = "gudhi" },
     { name = "hydra-core" },
     { name = "hydra-submitit-launcher" },
     { name = "hydra-zen" },
@@ -1117,6 +1134,7 @@ all = [
     { name = "diffrax" },
     { name = "faiss-cpu" },
     { name = "jax" },
+    { name = "manylatents-omics" },
     { name = "optax" },
     { name = "ott-jax" },
     { name = "torchdr" },
@@ -1136,6 +1154,9 @@ jax = [
     { name = "optax" },
     { name = "ott-jax" },
 ]
+omics = [
+    { name = "manylatents-omics" },
+]
 torchdr = [
     { name = "faiss-cpu" },
     { name = "torchdr" },
@@ -1147,7 +1168,6 @@ dev = [
     { name = "pytest" },
     { name = "scanpy", version = "1.11.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scanpy", version = "1.12", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "shop" },
 ]
 
 [package.metadata]
@@ -1157,13 +1177,15 @@ requires-dist = [
     { name = "diffrax", marker = "extra == 'jax'", specifier = ">=0.6" },
     { name = "faiss-cpu", marker = "extra == 'torchdr'" },
     { name = "graphtools", specifier = ">=2.0" },
+    { name = "gudhi", specifier = ">=3.0" },
     { name = "hydra-core", specifier = ">=1.3" },
     { name = "hydra-submitit-launcher", specifier = ">=1.2" },
     { name = "hydra-zen", specifier = ">=0.13" },
     { name = "jax", marker = "extra == 'jax'" },
     { name = "leidenalg", specifier = ">=0.10" },
     { name = "lightning", specifier = ">=2.5" },
-    { name = "manylatents", extras = ["hf", "torchdr", "jax"], marker = "extra == 'all'" },
+    { name = "manylatents", extras = ["hf", "torchdr", "jax", "omics"], marker = "extra == 'all'" },
+    { name = "manylatents-omics", marker = "extra == 'omics'", git = "https://github.com/latent-reasoning-works/manylatents-omics.git" },
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6" },
     { name = "mkdocs-macros-plugin", marker = "extra == 'docs'", specifier = ">=1.0" },
@@ -1191,14 +1213,21 @@ requires-dist = [
     { name = "umap-learn", specifier = ">=0.5" },
     { name = "wandb", specifier = ">=0.25.0" },
 ]
-provides-extras = ["hf", "torchdr", "jax", "docs", "all"]
+provides-extras = ["hf", "torchdr", "jax", "docs", "omics", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "anndata", specifier = ">=0.12.6" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "scanpy", specifier = ">=1.11.5" },
-    { name = "shop", editable = "../shop" },
+]
+
+[[package]]
+name = "manylatents-omics"
+version = "0.1.1"
+source = { git = "https://github.com/latent-reasoning-works/manylatents-omics.git#9206ca3a5a00c7ff71f9a887b030c627e8c4f69c" }
+dependencies = [
+    { name = "manylatents" },
 ]
 
 [[package]]
@@ -2570,49 +2599,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b2
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686", size = 9755, upload-time = "2023-10-24T04:13:38.866Z" },
 ]
-
-[[package]]
-name = "shop"
-version = "0.1.0"
-source = { editable = "../shop" }
-dependencies = [
-    { name = "click" },
-    { name = "hydra-core" },
-    { name = "hydra-submitit-launcher" },
-    { name = "omegaconf" },
-    { name = "rich" },
-    { name = "submitit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.0" },
-    { name = "heatgeo", marker = "extra == 'harness'" },
-    { name = "hydra-core", specifier = ">=1.3" },
-    { name = "hydra-submitit-launcher", specifier = ">=1.2" },
-    { name = "manylatents", marker = "extra == 'harness'" },
-    { name = "matplotlib", marker = "extra == 'harness'", specifier = ">=3.5" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.4.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
-    { name = "omegaconf", specifier = ">=2.3" },
-    { name = "pillow", marker = "extra == 'harness'", specifier = ">=9.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0" },
-    { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
-    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0" },
-    { name = "pyyaml", marker = "extra == 'test'", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "submitit", specifier = ">=1.4" },
-    { name = "wandb", marker = "extra == 'test'", specifier = ">=0.15" },
-]
-provides-extras = ["harness", "dev", "test", "docs"]
-
-[package.metadata.requires-dev]
-dev = []
 
 [[package]]
 name = "six"

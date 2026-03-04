@@ -110,12 +110,10 @@ dev = [
     "anndata>=0.12.6",
     "pytest>=8.3",
     "scanpy>=1.11.5",
-    "shop",
 ]
 
 [tool.uv.sources]
-manylatents-omics = { git = "ssh://git@github.com/latent-reasoning-works/manylatents-omics.git" }
-shop = { path = "../shop", editable = true }
+manylatents-omics = { git = "https://github.com/latent-reasoning-works/manylatents-omics.git" }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
