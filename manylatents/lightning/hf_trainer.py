@@ -26,6 +26,8 @@ class HFTrainerConfig:
         torch_dtype: Optional dtype for model (e.g., torch.bfloat16)
         trust_remote_code: Whether to trust remote code for model loading
         attn_implementation: Attention implementation (e.g., "flash_attention_2")
+        device_map: Device placement strategy (e.g., "auto"). None lets
+            Lightning/FSDP manage placement (existing behavior).
     """
     model_name_or_path: str
     learning_rate: float = 2e-5
@@ -35,6 +37,7 @@ class HFTrainerConfig:
     torch_dtype: Optional[torch.dtype] = None
     trust_remote_code: bool = False
     attn_implementation: Optional[str] = None
+    device_map: Optional[str] = None
 
 
 class HFTrainerModule(LightningModule):
@@ -68,6 +71,8 @@ class HFTrainerModule(LightningModule):
             model_kwargs["torch_dtype"] = self.config.torch_dtype
         if self.config.attn_implementation is not None:
             model_kwargs["attn_implementation"] = self.config.attn_implementation
+        if self.config.device_map is not None:
+            model_kwargs["device_map"] = self.config.device_map
 
         self.network = AutoModelForCausalLM.from_pretrained(**model_kwargs)
         self.tokenizer = AutoTokenizer.from_pretrained(
