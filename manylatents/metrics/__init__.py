@@ -25,6 +25,7 @@ Cache:
 # Import registry first (no dependencies on other metrics)
 from manylatents.metrics.registry import (
     compute_metric,
+    compute_metric_detailed,
     get_metric,
     get_metric_registry,
     list_metrics,
@@ -109,6 +110,7 @@ __all__ = [
     "Metric",
     # Registry functions
     "compute_metric",
+    "compute_metric_detailed",
     "get_metric",
     "get_metric_registry",
     "list_metrics",

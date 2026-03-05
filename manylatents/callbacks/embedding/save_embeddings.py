@@ -1,9 +1,9 @@
 import json
 import logging
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -18,17 +18,19 @@ from manylatents.utils.utils import save_embeddings
 
 logger = logging.getLogger(__name__)
 
-# Import LoggingContext if Geomancer is available
-try:
-    # Add Geomancer to path if running in multi-repo setup
-    geomancer_path = Path(__file__).resolve().parents[4] / "Geomancer"
-    if geomancer_path.exists() and str(geomancer_path) not in sys.path:
-        sys.path.insert(0, str(geomancer_path))
-    from geomancy.logging_context import LoggingContext
-    GEOMANCER_AVAILABLE = True
-except ImportError:
-    GEOMANCER_AVAILABLE = False
-    logger.debug("LoggingContext not available - running in standalone mode")
+
+@runtime_checkable
+class StepLogger(Protocol):
+    """Interface for external step-level logging (e.g., from geomancy).
+
+    Implementations should provide a directory for writing step outputs
+    and an experiment identifier for grouping.
+    """
+
+    def get_step_dir(self, create: bool = False) -> Path | None: ...
+    def get_experiment_id(self) -> str: ...
+    def write_completion_marker(self, step_dir: Path) -> None: ...
+
 
 # Import atomic_writer
 try:
@@ -45,7 +47,8 @@ class SaveEmbeddings(EmbeddingCallback):
                  experiment_name: str = "experiment",
                  use_timestamp: bool = True,
                  save_additional_outputs: bool = False,
-                 save_metric_tables: bool = False) -> None:
+                 save_metric_tables: bool = False,
+                 step_logger: StepLogger | None = None) -> None:
         """
         SaveEmbeddings callback that saves LatentOutputs and optionally metric tables.
 
@@ -56,6 +59,9 @@ class SaveEmbeddings(EmbeddingCallback):
             use_timestamp: Whether to include timestamp in names
             save_additional_outputs: Whether to save non-embeddings keys as separate files
             save_metric_tables: Whether to save separate metric table CSVs (scalar, per-sample)
+            step_logger: Optional external logger for writing to shared metrics directory.
+                Accepts any object implementing the StepLogger protocol (e.g., geomancy's
+                LoggingContext). If None, shared logging is disabled.
         """
         super().__init__()
         self.save_dir        = save_dir
@@ -64,6 +70,7 @@ class SaveEmbeddings(EmbeddingCallback):
         self.use_timestamp   = use_timestamp
         self.save_additional_outputs = save_additional_outputs
         self.save_metric_tables = save_metric_tables
+        self._step_logger = step_logger
         os.makedirs(self.save_dir, exist_ok=True)
         logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
 
@@ -261,14 +268,14 @@ class SaveEmbeddings(EmbeddingCallback):
         self.save_embeddings(embeddings)
         self.register_output("saved_embeddings", self.save_path)
 
-        # If running under Geomancer orchestration, also write to shared metrics directory
-        if GEOMANCER_AVAILABLE and ATOMIC_WRITER_AVAILABLE:
+        # If running under external orchestration (e.g., geomancy), write to shared metrics dir
+        if self._step_logger is not None and ATOMIC_WRITER_AVAILABLE:
             try:
-                step_dir = LoggingContext.get_step_dir(create=True)
+                step_dir = self._step_logger.get_step_dir(create=True)
                 if step_dir:
                     logger.info(f"Writing to shared metrics directory: {step_dir}")
                     write_embedding_outputs_atomic(embeddings, step_dir / "outputs.json")
-                    LoggingContext.write_completion_marker(step_dir)
+                    self._step_logger.write_completion_marker(step_dir)
                     logger.info(f"Successfully wrote LatentOutputs to {step_dir}")
             except Exception as e:
                 logger.warning(f"Failed to write to shared metrics directory: {e}")

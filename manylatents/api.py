@@ -81,6 +81,13 @@ def run(
         ...     {'name': 'step2', 'overrides': {'algorithms': {'latent': 'phate'}}}
         ... ])
     """
+    # Clear Hydra's global state if a caller (manyagents, geomancy, shop) already
+    # initialized it. This is the single canonical location for this guard.
+    from hydra.core.global_hydra import GlobalHydra
+    if GlobalHydra.instance().is_initialized():
+        logger.debug("Clearing GlobalHydra before manylatents API call")
+        GlobalHydra.instance().clear()
+
     # Build configuration from overrides
     config_dir = Path(__file__).parent / "configs"
     config_dir = str(config_dir.resolve())

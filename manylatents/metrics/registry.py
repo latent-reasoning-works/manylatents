@@ -134,14 +134,30 @@ def list_metrics() -> List[str]:
     return sorted(_REGISTRY.keys())
 
 
+def _to_scalar(raw: Any) -> float:
+    """Normalize any metric return type to a single float."""
+    if isinstance(raw, (int, float, np.integer, np.floating)):
+        return float(raw)
+    if isinstance(raw, tuple) and len(raw) >= 1:
+        return float(raw[0])
+    if isinstance(raw, np.ndarray):
+        return float(np.mean(raw))
+    if isinstance(raw, dict):
+        for v in raw.values():
+            if isinstance(v, (int, float, np.integer, np.floating)):
+                return float(v)
+        raise ValueError(f"Dict metric has no scalar value: {list(raw.keys())}")
+    return float(raw)
+
+
 def compute_metric(
     name: str,
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
     **kwargs,
-) -> Union[float, tuple[float, np.ndarray], Dict[str, Any]]:
-    """Convenience function to compute a metric by name.
+) -> float:
+    """Compute a metric by name, always returning a scalar float.
 
     Args:
         name: Metric name or alias.
@@ -151,7 +167,47 @@ def compute_metric(
         **kwargs: Additional parameters (override alias defaults).
 
     Returns:
-        Metric result (float, tuple, or dict depending on metric).
+        Scalar float metric value. For per-sample or structured output,
+        use compute_metric_detailed().
     """
     spec = get_metric(name)
-    return spec(embeddings=embeddings, dataset=dataset, module=module, **kwargs)
+    raw = spec(embeddings=embeddings, dataset=dataset, module=module, **kwargs)
+    return _to_scalar(raw)
+
+
+def compute_metric_detailed(
+    name: str,
+    embeddings: np.ndarray,
+    dataset: Optional[object] = None,
+    module: Optional[LatentModule] = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """Compute a metric with full detail (scalar + per-sample + raw).
+
+    Args:
+        name: Metric name or alias.
+        embeddings: The embedding array.
+        dataset: Optional dataset object.
+        module: Optional LatentModule.
+        **kwargs: Additional parameters (override alias defaults).
+
+    Returns:
+        Dict with keys:
+            - "value": float (scalar summary)
+            - "per_sample": np.ndarray or None
+            - "raw": original return value from the metric function
+    """
+    spec = get_metric(name)
+    raw = spec(embeddings=embeddings, dataset=dataset, module=module, **kwargs)
+
+    per_sample = None
+    if isinstance(raw, tuple) and len(raw) >= 2:
+        per_sample = np.asarray(raw[1]) if raw[1] is not None else None
+    elif isinstance(raw, np.ndarray) and raw.ndim >= 1:
+        per_sample = raw
+
+    return {
+        "value": _to_scalar(raw),
+        "per_sample": per_sample,
+        "raw": raw,
+    }
