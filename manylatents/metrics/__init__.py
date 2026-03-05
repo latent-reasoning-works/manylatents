@@ -92,6 +92,15 @@ from manylatents.metrics.dataset_topology_descriptor import DatasetTopologyDescr
 from manylatents.metrics.preservation import GroundTruthPreservation
 from manylatents.metrics.stratification import kmeans_stratification
 
+# Trajectory geometry metrics
+from manylatents.metrics.trajectory_geometry import (
+    TrajectoryVelocity,
+    TrajectoryCurvature,
+    compute_velocity,
+    compute_cosine_velocity,
+    compute_menger_curvature,
+)
+
 # Post-hoc analysis
 from manylatents.metrics.metric_agreement import MetricAgreement
 
@@ -151,6 +160,12 @@ __all__ = [
     "DatasetTopologyDescriptor",
     "GroundTruthPreservation",
     "kmeans_stratification",
+    # Trajectory geometry metrics
+    "TrajectoryVelocity",
+    "TrajectoryCurvature",
+    "compute_velocity",
+    "compute_cosine_velocity",
+    "compute_menger_curvature",
     # Post-hoc analysis
     "MetricAgreement",
 ]
