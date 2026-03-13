@@ -6,7 +6,7 @@ Original author: Daniel Burkhardt <daniel.burkhardt@yale.edu>
 Revised by: Shuang Ni 2025
 
 Note: This file contains both the core algorithm implementation (MultidimensionalScaling class)
-and the PyTorch Lightning wrapper (MDSModule). Ideally, these should be separate with the 
+and the PyTorch Lightning wrapper (MDSModule). Ideally, these should be separate with the
 core implementation imported from a shared library, but they are combined here for convenience.
 """
 
@@ -18,7 +18,6 @@ import numpy as np
 import torch
 from torch import Tensor
 from typing import Optional, Union
-from deprecated import deprecated
 
 from .latent_module_base import LatentModule
 import logging
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class MultidimensionalScaling():
-    def __init__(self, 
+    def __init__(self,
                  ndim: int = 2,
                 seed: Optional[int] = 42,
                 how: str = "metric", #  choose from ['classic', 'metric', 'nonmetric']
@@ -47,12 +46,6 @@ class MultidimensionalScaling():
         self.embedding = None
         self.distance_matrix = None  # Store computed distance matrix
 
-    # Fast classical MDS using random svd
-    @deprecated(version="1.0.0", reason="Use phate.mds.classic instead")
-    def cmdscale_fast(self, D):
-        return self.classic(D=D)
-
-
     def classic(self, D):
         """Fast CMDS using random SVD
 
@@ -60,12 +53,6 @@ class MultidimensionalScaling():
         ----------
         D : array-like, shape=[n_samples, n_samples]
             pairwise distances
-
-        n_components : int, optional (default: 2)
-            number of dimensions in which to embed `D`
-
-        random_state : int, RandomState or None, optional (default: None)
-            numpy random state
 
         Returns
         -------
@@ -80,21 +67,28 @@ class MultidimensionalScaling():
         Y = pca.fit_transform(D)
         return Y
 
-
-    @deprecated(version="1.0.0", reason="s_gd2 package removed. Use solver='smacof' instead.")
     def sgd(self, D, init=None):
-        """Metric MDS using stochastic gradient descent (DEPRECATED).
+        """Metric MDS using stochastic gradient descent via phate.sgd_mds.
 
-        This method is deprecated as the s_gd2 package has been removed.
-        Falls back to SMACOF solver.
+        Parameters
+        ----------
+        D : array-like, shape=[n_samples, n_samples]
+            pairwise distances
+        init : array-like or None
+            Initial embedding
+
+        Returns
+        -------
+        Y : array-like, shape=[n_samples, n_components]
         """
-        warnings.warn(
-            "The 'sgd' solver is deprecated (s_gd2 removed). Falling back to SMACOF.",
-            DeprecationWarning,
-            stacklevel=2
+        from phate.sgd_mds import sgd_mds
+        return sgd_mds(
+            D,
+            n_components=self.ndim,
+            init=init,
+            random_state=self.seed,
+            verbose=self.verbose,
         )
-        return self.smacof(D, init=init, metric=True)
-
 
     def smacof(
             self,
@@ -110,25 +104,12 @@ class MultidimensionalScaling():
         ----------
         D : array-like, shape=[n_samples, n_samples]
             pairwise distances
-
-        n_components : int, optional (default: 2)
-            number of dimensions in which to embed `D`
-
         metric : bool, optional (default: True)
             Use metric MDS. If False, uses non-metric MDS
-
         init : array-like or None, optional (default: None)
             Initialization state
-
-        random_state : int, RandomState or None, optional (default: None)
-            numpy random state
-
-        verbose : int or bool, optional (default: 0)
-            verbosity
-
         max_iter : int, optional (default: 3000)
             maximum iterations
-
         eps : float, optional (default: 1e-6)
             stopping criterion
 
@@ -152,7 +133,6 @@ class MultidimensionalScaling():
         )
         return Y
 
-
     def embed_MDS(self, X):
         """Performs classic, metric, and non-metric MDS
 
@@ -163,34 +143,6 @@ class MultidimensionalScaling():
         ----------
         X: ndarray [n_samples, n_features]
             2 dimensional input data array with n_samples
-
-        n_dim : int, optional, default: 2
-            number of dimensions in which the data will be embedded
-
-        how : string, optional, default: 'classic'
-            choose from ['classic', 'metric', 'nonmetric']
-            which MDS algorithm is used for dimensionality reduction
-
-        distance_metric : string, optional, default: 'euclidean'
-            choose from ['cosine', 'euclidean']
-            distance metric for MDS
-
-        solver : {'sgd', 'smacof'}, optional (default: 'sgd')
-            which solver to use for metric MDS. SGD is substantially faster,
-            but produces slightly less optimal results. Note that SMACOF was used
-            for all figures in the PHATE paper.
-
-        n_jobs : integer, optional, default: 1
-            The number of jobs to use for the computation.
-            If -1 all CPUs are used. If 1 is given, no parallel computing code is
-            used at all, which is useful for debugging.
-            For n_jobs below -1, (n_cpus + 1 + n_jobs) are used. Thus for
-            n_jobs = -2, all CPUs but one are used
-
-        seed: integer or numpy.RandomState, optional
-            The generator used to initialize SMACOF (metric, nonmetric) MDS
-            If an integer is given, it fixes the seed
-            Defaults to the global numpy random number generator
 
         Returns
         -------
@@ -211,44 +163,32 @@ class MultidimensionalScaling():
                 "'{}' was passed.".format(self.solver)
             )
 
-        # MDS embeddings, each gives a different output.
-        # Compute and store distance matrix (only computed once)
         self.distance_matrix = squareform(pdist(X, self.distance_metric))
+        D = self.distance_matrix
 
         # initialize all by CMDS
-        Y_classic = self.classic(self.distance_matrix)
+        Y_classic = self.classic(D)
         if self.how == "classic":
             self.embedding = Y_classic
             return Y_classic
 
-        # metric is next fastest
+        # metric step
         if self.solver == "sgd":
-            # s_gd2 has been deprecated - fall back to SMACOF
-            warnings.warn(
-                "solver='sgd' is deprecated (s_gd2 package removed). Using SMACOF instead.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            Y = self.smacof(
-                self.distance_matrix,
-                init=Y_classic,
-                metric=True,
-            )
+            Y = self.sgd(D, init=Y_classic)
         elif self.solver == "smacof":
-            Y = self.smacof(
-                self.distance_matrix, init=Y_classic, metric=True
-            )
+            Y = self.smacof(D, init=Y_classic, metric=True)
         else:
             raise RuntimeError
+
+        # re-orient to classic
+        _, Y, _ = scipy.spatial.procrustes(Y_classic, Y)
+
         if self.how == "metric":
-            # re-orient to classic
-            _, Y, _ = scipy.spatial.procrustes(Y_classic, Y)
             self.embedding = Y
             return Y
 
         # nonmetric is slowest
-        Y = self.smacof(self.distance_matrix, init=Y, metric=False)
-        # re-orient to classic
+        Y = self.smacof(D, init=Y, metric=False)
         _, Y, _ = scipy.spatial.procrustes(Y_classic, Y)
         self.embedding = Y
         return Y
@@ -271,6 +211,7 @@ class MDSModule(LatentModule):
     ):
         super().__init__(n_components=n_components, init_seed=random_state, **kwargs)
         self.fit_fraction = fit_fraction
+        # MDSModule uses n_components/random_state; inner class uses ndim/seed
         self.model = MultidimensionalScaling(ndim=n_components,
                                             seed=random_state,
                                             how=how,
@@ -293,10 +234,10 @@ class MDSModule(LatentModule):
         """Transforms data using the fitted MDS model. MDS can't be extend to new data, so we just return the embedding of the fitted data."""
         if not self._is_fitted:
             raise RuntimeError("MDS model is not fitted yet. Call `fit` first.")
-        
+
         embedding = self.model.embedding
         return torch.tensor(embedding, device=x.device, dtype=x.dtype)
-    
+
     def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
         """Fit and then transform on same data."""
         x_np = x.detach().cpu().numpy()

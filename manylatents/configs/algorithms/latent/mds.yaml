@@ -1,6 +1,6 @@
 _target_: manylatents.algorithms.latent.multi_dimensional_scaling.MDSModule
-ndim: 2
-seed: ${seed}
+n_components: 2
+random_state: ${seed}
 how: metric   #  choose from ['classic', 'metric', 'nonmetric']
 solver: smacof  # choose from ["sgd", "smacof"]
 distance_metric: euclidean  # recommended values: 'euclidean' and 'cosine'
