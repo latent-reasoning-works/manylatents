@@ -1056,6 +1056,262 @@ class GaussianBlobs(SyntheticDataset):
         return self.centers
 
 
+class Archetypal(SyntheticDataset):
+    """
+    Synthetic dataset sampling from an N-simplex, optionally projected onto a
+    sphere via inverse stereographic projection.
+
+    Points are sampled from a Dirichlet distribution over barycentric
+    coordinates on an N-simplex, converted to Euclidean coordinates, then
+    optionally mapped onto S^N (the N-sphere in R^{N+1}) via inverse
+    stereographic projection.
+
+    The ``concentration`` parameter controls the shape:
+    - concentration < 1: points concentrate near corners and edges (archetypal)
+    - concentration = 1: uniform sampling across the simplex
+    - concentration > 1: points concentrate toward the center
+
+    Labels are assigned by nearest simplex vertex (dominant barycentric
+    coordinate), giving n_components + 1 natural clusters.
+
+    When ``project_to_sphere=False``, points remain on the flat Euclidean
+    simplex — a clean benchmark for archetypal structure recovery.
+
+    Based on the AAnet stereo_sphere_projection:
+    https://github.com/KrishnaswamyLab/AAnet/blob/master/AAnet_torch/data/stereo_sphere_projection.py
+    """
+
+    def __init__(
+        self,
+        n_components: int = 3,
+        simplex_radius: float = 1.0,
+        n_obs: int = 5000,
+        concentration: float = 0.3,
+        noise: float = 0.0,
+        random_state: int = 42,
+        output_dims: int = 0,
+        use_gap: bool = False,
+        n_gaps: int = 0,
+        project_to_sphere: bool = True,
+        vertex_weights: Optional[List[float]] = None,
+        save_dir: str = "outputs",
+        save_figure: bool = False
+    ):
+        """
+        Parameters
+        ----------
+        n_components : int, default=3
+            Number of simplex dimensions. The simplex has n_components + 1
+            vertices. With sphere projection, points live on S^{n_components}
+            in R^{n_components+1}. Without, on the simplex in R^{n_components}.
+
+        simplex_radius : float, default=1.0
+            Radius of the simplex in Euclidean space. With sphere projection,
+            larger values spread points further from the projection pole.
+
+        n_obs : int, default=5000
+            Total number of points to sample.
+
+        concentration : float, default=0.3
+            Dirichlet concentration parameter (same alpha for all vertices).
+            < 1 biases toward corners/edges (archetypal structure).
+            = 1 gives uniform sampling on the simplex.
+            > 1 concentrates points toward the simplex center.
+
+        noise : float, default=0.0
+            Isotropic Gaussian noise added in ambient space.
+
+        random_state : int, default=42
+            Seed for reproducibility.
+
+        output_dims : int, default=0
+            Rotate the ambient-space data to this dimensionality.
+            Only applied when greater than the ambient dimension. Set to 0
+            to skip.
+
+        use_gap : bool, default=False
+            Whether to remove vertex-clusters to create gaps.
+
+        n_gaps : int, default=0
+            Number of vertex-clusters to remove when use_gap is True.
+            Must be < n_components + 1 (can't remove all vertices).
+
+        project_to_sphere : bool, default=True
+            If True, apply inverse stereographic projection to map simplex
+            points onto the unit sphere (curved manifold, R^{n_components+1}).
+            If False, keep points on the flat Euclidean simplex (R^{n_components}).
+
+        vertex_weights : list of float, optional
+            Per-vertex Dirichlet alpha values for sampling imbalance.
+            Length must equal n_components + 1. If None, all vertices use
+            ``concentration``. Lower weight = fewer points near that vertex.
+
+        save_dir : str, default="outputs"
+            Directory for ground truth visualizations.
+
+        save_figure : bool, default=False
+            Save figures of ground truth in `save_dir`.
+        """
+        super().__init__()
+        np.random.seed(random_state)
+        self.save_dir = save_dir
+        self.save_figure = save_figure
+        self.n_components = n_components
+        self.simplex_radius = simplex_radius
+        self.n_obs = n_obs
+        self.concentration = concentration
+        self.noise = noise
+        self.random_state = random_state
+        self.use_gap = use_gap
+        self.n_gaps = n_gaps
+        self.project_to_sphere = project_to_sphere
+
+        n_vertices = n_components + 1
+
+        # Build Dirichlet alpha vector
+        if vertex_weights is not None:
+            if len(vertex_weights) != n_vertices:
+                raise ValueError(
+                    f"vertex_weights length ({len(vertex_weights)}) must equal "
+                    f"n_components + 1 ({n_vertices})."
+                )
+            alpha = np.array(vertex_weights, dtype=float)
+        else:
+            alpha = np.full(n_vertices, concentration)
+
+        # Sample from Dirichlet over the simplex
+        all_bary = np.random.dirichlet(alpha, size=n_obs)
+
+        # Assign labels by dominant barycentric coordinate (nearest vertex)
+        self.metadata = np.argmax(all_bary, axis=1)
+
+        # Convert barycentric -> Euclidean
+        X_euclidean = self._barycentric_to_euclidean(all_bary, simplex_radius)
+
+        # Optionally project onto the sphere
+        if project_to_sphere:
+            self.gt_points = self._stereographic_inverse(X_euclidean)
+        else:
+            self.gt_points = X_euclidean
+
+        # Remove vertex-clusters if gaps requested
+        if use_gap and n_gaps > 0 and n_gaps < n_vertices:
+            remove_ids = np.random.choice(n_vertices, n_gaps, replace=False)
+            keep_mask = ~np.isin(self.metadata, remove_ids)
+            self.gt_points = self.gt_points[keep_mask]
+            self.metadata = self.metadata[keep_mask]
+            # Relabel to contiguous IDs
+            unique_labels = np.unique(self.metadata)
+            label_map = {old: new for new, old in enumerate(unique_labels)}
+            self.metadata = np.array([label_map[l] for l in self.metadata])
+
+        self.data = self.gt_points.copy()
+
+        # Rotate to higher dimension if requested
+        ambient_dim = self.gt_points.shape[1]
+        if output_dims > ambient_dim:
+            self.data = self.rotate_to_dim(output_dims)
+
+        # Add global noise in ambient space
+        if noise > 0:
+            self.data = self.data + np.random.normal(0, noise, self.data.shape)
+
+        # Store simplex vertices (useful for archetype analysis)
+        self.vertices_barycentric = np.eye(n_vertices)
+        verts_euclidean = self._barycentric_to_euclidean(
+            self.vertices_barycentric, simplex_radius
+        )
+        if project_to_sphere:
+            self.vertices = self._stereographic_inverse(verts_euclidean)
+        else:
+            self.vertices = verts_euclidean
+
+        # Save ground truth visualization
+        if self.save_figure:
+            self._save_ground_truth_figure()
+
+    def _save_ground_truth_figure(self):
+        """Save ground truth scatter plots to save_dir."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import os
+
+        os.makedirs(self.save_dir, exist_ok=True)
+        pts = self.gt_points
+        labels = self.metadata
+        dim = pts.shape[1]
+
+        if dim >= 3:
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111, projection="3d")
+            ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], c=labels, cmap="tab20", s=5)
+            ax.set_title("Archetypal ground truth (3D)")
+            plt.savefig(os.path.join(self.save_dir, "archetypal_raw_3d.png"), bbox_inches="tight")
+            plt.close(fig)
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.scatter(pts[:, 0], pts[:, 1], c=labels, cmap="tab20", s=5)
+        ax.set_title("Archetypal ground truth (2D projection)")
+        plt.savefig(os.path.join(self.save_dir, "archetypal_raw_2d.png"), bbox_inches="tight")
+        plt.close(fig)
+
+    def _barycentric_to_euclidean(self, X_bary, simplex_radius):
+        """
+        Convert (M, K) barycentric coordinates to (M, K-1) Euclidean coordinates.
+
+        Embeds the K vertices as a regular simplex in R^{K-1} (all edges
+        equal length), then maps barycentric coordinates via linear
+        interpolation: X_euclidean = X_bary @ vertices.
+        """
+        K = X_bary.shape[1]  # number of vertices
+        # Regular simplex: center K unit vectors in R^K, then SVD to R^{K-1}
+        centered = np.eye(K) - 1.0 / K
+        U, S, _ = np.linalg.svd(centered, full_matrices=False)
+        vertices = U[:, : K - 1] * S[: K - 1]
+        # Scale so edge length = simplex_radius
+        edge_len = np.linalg.norm(vertices[0] - vertices[1])
+        if edge_len > 0:
+            vertices = vertices / edge_len * simplex_radius
+        # Barycentric interpolation
+        return X_bary @ vertices
+
+    def _stereographic_inverse(self, X_plane):
+        """
+        Inverse stereographic projection: R^N -> S^N in R^{N+1}.
+        """
+        X = X_plane.T  # (N, M)
+        norms = np.linalg.norm(X, axis=0)
+        denom = norms ** 2 + 1
+        X_sphere = np.zeros((X.shape[0] + 1, X.shape[1]))
+        X_sphere[0] = (norms ** 2 - 1) / denom
+        X_sphere[1:] = 2 * X / denom
+        return X_sphere.T  # (M, N+1)
+
+    def get_gt_dists(self):
+        """
+        Ground truth pairwise distances.
+
+        Sphere mode: geodesic (great-circle) distances on the unit sphere.
+        Simplex mode: Euclidean distances on the flat simplex.
+        """
+        if self.project_to_sphere:
+            norms = np.linalg.norm(self.gt_points, axis=1, keepdims=True)
+            unit = self.gt_points / norms
+            cos_sim = np.clip(unit @ unit.T, -1.0, 1.0)
+            dists = np.arccos(cos_sim)
+            np.fill_diagonal(dists, 0.0)
+            return dists
+        else:
+            return pairwise_distances(self.gt_points, metric='euclidean')
+
+    def get_graph(self):
+        """Create a graphtools graph if it does not exist."""
+        if self.graph is None:
+            self.graph = graphtools.Graph(self.data, use_pygsp=True)
+        return self.graph
+
+
 class DLATreeFromGraph(SyntheticDataset):
     def __init__(
         self,

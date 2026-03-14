@@ -1,0 +1,19 @@
+defaults:
+  - default
+
+_target_: manylatents.data.archetypal.ArchetypalDataModule
+test_split: 0.2
+n_components: 3
+simplex_radius: 1.0
+n_obs: 5000
+concentration: 0.1
+noise: 0.0
+random_state: ${seed}
+output_dims: 100
+mode: full
+shuffle_traindata: false
+use_gap: false
+n_gaps: 0
+project_to_sphere: true
+vertex_weights: null
+save_dir: ${hydra:runtime.output_dir}
