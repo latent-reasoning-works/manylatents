@@ -26,7 +26,7 @@ class ArchetypalDataModule(LightningDataModule):
         concentration: float = 0.3,
         noise: float = 0.0,
         random_state: int = 42,
-        rotate_to_dim: int = 0,
+        output_dims: int = 0,
         mode: str = "full",
         use_gap: bool = False,
         n_gaps: int = 0,
@@ -48,7 +48,7 @@ class ArchetypalDataModule(LightningDataModule):
         self.concentration = concentration
         self.noise = noise
         self.random_state = random_state
-        self.rotate_to_dim = rotate_to_dim
+        self.output_dims = output_dims
 
         self.mode = mode
         self.use_gap = use_gap
@@ -73,7 +73,7 @@ class ArchetypalDataModule(LightningDataModule):
             concentration=self.concentration,
             noise=self.noise,
             random_state=self.random_state,
-            rotate_to_dim=self.rotate_to_dim,
+            output_dims=self.output_dims,
             use_gap=self.use_gap,
             n_gaps=self.n_gaps,
             project_to_sphere=self.project_to_sphere,

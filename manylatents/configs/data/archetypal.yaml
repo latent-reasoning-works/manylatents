@@ -9,7 +9,7 @@ n_obs: 5000
 concentration: 0.1
 noise: 0.0
 random_state: ${seed}
-rotate_to_dim: 100
+output_dims: 100
 mode: full
 shuffle_traindata: false
 use_gap: false

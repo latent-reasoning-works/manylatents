@@ -1089,7 +1089,7 @@ class Archetypal(SyntheticDataset):
         concentration: float = 0.3,
         noise: float = 0.0,
         random_state: int = 42,
-        rotate_to_dim: int = 0,
+        output_dims: int = 0,
         use_gap: bool = False,
         n_gaps: int = 0,
         project_to_sphere: bool = True,
@@ -1124,7 +1124,7 @@ class Archetypal(SyntheticDataset):
         random_state : int, default=42
             Seed for reproducibility.
 
-        rotate_to_dim : int, default=0
+        output_dims : int, default=0
             Rotate the ambient-space data to this dimensionality.
             Only applied when greater than the ambient dimension. Set to 0
             to skip.
@@ -1209,8 +1209,8 @@ class Archetypal(SyntheticDataset):
 
         # Rotate to higher dimension if requested
         ambient_dim = self.gt_points.shape[1]
-        if rotate_to_dim > ambient_dim:
-            self.data = self.rotate_to_dim(rotate_to_dim)
+        if output_dims > ambient_dim:
+            self.data = self.rotate_to_dim(output_dims)
 
         # Add global noise in ambient space
         if noise > 0:

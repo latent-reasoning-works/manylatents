@@ -27,9 +27,9 @@ def test_shape_sphere_projection():
     assert ds.data.shape == (200, 4)
 
 
-def test_shape_rotate_to_dim():
+def test_shape_output_dims():
     ds = Archetypal(n_components=3, n_obs=100, random_state=0,
-                    project_to_sphere=False, rotate_to_dim=50)
+                    project_to_sphere=False, output_dims=50)
     assert ds.data.shape == (100, 50)
 
 
