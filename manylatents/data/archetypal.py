@@ -32,6 +32,7 @@ class ArchetypalDataModule(LightningDataModule):
         n_gaps: int = 0,
         project_to_sphere: bool = True,
         vertex_weights: Optional[List[float]] = None,
+        save_figure: bool = False,
         save_dir: str = "outputs",
     ):
         super().__init__()
@@ -54,6 +55,7 @@ class ArchetypalDataModule(LightningDataModule):
         self.n_gaps = n_gaps
         self.project_to_sphere = project_to_sphere
         self.vertex_weights = vertex_weights
+        self.save_figure = save_figure
         self.save_dir = save_dir
 
         self.dataset = None
@@ -76,6 +78,7 @@ class ArchetypalDataModule(LightningDataModule):
             n_gaps=self.n_gaps,
             project_to_sphere=self.project_to_sphere,
             vertex_weights=self.vertex_weights,
+            save_figure=self.save_figure,
             save_dir=self.save_dir,
         )
 

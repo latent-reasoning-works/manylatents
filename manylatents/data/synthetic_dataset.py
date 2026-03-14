@@ -1095,6 +1095,7 @@ class Archetypal(SyntheticDataset):
         project_to_sphere: bool = True,
         vertex_weights: Optional[List[float]] = None,
         save_dir: str = "outputs",
+        save_figure: bool = False
     ):
         """
         Parameters
@@ -1147,10 +1148,14 @@ class Archetypal(SyntheticDataset):
 
         save_dir : str, default="outputs"
             Directory for ground truth visualizations.
+
+        save_figure : bool, default=False
+            Save figures of ground truth in `save_dir`.
         """
         super().__init__()
         np.random.seed(random_state)
         self.save_dir = save_dir
+        self.save_figure = save_figure
         self.n_components = n_components
         self.simplex_radius = simplex_radius
         self.n_obs = n_obs
@@ -1222,7 +1227,8 @@ class Archetypal(SyntheticDataset):
             self.vertices = verts_euclidean
 
         # Save ground truth visualization
-        self._save_ground_truth_figure()
+        if self.save_figure:
+            self._save_ground_truth_figure()
 
     def _save_ground_truth_figure(self):
         """Save ground truth scatter plots to save_dir."""
