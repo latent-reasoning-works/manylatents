@@ -13,6 +13,9 @@ try:
     wandb.init  # verify real package, not wandb/ output dir
 except (ImportError, AttributeError):
     wandb = None
+
+
+from manylatents.utils.utils import NumpyEncoder as _NumpyEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_latent_outputs
 from manylatents.utils.utils import save_embeddings
 
@@ -40,7 +43,7 @@ except ImportError:
     ATOMIC_WRITER_AVAILABLE = False
     logger.debug("atomic_writer not available")
 
-class SaveEmbeddings(EmbeddingCallback):
+class SaveOutputs(EmbeddingCallback):
     def __init__(self,
                  save_dir: str = "outputs",
                  save_format: str = "npy",
@@ -50,7 +53,7 @@ class SaveEmbeddings(EmbeddingCallback):
                  save_metric_tables: bool = False,
                  step_logger: StepLogger | None = None) -> None:
         """
-        SaveEmbeddings callback that saves LatentOutputs and optionally metric tables.
+        SaveOutputs callback that saves LatentOutputs and optionally metric tables.
 
         Args:
             save_dir: Base directory for saving outputs (Hydra will create subdirs)
@@ -72,7 +75,7 @@ class SaveEmbeddings(EmbeddingCallback):
         self.save_metric_tables = save_metric_tables
         self._step_logger = step_logger
         os.makedirs(self.save_dir, exist_ok=True)
-        logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
+        logger.info(f"SaveOutputs initialized with directory: {self.save_dir} and format: {self.save_format}")
 
     def save_embeddings(self, embeddings: dict) -> None:
         """Save LatentOutputs - main embeddings + optionally additional outputs."""
@@ -146,7 +149,7 @@ class SaveEmbeddings(EmbeddingCallback):
                 filename = f"{base_name}_{key}.json"
                 path = self._get_save_path(filename)
                 with open(path, 'w') as f:
-                    json.dump(value, f, indent=2, default=str)
+                    json.dump(value, f, indent=2, cls=_NumpyEncoder)
                 logger.info(f"Saved {key} to {path}")
 
     def _unpack_tuple_scores(self, raw_scores: dict) -> dict:
@@ -316,3 +319,7 @@ class SaveEmbeddings(EmbeddingCallback):
             rel_path = os.path.relpath(self.save_path, start=os.getcwd())
             wandb.save(rel_path, base_path=os.getcwd())
         return self.callback_outputs
+
+
+# Backwards-compat alias
+SaveEmbeddings = SaveOutputs

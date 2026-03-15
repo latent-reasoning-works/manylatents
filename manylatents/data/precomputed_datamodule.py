@@ -17,7 +17,7 @@ class PrecomputedDataModule(LightningDataModule):
     or from in-memory numpy arrays.
 
     Supports:
-    - Single files and multiple files from SaveEmbeddings
+    - Single files and multiple files from SaveOutputs (formerly SaveEmbeddings)
     - Multi-channel embeddings via `channels` parameter (HDF5, .pt, or directory)
 
     Multi-channel mode:

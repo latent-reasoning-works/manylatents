@@ -69,7 +69,7 @@ class PrecomputedDataset(Dataset):
 
     Supports:
     - Single files: .csv or .npy (legacy format)
-    - Multiple files: from SaveEmbeddings with save_additional_outputs=True
+    - Multiple files: from SaveOutputs with save_additional_outputs=True
 
     Always returns LatentOutputs format in __getitem__.
     """
@@ -130,7 +130,7 @@ class PrecomputedDataset(Dataset):
             raise ValueError(f"Unsupported file format: {path.suffix}")
 
     def _load_multiple_files(self):
-        """Load from directory with multiple files from SaveEmbeddings."""
+        """Load from directory with multiple files from SaveOutputs."""
         path = Path(self.path)
 
         # Find all relevant files
