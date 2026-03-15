@@ -1,4 +1,5 @@
 eigenvalue_effective_rank:
-  _target_: manylatents.metrics.eigenvalue_effective_rank.EigenvalueEffectiveRank
+  _target_: manylatents.metrics.participation_ratio.ParticipationRatio
   _partial_: True
-  k: 20
+  n_neighbors: 20
+  output_mode: full
