@@ -42,7 +42,7 @@ try:
     from manylatents.metrics.persistent_homology import PersistentHomology
 except ImportError:
     pass
-from manylatents.metrics.participation_ratio import ParticipationRatio
+from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis, ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
 from manylatents.metrics.loglog_consistency import LogLogConsistency
 from manylatents.metrics.trustworthiness import Trustworthiness
@@ -115,6 +115,7 @@ __all__ = [
     "MetricSpec",
     # Core metrics
     "PersistentHomology",
+    "LocalSpectralAnalysis",
     "ParticipationRatio",
     "LocalIntrinsicDimensionality",
     "LogLogConsistency",

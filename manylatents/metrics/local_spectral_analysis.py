@@ -10,23 +10,28 @@ from manylatents.utils.metrics import compute_knn
 logger = logging.getLogger(__name__)
 
 
-# ParticipationRatio is the eigenvalue-based LID estimate. It answers
-# "how many dimensions carry signal" via local PCA on kNN neighborhoods.
-# This is complementary to the distance-based LID (LocalIntrinsicDimensionality),
-# which answers "how many dimensions exist" via kNN distance ratios.
-# When these two disagree, the manifold has anisotropic structure —
-# know this when creating divergence plots and reliability maps.
+# Local spectral analysis: SVD of each point's kNN neighborhood.
+# The eigenvalue spectrum is the core object. Summary statistics are modes:
+#   - participation_ratio (scalar): (sum lambda)^2 / sum(lambda^2) — eigenvalue-based LID
+#   - full: spectrum + effective rank + anisotropy
+#
+# This is the eigenvalue-based LID estimate. It answers "how many dimensions
+# carry signal" via local PCA. Complementary to the distance-based LID
+# (LocalIntrinsicDimensionality), which answers "how many dimensions exist"
+# via kNN distance ratios. When these two disagree, the manifold has
+# anisotropic structure — know this when creating divergence plots and
+# reliability maps.
 @register_metric(
-    aliases=["participation_ratio", "pr"],
-    default_params={"return_per_sample": False},
-    description="Local participation ratio measuring effective dimensionality",
+    aliases=["local_spectral_analysis", "participation_ratio", "pr"],
+    default_params={"return_per_sample": False, "output_mode": "scalar"},
+    description="Local spectral analysis of kNN neighborhoods (participation ratio mode)",
 )
 @register_metric(
     aliases=["eigenvalue_effective_rank", "effective_rank", "local_effective_rank"],
     default_params={"output_mode": "full", "n_neighbors": 20},
     description="Per-point eigenvalue effective rank from local PCA on kNN neighborhood",
 )
-def ParticipationRatio(
+def LocalSpectralAnalysis(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
@@ -36,10 +41,16 @@ def ParticipationRatio(
     cache: Optional[dict] = None,
 ) -> Union[float, np.ndarray, dict[str, Any]]:
     """
-    Compute the local Participation Ratio (PR) for each sample's neighborhood.
+    Local spectral analysis of kNN neighborhoods.
 
-    PR = (sum_i lambda_i)^2 / sum_i (lambda_i^2)
-    where lambda_i are the eigenvalues of the local covariance.
+    Core operation: for each point, compute SVD of centered kNN neighborhood
+    to get the local eigenvalue spectrum. Summary statistics are selected
+    via output_mode.
+
+    output_mode="scalar": participation ratio (sum lambda)^2 / sum(lambda^2).
+        Returns float (mean) or per-sample array depending on return_per_sample.
+    output_mode="full": returns dict with effective_rank (= participation ratio),
+        top_eigenvalue_ratio (anisotropy), and full eigenvalue spectrum per point.
 
     Args:
         embeddings:   (n_samples, n_features) array (always numpy).
@@ -49,9 +60,7 @@ def ParticipationRatio(
         return_per_sample:
                       if True and output_mode="scalar", returns array of shape
                       (n_samples,) with each sample's PR; else returns the average PR.
-        output_mode:  "scalar" (default) returns float or per-sample array.
-                      "full" returns dict with effective_rank, top_eigenvalue_ratio,
-                      eigenvalues, and summary scalars.
+        output_mode:  "scalar" (default) or "full".
         cache: Optional shared cache dict. Passed through to compute_knn().
 
     Returns:
@@ -94,15 +103,19 @@ def ParticipationRatio(
             "eigenvalues": s2,
         }
         logger.info(
-            f"ParticipationRatio(full): mean_rank={result['mean_effective_rank']:.3f}, "
+            f"LocalSpectralAnalysis(full): mean_rank={result['mean_effective_rank']:.3f}, "
             f"mean_anisotropy={result['mean_top_eigenvalue_ratio']:.3f}"
         )
         return result
 
     if return_per_sample:
-        logger.info(f"ParticipationRatio: per-sample PR, mean={pr_arr.mean():.3f}")
+        logger.info(f"LocalSpectralAnalysis: per-sample PR, mean={pr_arr.mean():.3f}")
         return pr_arr
 
     avg_pr = float(np.nanmean(pr_arr))
-    logger.info(f"ParticipationRatio: average PR = {avg_pr:.3f}")
+    logger.info(f"LocalSpectralAnalysis: average PR = {avg_pr:.3f}")
     return avg_pr
+
+
+# Backwards compatibility
+ParticipationRatio = LocalSpectralAnalysis

@@ -3,7 +3,7 @@ from sklearn.datasets import make_blobs
 
 
 def test_eigenvalue_effective_rank_returns_expected_keys():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     X, _ = make_blobs(n_samples=100, n_features=5, random_state=42)
     result = ParticipationRatio(X.astype(np.float32), n_neighbors=20, output_mode="full")
     expected_keys = {
@@ -14,7 +14,7 @@ def test_eigenvalue_effective_rank_returns_expected_keys():
 
 
 def test_eigenvalue_effective_rank_shapes():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     n, d, k = 80, 5, 15
     X, _ = make_blobs(n_samples=n, n_features=d, random_state=42)
     result = ParticipationRatio(X.astype(np.float32), n_neighbors=k, output_mode="full")
@@ -24,7 +24,7 @@ def test_eigenvalue_effective_rank_shapes():
 
 
 def test_eigenvalue_effective_rank_bounds():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     n, d, k = 100, 5, 20
     X, _ = make_blobs(n_samples=n, n_features=d, centers=1, random_state=42)
     result = ParticipationRatio(X.astype(np.float32), n_neighbors=k, output_mode="full")
@@ -36,7 +36,7 @@ def test_eigenvalue_effective_rank_bounds():
 
 
 def test_eigenvalue_effective_rank_2d_embedding():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     X, _ = make_blobs(n_samples=100, n_features=2, centers=1, random_state=42)
     result = ParticipationRatio(X.astype(np.float32), n_neighbors=20, output_mode="full")
     valid = result["effective_rank"] > 0
@@ -45,7 +45,7 @@ def test_eigenvalue_effective_rank_2d_embedding():
 
 
 def test_eigenvalue_effective_rank_line_has_rank_near_1():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     t = np.linspace(0, 10, 200)
     X = np.column_stack([t, np.zeros_like(t)]).astype(np.float32)
     X += np.random.RandomState(42).randn(*X.shape).astype(np.float32) * 1e-4
@@ -54,7 +54,7 @@ def test_eigenvalue_effective_rank_line_has_rank_near_1():
 
 
 def test_eigenvalue_effective_rank_duplicate_points():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     X = np.zeros((50, 3), dtype=np.float32)
     result = ParticipationRatio(X, n_neighbors=20, output_mode="full")
     assert not np.any(np.isnan(result["effective_rank"]))
@@ -62,7 +62,7 @@ def test_eigenvalue_effective_rank_duplicate_points():
 
 
 def test_eigenvalue_effective_rank_uses_cache():
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     X, _ = make_blobs(n_samples=50, n_features=3, random_state=42)
     cache = {}
     ParticipationRatio(X.astype(np.float32), n_neighbors=15, output_mode="full", cache=cache)
@@ -74,11 +74,13 @@ def test_eigenvalue_effective_rank_registered():
     names = list_metrics()
     assert "eigenvalue_effective_rank" in names
     assert "effective_rank" in names
+    assert "local_spectral_analysis" in names
+    assert "participation_ratio" in names
 
 
 def test_scalar_mode_unchanged():
     """Existing scalar behavior should be preserved."""
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis as ParticipationRatio
     X, _ = make_blobs(n_samples=100, n_features=5, centers=1, random_state=42)
 
     scalar = ParticipationRatio(X.astype(np.float32), n_neighbors=20)
