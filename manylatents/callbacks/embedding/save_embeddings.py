@@ -13,6 +13,9 @@ try:
     wandb.init  # verify real package, not wandb/ output dir
 except (ImportError, AttributeError):
     wandb = None
+
+
+from manylatents.utils.utils import NumpyEncoder as _NumpyEncoder
 from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_latent_outputs
 from manylatents.utils.utils import save_embeddings
 
@@ -146,7 +149,7 @@ class SaveEmbeddings(EmbeddingCallback):
                 filename = f"{base_name}_{key}.json"
                 path = self._get_save_path(filename)
                 with open(path, 'w') as f:
-                    json.dump(value, f, indent=2, default=str)
+                    json.dump(value, f, indent=2, cls=_NumpyEncoder)
                 logger.info(f"Saved {key} to {path}")
 
     def _unpack_tuple_scores(self, raw_scores: dict) -> dict:
