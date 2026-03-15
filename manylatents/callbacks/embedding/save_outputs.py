@@ -43,7 +43,7 @@ except ImportError:
     ATOMIC_WRITER_AVAILABLE = False
     logger.debug("atomic_writer not available")
 
-class SaveEmbeddings(EmbeddingCallback):
+class SaveOutputs(EmbeddingCallback):
     def __init__(self,
                  save_dir: str = "outputs",
                  save_format: str = "npy",
@@ -53,7 +53,7 @@ class SaveEmbeddings(EmbeddingCallback):
                  save_metric_tables: bool = False,
                  step_logger: StepLogger | None = None) -> None:
         """
-        SaveEmbeddings callback that saves LatentOutputs and optionally metric tables.
+        SaveOutputs callback that saves LatentOutputs and optionally metric tables.
 
         Args:
             save_dir: Base directory for saving outputs (Hydra will create subdirs)
@@ -75,7 +75,7 @@ class SaveEmbeddings(EmbeddingCallback):
         self.save_metric_tables = save_metric_tables
         self._step_logger = step_logger
         os.makedirs(self.save_dir, exist_ok=True)
-        logger.info(f"SaveEmbeddings initialized with directory: {self.save_dir} and format: {self.save_format}")
+        logger.info(f"SaveOutputs initialized with directory: {self.save_dir} and format: {self.save_format}")
 
     def save_embeddings(self, embeddings: dict) -> None:
         """Save LatentOutputs - main embeddings + optionally additional outputs."""
@@ -319,3 +319,7 @@ class SaveEmbeddings(EmbeddingCallback):
             rel_path = os.path.relpath(self.save_path, start=os.getcwd())
             wandb.save(rel_path, base_path=os.getcwd())
         return self.callback_outputs
+
+
+# Backwards-compat alias
+SaveEmbeddings = SaveOutputs
