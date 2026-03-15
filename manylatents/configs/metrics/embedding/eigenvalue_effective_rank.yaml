@@ -1,0 +1,4 @@
+eigenvalue_effective_rank:
+  _target_: manylatents.metrics.eigenvalue_effective_rank.EigenvalueEffectiveRank
+  _partial_: True
+  k: 20

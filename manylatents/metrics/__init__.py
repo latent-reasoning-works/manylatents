@@ -45,6 +45,7 @@ except ImportError:
 from manylatents.metrics.participation_ratio import ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
 from manylatents.metrics.loglog_consistency import LogLogConsistency
+from manylatents.metrics.eigenvalue_effective_rank import EigenvalueEffectiveRank
 from manylatents.metrics.trustworthiness import Trustworthiness
 
 # Additional embedding metrics
@@ -118,6 +119,7 @@ __all__ = [
     "ParticipationRatio",
     "LocalIntrinsicDimensionality",
     "LogLogConsistency",
+    "EigenvalueEffectiveRank",
     "Trustworthiness",
     # Additional metrics
     "Continuity",
