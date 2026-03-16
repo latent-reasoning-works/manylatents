@@ -1,0 +1,22 @@
+_target_: manylatents.algorithms.latent.selective_correction.SelectiveCorrectionModule
+n_components: 2
+random_state: ${seed}
+neighborhood_size: ${neighborhood_size}
+backend: null
+device: null
+diagnostic_k: 200
+r2_threshold: 0.95
+v_max: 1.0
+v_min: 0.5
+correction_lr: 0.001
+correction_steps: 500
+correction_k: 100
+correction_k_min: 5
+correction_k_steps: 15
+inner:
+  _target_: manylatents.algorithms.latent.umap.UMAPModule
+  n_components: 2
+  random_state: ${seed}
+  neighborhood_size: ${neighborhood_size}
+  backend: null
+  device: null
