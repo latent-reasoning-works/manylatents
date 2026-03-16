@@ -31,7 +31,7 @@ def test_registry_has_participation_ratio():
 
     assert "participation_ratio" in registry
     assert "pr" in registry
-    assert registry["participation_ratio"].func.__name__ == "ParticipationRatio"
+    assert registry["participation_ratio"].func.__name__ == "LocalSpectralAnalysis"
 
 
 def test_registry_has_lid():
