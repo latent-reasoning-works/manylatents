@@ -7,7 +7,7 @@ device: null
 diagnostic_k: 200
 r2_threshold: 0.95
 v_max: 1.0
-v_min: 0.5
+v_min: 0.0
 correction_lr: 0.001
 correction_steps: 500
 correction_k: 100
