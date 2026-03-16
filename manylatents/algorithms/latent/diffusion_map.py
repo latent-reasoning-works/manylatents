@@ -19,6 +19,35 @@ from .latent_module_base import LatentModule
 
 logger = logging.getLogger(__name__)
 
+
+def _svd_symmetric(S: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """SVD of symmetric matrix with tiered backend: CUDA GPU > CPU torch > scipy.
+
+    Args:
+        S: (N, N) symmetric matrix (numpy).
+
+    Returns:
+        (evecs, svals) — both numpy arrays.
+    """
+    try:
+        S_t = torch.from_numpy(S).to(dtype=torch.float64)
+        if torch.cuda.is_available():
+            S_t = S_t.cuda()
+            backend = "torch-gpu"
+        else:
+            backend = "torch-cpu"
+        U, svals_t, _ = torch.linalg.svd(S_t)
+        evecs = U.cpu().numpy()
+        svals = svals_t.cpu().numpy()
+        logger.info(f"_svd_symmetric: {backend}, N={S.shape[0]}")
+        return evecs, svals
+    except Exception as e:
+        logger.warning(f"torch SVD failed ({type(e).__name__}: {e}), falling back to scipy")
+        evecs, svals, _ = scipy.linalg.svd(S)
+        logger.info(f"_svd_symmetric: scipy, N={S.shape[0]}")
+        return evecs, svals
+
+
 def compute_dm(K, alpha=0., verbose=0):
     # Using setup and notation from: https://www.stats.ox.ac.uk/~cucuring/CDT_08_Nonlinear_Dim_Red_b__Diffusion_Maps_FoDS.pdf
     # alpha=0 Graph Laplacian
@@ -65,7 +94,8 @@ def compute_dm(K, alpha=0., verbose=0):
     # BUT this returns non-orthogonal eigenvectors!
     # So would have to correct for that
     # Using SVD since more numerically stable
-    evecs, svals, _ = scipy.linalg.svd(S)
+    # Tiered backend: torch GPU > torch CPU > scipy
+    evecs, svals = _svd_symmetric(S)
 
     # Retrieve sign!
     test_product = S@evecs
