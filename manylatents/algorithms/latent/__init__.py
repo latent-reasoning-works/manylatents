@@ -10,6 +10,7 @@ from .merging import MergingModule, ChannelLoadings
 from .classifier import ClassifierModule
 from .leiden import LeidenModule
 from .reeb_graph import ReebGraphModule
+from .selective_correction import SelectiveCorrectionModule
 
 __all__ = [
     "PCAModule",
@@ -24,4 +25,5 @@ __all__ = [
     "ClassifierModule",
     "LeidenModule",
     "ReebGraphModule",
+    "SelectiveCorrectionModule",
 ]

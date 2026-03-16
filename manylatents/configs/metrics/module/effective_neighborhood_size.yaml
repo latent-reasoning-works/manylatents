@@ -1,0 +1,3 @@
+effective_neighborhood_size:
+  _target_: manylatents.metrics.effective_neighborhood_size.EffectiveNeighborhoodSize
+  _partial_: True
