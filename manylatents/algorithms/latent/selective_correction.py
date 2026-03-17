@@ -89,6 +89,9 @@ def _compute_mismatch_labels(
     k_values = np.unique(
         np.logspace(np.log10(k_min), np.log10(k_max), k_steps).astype(int)
     )
+    # Clamp to available columns (compute_knn clamps k when n_samples is small)
+    max_col = distances.shape[1] - 1
+    k_values = k_values[k_values <= max_col]
 
     T = distances[:, k_values]
     eps = 1e-30

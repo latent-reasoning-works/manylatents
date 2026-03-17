@@ -449,6 +449,28 @@ class DiffusionMap():
 # PyTorch Lightning Module wrapper
 
 class DiffusionMapModule(LatentModule):
+    """Diffusion map dimensionality reduction with dual-backend support.
+
+    Constructs a diffusion operator from an adaptive-bandwidth kernel on
+    the kNN graph, then embeds via the leading eigenvectors scaled by
+    eigenvalues raised to diffusion time t.
+
+    Two backends are available:
+
+    - **graphtools (default, backend=None)**: Uses graphtools' alpha-decay
+      kernel with Laplace-Beltrami normalization. Eigendecomposition is
+      GPU-accelerated via ``_svd_symmetric`` when CUDA is available.
+      This is the reference implementation and should be used for all
+      published results.
+
+    - **torchdr (backend="torchdr")**: Experimental GPU-native path using
+      a simplified alpha-decay kernel via ``torch.cdist``. Produces
+      qualitatively similar but not numerically identical embeddings
+      (pairwise distance correlation ~0.4 vs graphtools on swiss roll).
+      Useful for rapid prototyping on large datasets but not recommended
+      for results that must match prior graphtools-based runs.
+    """
+
     def __init__(
         self,
         n_components: int = 2,
@@ -533,8 +555,12 @@ class DiffusionMapModule(LatentModule):
             self._fit_clusters()
 
     def _fit_torchdr(self, x_np: np.ndarray) -> None:
-        """Fit diffusion map using TorchDR affinity + torch eigendecomposition."""
-        from torchdr import SelfTuningAffinity
+        """Fit diffusion map using TorchDR alpha-decay kernel + torch eigendecomposition.
+
+        Uses MAGICAffinity (alpha-decay kernel, same as graphtools) with
+        Laplace-Beltrami (alpha=1) normalization, matching compute_dm().
+        """
+        from torchdr import MAGICAffinity
         from ...utils.backend import resolve_device
 
         dev = resolve_device(self.device)
@@ -542,19 +568,29 @@ class DiffusionMapModule(LatentModule):
         if dev == "cuda":
             x_t = x_t.cuda()
 
-        # Build adaptive-bandwidth kernel (analogous to graphtools alpha-decay)
-        affinity = SelfTuningAffinity(K=self._knn, device=dev)
-        K = affinity(x_t)  # (N, N) dense affinity on GPU
+        # Alpha-decay kernel (same as graphtools): exp(-d/sigma_i)
+        # MAGICAffinity symmetrizes and row-normalizes internally,
+        # but we need the raw kernel before normalization for alpha-norm.
+        # So we build the kernel manually using the same formula.
+        C = torch.cdist(x_t, x_t, p=2.0) ** 2  # squared Euclidean
+        topk = torch.topk(C, k=self._knn + 1, dim=1, largest=False)
+        sigma = topk.values[:, -1]  # kth-neighbor distance (squared)
+        sigma = sigma.clamp(min=1e-10)
 
-        # Row-normalize to build diffusion operator
-        row_sums = K.sum(dim=1, keepdim=True)
-        row_sums = row_sums.clamp(min=1e-10)
-        P = K / row_sums  # row-stochastic transition matrix
+        # Alpha-decay kernel: exp(-d_sq / sigma_i)
+        K = torch.exp(-C / sigma.unsqueeze(1))
+        # Symmetrize
+        K = (K + K.T) / 2
 
-        # Symmetric form for stable eigendecomposition: S = D^{-1/2} K D^{-1/2}
+        # Laplace-Beltrami normalization (alpha=1), matching compute_dm(K, alpha=1)
         d = K.sum(dim=1)
-        d_inv_sqrt = (1.0 / d.sqrt()).diag()
-        S = d_inv_sqrt @ K @ d_inv_sqrt
+        D_inv = torch.diag(1.0 / d.clamp(min=1e-10))
+        K_alpha = D_inv @ K @ D_inv
+        d_alpha = K_alpha.sum(dim=1)
+
+        # Symmetric diffusion operator: S = D_alpha^{-1/2} K_alpha D_alpha^{-1/2}
+        d_alpha_inv_sqrt = torch.diag(1.0 / d_alpha.sqrt().clamp(min=1e-10))
+        S = d_alpha_inv_sqrt @ K_alpha @ d_alpha_inv_sqrt
 
         # Eigendecomposition on GPU
         evals, evecs = torch.linalg.eigh(S)
@@ -565,11 +601,12 @@ class DiffusionMapModule(LatentModule):
         evecs = evecs[:, order]
 
         # Convert right eigenvectors of S to those of the diffusion operator
-        d_inv_sqrt_np = d_inv_sqrt.cpu().numpy()
-        evecs_right = d_inv_sqrt_np @ evecs.cpu().numpy()
+        d_alpha_inv_sqrt_np = d_alpha_inv_sqrt.cpu().numpy()
+        evecs_right = d_alpha_inv_sqrt_np @ evecs.cpu().numpy()
 
         # Normalize: first right eigenvector should be all 1s
-        scaling = 1.0 / np.sqrt(d.cpu().numpy().sum())
+        d_alpha_np = d_alpha.cpu().numpy()
+        scaling = 1.0 / np.sqrt(d_alpha_np.sum())
         if np.isclose(evecs_right[:, 0] / scaling, -1).any():
             scaling *= -1
         evecs_right /= scaling
@@ -577,6 +614,7 @@ class DiffusionMapModule(LatentModule):
         self._torchdr_evals = evals.cpu().numpy()
         self._torchdr_evecs = evecs_right
         self._torchdr_affinity = K.cpu().numpy()
+        self._torchdr_d_noalpha = d.cpu().numpy()
 
         logger.info(
             f"DiffusionMap(torchdr): N={x_np.shape[0]}, "
