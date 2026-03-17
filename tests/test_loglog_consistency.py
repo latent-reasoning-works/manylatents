@@ -9,7 +9,7 @@ def test_loglog_consistency_returns_expected_keys():
     result = LogLogConsistency(X.astype(np.float32), k=50, k_min=5, k_steps=10)
     expected_keys = {
         "mean_r_squared", "std_r_squared", "frac_reliable", "mean_slope",
-        "slope", "lid_from_slope", "r_squared", "k_values", "mean_log_R",
+        "slope", "r_squared", "k_values", "mean_log_T",
     }
     assert set(result.keys()) == expected_keys
 
@@ -20,9 +20,8 @@ def test_loglog_consistency_shapes():
     X, _ = make_blobs(n_samples=n, n_features=3, random_state=42)
     result = LogLogConsistency(X.astype(np.float32), k=50, k_min=5, k_steps=10)
     assert result["slope"].shape == (n,)
-    assert result["lid_from_slope"].shape == (n,)
     assert result["r_squared"].shape == (n,)
-    assert len(result["k_values"]) == len(result["mean_log_R"])
+    assert len(result["k_values"]) == len(result["mean_log_T"])
     assert len(result["k_values"]) <= 10
 
 
