@@ -45,6 +45,9 @@ def LogLogConsistency(
     """
     distances, _ = compute_knn(embeddings, k=k, include_self=True, cache=cache)
 
+    # Clamp k to actual columns returned (compute_knn may reduce k for small datasets)
+    k = distances.shape[1] - 1  # last valid index (column 0 = self)
+
     # Build log-spaced k grid
     k_values = np.unique(
         np.logspace(np.log10(k_min), np.log10(k), k_steps).astype(int)
