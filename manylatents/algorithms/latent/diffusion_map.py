@@ -276,7 +276,7 @@ class DiffusionMap():
 
         K = self.G.kernel
         K = np.array(K.todense())
-        self.evecs_right, self.evals, _, _, sym_diff_op = compute_dm(K, 1)
+        self.evecs_right, self.evals, self.L, self.d_noalpha, self.S = compute_dm(K, 1)
         self.X = X
         
         
@@ -707,8 +707,8 @@ class DiffusionMapModule(LatentModule):
             row_sums[row_sums == 0] = 1
             diff_op = K / row_sums
         else:
-            K = np.asarray(self.model.G.kernel.todense())
-            _, _, diff_op, _, sym_diff_op = compute_dm(K, alpha=1.0)
+            diff_op = self.model.L
+            sym_diff_op = self.model.S
 
         if use_symmetric:
             result = sym_diff_op
