@@ -1,8 +1,48 @@
 # API Usage Guide
 
-The ManyLatents programmatic API enables workflow integration and in-memory data chaining.
+ManyLatents has two APIs: a **direct Python API** for fast iteration, and a **config-driven API** (Hydra) for reproducible sweeps and SLURM submission.
 
-## Quick Start
+## Quick Start (Direct API)
+
+```python
+import numpy as np
+from manylatents.algorithms.latent import UMAPModule, PHATEModule
+from manylatents import evaluate_metrics
+
+# Generate or load data
+X = np.random.randn(500, 50).astype(np.float32)
+
+# Fit a DR method — accepts ndarray directly
+mod = UMAPModule(n_components=2, n_neighbors=15)
+emb = mod.fit_transform(X)  # ndarray in, ndarray out
+
+# Evaluate metrics by name
+scores = evaluate_metrics(emb, metrics=["FractalDimension", "Anisotropy"])
+
+# Module-context metrics (need the fitted module)
+scores = evaluate_metrics(emb, module=mod, metrics=["k_eff", "trustworthiness"])
+```
+
+## Shared Cache
+
+When evaluating multiple methods on the same data, pass a shared `cache` dict to avoid redundant kNN computation:
+
+```python
+cache = {}
+
+mod1 = UMAPModule(n_components=2, n_neighbors=15)
+emb1 = mod1.fit_transform(X)
+scores1 = evaluate_metrics(emb1, module=mod1, metrics=["k_eff"], cache=cache)
+
+mod2 = PHATEModule(n_components=2, knn=15, n_landmark=None)
+emb2 = mod2.fit_transform(X)
+scores2 = evaluate_metrics(emb2, module=mod2, metrics=["k_eff"], cache=cache)
+# Input-space kNN not recomputed
+```
+
+## Config-Driven API (Hydra)
+
+For reproducible sweeps and SLURM submission, use the Hydra-based `api.run()`:
 
 ```python
 from manylatents.api import run
@@ -17,7 +57,7 @@ embeddings = result['embeddings']  # numpy array
 scores = result['scores']          # dict of metrics
 ```
 
-## Chained Workflows
+### Chained Workflows
 
 Chain multiple algorithms by passing the output of one as input to another:
 
@@ -39,19 +79,6 @@ result2 = run(
 final_embeddings = result2['embeddings']
 ```
 
-Note: Embeddings are automatically converted to numpy arrays by the evaluation system.
-
-## Available Algorithms
-
-### Dimensionality Reduction
-
-- **PCA**: `manylatents.algorithms.latent.pca.PCAModule`
-- **t-SNE**: `manylatents.algorithms.latent.tsne.TSNEModule`
-- **UMAP**: `manylatents.algorithms.latent.umap.UMAPModule`
-- **PHATE**: `manylatents.algorithms.latent.phate.PHATEModule`
-
-## API Reference
-
 ### `run(input_data=None, **overrides)`
 
 Execute a dimensionality reduction algorithm.
@@ -69,98 +96,20 @@ Dictionary with keys:
 - `metadata`: Run metadata dictionary
 - `scores`: Evaluation metrics (if enabled)
 
-**Examples:**
+## Available Algorithms
 
-```python
-# Using a built-in dataset
-result = run(data='swissroll', algorithms={'latent': 'pca'})
+### Dimensionality Reduction
 
-# Using in-memory data
-import numpy as np
-my_data = np.random.randn(1000, 100).astype(np.float32)
-result = run(input_data=my_data, algorithms={'latent': 'pca'})
-
-# Chaining algorithms
-result2 = run(input_data=result['embeddings'], algorithms={'latent': 'umap'})
-```
-
-## Advanced Usage
-
-### Custom Configuration
-
-```python
-result = run(
-    data='swissroll',
-    algorithms={
-        'latent': {
-            '_target_': 'manylatents.algorithms.latent.umap.UMAPModule',
-            'n_components': 2,
-            'n_neighbors': 15,
-            'min_dist': 0.1
-        }
-    }
-)
-```
-
-### Disabling Features for Speed
-
-```python
-# Disable W&B logging
-result = run(data='swissroll', algorithms={'latent': 'pca'}, debug=True)
-
-# Skip evaluation metrics
-result = run(data='swissroll', algorithms={'latent': 'pca'}, metrics=None)
-```
+- **PCA**: `manylatents.algorithms.latent.pca.PCAModule`
+- **t-SNE**: `manylatents.algorithms.latent.tsne.TSNEModule`
+- **UMAP**: `manylatents.algorithms.latent.umap.UMAPModule`
+- **PHATE**: `manylatents.algorithms.latent.phate.PHATEModule`
 
 ## Data Format Requirements
 
 - **Input**: numpy.ndarray with dtype `float32` or `float64`
 - **Shape**: `(n_samples, n_features)`
-- **Output**: numpy array (tensor conversion is handled automatically)
-
-## Multi-Step Example
-
-```python
-from manylatents.api import run
-
-# Progressive dimensionality reduction
-steps = [
-    ('PCA 100D', 'manylatents.algorithms.latent.pca.PCAModule', 100),
-    ('PCA 50D', 'manylatents.algorithms.latent.pca.PCAModule', 50),
-    ('UMAP 2D', 'manylatents.algorithms.latent.umap.UMAPModule', 2),
-]
-
-# Initial data
-current_data = run(
-    data='swissroll',
-    algorithms={'latent': {'_target_': steps[0][1], 'n_components': steps[0][2]}}
-)
-
-# Chain subsequent steps
-for name, target, n_comp in steps[1:]:
-    print(f"Running {name}...")
-    current_data = run(
-        input_data=current_data['embeddings'],
-        algorithms={'latent': {'_target_': target, 'n_components': n_comp}}
-    )
-
-print(f"Final shape: {current_data['embeddings'].shape}")
-```
-
-## Implementation Details
-
-The in-memory data pipeline uses:
-- `PrecomputedDataModule`: Accepts `data` parameter for numpy arrays
-- `InMemoryDataset`: Wraps arrays in LatentOutputs format
-- Compatible with all ManyLatents metrics, callbacks, and visualizations
-
-## Troubleshooting
-
-### Common Issues
-
-**"PrecomputedDataModule requires either a 'path' or 'data' argument"**
-
-Provide either `data='dataset_name'` OR `input_data=array`, not both or neither.
+- **Output**: matches input type (ndarray in → ndarray out, Tensor in → Tensor out)
 
 ## See Also
 
