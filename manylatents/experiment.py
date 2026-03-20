@@ -309,19 +309,11 @@ def prewarm_cache(
     return cache
 
 
-def _flatten_metric_result(metric_name: str, raw_result: Any) -> dict[str, Any]:
-    """Flatten a metric result into a dict of name->value pairs.
-
-    - dict: each key becomes '{metric_name}.{key}'
-    - anything else: stored as-is under metric_name
-    """
-    if isinstance(raw_result, dict):
-        return {f"{metric_name}.{k}": v for k, v in raw_result.items()}
-    return {metric_name: raw_result}
+from manylatents.evaluate import _flatten_metric_result
 
 
 @evaluate.register(dict)
-def evaluate_embeddings(
+def evaluate_outputs(
     latent_outputs: dict,
     *,
     cfg: DictConfig,

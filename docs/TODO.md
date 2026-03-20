@@ -126,4 +126,4 @@ Implemented `logger` config group to control wandb initialization:
 **Priority**: Medium
 **Status**: ✅ COMPLETED
 
-Moved tensor-to-numpy conversion from individual metrics to `evaluate_embeddings()` in `experiment.py`. Removed duplicate code from 10+ metric files.
+Moved tensor-to-numpy conversion from individual metrics to `evaluate_outputs()` in `experiment.py`. Removed duplicate code from 10+ metric files.

@@ -153,7 +153,7 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 |------|-------------|
 | `main.py` | CLI entry point |
 | `api.py` | Python API (`run()`) |
-| `experiment.py` | Core engine: `run_algorithm()`, `evaluate_embeddings()`, `prewarm_cache()` |
+| `experiment.py` | Core engine: `run_algorithm()`, `evaluate_outputs()`, `prewarm_cache()` |
 | `metrics/metric.py` | Metric protocol definition |
 | `metrics/registry.py` | `@register_metric` decorator, `list_metrics()` |
 | `utils/metrics.py` | `compute_knn()`, `compute_svd_cache()` — shared cache infrastructure |

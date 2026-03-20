@@ -3,7 +3,7 @@
 All metrics share a single `cache` dict. The config sleuther discovers k-values from metric configs and pre-warms kNN and eigenvalues before any metric runs.
 
 ```python
-# this happens automatically inside evaluate_embeddings()
+# this happens automatically inside evaluate_outputs()
 cache = {}
 compute_knn(high_dim_data, k=25, cache=cache)    # computed once
 compute_knn(embeddings,     k=25, cache=cache)    # computed once
@@ -18,7 +18,7 @@ continuity(emb, dataset=ds, cache=cache)
 
 ## How It Works
 
-`evaluate_embeddings()` uses `extract_k_requirements()` to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` to compute kNN once with `max(k)`:
+`evaluate_outputs()` uses `extract_k_requirements()` to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` to compute kNN once with `max(k)`:
 
 1. **Sleuther** extracts requirements from metric configs
 2. **Pre-warm** computes kNN and eigenvalues at optimal k values
