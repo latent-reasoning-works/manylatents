@@ -243,26 +243,30 @@ def extract_k_requirements(metrics) -> dict:
 
 
 def prewarm_cache(
-    metric_cfgs: Dict[str, DictConfig],
+    metrics,  # Dict[str, DictConfig] or list[str]
     embeddings: np.ndarray,
     dataset,
     module=None,
     knn_cache_dir=None,
+    cache: Optional[dict] = None,
 ) -> dict:
     """Pre-compute kNN and eigenvalues based on metric requirements.
 
     Args:
-        metric_cfgs: Flattened metric configs.
+        metrics: Flattened metric configs (Dict[str, DictConfig]) or
+            list of metric registry names (list[str]).
         embeddings: Embedding array.
         dataset: Dataset object with .data attribute.
         module: Optional fitted LatentModule.
         knn_cache_dir: Optional directory for disk-persisted dataset kNN.
+        cache: Optional pre-existing cache dict. Created if None.
 
     Returns:
         Populated cache dict.
     """
-    reqs = extract_k_requirements(metric_cfgs)
-    cache: dict = {}
+    reqs = extract_k_requirements(metrics)
+    if cache is None:
+        cache = {}
 
     if reqs["emb_k"]:
         max_k = max(reqs["emb_k"])
