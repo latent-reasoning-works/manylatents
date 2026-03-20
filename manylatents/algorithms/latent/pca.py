@@ -4,7 +4,7 @@ import torch
 from sklearn.decomposition import PCA
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
 class PCAModule(LatentModule):
@@ -22,9 +22,9 @@ class PCAModule(LatentModule):
         self._is_fitted = False
         self._fit_data = None  # Store fitted data for covariance computation
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fits PCA on a subset of data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
         self.model.fit(x_np[:n_fit])
@@ -33,14 +33,14 @@ class PCAModule(LatentModule):
         self._fit_data = x_np[:n_fit]
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Transforms data using the fitted PCA model."""
         if not self._is_fitted:
             raise RuntimeError("PCA model is not fitted yet. Call `fit` first.")
 
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         embedding = self.model.transform(x_np)
-        return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+        return _to_output(embedding, x)
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
         """

@@ -1,7 +1,30 @@
 from abc import ABC, abstractmethod
-import numpy as np
+from typing import Union
 
+import numpy as np
+import torch
 from torch import Tensor
+
+ArrayLike = Union[np.ndarray, Tensor]
+
+
+def _to_numpy(x):
+    """Convert Tensor or ndarray to ndarray."""
+    if isinstance(x, Tensor):
+        return x.detach().cpu().numpy()
+    return np.asarray(x)
+
+
+def _to_output(result, input_ref):
+    """Match output type to input type. For transform/fit_transform only."""
+    if isinstance(input_ref, Tensor):
+        if isinstance(result, np.ndarray):
+            return torch.tensor(result, device=input_ref.device, dtype=input_ref.dtype)
+        return result  # already a Tensor
+    else:
+        if isinstance(result, Tensor):
+            return result.detach().cpu().numpy()
+        return np.asarray(result)
 
 
 class LatentModule(ABC):
@@ -20,21 +43,21 @@ class LatentModule(ABC):
         self._is_fitted = False
 
     @abstractmethod
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x: ArrayLike, y: ArrayLike | None = None) -> None:
         """Fit the module on data.
 
         Args:
-            x: Input data of shape (N, D).
+            x: Input data of shape (N, D). Accepts ndarray or Tensor.
             y: Optional labels of shape (N,) for supervised methods.
                Ignored by unsupervised modules.
         """
         pass
 
     @abstractmethod
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x: ArrayLike) -> ArrayLike:
         pass
 
-    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
+    def fit_transform(self, x: ArrayLike, y: ArrayLike | None = None) -> ArrayLike:
         self.fit(x, y)
         return self.transform(x)
 

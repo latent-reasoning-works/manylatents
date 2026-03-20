@@ -14,7 +14,7 @@ import torch
 from sklearn.linear_model import LogisticRegression
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
 class ClassifierModule(LatentModule):
@@ -45,11 +45,11 @@ class ClassifierModule(LatentModule):
         self.max_iter = max_iter
         self._clf = None
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fit classifier on input data and labels.
 
         Args:
-            x: Input data of shape (N, D).
+            x: Input data of shape (N, D). Accepts ndarray or Tensor.
             y: Labels of shape (N,). Required for ClassifierModule.
 
         Raises:
@@ -61,8 +61,8 @@ class ClassifierModule(LatentModule):
                 "Pass labels via fit(x, y) or ensure your datamodule provides them."
             )
 
-        x_np = x.detach().cpu().numpy() if isinstance(x, Tensor) else x
-        y_np = y.detach().cpu().numpy() if isinstance(y, Tensor) else y
+        x_np = _to_numpy(x)
+        y_np = _to_numpy(y)
 
         if self.model_type == "logistic":
             self._clf = LogisticRegression(
@@ -75,14 +75,15 @@ class ClassifierModule(LatentModule):
         self._clf.fit(x_np, y_np)
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Return P(y=1|x) as predictions.
 
         Args:
-            x: Input data of shape (N, D).
+            x: Input data of shape (N, D). Accepts ndarray or Tensor.
 
         Returns:
-            Predictions of shape (N,) representing P(y=1|x).
+            Predictions of shape (N, 1) representing P(y=1|x).
+            Returns same type as input (ndarray or Tensor).
 
         Raises:
             RuntimeError: If called before fit().
@@ -92,11 +93,11 @@ class ClassifierModule(LatentModule):
                 "ClassifierModule is not fitted yet. Call `fit(x, y)` first."
             )
 
-        x_np = x.detach().cpu().numpy() if isinstance(x, Tensor) else x
+        x_np = _to_numpy(x)
 
         # Get probability of positive class, return as (N, 1)
-        proba = self._clf.predict_proba(x_np)[:, 1]
-        return torch.from_numpy(proba.reshape(-1, 1)).float().to(x.device if isinstance(x, Tensor) else "cpu")
+        proba = self._clf.predict_proba(x_np)[:, 1].reshape(-1, 1).astype(np.float32)
+        return _to_output(proba, x)
 
     def get_loadings(self) -> np.ndarray:
         """Return classifier coefficients for interpretability.

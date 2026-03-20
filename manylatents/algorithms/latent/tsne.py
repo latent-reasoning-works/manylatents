@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
 from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
 
@@ -76,8 +76,8 @@ class TSNEModule(LatentModule):
             random_state=self.random_state,
         )
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
-        x_np = x.detach().cpu().numpy()
+    def fit(self, x, y=None) -> None:
+        x_np = _to_numpy(x)
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))
         x_fit = x_np[:n_fit]
@@ -139,26 +139,25 @@ class TSNEModule(LatentModule):
 
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         if not self._is_fitted:
             raise RuntimeError("tSNE model is not fitted yet. Call `fit` first.")
 
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
 
         if self._resolved_backend == "torchdr":
             import torch as th
             x_torch = th.from_numpy(x_np).float()
             if resolve_device(self.device) == "cuda":
                 x_torch = x_torch.cuda()
-            embedding = self.model.transform(x_torch)
-            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
+            embedding_np = self.model.transform(x_torch).detach().cpu().numpy()
         else:
-            embedding_out = self.embedding_train.transform(x_np)
-            return torch.tensor(embedding_out, device=x.device, dtype=x.dtype)
+            embedding_np = np.asarray(self.embedding_train.transform(x_np))
+        return _to_output(embedding_np, x)
 
-    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
+    def fit_transform(self, x, y=None):
         """Fit and then transform on same data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         n_fit = max(1, int(self.fit_fraction * x_np.shape[0]))
 
         if self._resolved_backend == "torchdr":
@@ -166,12 +165,12 @@ class TSNEModule(LatentModule):
             x_torch = th.from_numpy(x_np[:n_fit]).float()
             if resolve_device(self.device) == "cuda":
                 x_torch = x_torch.cuda()
-            embedding = self.model.fit_transform(x_torch)
+            embedding_np = self.model.fit_transform(x_torch).detach().cpu().numpy()
             self._is_fitted = True
-            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
         else:
             self.fit(x, y)
-            return torch.tensor(np.array(self.embedding_train), device=x.device, dtype=x.dtype)
+            embedding_np = np.array(self.embedding_train)
+        return _to_output(embedding_np, x)
 
     def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
