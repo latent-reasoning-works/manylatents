@@ -15,7 +15,7 @@ from torch import Tensor
 from typing import Optional, Union
 import logging
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +276,7 @@ class DiffusionMap():
 
         K = self.G.kernel
         K = np.array(K.todense())
-        self.evecs_right, self.evals, _, _, sym_diff_op = compute_dm(K, 1)
+        self.evecs_right, self.evals, self.L, self.d_noalpha, self.S = compute_dm(K, 1)
         self.X = X
         
         
@@ -539,9 +539,9 @@ class DiffusionMapModule(LatentModule):
         # Must have at least 1 cluster
         return max(k, 1)
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fits DiffusionMap on a subset of data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))
 
@@ -647,27 +647,24 @@ class DiffusionMapModule(LatentModule):
         km = KMeans(n_clusters=k, random_state=rs, n_init=10)
         self._labels = km.fit_predict(features)
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Transforms data using the fitted DiffusionMap model."""
         if not self._is_fitted:
             raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
 
         if self.mode == "cluster":
-            labels = torch.from_numpy(self._labels.reshape(-1, 1)).float()
-            if isinstance(x, Tensor):
-                labels = labels.to(device=x.device)
-            return labels
+            labels_np = self._labels.reshape(-1, 1).astype(np.float32)
+            return _to_output(labels_np, x)
 
         if self._resolved_backend == "torchdr":
             evals = self._torchdr_evals
             evecs = self._torchdr_evecs
             t = self.t if isinstance(self.t, int) else 5
-            embedding = evecs @ np.diag(evals ** t)[:, 1:(self.n_components + 1)]
-            return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+            embedding_np = evecs @ np.diag(evals ** t)[:, 1:(self.n_components + 1)]
         else:
-            x_np = x.detach().cpu().numpy()
-            embedding = self.model.transform(x_np)
-            return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+            x_np = _to_numpy(x)
+            embedding_np = self.model.transform(x_np)
+        return _to_output(embedding_np, x)
 
     def predict_labels(self) -> np.ndarray:
         """Return integer cluster assignments.
@@ -710,8 +707,8 @@ class DiffusionMapModule(LatentModule):
             row_sums[row_sums == 0] = 1
             diff_op = K / row_sums
         else:
-            K = np.asarray(self.model.G.kernel.todense())
-            _, _, diff_op, _, sym_diff_op = compute_dm(K, alpha=1.0)
+            diff_op = self.model.L
+            sym_diff_op = self.model.S
 
         if use_symmetric:
             result = sym_diff_op

@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 logger = logging.getLogger(__name__)
 
@@ -221,19 +221,19 @@ class SelectiveCorrectionModule(LatentModule):
         self._mismatch_ratio = None
         self._correction_loss_history = None
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         # Run inner algorithm
         self.inner.fit(x, y)
-        self._input_data = x.detach().cpu().numpy()
+        self._input_data = _to_numpy(x)
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         if not self._is_fitted:
             raise RuntimeError("Not fitted. Call fit() first.")
 
         # Get inner embedding
         embedding = self.inner.transform(x)
-        embedding_np = embedding.detach().cpu().numpy()
+        embedding_np = _to_numpy(embedding)
 
         # Compute mismatch labels
         self._mismatched, self._mismatch_ratio = _compute_mismatch_labels(
@@ -249,7 +249,7 @@ class SelectiveCorrectionModule(LatentModule):
         if n_mismatched == 0:
             logger.info("No mismatched points — returning inner embedding unchanged.")
             self._embedding = embedding_np
-            return embedding
+            return _to_output(embedding_np, x)
 
         logger.info(
             f"Correcting {n_mismatched}/{len(embedding_np)} points "
@@ -259,7 +259,7 @@ class SelectiveCorrectionModule(LatentModule):
         # Run SGD correction
         corrected = self._correct(embedding_np)
         self._embedding = corrected
-        return torch.tensor(corrected, device=x.device, dtype=x.dtype)
+        return _to_output(corrected, x)
 
     def _correct(self, embedding: np.ndarray) -> np.ndarray:
         """SGD correction of mismatched points."""

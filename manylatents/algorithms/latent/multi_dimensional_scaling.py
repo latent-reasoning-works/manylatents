@@ -19,7 +19,7 @@ import torch
 from torch import Tensor
 from typing import Optional, Union
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 import logging
 import warnings
 logger = logging.getLogger(__name__)
@@ -220,9 +220,9 @@ class MDSModule(LatentModule):
                                             n_jobs=n_jobs,
                                             verbose=verbose)
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fits MDS on all of data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))  # Use only a fraction of the data
 
@@ -230,22 +230,22 @@ class MDSModule(LatentModule):
         emb = self.model.embed_MDS(x_np[:n_fit])
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Transforms data using the fitted MDS model. MDS can't be extend to new data, so we just return the embedding of the fitted data."""
         if not self._is_fitted:
             raise RuntimeError("MDS model is not fitted yet. Call `fit` first.")
 
-        embedding = self.model.embedding
-        return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+        embedding_np = self.model.embedding
+        return _to_output(embedding_np, x)
 
-    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
+    def fit_transform(self, x, y=None):
         """Fit and then transform on same data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
 
         # embed_MDS will compute and store distance matrix in self.model.distance_matrix
-        embedding = self.model.embed_MDS(x_np)
+        embedding_np = self.model.embed_MDS(x_np)
         self._is_fitted = True
-        return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+        return _to_output(embedding_np, x)
 
     def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
         """

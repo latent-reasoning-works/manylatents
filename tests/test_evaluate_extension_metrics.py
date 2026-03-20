@@ -1,4 +1,4 @@
-"""Test evaluate_embeddings handles metrics that don't accept cache=."""
+"""Test evaluate_outputs handles metrics that don't accept cache=."""
 import sys
 import types
 import numpy as np
@@ -30,7 +30,7 @@ def test_legacy_metric_without_cache():
     emb = np.random.randn(10, 2).astype(np.float32)
     cache = {"some": "data"}
 
-    # Simulate what evaluate_embeddings should do
+    # Simulate what evaluate_outputs should do
     try:
         result = legacy_metric(embeddings=emb, dataset=None, module=None, cache=cache)
     except TypeError:

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
 from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
 
@@ -83,9 +83,9 @@ class PHATEModule(LatentModule):
             }
             return PHATE(**phate_kwargs)
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fits PHATE on a subset of data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))
 
@@ -105,20 +105,19 @@ class PHATEModule(LatentModule):
             self.model.fit(x_np[:n_fit])
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Transforms data using the fitted PHATE model."""
         if not self._is_fitted:
             raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
 
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
 
         if self._resolved_backend == "torchdr":
             import torch as th
             x_torch = th.from_numpy(x_np).float()
             if resolve_device(self.device) == "cuda":
                 x_torch = x_torch.cuda()
-            embedding = self.model.transform(x_torch)
-            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
+            embedding_np = self.model.transform(x_torch).detach().cpu().numpy()
         else:
             # Check for potential data permutation issues
             if (x_np.shape == self._training_shape and
@@ -133,12 +132,12 @@ class PHATEModule(LatentModule):
                     "Consider setting 'shuffle_traindata: false' in your data config to avoid PHATE warnings.",
                     UserWarning
                 )
-            embedding = self.model.transform(x_np)
-            return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+            embedding_np = self.model.transform(x_np)
+        return _to_output(embedding_np, x)
 
-    def fit_transform(self, x: Tensor, y: Tensor | None = None) -> Tensor:
+    def fit_transform(self, x, y=None):
         """Fit and then transform on same data."""
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         n_fit = max(1, int(self.fit_fraction * x_np.shape[0]))
 
         if self._resolved_backend == "torchdr":
@@ -146,18 +145,17 @@ class PHATEModule(LatentModule):
             x_torch = th.from_numpy(x_np[:n_fit]).float()
             if resolve_device(self.device) == "cuda":
                 x_torch = x_torch.cuda()
-            embedding = self.model.fit_transform(x_torch)
+            embedding_np = self.model.fit_transform(x_torch).detach().cpu().numpy()
             self._is_fitted = True
-            return torch.tensor(embedding.detach().cpu().numpy(), device=x.device, dtype=x.dtype)
         else:
             # Store lightweight statistics for permutation detection in transform
             self._training_shape = x_np[:n_fit].shape
             self._training_mean = np.mean(x_np[:n_fit], axis=0)
             self._training_std = np.std(x_np[:n_fit], axis=0)
             self._training_sample = x_np[:min(10, n_fit)].copy()
-            embedding = self.model.fit_transform(x_np[:n_fit])
+            embedding_np = self.model.fit_transform(x_np[:n_fit])
             self._is_fitted = True
-            return torch.tensor(embedding, device=x.device, dtype=x.dtype)
+        return _to_output(embedding_np, x)
 
     def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """

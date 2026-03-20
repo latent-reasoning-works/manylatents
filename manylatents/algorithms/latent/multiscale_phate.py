@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
 class MultiscalePHATEModule(LatentModule):
@@ -93,21 +93,21 @@ class MultiscalePHATEModule(LatentModule):
         self.clusters_: Optional[np.ndarray] = None
         self.sizes_: Optional[np.ndarray] = None
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """
         Fit Multiscale PHATE and compute embedding at finest resolution.
 
         Parameters
         ----------
-        x : Tensor
-            Input data of shape (n_samples, n_features).
+        x : array-like
+            Input data of shape (n_samples, n_features). Accepts ndarray or Tensor.
         """
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         self._n_input = x_np.shape[0]
         self.embedding_, self.clusters_, self.sizes_ = self.model.fit_transform(x_np)
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """
         Return the embedding at finest resolution.
 
@@ -118,13 +118,13 @@ class MultiscalePHATEModule(LatentModule):
 
         Parameters
         ----------
-        x : Tensor
-            Input data (used for device/dtype and expected row count).
+        x : array-like
+            Input data (used for type/shape reference and expected row count).
 
         Returns
         -------
-        Tensor
-            2D embedding of shape (n_samples, n_components).
+        ndarray or Tensor
+            2D embedding of shape (n_samples, n_components). Matches input type.
         """
         if not self._is_fitted:
             raise RuntimeError(
@@ -137,8 +137,8 @@ class MultiscalePHATEModule(LatentModule):
             padded = np.zeros((n_expected, self.embedding_.shape[1]))
             padded[:n_emb] = self.embedding_
             padded[n_emb:] = self.embedding_.mean(axis=0)
-            return torch.tensor(padded, device=x.device, dtype=x.dtype)
-        return torch.tensor(self.embedding_, device=x.device, dtype=x.dtype)
+            return _to_output(padded, x)
+        return _to_output(self.embedding_, x)
 
     def get_n_components_per_scale(self) -> np.ndarray:
         """
