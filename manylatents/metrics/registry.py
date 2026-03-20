@@ -31,11 +31,12 @@ class MetricSpec:
         embeddings: np.ndarray,
         dataset: Optional[object] = None,
         module: Optional[LatentModule] = None,
+        cache: Optional[dict] = None,
         **kwargs,
     ) -> Union[float, tuple[float, np.ndarray], Dict[str, Any]]:
         """Call the metric with alias defaults merged with kwargs."""
         merged = {**self.params, **kwargs}
-        return self.func(embeddings=embeddings, dataset=dataset, module=module, **merged)
+        return self.func(embeddings=embeddings, dataset=dataset, module=module, cache=cache, **merged)
 
 
 # Global registry
@@ -155,6 +156,7 @@ def compute_metric(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
+    cache: Optional[dict] = None,
     **kwargs,
 ) -> float:
     """Compute a metric by name, always returning a scalar float.
@@ -164,6 +166,7 @@ def compute_metric(
         embeddings: The embedding array.
         dataset: Optional dataset object.
         module: Optional LatentModule.
+        cache: Optional shared cache dict for deduplicated computation.
         **kwargs: Additional parameters (override alias defaults).
 
     Returns:
@@ -171,7 +174,7 @@ def compute_metric(
         use compute_metric_detailed().
     """
     spec = get_metric(name)
-    raw = spec(embeddings=embeddings, dataset=dataset, module=module, **kwargs)
+    raw = spec(embeddings=embeddings, dataset=dataset, module=module, cache=cache, **kwargs)
     return _to_scalar(raw)
 
 
@@ -180,6 +183,7 @@ def compute_metric_detailed(
     embeddings: np.ndarray,
     dataset: Optional[object] = None,
     module: Optional[LatentModule] = None,
+    cache: Optional[dict] = None,
     **kwargs,
 ) -> Dict[str, Any]:
     """Compute a metric with full detail (scalar + per-sample + raw).
@@ -189,6 +193,7 @@ def compute_metric_detailed(
         embeddings: The embedding array.
         dataset: Optional dataset object.
         module: Optional LatentModule.
+        cache: Optional shared cache dict for deduplicated computation.
         **kwargs: Additional parameters (override alias defaults).
 
     Returns:
@@ -198,7 +203,7 @@ def compute_metric_detailed(
             - "raw": original return value from the metric function
     """
     spec = get_metric(name)
-    raw = spec(embeddings=embeddings, dataset=dataset, module=module, **kwargs)
+    raw = spec(embeddings=embeddings, dataset=dataset, module=module, cache=cache, **kwargs)
 
     per_sample = None
     if isinstance(raw, tuple) and len(raw) >= 2:
