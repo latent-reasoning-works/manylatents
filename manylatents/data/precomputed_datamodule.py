@@ -196,7 +196,10 @@ class PrecomputedDataModule(LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.train_dataset, batch_size=self.hparams.batch_size, num_workers=self.hparams.num_workers, shuffle=True
+            self.train_dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=self.hparams.shuffle_traindata,
         )
         
     def val_dataloader(self) -> DataLoader:
