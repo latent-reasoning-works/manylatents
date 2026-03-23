@@ -1,11 +1,6 @@
 """Tests for PHATEModule backend routing."""
 import numpy as np
-import pytest
 import torch
-
-from manylatents.utils.backend import check_torchdr_available
-
-TORCHDR_AVAILABLE = check_torchdr_available()
 
 
 def test_phate_default_backend_unchanged():
@@ -28,7 +23,6 @@ def test_phate_accepts_backend_param():
     assert m.backend is None
 
 
-@pytest.mark.skipif(not TORCHDR_AVAILABLE, reason="torchdr not installed")
 def test_phate_torchdr_backend_fit_transform():
     """PHATEModule with torchdr backend produces embeddings."""
     from manylatents.algorithms.latent.phate import PHATEModule
@@ -42,7 +36,6 @@ def test_phate_torchdr_backend_fit_transform():
     assert emb.shape == (50, 2)
 
 
-@pytest.mark.skipif(not TORCHDR_AVAILABLE, reason="torchdr not installed")
 def test_phate_torchdr_param_mapping():
     """PHATEModule maps knn->k and decay->alpha for TorchDR."""
     from manylatents.algorithms.latent.phate import PHATEModule
@@ -55,9 +48,9 @@ def test_phate_torchdr_param_mapping():
     assert m.model.k == 10
     assert m.model.alpha == 40
     assert m.model.t == 50
+    assert m.model.n_landmarks == 2000
 
 
-@pytest.mark.skipif(not TORCHDR_AVAILABLE, reason="torchdr not installed")
 def test_phate_backend_output_agreement():
     """CPU and TorchDR PHATE produce structurally consistent affinity matrices.
 

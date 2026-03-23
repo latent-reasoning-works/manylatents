@@ -6,7 +6,7 @@ from torch import Tensor
 
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
-from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
+from ...utils.backend import resolve_device
 
 
 class PHATEModule(LatentModule):
@@ -45,24 +45,35 @@ class PHATEModule(LatentModule):
         self.fit_fraction = fit_fraction
         self.random_state = random_state
         self.random_landmarking = random_landmarking
-
-        self._resolved_backend = resolve_backend(backend)
+        self._resolved_backend = self._resolve_phate_backend(backend)
         self.model = self._create_model()
+
+    @staticmethod
+    def _resolve_phate_backend(backend: str | None) -> str | None:
+        if backend is None or backend == "sklearn":
+            return None
+        if backend == "torchdr":
+            return "torchdr"
+        if backend == "auto":
+            return "torchdr" if torch.cuda.is_available() else None
+        raise ValueError(
+            f"Unknown backend: {backend!r}. Use None, 'sklearn', 'torchdr', or 'auto'."
+        )
 
     def _create_model(self):
         if self._resolved_backend == "torchdr":
-            from torchdr import PHATE
+            from .torchdr_phate_local import PHATE
 
-            # TorchDR PHATE param mapping: knn->k, decay->alpha
-            # TorchDR PHATE does NOT support faiss/keops, force backend=None
             return PHATE(
                 n_components=self.n_components,
                 k=self.knn,
                 t=self.t,
                 alpha=self.decay,
+                n_landmarks=self.n_landmark,
+                random_landmarking=self.random_landmarking,
                 device=resolve_device(self.device),
                 random_state=self.random_state,
-                backend=None,  # TorchDR PHATE only supports None
+                backend=None,
             )
         else:
             from phate import PHATE
@@ -180,8 +191,8 @@ class PHATEModule(LatentModule):
             return symmetric_diffusion_operator(K)
         else:
             if self._resolved_backend == "torchdr":
-                # TorchDR PHATE stores affinity_in_ as NxN dense in log-space
-                A = torch.exp(self.model.affinity_in_.detach()).cpu().numpy()
+                # Local TorchDR-style PHATE exposes diffusion operator directly.
+                A = self.model.diff_op_.detach().cpu().numpy()
             else:
                 diff_op = self.model.diff_op
                 A = np.asarray(diff_op)
@@ -204,8 +215,7 @@ class PHATEModule(LatentModule):
             raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
 
         if self._resolved_backend == "torchdr":
-            # TorchDR PHATE stores affinity_in_ as NxN dense in log-space
-            K = torch.exp(self.model.affinity_in_.detach()).cpu().numpy()
+            K = self.model.kernel_.detach().cpu().numpy()
         else:
             K = np.asarray(self.model.graph.K.todense())
 
