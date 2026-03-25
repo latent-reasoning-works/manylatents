@@ -886,7 +886,16 @@ def ltsa_align(X: np.ndarray, indices: np.ndarray,
     vals = np.concatenate(vals)
     B_csr = coo_matrix((vals, (rows, cols)), shape=(n, n)).tocsr()
 
-    eigenvalues, eigenvectors = eigsh(B_csr, k=n_components + 1, which='SM')
+    try:
+        eigenvalues, eigenvectors = eigsh(
+            B_csr, k=n_components + 1, which='SM', maxiter=n * 20,
+        )
+    except Exception:
+        # ARPACK may fail to converge on small/ill-conditioned matrices;
+        # fall back to dense eigendecomposition.
+        logger.debug("eigsh failed on LTSA alignment matrix, falling back to dense eigh")
+        eigenvalues, eigenvectors = np.linalg.eigh(B_csr.toarray())
+
     idx = np.argsort(eigenvalues)
     eigenvectors = eigenvectors[:, idx]
     embedding = eigenvectors[:, 1:n_components + 1]
