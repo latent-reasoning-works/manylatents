@@ -44,6 +44,12 @@ def test_both_paths_same_function():
     assert knn_new is knn_old
 
 
+def test_content_key_same_function():
+    from manylatents.utils.knn import _content_key as key_new
+    from manylatents.utils.metrics import _content_key as key_old
+    assert key_new is key_old
+
+
 def test_compute_knn_basic():
     from manylatents.utils.knn import compute_knn
     rng = np.random.default_rng(42)
@@ -165,6 +171,16 @@ def make_rpca_test_data(m=200, n=100, rank=5, sparse_frac=0.05,
     noise = noise_std * rng.standard_normal((m, n)) if noise_std > 0 else 0
     D = L_true + S_true + noise
     return D, L_true, S_true
+
+
+class TestSolverEdgeCases:
+    def test_zero_matrix(self):
+        from manylatents.utils.robust_pca_solvers import rpca_ialm
+        D = np.zeros((50, 30))
+        result = rpca_ialm(D)
+        assert result.rank == 0
+        assert np.allclose(result.L, 0)
+        assert np.allclose(result.S, 0)
 
 
 class TestSolverIALM:
@@ -316,7 +332,7 @@ def _svt(X: np.ndarray, tau: float, prev_rank: Optional[int] = None,
     U_k = U[:, mask]
     sigma_k = sigma[mask] - tau
     Vt_k = Vt[mask, :]
-    L = U_k * sigma_k[np.newaxis, :] @ Vt_k  # avoid diag allocation
+    L = (U_k * sigma_k[np.newaxis, :]) @ Vt_k  # avoid diag allocation
     return SVTResult(matrix=L, U=U_k, sigma=sigma_k, Vt=Vt_k)
 ```
 
@@ -565,6 +581,18 @@ class TestPCAModuleRobust:
         X_new = rng.standard_normal((50, 100)).astype(np.float32)
         emb = mod.transform(X_new)
         assert emb.shape == (50, 5)
+
+    def test_fit_fraction_interaction(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        D, _, _ = make_rpca_test_data(m=200, n=100)
+        mod = PCAModule(n_components=5, method='robust_ialm', fit_fraction=0.5)
+        mod.fit(D.astype(np.float32))
+        # L/S should have shape of the subsetted data
+        extras = mod.extra_outputs()
+        assert extras['low_rank_matrix'].shape == (100, 100)  # 50% of 200
+        # transform on new data should still work
+        emb = mod.transform(D.astype(np.float32))
+        assert emb.shape == (200, 5)
 
     def test_robust_pca_api_integration(self):
         from manylatents.api import run
@@ -1011,7 +1039,9 @@ def _local_cov_none(points: np.ndarray):
 def _local_cov_trimmed(points: np.ndarray, trim_fraction: float):
     """Trimmed covariance: remove furthest points from median centroid."""
     k, d = points.shape
-    n_trim = max(1, int(np.floor(k * trim_fraction)))
+    n_trim = int(np.floor(k * trim_fraction))
+    if n_trim == 0:
+        return _local_cov_none(points)
     centroid = np.median(points, axis=0)
     dists = np.linalg.norm(points - centroid, axis=1)
     keep_idx = np.argsort(dists)[:k - n_trim]
@@ -1081,7 +1111,7 @@ def _local_cov_huber(points: np.ndarray, trim_fraction: float,
         logger.debug("Huber: k=%d <= d=%d, falling back to trimmed", k, d)
         return _local_cov_trimmed(points, trim_fraction)
 
-    c = np.sqrt(chi2.ppf(0.95, df=min(k - 1, d)))
+    c = np.sqrt(chi2.ppf(0.95, df=d))
     mu = points.mean(axis=0)
     centered = points - mu
     Sigma = (centered.T @ centered) / max(k - 1, 1)
@@ -1316,12 +1346,13 @@ def ltsa_align(X: np.ndarray, indices: np.ndarray,
     Returns:
         (n, n_components) embedding.
     """
-    from scipy.sparse import lil_matrix
+    from scipy.sparse import coo_matrix
     from scipy.sparse.linalg import eigsh
 
     n, k = indices.shape
 
-    B = lil_matrix((n, n, ), dtype=np.float64)
+    # COO construction (much faster than lil_matrix element access)
+    rows, cols, vals = [], [], []
 
     for i in range(n):
         I_i = indices[i]
@@ -1332,11 +1363,17 @@ def ltsa_align(X: np.ndarray, indices: np.ndarray,
         G_i = np.hstack([np.ones((k, 1)), Theta_i])  # (k, n_components + 1)
         W_i = np.eye(k) - G_i @ np.linalg.pinv(G_i)  # (k, k)
 
-        for a in range(k):
-            for b in range(k):
-                B[I_i[a], I_i[b]] += W_i[a, b]
+        # Vectorized index construction for this neighborhood
+        row_idx = np.repeat(I_i, k)
+        col_idx = np.tile(I_i, k)
+        rows.append(row_idx)
+        cols.append(col_idx)
+        vals.append(W_i.ravel())
 
-    B_csr = B.tocsr()
+    rows = np.concatenate(rows)
+    cols = np.concatenate(cols)
+    vals = np.concatenate(vals)
+    B_csr = coo_matrix((vals, (rows, cols)), shape=(n, n)).tocsr()
 
     eigenvalues, eigenvectors = eigsh(B_csr, k=n_components + 1, which='SM')
 

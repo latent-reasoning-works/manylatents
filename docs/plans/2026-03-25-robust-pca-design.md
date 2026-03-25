@@ -98,7 +98,7 @@ def __init__(self, n_components=2, random_state=42, fit_fraction=1.0,
              use_truncated_svd=True,   # adaptive truncated SVD for performance
              # --- Local RPCA params (robust_local) ---
              n_neighbors=20,           # local neighborhood size (overridden by neighborhood_size if set)
-             robust_method='trimmed',  # 'mcd' | 'trimmed' | 'huber' | 'none'
+             robust_method='trimmed',  # 'mcd' | 'trimmed' | 'huber' | 'gaussian' | 'none'
              support_fraction=0.75,    # MCD inlier fraction
              trim_fraction=0.1,        # trimmed discard fraction
              # --- Shared ---
@@ -328,7 +328,7 @@ def robust_local_pca(
     X,                          # (n, d) data matrix
     n_neighbors=20,             # k for k-NN
     n_components=None,          # local dim; if None, estimate per-point via eigenvalue gap
-    robust_method='trimmed',    # 'mcd' | 'trimmed' | 'huber' | 'none'
+    robust_method='trimmed',    # 'mcd' | 'trimmed' | 'huber' | 'gaussian' | 'none'
     support_fraction=0.75,      # MCD inlier fraction
     trim_fraction=0.1,          # trimmed discard fraction
     precomputed_neighbors=None, # (n, k) index array
@@ -368,7 +368,11 @@ Iteratively reweighted covariance with Huber weights:
 
 **Fallback:** When `k <= d`, falls back to `trimmed` (can't invert covariance).
 
-### Method 4: None (`robust_method='none'`)
+### Method 4: Gaussian (`robust_method='gaussian'`)
+
+Gaussian kernel-weighted local covariance, inspired by AdaL-PCA (Mez et al., github.com/LydiaMez/AdaL-PCA). Each neighbor is weighted by `exp(-dist² / epsilon)` where `epsilon` is the adaptive bandwidth (median of squared distances). This is a soft alternative to trimming — all points contribute but distant ones are downweighted smoothly.
+
+### Method 5: None (`robust_method='none'`)
 
 Standard empirical covariance. Baseline for comparison.
 
