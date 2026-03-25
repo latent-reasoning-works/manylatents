@@ -52,7 +52,7 @@ import torch
 from sklearn.decomposition import PCA, TruncatedSVD
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
 @dataclass
@@ -259,14 +259,15 @@ class MergingModule(LatentModule):
             e.cpu().numpy() if isinstance(e, Tensor) else e for e in embeddings
         ]
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fit projection models for projection-based strategies.
 
         For simple strategies (concat, weighted_sum, mean), this is a no-op.
         For projection strategies, this fits the projection model(s).
 
         Args:
-            x: Input tensor (ignored - embeddings from __init__ or datamodule)
+            x: Input data (ignored - embeddings from __init__ or datamodule).
+               Accepts ndarray or Tensor.
             y: Optional labels (ignored - MergingModule is unsupervised)
         """
         if self._strategy not in self.PROJECTION_STRATEGIES:
@@ -325,11 +326,12 @@ class MergingModule(LatentModule):
         else:  # mean
             self.n_components = self._target_dim
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Merge embeddings from all channels.
 
         Args:
-            x: Input tensor (ignored - embeddings from __init__ or datamodule)
+            x: Input data (ignored - embeddings from __init__ or datamodule).
+               Accepts ndarray or Tensor. Output type matches input type.
 
         Returns:
             Merged embeddings of shape (N, merged_dim)
@@ -345,7 +347,7 @@ class MergingModule(LatentModule):
 
         merged = self._apply_strategy(channels, embeddings)
         self.n_components = merged.shape[-1]
-        return merged
+        return _to_output(merged, x)
 
     def _apply_strategy(self, channels: List[str], embeddings: List[Tensor]) -> Tensor:
         """Apply the configured merging strategy."""

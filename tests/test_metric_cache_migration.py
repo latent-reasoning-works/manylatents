@@ -51,7 +51,7 @@ def test_continuity_cache(embedding_data):
 
 
 def test_participation_ratio_cache(embedding_data):
-    from manylatents.metrics.participation_ratio import ParticipationRatio
+    from manylatents.metrics.local_spectral_analysis import ParticipationRatio
     emb, ds = embedding_data
     cache = {}
     result = ParticipationRatio(emb, cache=cache, n_neighbors=5)

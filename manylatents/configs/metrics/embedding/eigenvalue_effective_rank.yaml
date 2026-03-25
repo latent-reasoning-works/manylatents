@@ -1,5 +1,5 @@
-participation_ratio:
+eigenvalue_effective_rank:
   _target_: manylatents.metrics.local_spectral_analysis.LocalSpectralAnalysis
   _partial_: True
-  n_neighbors: 25
-  return_per_sample: True
+  n_neighbors: 20
+  output_mode: full

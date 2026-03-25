@@ -7,7 +7,7 @@ from torch import Tensor
 from sklearn.metrics import pairwise_distances
 from sklearn.decomposition import PCA
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 logger = logging.getLogger(__name__)
 
@@ -300,12 +300,12 @@ class ReebGraphModule(LatentModule):
                 f"{', '.join(_LENS_REGISTRY)}"
             )
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         from ripser import ripser  # noqa: F401
         import gudhi  # noqa: F401
         import networkx as nx
 
-        x_np = x.detach().cpu().numpy() if isinstance(x, Tensor) else np.asarray(x)
+        x_np = _to_numpy(x)
 
         # Compute lens function
         function = self._compute_lens(x_np)
@@ -363,14 +363,11 @@ class ReebGraphModule(LatentModule):
             f"{self.structural_summary['n_branch_points']} branch pts"
         )
 
-    def transform(self, x: Tensor) -> Tensor:
-        """Return (N, M) binary membership matrix as a float tensor."""
+    def transform(self, x):
+        """Return (N, M) binary membership matrix. Matches input type."""
         if not self._is_fitted:
             raise RuntimeError("ReebGraphModule is not fitted. Call fit() first.")
-        result = torch.from_numpy(self._membership)
-        if isinstance(x, Tensor):
-            result = result.to(device=x.device)
-        return result
+        return _to_output(self._membership, x)
 
     def adjacency_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Return the Reeb graph adjacency as an (M, M) binary dense array.

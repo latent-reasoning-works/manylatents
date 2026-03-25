@@ -51,7 +51,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
         raise NotImplementedError(...)
 
     @evaluate.register(dict)
-    def evaluate_embeddings(latent_outputs: dict, *, cfg, datamodule, **kwargs):
+    def evaluate_outputs(latent_outputs: dict, *, cfg, datamodule, **kwargs):
         # Handles embedding-level metrics (trustworthiness, continuity, etc.)
         ...
 
@@ -63,10 +63,10 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     | Dispatch Type | Handler | Evaluates |
     |---------------|---------|-----------|
-    | `dict` (LatentOutputs) | `evaluate_embeddings()` | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
+    | `dict` (LatentOutputs) | `evaluate_outputs()` | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
     | `LightningModule` | `evaluate_lightningmodule()` | `trainer.test()` results + custom model metrics |
 
-    Both paths are called during a LightningModule run: first `evaluate_lightningmodule` during `execute_step()`, then `evaluate_embeddings` on the extracted embeddings.
+    Both paths are called during a LightningModule run: first `evaluate_lightningmodule` during `execute_step()`, then `evaluate_outputs` on the extracted embeddings.
 
     ### Pipeline Mode
 
@@ -156,7 +156,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### How Sampling Integrates
 
-    In `evaluate_embeddings()`, sampling runs before any metrics:
+    In `evaluate_outputs()`, sampling runs before any metrics:
 
     ```python
     sampling_cfg = cfg.metrics.get("sampling", None)
@@ -175,7 +175,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### How It Works
 
-    `evaluate_embeddings()` uses the config sleuther (`extract_k_requirements`) to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` to compute kNN and eigenvalues once with `max(k)`:
+    `evaluate_outputs()` uses the config sleuther (`extract_k_requirements`) to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` to compute kNN and eigenvalues once with `max(k)`:
 
     ```python
     # 1. Sleuther extracts requirements from metric configs

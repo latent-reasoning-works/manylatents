@@ -168,11 +168,12 @@ _SPECTRAL_METRICS = frozenset({
 })
 
 
-def extract_k_requirements(metric_cfgs: Dict[str, DictConfig]) -> dict:
-    """Scan metric configs for kNN and spectral requirements.
+def extract_k_requirements(metrics) -> dict:
+    """Scan metrics for kNN and spectral requirements.
 
     Args:
-        metric_cfgs: Flattened metric configs from flatten_and_unroll_metrics().
+        metrics: Either a Dict[str, DictConfig] (Hydra configs from flatten_and_unroll_metrics)
+                 or a list[str] (metric registry names).
 
     Returns:
         Dict with keys:
@@ -184,52 +185,88 @@ def extract_k_requirements(metric_cfgs: Dict[str, DictConfig]) -> dict:
     data_k: set[int] = set()
     spectral = False
 
-    for metric_cfg in metric_cfgs.values():
-        target = getattr(metric_cfg, "_target_", "")
+    if isinstance(metrics, list):
+        import inspect
+        from manylatents.metrics.registry import get_metric
 
-        # Extract k value
-        k_val = None
-        for param in ("k", "n_neighbors"):
-            if hasattr(metric_cfg, param):
-                val = getattr(metric_cfg, param)
-                if isinstance(val, (int, float)) and val > 0:
-                    k_val = int(val)
-                    break
+        for name in metrics:
+            spec = get_metric(name)
+            # Assumes metric functions are module-level (not nested/methods),
+            # enforced by @register_metric decorator pattern.
+            target = f"{spec.func.__module__}.{spec.func.__qualname__}"
 
-        if k_val is not None:
-            input_space = getattr(metric_cfg, "input_space", "embedding")
-            if input_space == "dataset" or target in _DATA_KNN_METRICS:
-                data_k.add(k_val)
-            if input_space != "dataset":
+            sig = inspect.signature(spec.func)
+            k_val = None
+            for param_name in ("k", "n_neighbors"):
+                if param_name in spec.params:
+                    val = spec.params[param_name]
+                    if isinstance(val, (int, float)) and val > 0:
+                        k_val = int(val)
+                        break
+                elif param_name in sig.parameters:
+                    default = sig.parameters[param_name].default
+                    if default is not inspect.Parameter.empty and isinstance(default, (int, float)) and default > 0:
+                        k_val = int(default)
+                        break
+
+            if k_val is not None:
+                if target in _DATA_KNN_METRICS:
+                    data_k.add(k_val)
                 emb_k.add(k_val)
 
-        if target in _SPECTRAL_METRICS:
-            spectral = True
+            if target in _SPECTRAL_METRICS:
+                spectral = True
+    else:
+        # Existing DictConfig path
+        for metric_cfg in metrics.values():
+            target = getattr(metric_cfg, "_target_", "")
+
+            k_val = None
+            for param in ("k", "n_neighbors"):
+                if hasattr(metric_cfg, param):
+                    val = getattr(metric_cfg, param)
+                    if isinstance(val, (int, float)) and val > 0:
+                        k_val = int(val)
+                        break
+
+            if k_val is not None:
+                input_space = getattr(metric_cfg, "input_space", "embedding")
+                if input_space == "dataset" or target in _DATA_KNN_METRICS:
+                    data_k.add(k_val)
+                if input_space != "dataset":
+                    emb_k.add(k_val)
+
+            if target in _SPECTRAL_METRICS:
+                spectral = True
 
     return {"emb_k": emb_k, "data_k": data_k, "spectral": spectral}
 
 
 def prewarm_cache(
-    metric_cfgs: Dict[str, DictConfig],
+    metrics,  # Dict[str, DictConfig] or list[str]
     embeddings: np.ndarray,
     dataset,
     module=None,
     knn_cache_dir=None,
+    cache: Optional[dict] = None,
 ) -> dict:
     """Pre-compute kNN and eigenvalues based on metric requirements.
 
     Args:
-        metric_cfgs: Flattened metric configs.
+        metrics: Flattened metric configs (Dict[str, DictConfig]) or
+            list of metric registry names (list[str]).
         embeddings: Embedding array.
         dataset: Dataset object with .data attribute.
         module: Optional fitted LatentModule.
         knn_cache_dir: Optional directory for disk-persisted dataset kNN.
+        cache: Optional pre-existing cache dict. Created if None.
 
     Returns:
         Populated cache dict.
     """
-    reqs = extract_k_requirements(metric_cfgs)
-    cache: dict = {}
+    reqs = extract_k_requirements(metrics)
+    if cache is None:
+        cache = {}
 
     if reqs["emb_k"]:
         max_k = max(reqs["emb_k"])
@@ -272,8 +309,11 @@ def prewarm_cache(
     return cache
 
 
+from manylatents.evaluate import _flatten_metric_result
+
+
 @evaluate.register(dict)
-def evaluate_embeddings(
+def evaluate_outputs(
     latent_outputs: dict,
     *,
     cfg: DictConfig,
@@ -343,7 +383,7 @@ def evaluate_embeddings(
             results[metric_name] = value
             results[f"{metric_name}__viz"] = viz_info
         else:
-            results[metric_name] = raw_result
+            results.update(_flatten_metric_result(metric_name, raw_result))
 
     return results
 

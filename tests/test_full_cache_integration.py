@@ -1,4 +1,4 @@
-"""Integration test: full evaluate_embeddings with cache."""
+"""Integration test: full evaluate_outputs with cache."""
 import sys
 import types
 import numpy as np

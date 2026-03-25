@@ -1,0 +1,105 @@
+[rank: 0] Seed set to 42
+[02/16/26 04:36:12] INFO     Cache directory ensured at:        experiment.py:67
+                             outputs/cache
+[02/16/26 04:36:13] INFO     SaveEmbeddings initialized    save_embeddings.py:64
+                             with directory:
+                             /network/scratch/c/cesar.vald
+                             ez/mbyl_for_practitioners/exp
+                             eriments/tools/lrw/manylatent
+                             s/logs/phate_phase/multiruns/
+                             2026-02-16/03-26-36/0 and
+                             format: csv
+                    INFO     PlotEmbeddings initialized   plot_embeddings.py:101
+                             with directory:
+                             /network/scratch/c/cesar.val
+                             dez/mbyl_for_practitioners/e
+                             xperiments/tools/lrw/manylat
+                             ents/logs/phate_phase/multir
+                             uns/2026-02-16/03-26-36/0
+                             and experiment name:
+                             phate_phase.png
+                    INFO     Trainer loggers enabled: 0        experiment.py:520
+                             logger(s)
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+/network/scratch/c/cesar.valdez/mbyl_for_practitioners/experiments/tools/lrw/manylatents/.venv/lib/python3.12/site-packages/lightning/pytorch/trainer/connectors/logger_connector/logger_connector.py:76: Starting from v1.9.0, `tensorboardX` has been removed as a dependency of the `lightning.pytorch` package, due to potential conflicts with other packages in the ML ecosystem. For this reason, `logger=True` will use `CSVLogger` as the default logger, unless the `tensorboard` or `tensorboardX` packages are found. Please `pip install lightning[extra]` or one of them to enable TensorBoard support by default
+💡 Tip: For seamless cloud logging and experiment tracking, try installing [litlogger](https://pypi.org/project/litlogger/) to enable LitLogger, which logs metrics and artifacts automatically to the Lightning Experiments platform.
+                    INFO     Starting algorithm execution...   experiment.py:531
+                    INFO     Extracted 1000 training labels    experiment.py:551
+                             for supervised learning
+                    INFO     Running algorithm on using        experiment.py:553
+                             unified data:
+                             Train tensor shape:
+                             torch.Size([1000, 100])
+                             Test tensor shape:
+                             torch.Size([1000, 100])
+                             Algorithm: PHATEModule
+/network/scratch/c/cesar.valdez/mbyl_for_practitioners/experiments/tools/lrw/manylatents/.venv/lib/python3.12/site-packages/phate/phate.py:919: RuntimeWarning: Graph is disconnected with 3 connected components. This may indicate that your knn parameter (currently 5) is too small, or that your data contains distinct clusters. PHATE may not accurately represent relationships between disconnected components.
+  warnings.warn(
+  SGD-MDS may not have converged: stress changed by -1.5% in final iterations. Consider increasing n_iter or adjusting learning_rate.
+[02/16/26 04:36:17] INFO     LatentModule embedding shape:     experiment.py:398
+                             torch.Size([1000, 2])
+                    INFO     Evaluating embeddings from        experiment.py:584
+                             PHATEModule...
+                    INFO     Reference data shape: (1000, 100) experiment.py:270
+                    INFO     Dataset capabilities:            capabilities.py:55
+                             gt_dists=True, graph=True,
+                             labels=True, centers=False,
+                             gt_type=manifold
+                    INFO     Pre-warming cache: eigenvalue     experiment.py:237
+                             decomposition
+[02/16/26 04:36:18] INFO     PersistentHomology: Found persistent_homology.py:49
+                             1 features with
+                             persistence > 3.0
+                    INFO     SpectralGapRatio: 1.0000   spectral_gap_ratio.py:48
+                    INFO     SpectralDecayRate: 0.0014 spectral_decay_rate.py:61
+                             (top_k=20)
+                    INFO     Saving embeddings with shape save_embeddings.py:102
+                             (1000, 2) to
+                             /network/scratch/c/cesar.val
+                             dez/mbyl_for_practitioners/e
+                             xperiments/tools/lrw/manylat
+                             ents/logs/phate_phase/multir
+                             uns/2026-02-16/03-26-36/0/em
+                             beddings_phate_phase_2026021
+                             6_043618.csv
+                    INFO     Output registered under key:            base.py:116
+                             saved_embeddings
+wandb: WARNING Symlinked 1 file into the W&B run directory; call wandb.save again to sync new files.
+                    INFO     Callback SaveEmbeddings returned: experiment.py:600
+                             ['saved_embeddings']
+                    INFO     Saved 2D embeddings plot to  plot_embeddings.py:468
+                             /network/scratch/c/cesar.val
+                             dez/mbyl_for_practitioners/e
+                             xperiments/tools/lrw/manylat
+                             ents/logs/phate_phase/multir
+                             uns/2026-02-16/03-26-36/0/em
+                             bedding_plot_phate_phase.png
+                             _20260216_043618.png
+                    INFO     Uploaded plot to WandB with  plot_embeddings.py:343
+                             key: embedding_plot
+                    INFO     Output registered under key:            base.py:116
+                             embedding_plot_path
+                    INFO     Callback PlotEmbeddings returned: experiment.py:600
+                             ['embedding_plot_path']
+                    INFO     Logged scalars for           wandb_log_scores.py:64
+                             single_algorithm:
+                             ['single_algorithm/embedding
+                             .persistent_homology',
+                             'single_algorithm/module.spe
+                             ctral_gap_ratio',
+                             'single_algorithm/module.spe
+                             ctral_decay_rate']
+                    INFO     Callback WandbLogScores returned: experiment.py:600
+                             []
+                    INFO     Added callback outputs to         experiment.py:605
+                             embeddings: ['saved_embeddings',
+                             'embedding_plot_path']
+                    INFO     Experiment complete.              experiment.py:607
+                    INFO     Auto-logged 3 metrics to wandb:   experiment.py:620
+                             ['metrics/embedding.persistent_ho
+                             mology',
+                             'metrics/module.spectral_gap_rati
+                             o',
+                             'metrics/module.spectral_decay_ra
+                             te']

@@ -10,7 +10,7 @@ from scipy.stats import rankdata, spearmanr
 
 from manylatents.metrics.registry import register_metric
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
-from manylatents.metrics.participation_ratio import ParticipationRatio
+from manylatents.metrics.local_spectral_analysis import ParticipationRatio
 
 
 def _ensure_2d(arr: np.ndarray) -> np.ndarray:

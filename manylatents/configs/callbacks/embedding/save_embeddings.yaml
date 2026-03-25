@@ -1,6 +1,2 @@
-save_embeddings:
-  _target_: manylatents.callbacks.embedding.save_embeddings.SaveEmbeddings
-  save_dir: ${hydra:runtime.output_dir}
-  save_format: "csv"
-  experiment_name: ${name}
-  save_metric_tables: false
+defaults:
+  - save_outputs

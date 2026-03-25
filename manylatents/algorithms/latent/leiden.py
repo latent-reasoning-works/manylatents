@@ -4,7 +4,7 @@ import scipy.sparse
 import torch
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
 class LeidenModule(LatentModule):
@@ -83,19 +83,17 @@ class LeidenModule(LatentModule):
         )
         return np.array(partition.membership, dtype=np.int64)
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
-        x_np = x.detach().cpu().numpy() if isinstance(x, Tensor) else np.asarray(x)
+    def fit(self, x, y=None) -> None:
+        x_np = _to_numpy(x)
         self._adjacency = self._build_adjacency(x_np)
         self._labels = self._run_leiden(self._adjacency)
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         if not self._is_fitted:
             raise RuntimeError("LeidenModule is not fitted. Call fit() first.")
-        labels = torch.from_numpy(self._labels.reshape(-1, 1)).float()
-        if isinstance(x, Tensor):
-            labels = labels.to(device=x.device)
-        return labels
+        labels_np = self._labels.reshape(-1, 1).astype(np.float32)
+        return _to_output(labels_np, x)
 
     def fit_from_graph(self, adjacency: scipy.sparse.spmatrix) -> np.ndarray:
         """Run Leiden on a precomputed adjacency matrix.

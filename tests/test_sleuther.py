@@ -163,3 +163,25 @@ def test_prewarm_cache_no_data_attribute():
     })
     cache = prewarm_cache(cfgs, emb, NoDataDataset())
     assert _content_key(emb) in cache  # embedding kNN still warmed
+
+
+def test_extract_k_requirements_from_names():
+    """extract_k_requirements accepts list[str] of metric names."""
+    from manylatents.experiment import extract_k_requirements
+    reqs = extract_k_requirements(["Trustworthiness", "LocalIntrinsicDimensionality"])
+    assert len(reqs["emb_k"]) > 0
+    assert reqs["data_k"]  # Trustworthiness needs data kNN
+
+
+def test_extract_k_requirements_from_names_spectral():
+    from manylatents.experiment import extract_k_requirements
+    reqs = extract_k_requirements(["SpectralGapRatio"])
+    assert reqs["spectral"] is True
+
+
+def test_extract_k_requirements_from_names_empty():
+    from manylatents.experiment import extract_k_requirements
+    reqs = extract_k_requirements([])
+    assert reqs["emb_k"] == set()
+    assert reqs["data_k"] == set()
+    assert reqs["spectral"] is False

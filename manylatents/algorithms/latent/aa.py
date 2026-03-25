@@ -1,7 +1,7 @@
 import torch
 from torch import Tensor
 
-from .latent_module_base import LatentModule
+from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
 class ArchetypalAnalysisModule(LatentModule):
@@ -21,11 +21,11 @@ class ArchetypalAnalysisModule(LatentModule):
         self.model = None
         self._is_fitted = False
 
-    def fit(self, x: Tensor, y: Tensor | None = None) -> None:
+    def fit(self, x, y=None) -> None:
         """Fits the archetypal analysis model to the input data."""
         from archetypes import AA
 
-        x_np = x.detach().cpu().numpy()
+        x_np = _to_numpy(x)
         method_kwargs = {"max_iter_optimizer": self.max_iter}
 
         self.model = AA(
@@ -37,11 +37,11 @@ class ArchetypalAnalysisModule(LatentModule):
         self.model.fit(x_np)
         self._is_fitted = True
 
-    def transform(self, x: Tensor) -> Tensor:
+    def transform(self, x):
         """Transforms the input into similarity degrees to each archetype."""
         if not self._is_fitted:
             raise RuntimeError("Archetypal Analysis model is not fitted yet. Call `fit` first.")
-        
-        x_np = x.detach().cpu().numpy()
+
+        x_np = _to_numpy(x)
         similarity = self.model.transform(x_np)
-        return torch.tensor(similarity, device=x.device, dtype=x.dtype)
+        return _to_output(similarity, x)

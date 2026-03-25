@@ -43,8 +43,9 @@ try:
     from manylatents.metrics.persistent_homology import PersistentHomology
 except ImportError:
     pass
-from manylatents.metrics.participation_ratio import ParticipationRatio
+from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis, ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
+from manylatents.metrics.loglog_consistency import LogLogConsistency
 from manylatents.metrics.trustworthiness import Trustworthiness
 
 # Additional embedding metrics
@@ -102,6 +103,9 @@ from manylatents.metrics.trajectory_geometry import (
     compute_menger_curvature,
 )
 
+# Geometric diagnostics
+from manylatents.metrics.effective_neighborhood_size import EffectiveNeighborhoodSize
+
 # Post-hoc analysis
 from manylatents.metrics.metric_agreement import MetricAgreement
 
@@ -119,8 +123,10 @@ __all__ = [
     "MetricSpec",
     # Core metrics
     "PersistentHomology",
+    "LocalSpectralAnalysis",
     "ParticipationRatio",
     "LocalIntrinsicDimensionality",
+    "LogLogConsistency",
     "Trustworthiness",
     # Additional metrics
     "Continuity",
@@ -168,6 +174,8 @@ __all__ = [
     "compute_velocity",
     "compute_cosine_velocity",
     "compute_menger_curvature",
+    # Geometric diagnostics
+    "EffectiveNeighborhoodSize",
     # Post-hoc analysis
     "MetricAgreement",
 ]
