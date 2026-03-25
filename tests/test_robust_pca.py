@@ -88,3 +88,69 @@ class TestStablePCP:
         result = rpca_ialm(D, delta=noise_bound)
         rel_err = np.linalg.norm(result.L - L_true, 'fro') / np.linalg.norm(L_true, 'fro')
         assert rel_err < 0.1, f"Stable PCP L recovery error {rel_err:.4f} >= 0.1"
+
+
+class TestPCAModuleRobust:
+    def test_standard_pca_unchanged(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        rng = np.random.default_rng(42)
+        X = rng.standard_normal((100, 10)).astype(np.float32)
+        mod_old = PCAModule(n_components=2)
+        emb_old = mod_old.fit_transform(X)
+        mod_new = PCAModule(n_components=2, method='standard')
+        emb_new = mod_new.fit_transform(X)
+        np.testing.assert_array_equal(emb_old, emb_new)
+
+    def test_robust_ialm_embedding_shape(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        D, _, _ = make_rpca_test_data()
+        mod = PCAModule(n_components=5, method='robust_ialm')
+        emb = mod.fit_transform(D.astype(np.float32))
+        assert emb.shape == (200, 5)
+
+    def test_robust_ialm_extra_outputs(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        D, L_true, _ = make_rpca_test_data()
+        mod = PCAModule(n_components=5, method='robust_ialm')
+        mod.fit(D.astype(np.float32))
+        extras = mod.extra_outputs()
+        assert 'low_rank_matrix' in extras
+        assert 'sparse_matrix' in extras
+        assert 'robust_rank' in extras
+        assert 'convergence_history' in extras
+        assert extras['robust_rank'] == 5
+        assert 'kernel_matrix' in extras
+
+    def test_robust_transform_new_data(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        D, _, _ = make_rpca_test_data()
+        mod = PCAModule(n_components=5, method='robust_ialm')
+        mod.fit(D.astype(np.float32))
+        rng = np.random.default_rng(99)
+        X_new = rng.standard_normal((50, 100)).astype(np.float32)
+        emb = mod.transform(X_new)
+        assert emb.shape == (50, 5)
+
+    def test_fit_fraction_interaction(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        D, _, _ = make_rpca_test_data(m=200, n=100)
+        mod = PCAModule(n_components=5, method='robust_ialm', fit_fraction=0.5)
+        mod.fit(D.astype(np.float32))
+        extras = mod.extra_outputs()
+        assert extras['low_rank_matrix'].shape == (100, 100)
+        emb = mod.transform(D.astype(np.float32))
+        assert emb.shape == (200, 5)
+
+    def test_robust_pca_api_integration(self):
+        from manylatents.api import run
+        rng = np.random.default_rng(42)
+        X = rng.standard_normal((200, 50)).astype(np.float32)
+        result = run(
+            input_data=X,
+            algorithms={'latent': {
+                '_target_': 'manylatents.algorithms.latent.pca.PCAModule',
+                'n_components': 5,
+                'method': 'robust_ialm',
+            }}
+        )
+        assert result['embeddings'].shape == (200, 5)
