@@ -102,3 +102,65 @@ class TestRobustLocalPCASolver:
         result = robust_local_pca(X, n_neighbors=30, n_components=None,
                                    robust_method='trimmed')
         assert np.median(result.local_dims) == 2
+
+
+class TestPCAModuleRobustLocal:
+    def test_fit_transform_shape(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        X, _, _ = make_robust_local_pca_test_data(n=200, contamination_frac=0.0)
+        mod = PCAModule(n_components=2, method='robust_local',
+                        robust_method='trimmed', n_neighbors=20)
+        emb = mod.fit_transform(X)
+        assert emb.shape == (200, 2)
+
+    def test_transform_returns_cached(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        X, _, _ = make_robust_local_pca_test_data(n=100)
+        mod = PCAModule(n_components=2, method='robust_local')
+        emb1 = mod.fit_transform(X)
+        emb2 = mod.transform(X)
+        np.testing.assert_array_equal(emb1, emb2)
+
+    def test_transform_new_data_raises(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        X, _, _ = make_robust_local_pca_test_data(n=100)
+        mod = PCAModule(n_components=2, method='robust_local')
+        mod.fit_transform(X)
+        X_new = np.random.default_rng(99).standard_normal((50, 3)).astype(np.float32)
+        with pytest.raises(NotImplementedError):
+            mod.transform(X_new)
+
+    def test_extra_outputs(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        X, _, _ = make_robust_local_pca_test_data(n=100)
+        mod = PCAModule(n_components=2, method='robust_local', n_neighbors=15)
+        mod.fit_transform(X)
+        extras = mod.extra_outputs()
+        assert 'local_eigenvalues' in extras
+        assert 'local_dims' in extras
+        assert 'outlier_masks' in extras
+        assert extras['local_dims'].shape == (100,)
+
+    def test_kernel_matrix_raises(self):
+        from manylatents.algorithms.latent.pca import PCAModule
+        X, _, _ = make_robust_local_pca_test_data(n=100)
+        mod = PCAModule(n_components=2, method='robust_local')
+        mod.fit_transform(X)
+        with pytest.raises(NotImplementedError):
+            mod.kernel_matrix()
+
+    def test_api_integration(self):
+        from manylatents.api import run
+        from sklearn.datasets import make_swiss_roll
+        X, _ = make_swiss_roll(300, random_state=42)
+        result = run(
+            input_data=X.astype(np.float32),
+            algorithms={'latent': {
+                '_target_': 'manylatents.algorithms.latent.pca.PCAModule',
+                'n_components': 2,
+                'method': 'robust_local',
+                'robust_method': 'trimmed',
+                'n_neighbors': 20,
+            }}
+        )
+        assert result['embeddings'].shape == (300, 2)

@@ -144,7 +144,7 @@ class PCAModule(LatentModule):
         elif self.method in ('robust_ialm', 'robust_admm'):
             self._fit_robust_global(x_fit)
         elif self.method == 'robust_local':
-            raise NotImplementedError("robust_local not yet implemented")
+            self._fit_robust_local(x_fit)
         self._is_fitted = True
 
     def _fit_standard(self, x_np: np.ndarray) -> None:
@@ -182,6 +182,36 @@ class PCAModule(LatentModule):
         self._mean = result.L.mean(axis=0)
         self._fit_data = result.L
 
+    def _fit_robust_local(self, x_np):
+        """Fit via robust local PCA with LTSA alignment."""
+        from manylatents.utils.robust_pca_solvers import robust_local_pca, ltsa_align
+        from manylatents.utils.knn import compute_knn
+
+        self._X_fit_shape = tuple(x_np.shape)
+
+        # Compute neighborhoods
+        dists, indices = compute_knn(x_np.astype(np.float32),
+                                      k=self.n_neighbors, include_self=False)
+
+        # Robust local PCA
+        local_result = robust_local_pca(
+            x_np, n_neighbors=self.n_neighbors,
+            n_components=self.n_components,
+            robust_method=self.robust_method,
+            support_fraction=self.support_fraction,
+            trim_fraction=self.trim_fraction,
+            precomputed_neighbors=indices,
+            precomputed_distances=dists,
+            random_state=self.init_seed,
+        )
+        self._local_result = local_result
+
+        # LTSA alignment
+        self._embedding = ltsa_align(
+            x_np.astype(np.float64), indices,
+            local_result.local_bases, self.n_components
+        ).astype(x_np.dtype)
+
     # ------------------------------------------------------------------
     # transform
     # ------------------------------------------------------------------
@@ -198,7 +228,13 @@ class PCAModule(LatentModule):
         elif self.method in ('robust_ialm', 'robust_admm'):
             embedding = (x_np - self._mean) @ self._components.T
         elif self.method == 'robust_local':
-            raise NotImplementedError("robust_local not yet implemented")
+            if hasattr(self, '_X_fit_shape') and tuple(x_np.shape) == self._X_fit_shape:
+                embedding = self._embedding
+            else:
+                raise NotImplementedError(
+                    "robust_local is transductive — transform() only supports "
+                    "the original training data. Use fit_transform() instead."
+                )
 
         return _to_output(embedding, x)
 
@@ -227,6 +263,15 @@ class PCAModule(LatentModule):
             extras['sparse_matrix'] = self._robust_result.S
             extras['robust_rank'] = self._robust_result.rank
             extras['convergence_history'] = self._robust_result.convergence_history
+
+        if self.method == 'robust_local' and hasattr(self, '_local_result'):
+            r = self._local_result
+            extras['local_eigenvalues'] = r.local_eigenvalues
+            extras['local_dims'] = r.local_dims
+            extras['local_variances'] = r.local_variances
+            extras['outlier_masks'] = r.outlier_masks
+            extras['condition_numbers'] = r.condition_numbers
+            extras['support_sizes'] = r.support_sizes
 
         return extras
 

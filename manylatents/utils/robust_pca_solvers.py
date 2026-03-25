@@ -840,3 +840,55 @@ def robust_local_pca(
         condition_numbers=all_condition_numbers,
         support_sizes=all_support_sizes,
     )
+
+
+# ---------------------------------------------------------------------------
+# LTSA alignment
+# ---------------------------------------------------------------------------
+
+
+def ltsa_align(X: np.ndarray, indices: np.ndarray,
+               local_bases: np.ndarray, n_components: int) -> np.ndarray:
+    """Local Tangent Space Alignment (Zhang & Zha 2004).
+
+    Args:
+        X: (n, d) data matrix.
+        indices: (n, k) neighbor index array.
+        local_bases: (n, n_components, d) local PC bases per point.
+        n_components: Embedding dimensionality.
+
+    Returns:
+        (n, n_components) embedding.
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.linalg import eigsh
+
+    n, k = indices.shape
+    rows, cols, vals = [], [], []
+
+    for i in range(n):
+        I_i = indices[i]
+        X_local = X[I_i] - X[I_i].mean(axis=0)
+        U_i = local_bases[i].T  # (d, n_components)
+        Theta_i = X_local @ U_i  # (k, n_components)
+
+        G_i = np.hstack([np.ones((k, 1)), Theta_i])  # (k, n_components + 1)
+        W_i = np.eye(k) - G_i @ np.linalg.pinv(G_i)  # (k, k)
+
+        row_idx = np.repeat(I_i, k)
+        col_idx = np.tile(I_i, k)
+        rows.append(row_idx)
+        cols.append(col_idx)
+        vals.append(W_i.ravel())
+
+    rows = np.concatenate(rows)
+    cols = np.concatenate(cols)
+    vals = np.concatenate(vals)
+    B_csr = coo_matrix((vals, (rows, cols)), shape=(n, n)).tocsr()
+
+    eigenvalues, eigenvectors = eigsh(B_csr, k=n_components + 1, which='SM')
+    idx = np.argsort(eigenvalues)
+    eigenvectors = eigenvectors[:, idx]
+    embedding = eigenvectors[:, 1:n_components + 1]
+
+    return embedding
