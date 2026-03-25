@@ -2,6 +2,20 @@
 
 Unified dimensionality reduction and neural network analysis. PyTorch Lightning + Hydra + uv.
 
+## Before Starting Work
+
+- **Check for existing implementations** before building anything new. Run `git log --oneline main | head -30` and `gh pr list --state merged --limit 10` to avoid reimplementing features that already exist under different naming.
+- **Always use manylatents APIs** (e.g. `from manylatents.api import run`) for experiments and traces — never substitute with raw sklearn/numpy equivalents unless explicitly told to.
+- **Prefer minimal, scoped changes.** Do not proactively expand scope (adding config files, fixing docs, cleaning orphan configs) unless explicitly asked. Ask before doing extra work.
+
+## Releases
+
+When tagging a release:
+1. **Bump `version` in `pyproject.toml` first** — PyPI rejects uploads if the version already exists.
+2. Run `uv run pytest tests/ -x -q` to verify.
+3. Commit the version bump, push to main, then create the tag/release.
+4. Watch the Publish to PyPI workflow with `gh run watch`.
+
 ## What belongs here
 
 This is a **public** repo. Only core infrastructure goes here:
