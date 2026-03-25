@@ -5,5 +5,5 @@ plot_embeddings:
   figsize: [8, 6]
   label_col: Population
   legend: false
-  color_by_score: null
+  color_by: null
   enable_wandb_upload: false  # Disable WandB upload for orchestrated/offline mode
