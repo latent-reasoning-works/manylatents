@@ -97,6 +97,7 @@ def __init__(self, n_components=2, random_state=42, fit_fraction=1.0,
              rho=1.5,                # penalty growth rate (IALM)
              use_truncated_svd=True,   # adaptive truncated SVD for performance
              # --- Local RPCA params (robust_local) ---
+             n_neighbors=20,           # local neighborhood size (overridden by neighborhood_size if set)
              robust_method='trimmed',  # 'mcd' | 'trimmed' | 'huber' | 'none'
              support_fraction=0.75,    # MCD inlier fraction
              trim_fraction=0.1,        # trimmed discard fraction
@@ -149,9 +150,20 @@ The `extra_outputs()` override **must call `super().extra_outputs()`** first (to
 - `condition_numbers`: (n,) condition number of each local covariance estimate
 - `support_sizes`: (n,) number of points used in each local estimate
 
+### neighborhood_size / n_neighbors interaction
+
+For `robust_local` mode, the local neighborhood size follows the standard manylatents override pattern:
+```python
+self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors
+```
+
+This is the same pattern used by UMAP, PHATE, and other neighbor-aware modules.
+
 ### kernel_matrix() / affinity_matrix()
 
-When global robust, these operate on L (the denoised low-rank component) instead of D. When `robust_local`, default base class behavior (operates on fitted data).
+When global robust (`robust_admm`/`robust_ialm`), these operate on L (the denoised low-rank component) instead of D.
+
+When `robust_local`, these raise `NotImplementedError` — sklearn PCA is never fitted in this mode, and the LTSA alignment matrix is not a meaningful kernel/affinity matrix. The base class `extra_outputs()` catches `NotImplementedError` gracefully.
 
 ## Solver Internals: `utils/robust_pca_solvers.py`
 
@@ -302,8 +314,10 @@ In `utils/robust_pca_solvers.py`:
 
 ```python
 class RobustLocalPCAResult(NamedTuple):
-    local_bases: np.ndarray       # (n, n_components, d) local PC bases per point
-    local_eigenvalues: np.ndarray # (n, d) full local eigenspectra (descending)
+    local_bases: np.ndarray       # (n, max_dim, d) local PC bases per point
+                                  # max_dim = n_components if set, else max(local_dims)
+                                  # Unused dimensions (for points with local_dim < max_dim) are zero-padded
+    local_eigenvalues: np.ndarray # (n, min(k, d)) local eigenspectra (descending, zero-padded if rank < min(k,d))
     local_dims: np.ndarray        # (n,) estimated local intrinsic dimension
     local_variances: np.ndarray   # (n,) total local variance (trace of local cov)
     outlier_masks: np.ndarray     # (n, k) bool, True = flagged as outlier
@@ -378,15 +392,41 @@ def _estimate_local_dim(eigenvalues):
 
 After computing per-point robust local tangent bases `{(U_i, eigenvalues_i)}`, align them into a global embedding via Local Tangent Space Alignment (Zhang & Zha 2004):
 
-1. For each point i, project its k neighbors onto the local tangent basis U_i (n_components top eigenvectors)
-2. Build the alignment matrix B (n x n, sparse): for each neighborhood, compute the local reconstruction that maps local coordinates back to global indices
-3. Eigendecompose B to get the d-dimensional embedding (smallest non-trivial eigenvectors)
+**Step 1: Local coordinate projection.** For each point i with neighborhood indices `I_i = {i_1, ..., i_k}`:
+- Center the neighborhood: `X_local = X[I_i] - mean(X[I_i])`
+- Project onto the top `n_components` robust eigenvectors: `Theta_i = X_local @ U_i` where `U_i` is `(d, n_components)` — the local tangent coordinates
+
+**Step 2: Build alignment matrix B** (n x n, sparse).
+For each neighborhood i:
+```python
+# Theta_i is (k, n_components) — local tangent coordinates of neighbors
+# Augment with ones column for translation invariance
+G_i = np.hstack([np.ones((k, 1)), Theta_i])    # (k, n_components + 1)
+# Local alignment: project out the span of G_i
+W_i = np.eye(k) - G_i @ np.linalg.pinv(G_i)   # (k, k) centering residual
+# Accumulate into global alignment matrix
+B[np.ix_(I_i, I_i)] += W_i
+```
+
+Use COO format for construction, convert to CSR before eigendecomposition.
+
+**Step 3: Eigendecompose B.**
+```python
+# B is (n, n), sparse, symmetric positive semi-definite
+# The smallest eigenvalue is trivially 0 (constant eigenvector) — skip it
+eigenvalues, eigenvectors = scipy.sparse.linalg.eigsh(B, k=n_components + 1, which='SM')
+# Sort ascending, skip the first (trivial) eigenvector
+embedding = eigenvectors[:, 1:n_components + 1]  # (n, n_components)
+```
 
 This is the standard LTSA algorithm but with robust local tangent spaces instead of naive PCA tangent spaces.
 
-**Implementation note:** Use `scipy.sparse.linalg.eigsh` on the alignment matrix (it's sparse and symmetric). The smallest `n_components + 1` eigenvalues correspond to the embedding; discard the trivial zero eigenvalue.
+**Transductive.** LTSA is transductive. The `transform()` / `fit_transform()` contract for `robust_local` mode follows the pattern from `gpu_phate_local.py`:
+- `fit(x)` runs the full pipeline (robust local PCA + LTSA alignment) and caches the embedding as `self._embedding`
+- `transform(x)` checks if `x` has the same shape as the training data — if so, returns the cached embedding; otherwise raises `NotImplementedError`
+- `fit_transform(x)` calls `fit(x)` and returns `self._embedding` directly (does NOT call `transform(x)`)
 
-**Transductive:** LTSA is transductive. `transform(x_new)` raises `NotImplementedError` — same pattern as other transductive modules (e.g., Leiden, ReebGraph).
+This avoids the base class `fit_transform()` → `fit()` + `transform()` failure path.
 
 ## kNN Integration
 
@@ -434,6 +474,7 @@ n_components: 2
 random_state: ${seed}
 neighborhood_size: ${neighborhood_size}
 method: robust_local
+n_neighbors: 20
 robust_method: trimmed
 support_fraction: 0.75
 trim_fraction: 0.1
@@ -514,7 +555,7 @@ def make_robust_local_pca_test_data(n=1000, noise_std=0.0,
 
 4. **test_precomputed_neighbors** — Accepts precomputed neighborhood indices and distances.
 
-5. **test_eigenvalue_spectra_shape** — `local_eigenvalues` shape is `(n, d)`, `local_bases` shape is `(n, n_components, d)`.
+5. **test_eigenvalue_spectra_shape** — `local_eigenvalues` shape is `(n, min(k, d))`. When `n_components=2`, `local_bases` shape is `(n, 2, d)`. When `n_components=None`, `local_bases` second dim is `max(local_dims)` with zero-padding.
 
 6. **test_robust_local_pca_api_integration** — Callable via `manylatents.api.run()`:
    ```python
@@ -535,9 +576,11 @@ def make_robust_local_pca_test_data(n=1000, noise_std=0.0,
 
 7. **test_outlier_diagnostics** — `extra_outputs()` returns `outlier_masks`, `condition_numbers`, `support_sizes` with correct shapes.
 
-8. **test_robust_local_pca_transform_raises** — `transform(x_new)` on unseen data raises `NotImplementedError` (transductive method).
+8. **test_robust_local_pca_transform_raises** — `transform(x_new)` on genuinely new data (different shape) raises `NotImplementedError`.
 
-9. **test_robust_local_pca_improves_lid** — Integration test: robust local eigenspectra yield LID estimates closer to true intrinsic dimension than naive, on contaminated Swiss roll.
+9. **test_robust_local_pca_fit_transform** — `fit_transform(x)` succeeds and returns the correct shape `(n, n_components)`. This is how `execute_step` invokes the module at runtime.
+
+10. **test_robust_local_pca_improves_lid** — Integration test: robust local eigenspectra yield LID estimates closer to true intrinsic dimension than naive, on contaminated Swiss roll.
 
 ## `tests/test_knn_refactor.py` (kNN backward compat)
 
