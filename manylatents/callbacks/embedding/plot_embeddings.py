@@ -1,5 +1,6 @@
 import logging
 import os
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -22,6 +23,8 @@ from manylatents.callbacks.embedding.base import (
 from manylatents.utils.plotting import resolve_colormap, merge_colormap_info
 
 logger = logging.getLogger(__name__)
+
+_MAX_CATEGORICAL_UNIQUE = 50  # auto-detect threshold for categorical vs continuous
 
 
 class PlotEmbeddings(EmbeddingCallback):
@@ -46,6 +49,7 @@ class PlotEmbeddings(EmbeddingCallback):
         figsize: tuple = (8, 6),
         label_col: str = "Population",
         legend: bool = False,
+        color_by: str = None,
         color_by_score: str = None,
         x_label: str = "Dim 1",
         y_label: str = "Dim 2",
@@ -68,8 +72,14 @@ class PlotEmbeddings(EmbeddingCallback):
             figsize: Figure size (width, height).
             label_col: Column name in metadata to use for labels (fallback).
             legend: Whether to include a legend for categorical data.
-            color_by_score: Optional key in scores to use for coloring.
-                           Metric can provide visualization hints via __viz suffix.
+            color_by: Key in the LatentOutputs dict to use for coloring.
+                     Special values:
+                       - "embeddings": color by first component of the embedding
+                         (e.g. cluster labels from Leiden, PC1 from PCA).
+                         Auto-detects categorical vs continuous.
+                       - Any other string: looked up in scores, then top-level keys.
+                       - None (default): use embeddings["label"] or dataset.get_labels().
+            color_by_score: Deprecated alias for color_by. Use color_by instead.
             x_label: Label for the x-axis.
             y_label: Label for the y-axis.
             title: Title for the plot.
@@ -88,7 +98,20 @@ class PlotEmbeddings(EmbeddingCallback):
         self.figsize = figsize
         self.label_col = label_col
         self.legend = legend
-        self.color_by_score = color_by_score
+
+        # Resolve color_by vs deprecated color_by_score
+        if color_by is not None:
+            self.color_by = color_by
+        elif color_by_score is not None:
+            warnings.warn(
+                "color_by_score is deprecated, use color_by instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self.color_by = color_by_score
+        else:
+            self.color_by = None
+
         self.x_label = x_label
         self.y_label = y_label
         self.title = title
@@ -134,9 +157,9 @@ class PlotEmbeddings(EmbeddingCallback):
         base_info = None
 
         # Check for metric-declared viz metadata in scores
-        if self.color_by_score is not None and embeddings is not None:
+        if self.color_by is not None and self.color_by != "embeddings" and embeddings is not None:
             scores = embeddings.get("scores", {})
-            viz_key = f"{self.color_by_score}__viz"
+            viz_key = f"{self.color_by}__viz"
             if viz_key in scores and isinstance(scores[viz_key], ColormapInfo):
                 base_info = scores[viz_key]
                 logger.debug(f"Using metric-declared colormap from {viz_key}")
@@ -146,9 +169,15 @@ class PlotEmbeddings(EmbeddingCallback):
             base_info = dataset.get_colormap_info()
             logger.debug("Using dataset-provided colormap via ColormapProvider")
 
-        # Fall back to defaults based on whether we're coloring by score
+        # Fall back to defaults based on color_by mode
         if base_info is None:
-            if self.color_by_score is not None:
+            if self.color_by == "embeddings":
+                # Auto-detected later in _get_color_array; default to categorical
+                # (overridden by _infer_categorical if needed)
+                base_info = ColormapInfo(
+                    cmap="viridis", label_names=None, is_categorical=True
+                )
+            elif self.color_by is not None:
                 # Default to continuous for score coloring (metric can override via __viz)
                 base_info = ColormapInfo(
                     cmap="viridis", label_names=None, is_categorical=False
@@ -197,14 +226,34 @@ class PlotEmbeddings(EmbeddingCallback):
 
         return embeddings_to_plot
 
+    @staticmethod
+    def _is_categorical(values: np.ndarray) -> bool:
+        """Auto-detect whether a 1-D array should be treated as categorical.
+
+        Returns True when every value is integer-valued (even if stored as
+        float) **and** the number of unique values is at most
+        ``_MAX_CATEGORICAL_UNIQUE``.
+        """
+        if not np.issubdtype(values.dtype, np.number):
+            return True  # string / object → always categorical
+        if np.issubdtype(values.dtype, np.integer):
+            return len(np.unique(values)) <= _MAX_CATEGORICAL_UNIQUE
+        # Float dtype: check if all values are whole numbers
+        finite = values[np.isfinite(values)]
+        if len(finite) == 0:
+            return False
+        all_integer = np.all(np.equal(np.mod(finite, 1), 0))
+        return all_integer and len(np.unique(finite)) <= _MAX_CATEGORICAL_UNIQUE
+
     def _get_color_array(self, dataset: Any, embeddings: dict) -> Optional[np.ndarray]:
         """
         Extract color array for scatter plot coloring.
 
         Resolution order:
-        1. If color_by_score is set, look in embeddings['scores'][key] or embeddings[key].
-        2. Use embeddings['label'] if available.
-        3. Fall back to dataset.get_labels().
+        1. If color_by == "embeddings", use first column of the embedding itself.
+        2. If color_by is set to another key, look in scores[key], then embeddings[key].
+        3. Use embeddings['label'] if available.
+        4. Fall back to dataset.get_labels().
 
         Args:
             dataset: Dataset object with optional get_labels() method.
@@ -215,23 +264,41 @@ class PlotEmbeddings(EmbeddingCallback):
         """
         color_array = None
 
-        if self.color_by_score is not None:
+        if self.color_by == "embeddings":
+            emb = embeddings.get("embeddings")
+            if emb is not None:
+                if hasattr(emb, "detach"):
+                    emb = emb.detach()
+                if hasattr(emb, "cpu"):
+                    emb = emb.cpu()
+                if hasattr(emb, "numpy"):
+                    emb = emb.numpy()
+                emb = np.asarray(emb)
+                color_array = emb[:, 0] if emb.ndim == 2 else emb
+                logger.info("Using embedding values (first component) for coloring.")
+            else:
+                logger.warning(
+                    "color_by='embeddings' but no embeddings found; "
+                    "falling back to label-based coloring."
+                )
+
+        elif self.color_by is not None:
             # Try to get from scores dict first
             scores = embeddings.get("scores")
             if scores is not None and isinstance(scores, dict):
-                color_array = scores.get(self.color_by_score)
+                color_array = scores.get(self.color_by)
 
             # Fall back to direct key
             if color_array is None:
-                color_array = embeddings.get(self.color_by_score)
+                color_array = embeddings.get(self.color_by)
 
             if color_array is None:
                 logger.warning(
-                    f"Coloring key '{self.color_by_score}' not found; "
+                    f"Coloring key '{self.color_by}' not found; "
                     "falling back to label-based coloring."
                 )
             else:
-                logger.info(f"Using '{self.color_by_score}' for coloring.")
+                logger.info(f"Using '{self.color_by}' for coloring.")
 
         # Label-based coloring fallback
         if color_array is None:
@@ -376,6 +443,24 @@ class PlotEmbeddings(EmbeddingCallback):
         """
         cmap_info = self._get_colormap(dataset, embeddings)
 
+        # Auto-detect categorical/continuous when coloring by embeddings
+        if (
+            self.color_by == "embeddings"
+            and self.is_categorical_override is None
+            and color_array is not None
+        ):
+            detected = self._is_categorical(color_array)
+            cmap_info = ColormapInfo(
+                cmap=cmap_info.cmap,
+                label_names=cmap_info.label_names,
+                label_format=cmap_info.label_format,
+                is_categorical=detected,
+            )
+            logger.debug(
+                f"Auto-detected color_by='embeddings' as "
+                f"{'categorical' if detected else 'continuous'}"
+            )
+
         # Resolve semantic hints to concrete colormap/labels using actual data
         cmap, label_names, is_categorical = resolve_colormap(cmap_info, color_array)
 
@@ -451,9 +536,9 @@ class PlotEmbeddings(EmbeddingCallback):
             )
 
             # Add colorbar for continuous data
-            if not cmap_info.is_categorical and self.color_by_score:
+            if not cmap_info.is_categorical and self.color_by:
                 cbar = plt.colorbar(scatter, ax=ax)
-                cbar.set_label(f"{self.color_by_score} Score")
+                cbar.set_label(f"{self.color_by} Score")
             elif self.legend and cmap_info.is_categorical and color_array is not None:
                 # Categorical with string colormap
                 self._add_categorical_legend_from_data(ax, color_array, cmap_info)

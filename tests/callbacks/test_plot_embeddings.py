@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+import warnings
 from typing import Optional
 from unittest.mock import patch, MagicMock
 
@@ -55,7 +56,7 @@ class TestPlotEmbeddingsInit:
         with tempfile.TemporaryDirectory() as tmpdir:
             callback = PlotEmbeddings(save_dir=tmpdir)
             assert callback.legend is False
-            assert callback.color_by_score is None
+            assert callback.color_by is None
             assert callback.alpha == 0.8
             assert callback.enable_wandb_upload is True
 
@@ -66,12 +67,12 @@ class TestPlotEmbeddingsInit:
                 save_dir=tmpdir,
                 legend=True,
                 alpha=0.5,
-                color_by_score="test_score",
+                color_by="test_score",
                 enable_wandb_upload=False,
             )
             assert callback.legend is True
             assert callback.alpha == 0.5
-            assert callback.color_by_score == "test_score"
+            assert callback.color_by == "test_score"
             assert callback.enable_wandb_upload is False
 
     def test_init_creates_save_dir(self):
@@ -88,7 +89,7 @@ class TestGetColormap:
     def test_metric_provided_viz_metadata(self):
         """Test that metric-provided __viz metadata is used for coloring."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            callback = PlotEmbeddings(save_dir=tmpdir, color_by_score="tangent_space")
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="tangent_space")
 
             # Simulate metric providing viz metadata via __viz key
             embeddings = {
@@ -113,7 +114,7 @@ class TestGetColormap:
     def test_continuous_score_colormap(self):
         """Test continuous score coloring returns viridis."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            callback = PlotEmbeddings(save_dir=tmpdir, color_by_score="some_metric")
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="some_metric")
             cmap_info = callback._get_colormap(MockDataset(np.array([0, 1])))
 
             assert cmap_info.cmap == "viridis"
@@ -151,7 +152,7 @@ class TestGetColormap:
         with tempfile.TemporaryDirectory() as tmpdir:
             callback = PlotEmbeddings(
                 save_dir=tmpdir,
-                color_by_score="tangent_space",
+                color_by="tangent_space",
                 cmap_override="plasma",
                 is_categorical_override=False,
             )
@@ -254,24 +255,24 @@ class TestGetColorArray:
 
             np.testing.assert_array_equal(result, [10, 20, 30])
 
-    def test_color_by_score_from_scores_dict(self):
-        """Test color_by_score retrieves from scores dict."""
+    def test_color_by_from_scores_dict(self):
+        """Test color_by retrieves from scores dict."""
         dataset = MockDataset(np.array([0, 1]))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            callback = PlotEmbeddings(save_dir=tmpdir, color_by_score="my_metric")
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="my_metric")
 
             embeddings = {"scores": {"my_metric": np.array([0.5, 0.8])}}
             result = callback._get_color_array(dataset, embeddings)
 
             np.testing.assert_array_equal(result, [0.5, 0.8])
 
-    def test_color_by_score_fallback_to_label(self):
-        """Test color_by_score falls back to label if metric not found."""
+    def test_color_by_fallback_to_label(self):
+        """Test color_by falls back to label if key not found."""
         dataset = MockDataset(np.array([0, 1]))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            callback = PlotEmbeddings(save_dir=tmpdir, color_by_score="missing_metric")
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="missing_metric")
 
             embeddings = {"label": np.array([5, 6])}
             result = callback._get_color_array(dataset, embeddings)
@@ -410,3 +411,150 @@ class TestBackwardCompatibility:
 
             assert cmap_info.cmap == {"custom": "purple"}
             assert cmap_info.label_names == {0: "Custom Label"}
+
+
+class TestColorBy:
+    """Tests for the generalized color_by parameter."""
+
+    def test_color_by_embeddings_integer_labels(self):
+        """color_by='embeddings' extracts first column as color array."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="embeddings")
+
+            embeddings = {
+                "embeddings": np.array([[0.0], [1.0], [2.0], [1.0]]),
+            }
+            result = callback._get_color_array(MockDataset(np.array([9, 9, 9, 9])), embeddings)
+
+            np.testing.assert_array_equal(result, [0.0, 1.0, 2.0, 1.0])
+
+    def test_color_by_embeddings_2d(self):
+        """color_by='embeddings' takes first column of multi-dim embeddings."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="embeddings")
+
+            embeddings = {
+                "embeddings": np.array([[10.0, 20.0], [30.0, 40.0]]),
+            }
+            result = callback._get_color_array(MockDataset(np.array([0, 1])), embeddings)
+
+            np.testing.assert_array_equal(result, [10.0, 30.0])
+
+    def test_color_by_key_in_scores(self):
+        """color_by with arbitrary key looks in scores first."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="my_metric")
+
+            embeddings = {"scores": {"my_metric": np.array([0.5, 0.8])}}
+            result = callback._get_color_array(MockDataset(np.array([0, 1])), embeddings)
+
+            np.testing.assert_array_equal(result, [0.5, 0.8])
+
+    def test_color_by_key_toplevel(self):
+        """color_by falls back to top-level key if not in scores."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by="custom_field")
+
+            embeddings = {"custom_field": np.array([1, 2, 3])}
+            result = callback._get_color_array(MockDataset(np.array([0, 0, 0])), embeddings)
+
+            np.testing.assert_array_equal(result, [1, 2, 3])
+
+    def test_color_by_none_uses_label_fallback(self):
+        """color_by=None preserves old behavior (label-based)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(save_dir=tmpdir, color_by=None)
+
+            embeddings = {"label": np.array([5, 6, 7])}
+            result = callback._get_color_array(MockDataset(np.array([0, 0, 0])), embeddings)
+
+            np.testing.assert_array_equal(result, [5, 6, 7])
+
+    def test_color_by_score_deprecated_alias(self):
+        """color_by_score triggers deprecation warning and works as color_by."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                callback = PlotEmbeddings(save_dir=tmpdir, color_by_score="my_metric")
+
+                assert len(w) == 1
+                assert issubclass(w[0].category, DeprecationWarning)
+                assert "color_by_score" in str(w[0].message)
+
+            assert callback.color_by == "my_metric"
+
+    def test_color_by_takes_precedence_over_color_by_score(self):
+        """color_by wins over color_by_score when both set."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, color_by="winner", color_by_score="loser"
+            )
+            assert callback.color_by == "winner"
+
+
+class TestIsCategorical:
+    """Tests for the _is_categorical auto-detection."""
+
+    def test_integer_few_unique(self):
+        assert PlotEmbeddings._is_categorical(np.array([0, 1, 2, 0, 1]))
+
+    def test_integer_many_unique(self):
+        assert not PlotEmbeddings._is_categorical(np.arange(100))
+
+    def test_float_whole_numbers_few_unique(self):
+        assert PlotEmbeddings._is_categorical(np.array([0.0, 1.0, 2.0, 0.0]))
+
+    def test_float_continuous(self):
+        assert not PlotEmbeddings._is_categorical(np.linspace(0, 1, 100))
+
+    def test_string_labels(self):
+        assert PlotEmbeddings._is_categorical(np.array(["a", "b", "a"]))
+
+
+class TestColorByFullPipeline:
+    """Integration tests for color_by with full plotting pipeline."""
+
+    @_disable_wandb
+    def test_color_by_embeddings_leiden_style(self):
+        """Simulates Leiden output: 1D integer cluster labels as embeddings."""
+        cluster_labels = np.array([0, 0, 1, 1, 2, 2], dtype=np.float32)
+        embeddings = {
+            "embeddings": np.column_stack([
+                np.random.randn(6),
+                np.random.randn(6),
+            ]),
+            "label": cluster_labels.astype(int),
+        }
+        # Override embeddings to be the cluster labels (as Leiden would produce
+        # before the plotting callback receives the 2D projection)
+        embeddings_with_clusters = dict(embeddings)
+        embeddings_with_clusters["embeddings"] = cluster_labels.reshape(-1, 1)
+
+        dataset = MockDataset(np.zeros(6))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, color_by="label", legend=True,
+                enable_wandb_upload=False,
+            )
+            result = callback.on_latent_end(dataset, embeddings)
+
+            assert "embedding_plot_path" in result
+            assert os.path.exists(result["embedding_plot_path"])
+
+    @_disable_wandb
+    def test_color_by_embeddings_continuous(self):
+        """Continuous embedding values: should produce a colorbar, not legend."""
+        embeddings = {
+            "embeddings": np.random.randn(20, 2),
+        }
+        dataset = MockDataset(np.zeros(20))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, color_by="embeddings",
+                enable_wandb_upload=False,
+            )
+            result = callback.on_latent_end(dataset, embeddings)
+
+            assert os.path.exists(result["embedding_plot_path"])
