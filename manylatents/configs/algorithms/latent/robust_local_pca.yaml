@@ -1,0 +1,10 @@
+_target_: manylatents.algorithms.latent.pca.PCAModule
+n_components: 2
+random_state: ${seed}
+neighborhood_size: ${neighborhood_size}
+method: robust_local
+n_neighbors: 20
+robust_method: trimmed
+support_fraction: 0.75
+trim_fraction: 0.1
+verbose: false

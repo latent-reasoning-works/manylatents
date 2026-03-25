@@ -1,3 +1,6 @@
+# Worktrees
+.worktrees/
+
 # Data and outputs (anchored to repo root so manylatents/data/ is not excluded)
 /data/
 /outputs/

@@ -1,0 +1,14 @@
+_target_: manylatents.algorithms.latent.pca.PCAModule
+n_components: 2
+random_state: ${seed}
+neighborhood_size: ${neighborhood_size}
+method: robust_ialm
+lmbda: null
+delta: null
+solver_max_iter: 100
+tol: 1.0e-7
+mu: null
+mu_max: 1.0e7
+rho: 1.5
+use_truncated_svd: true
+verbose: false
