@@ -146,7 +146,7 @@ def _metrics_table(context: str) -> str:
                 continue
 
         # Filter by on: field to match the requested context
-        on_value = inner.get("on", "")
+        on_value = inner.get("at", "")
         if on_value != context:
             continue
 
@@ -155,7 +155,7 @@ def _metrics_table(context: str) -> str:
         override = f"`metrics={config_name}`"
 
         # Extract default params
-        skip_keys = {"_target_", "_partial_", "on"}
+        skip_keys = {"_target_", "_partial_", "at"}
         params = {k: v for k, v in inner.items() if k not in skip_keys}
         param_str = ", ".join(f"{k}={v}" for k, v in params.items()) or "--"
 

@@ -3,4 +3,4 @@ knn_preservation:
   _partial_: True
   n_neighbors: 10
   metric: euclidean
-  "on": embedding
+  at: embedding

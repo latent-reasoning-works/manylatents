@@ -14,4 +14,4 @@ magnitude_dimension:
   perturb_singularities: true
   positive_magnitude: false
   exact: false
-  "on": embedding
+  at: embedding

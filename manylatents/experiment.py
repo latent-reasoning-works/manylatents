@@ -163,14 +163,14 @@ def extract_k_requirements(metrics) -> dict:
 
     Returns:
         Dict with keys:
-            knn: dict mapping on_value -> set of k values needed
+            knn: dict mapping at_value -> set of k values needed
             spectral: whether eigendecomposition is needed
     """
     knn: dict[str, set[int]] = {}
     spectral = False
 
     if isinstance(metrics, list):
-        # Registry path -- no ``on`` field, assume embedding
+        # Registry path -- no ``at`` field, assume embedding
         import inspect
         from manylatents.metrics.registry import get_metric
 
@@ -194,12 +194,12 @@ def extract_k_requirements(metrics) -> dict:
                 knn.setdefault("embedding", set()).add(k_val)
 
     else:
-        # DictConfig path -- use ``on`` field for routing
+        # DictConfig path -- use ``at`` field for routing
         for metric_name, metric_cfg in metrics.items():
-            on_value = getattr(metric_cfg, "on", "embedding")
+            at_value = getattr(metric_cfg, "at", "embedding")
 
             # Module metrics need eigendecomposition
-            if on_value == "module":
+            if at_value == "module":
                 spectral = True
 
             # Extract k value
@@ -212,7 +212,7 @@ def extract_k_requirements(metrics) -> dict:
                         break
 
             if k_val is not None:
-                knn.setdefault(on_value, set()).add(k_val)
+                knn.setdefault(at_value, set()).add(k_val)
 
     return {"knn": knn, "spectral": spectral}
 
@@ -228,7 +228,7 @@ def prewarm_cache(
 ) -> dict:
     """Pre-compute kNN and eigenvalues based on metric requirements.
 
-    Uses the ``on`` field from each metric config to determine which data
+    Uses the ``at`` field from each metric config to determine which data
     source needs kNN pre-computation.
 
     Args:
@@ -239,7 +239,7 @@ def prewarm_cache(
         module: Optional fitted LatentModule.
         knn_cache_dir: Optional directory for disk-persisted dataset kNN.
         cache: Optional pre-existing cache dict. Created if None.
-        outputs: Optional dict mapping on_value -> data arrays, built by
+        outputs: Optional dict mapping at_value -> data arrays, built by
             evaluate_outputs. Allows prewarming for any ``on`` value.
 
     Returns:
@@ -249,21 +249,21 @@ def prewarm_cache(
     if cache is None:
         cache = {}
 
-    # kNN for each on_value that has requirements
-    for on_value, k_set in reqs["knn"].items():
+    # kNN for each at_value that has requirements
+    for at_value, k_set in reqs["knn"].items():
         data = None
-        if outputs and on_value in outputs:
-            data = outputs[on_value]
-        elif on_value == "embedding":
+        if outputs and at_value in outputs:
+            data = outputs[at_value]
+        elif at_value == "embedding":
             data = embeddings
-        elif on_value == "dataset" and dataset is not None and hasattr(dataset, "data"):
+        elif at_value == "dataset" and dataset is not None and hasattr(dataset, "data"):
             data = dataset.data
 
         if data is not None and k_set:
             max_k = max(k_set)
 
             # Disk cache for dataset kNN
-            if on_value == "dataset" and knn_cache_dir is not None:
+            if at_value == "dataset" and knn_cache_dir is not None:
                 content_hash = _content_key(data)
                 from pathlib import Path
                 npz_path = Path(knn_cache_dir) / "knn" / f"{content_hash}_k{max_k}.npz"
@@ -273,11 +273,11 @@ def prewarm_cache(
                     logger.info(f"Loaded dataset kNN from disk cache: {npz_path}")
                     continue
 
-            logger.info(f"Pre-warming cache: {on_value} kNN with max_k={max_k}")
+            logger.info(f"Pre-warming cache: {at_value} kNN with max_k={max_k}")
             compute_knn(data, k=max_k, cache=cache)
 
             # Save dataset kNN to disk cache
-            if on_value == "dataset" and knn_cache_dir is not None:
+            if at_value == "dataset" and knn_cache_dir is not None:
                 content_hash = _content_key(data)
                 from pathlib import Path
                 knn_dir = Path(knn_cache_dir) / "knn"
@@ -329,21 +329,9 @@ def evaluate_outputs(
 
     logger.info(f"Reference data shape: {ds.data.shape}")
 
-    # --- Post-fit sampling (optional, top-level cfg.sampling) ---
-    sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
-    if sampling_cfg is not None and "embedding" in sampling_cfg:
-        emb_sampler = hydra.utils.instantiate(sampling_cfg["embedding"])
-        sample_indices = emb_sampler.get_indices(embeddings)
-        embeddings = embeddings[sample_indices]
-        # Slice dataset to same indices for cross-space metrics
-        if hasattr(ds, 'data'):
-            from manylatents.utils.sampling import _subsample_dataset_metadata
-            ds = _subsample_dataset_metadata(ds, sample_indices)
-        logger.info(f"Post-fit sampling: {len(sample_indices)} samples using {type(emb_sampler).__name__}")
-
     module = kwargs.get("module", None)
 
-    # Build outputs dict -- maps on_value to data
+    # Build outputs dict — maps output names to data
     outputs: dict[str, Any] = {}
     outputs["dataset"] = ds.data if hasattr(ds, "data") else None
     outputs["embedding"] = embeddings
@@ -351,6 +339,24 @@ def evaluate_outputs(
         outputs["module"] = module
         for key, val in module.extra_outputs().items():
             outputs[key] = val
+
+    # --- Post-fit sampling: dynamic over outputs dict ---
+    sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
+    if sampling_cfg is not None:
+        for output_name, sampler_cfg in sampling_cfg.items():
+            if output_name == "dataset":
+                continue  # pre-fit sampling handled in run_algorithm()
+            if output_name not in outputs or not isinstance(outputs[output_name], np.ndarray):
+                continue
+            sampler = hydra.utils.instantiate(sampler_cfg)
+            sample_indices = sampler.get_indices(outputs[output_name])
+            outputs[output_name] = outputs[output_name][sample_indices]
+            logger.info(f"Post-fit sampling on '{output_name}': {len(sample_indices)} samples using {type(sampler).__name__}")
+        # If embedding was sampled, slice dataset to matching indices for cross-space metrics
+        if "embedding" in sampling_cfg and hasattr(ds, 'data'):
+            from manylatents.utils.sampling import _subsample_dataset_metadata
+            ds = _subsample_dataset_metadata(ds, sample_indices)
+            outputs["dataset"] = ds.data
 
     # Log dataset capabilities
     from manylatents.data.capabilities import log_capabilities
@@ -370,23 +376,23 @@ def evaluate_outputs(
         # Read and pop 'on' before instantiation so it is not passed to the
         # metric function as a keyword argument.
         cfg_copy = _copy.deepcopy(metric_cfg)
-        on_value = getattr(cfg_copy, "on", "embedding")  # default for safety
-        if hasattr(cfg_copy, "on"):
+        at_value = getattr(cfg_copy, "at", "embedding")  # default for safety
+        if hasattr(cfg_copy, "at"):
             try:
-                delattr(cfg_copy, "on")
+                delattr(cfg_copy, "at")
             except Exception:
                 pass  # read-only struct flags -- safe to ignore
 
         # Resolve primary data from outputs dict
-        if on_value == "module":
+        if at_value == "module":
             # Module metrics don't substitute the embeddings kwarg
             primary_data = None
         else:
-            primary_data = outputs.get(on_value)
+            primary_data = outputs.get(at_value)
             if primary_data is None:
                 algo_name = type(module).__name__ if module else "unknown"
                 logger.warning(
-                    f"Skipping metric '{metric_name}': output '{on_value}' "
+                    f"Skipping metric '{metric_name}': output '{at_value}' "
                     f"not available from {algo_name}. "
                     f"Check that the algorithm produces this output."
                 )

@@ -47,6 +47,7 @@ class SamplingStrategy(Protocol):
         n_samples: Optional[int] = None,
         fraction: Optional[float] = None,
         seed: Optional[int] = None,
+        **kwargs,
     ) -> np.ndarray:
         """
         Compute sample indices from data or a total count.
@@ -57,6 +58,8 @@ class SamplingStrategy(Protocol):
             n_samples: Absolute number of samples to take.
             fraction: Fraction of samples to take.
             seed: Random seed for reproducibility.
+            **kwargs: Reserved for future complex samplers (e.g. cache,
+                outputs, module for diffusion condensation sampling).
 
         Returns:
             Sorted array of selected indices.

@@ -7,4 +7,4 @@ diffusion_condensation:
   decay: 40
   n_pca: 50
   output_mode: "stable"
-  "on": embedding
+  at: embedding

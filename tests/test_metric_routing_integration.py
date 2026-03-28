@@ -45,7 +45,7 @@ def test_cli_single_metric():
                 "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
                 "_partial_": True,
                 "n_neighbors": 5,
-                "on": "embedding",
+                "at": "embedding",
             }
         },
     )
@@ -67,14 +67,14 @@ def test_on_sweep_produces_two_evaluations():
                 "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
                 "_partial_": True,
                 "k": 10,
-                "on": ["embedding", "dataset"],
+                "at": ["embedding", "dataset"],
             }
         },
     )
     scores = result["scores"]
-    # flatten_and_unroll_metrics produces keys like lid__on_embedding, lid__on_dataset
-    assert any("on_embedding" in k for k in scores), f"No on_embedding key in {list(scores)}"
-    assert any("on_dataset" in k for k in scores), f"No on_dataset key in {list(scores)}"
+    # flatten_and_unroll_metrics produces keys like lid__at_embedding, lid__at_dataset
+    assert any("at_embedding" in k for k in scores), f"No at_embedding key in {list(scores)}"
+    assert any("at_dataset" in k for k in scores), f"No at_dataset key in {list(scores)}"
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ def test_on_module_routes_to_module_metrics():
             "spectral_gap_ratio": {
                 "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
                 "_partial_": True,
-                "on": "module",
+                "at": "module",
             }
         },
     )
@@ -114,7 +114,7 @@ def test_on_missing_output_skips_with_warning(caplog):
                 "spectral_gap": {
                     "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
                     "_partial_": True,
-                    "on": "adjacency",
+                    "at": "adjacency",
                 }
             },
         )
@@ -138,7 +138,7 @@ def test_sampling_dataset_reduces_data_before_fit():
                 "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
                 "_partial_": True,
                 "k": 5,
-                "on": "embedding",
+                "at": "embedding",
             }
         },
         sampling={
@@ -170,7 +170,7 @@ def test_sampling_embedding_reduces_for_eval():
                 "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
                 "_partial_": True,
                 "n_neighbors": 5,
-                "on": "embedding",
+                "at": "embedding",
             }
         },
         sampling={
@@ -211,12 +211,12 @@ def test_cache_isolation_across_on_values():
         "emb_metric": OmegaConf.create({
             "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
             "n_neighbors": 10,
-            "on": "embedding",
+            "at": "embedding",
         }),
         "data_metric": OmegaConf.create({
             "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
             "n_neighbors": 10,
-            "on": "dataset",
+            "at": "dataset",
         }),
     }
     outputs = {"embedding": emb, "dataset": data}
@@ -261,7 +261,7 @@ def test_result_keys_have_no_group_prefix():
                 "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
                 "_partial_": True,
                 "n_neighbors": 5,
-                "on": "embedding",
+                "at": "embedding",
             }
         },
     )

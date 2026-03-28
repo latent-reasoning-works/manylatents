@@ -104,7 +104,7 @@ def test_disk_cache_roundtrip(sample_data, tmp_path):
         "trustworthiness": SimpleNamespace(
             _target_="manylatents.metrics.trustworthiness.Trustworthiness",
             n_neighbors=10,
-            on="dataset",
+            at="dataset",
         ),
     }
     dataset = SimpleNamespace(data=sample_data)

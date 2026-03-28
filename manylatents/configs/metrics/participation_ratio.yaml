@@ -3,4 +3,4 @@ participation_ratio:
   _partial_: True
   n_neighbors: 25
   return_per_sample: True
-  "on": embedding
+  at: embedding

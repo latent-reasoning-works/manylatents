@@ -33,12 +33,12 @@ def test_extract_k_requirements_embedding_metrics():
         "trustworthiness": {
             "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
             "n_neighbors": 25,
-            "on": "embedding",
+            "at": "embedding",
         },
         "lid": {
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 10,
-            "on": "embedding",
+            "at": "embedding",
         },
     })
     reqs = extract_k_requirements(cfgs)
@@ -52,7 +52,7 @@ def test_extract_k_requirements_data_metrics():
         "knn_preservation": {
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
             "n_neighbors": 15,
-            "on": "dataset",
+            "at": "dataset",
         },
     })
     reqs = extract_k_requirements(cfgs)
@@ -64,7 +64,7 @@ def test_extract_k_requirements_spectral():
     cfgs = _make_metric_cfgs({
         "spectral_gap_ratio": {
             "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
-            "on": "module",
+            "at": "module",
         },
     })
     reqs = extract_k_requirements(cfgs)
@@ -93,7 +93,7 @@ def test_prewarm_cache_populates():
         "knn_preservation": {
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
             "n_neighbors": 10,
-            "on": "embedding",
+            "at": "embedding",
         },
     })
     cache = prewarm_cache(cfgs, emb, ds)
@@ -112,12 +112,12 @@ def test_prewarm_cache_uses_max_k():
         "lid": {
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 5,
-            "on": "embedding",
+            "at": "embedding",
         },
         "lid_large": {
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 20,
-            "on": "embedding",
+            "at": "embedding",
         },
     })
     cache = prewarm_cache(cfgs, emb, FakeDataset())
@@ -142,7 +142,7 @@ def test_prewarm_cache_spectral():
     cfgs = _make_metric_cfgs({
         "spectral_gap_ratio": {
             "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
-            "on": "module",
+            "at": "module",
         },
     })
     cache = prewarm_cache(cfgs, emb, FakeDataset(), module=FakeModule())
@@ -162,7 +162,7 @@ def test_prewarm_cache_no_data_attribute():
         "lid": {
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 5,
-            "on": "embedding",
+            "at": "embedding",
         },
     })
     cache = prewarm_cache(cfgs, emb, NoDataDataset())

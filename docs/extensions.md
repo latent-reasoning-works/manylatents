@@ -494,7 +494,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
       _partial_: true  # CRITICAL: deferred parameter binding
       threshold: 0.5
       return_per_sample: false
-      on: dataset
+      at: dataset
     ```
 
     ### Experiment Config

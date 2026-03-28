@@ -6,4 +6,4 @@ persistent_homology:
   _partial_: True
   homology_dim: 0  # beta_0 = connected components
   persistence_threshold: 3.0  # Override via multirun: ...threshold=0.5,1.0,3.0,5.0,10.0
-  "on": embedding
+  at: embedding

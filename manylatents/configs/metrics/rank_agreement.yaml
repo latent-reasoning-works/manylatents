@@ -3,4 +3,4 @@ rank_agreement:
   _partial_: True
   k: 20
   metric_fn: lid
-  "on": embedding
+  at: embedding

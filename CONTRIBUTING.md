@@ -62,11 +62,11 @@ def YourMetric(
 
 **Return types:** `float`, `tuple[float, np.ndarray]` (scalar + per-sample), or `dict[str, Any]` (structured).
 
-**Evaluation context** is declared via the `on:` field in the config:
+**Evaluation context** is declared via the `at:` field in the config:
 
-- Only needs original data? → `on: dataset`
-- Compares original vs. reduced? → `on: embedding`
-- Needs algorithm internals (graph, kernel)? → `on: module`
+- Only needs original data? → `at: dataset`
+- Compares original vs. reduced? → `at: embedding`
+- Needs algorithm internals (graph, kernel)? → `at: module`
 
 ### Step 2: Register It
 
@@ -82,10 +82,10 @@ your_metric:
   _target_: manylatents.metrics.your_metric.YourMetric
   _partial_: True
   k: 25
-  on: embedding
+  at: embedding
 ```
 
-Configs are **nested under the metric name** with `_partial_: True` and an `on:` field declaring the evaluation context. Hydra binds the params at config time and the engine calls it with `embeddings`, `dataset`, `module`, and `cache` at runtime.
+Configs are **nested under the metric name** with `_partial_: True` and an `at:` field declaring the evaluation context. Hydra binds the params at config time and the engine calls it with `embeddings`, `dataset`, `module`, and `cache` at runtime.
 
 ### Step 4: E2E Smoke Test
 

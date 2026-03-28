@@ -108,13 +108,13 @@ ls manylatents/configs/cluster/             # cluster profiles
 
 For registered metrics: `uv run python -c "from manylatents.metrics import list_metrics; print(list_metrics())"`
 
-Metric configs use `_partial_: True` with an `on:` field indicating evaluation context:
+Metric configs use `_partial_: True` with an `at:` field indicating evaluation context:
 ```yaml
 trustworthiness:
   _target_: manylatents.metrics.trustworthiness.Trustworthiness
   _partial_: True
   n_neighbors: 25
-  on: embedding
+  at: embedding
 ```
 
 **Metric parameter sweeps use `flatten_and_unroll_metrics()`.** To sweep a metric parameter (e.g. `k`), set it to a list in the config — `flatten_and_unroll_metrics` does Cartesian expansion automatically. Never create separate YAML files per parameter value.
@@ -128,7 +128,7 @@ local_intrinsic_dimensionality:
 
 ## Adding New Components
 
-**New metric**: wrapper function → `@register_metric` decorator → config YAML in `configs/metrics/<name>.yaml` (flat, with `on:` field) → import in `__init__.py` → CI smoke test.
+**New metric**: wrapper function → `@register_metric` decorator → config YAML in `configs/metrics/<name>.yaml` (flat, with `at:` field) → import in `__init__.py` → CI smoke test.
 See `CONTRIBUTING.md` for the full 4-step pipeline.
 
 **New LatentModule** — there are exactly 4 files to touch:

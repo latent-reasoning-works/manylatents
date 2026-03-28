@@ -2,4 +2,4 @@ fractal_dimension:
   _target_: manylatents.metrics.fractal_dimension.FractalDimension
   _partial_: True
   n_box_sizes: 10
-  "on": embedding
+  at: embedding

@@ -3,4 +3,4 @@ alignment_score:
   _partial_: True
   k: 20
   method: jaccard
-  "on": embedding
+  at: embedding

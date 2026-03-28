@@ -1,4 +1,4 @@
 auc:
   _target_: manylatents.metrics.auc.AUC
   _partial_: True
-  "on": embedding
+  at: embedding

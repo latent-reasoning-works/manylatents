@@ -147,7 +147,7 @@ All metrics share a `cache` dict for deduplicated kNN computation.
 List-valued parameters expand via `flatten_and_unroll_metrics()` --
 one kNN computation covers the entire sweep.
 
-Config pattern: `metrics=<name>` (each metric config has an `on:` field for evaluation context)
+Config pattern: `metrics=<name>` (each metric config has an `at:` field for evaluation context)
 
 ---
 

@@ -3,4 +3,4 @@ trustworthiness:
   _partial_: True
   n_neighbors: [15,25,50,100,250]
   metric: euclidean
-  "on": embedding
+  at: embedding

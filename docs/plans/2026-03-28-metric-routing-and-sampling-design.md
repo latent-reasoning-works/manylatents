@@ -20,7 +20,7 @@ These are the same problem: metrics and sampling need to be pointable at any dat
 
 ### Core Concept
 
-Every metric config has a required `on` field that names which pipeline output it evaluates on. Sampling is keyed by the same output names. Cache prewarming is derived from `on` values, not hardcoded lists.
+Every metric config has a required `at` field that names which pipeline output it evaluates on. Sampling is keyed by the same output names. Cache prewarming is derived from `at` values, not hardcoded lists.
 
 ### Pipeline Outputs
 
@@ -40,7 +40,7 @@ if module is not None:
 
 Output keys use short normalized names: `affinity`, `kernel`, `adjacency` (not `affinity_matrix`). The `LatentModule.extra_outputs()` method and its callers are updated to use these short names. This is a protocol-level convention documented on the base class.
 
-### The `on` Field
+### The `at` Field
 
 Every metric config must include `on: <output_name>`. This is the routing directive — it names which pipeline output the metric evaluates on.
 
@@ -50,23 +50,23 @@ trustworthiness:
   _target_: manylatents.metrics.trustworthiness.Trustworthiness
   _partial_: True
   n_neighbors: 5
-  on: embedding
+  at: embedding
 
 # configs/metrics/dse_knn.yaml
 dse_knn:
   _target_: manylatents.metrics.diffusion_spectral_entropy.DiffusionSpectralEntropy
   _partial_: True
-  on: embedding
+  at: embedding
   k: ${neighborhood_size}
 ```
 
-Valid `on` values: `embedding`, `dataset`, `module`, plus any key produced by `module.extra_outputs()` (`affinity`, `kernel`, `adjacency`).
+Valid `at` values: `embedding`, `dataset`, `module`, plus any key produced by `module.extra_outputs()` (`affinity`, `kernel`, `adjacency`).
 
-For `on: embedding` and `on: dataset`, the resolved array goes into the metric's `embeddings` kwarg as the primary evaluation data. For `on: module`, the metric receives the fitted module via the `module` kwarg — no array substitution (module-level metrics access internal state like affinity matrices through the module's methods). Cache prewarming adapts accordingly: kNN for array-valued outputs, eigenvalue decomposition for module.
+For `at: embedding` and `at: dataset`, the resolved array goes into the metric's `embeddings` kwarg as the primary evaluation data. For `at: module`, the metric receives the fitted module via the `module` kwarg — no array substitution (module-level metrics access internal state like affinity matrices through the module's methods). Cache prewarming adapts accordingly: kNN for array-valued outputs, eigenvalue decomposition for module.
 
-#### Sweeping `on`
+#### Sweeping `at`
 
-`on` participates in `flatten_and_unroll_metrics()` sweep expansion like any other list-valued field:
+`at` participates in `flatten_and_unroll_metrics()` sweep expansion like any other list-valued field:
 
 ```yaml
 dse_both_spaces:
@@ -82,16 +82,16 @@ This produces two evaluations: `dse_both_spaces__on_embedding` and `dse_both_spa
 
 For each metric:
 
-1. Read `on` from config (required field — error if missing)
+1. Read `at` from config (required field — error if missing)
 2. Resolve the output:
-   - `on: embedding` or `on: dataset` → resolve `outputs[on_value]` to an array, pass as `embeddings` kwarg
-   - `on: module` → no array substitution; metric accesses module internals via `module` kwarg
-   - `on: affinity`, `on: kernel`, etc. → resolve from `outputs` dict (populated by `module.extra_outputs()`)
-3. If the output doesn't exist (e.g., `on: affinity` against PCA), **skip with loud warning**: `logger.warning(f"Skipping metric '{metric_name}': output '{on_value}' not available from {type(module).__name__}. Check that the algorithm produces this output.")`
-4. Pop `on` from a config copy before `hydra.utils.instantiate()` so it doesn't leak into metric kwargs
+   - `at: embedding` or `at: dataset` → resolve `outputs[at_value]` to an array, pass as `embeddings` kwarg
+   - `at: module` → no array substitution; metric accesses module internals via `module` kwarg
+   - `at: affinity`, `at: kernel`, etc. → resolve from `outputs` dict (populated by `module.extra_outputs()`)
+3. If the output doesn't exist (e.g., `at: affinity` against PCA), **skip with loud warning**: `logger.warning(f"Skipping metric '{metric_name}': output '{at_value}' not available from {type(module).__name__}. Check that the algorithm produces this output.")`
+4. Pop `at` from a config copy before `hydra.utils.instantiate()` so it doesn't leak into metric kwargs
 5. Call the metric with the standard signature — `metric_fn(embeddings=..., dataset=..., module=..., cache=...)` — unchanged
 
-The `on` field determines:
+The `at` field determines:
 - Which data is primary for the metric (array outputs → `embeddings` kwarg; module → `module` kwarg)
 - Which cache entries to prewarm (kNN for array outputs, eigenvalues for module)
 - Which sampling indices apply
@@ -128,7 +128,7 @@ Post-fit sampling (`sampling.embedding`) remains in `evaluate_outputs()`, applie
 
 #### Config Structure
 
-Sampling moves from `configs/metrics/sampling/` to a top-level `configs/sampling/` config group. Keyed by output names — same vocabulary as `on`:
+Sampling moves from `configs/metrics/sampling/` to a top-level `configs/sampling/` config group. Keyed by output names — same vocabulary as `at`:
 
 ```yaml
 # configs/sampling/balanced.yaml
@@ -194,16 +194,16 @@ Delete `_DATA_KNN_METRICS` and `_SPECTRAL_METRICS` frozensets.
 
 Rewrite `extract_k_requirements()`:
 
-1. For each metric, read its `on` value (required)
+1. For each metric, read its `at` value (required)
 2. Extract `k`/`n_neighbors` from the config (existing logic, unchanged)
-3. Group k requirements by `on` value — not by hardcoded target string
-4. Return `{on_value: set_of_k_values}` for array-valued outputs, plus `spectral: True` if any metric has `on: module`
+3. Group k requirements by `at` value — not by hardcoded target string
+4. Return `{at_value: set_of_k_values}` for array-valued outputs, plus `spectral: True` if any metric has `at: module`
 
 `prewarm_cache()` iterates the requirements dict:
 
 ```python
-for on_value, k_set in requirements.items():
-    data = outputs.get(on_value)
+for at_value, k_set in requirements.items():
+    data = outputs.get(at_value)
     if data is not None and k_set:
         max_k = max(k_set)
         compute_knn(data, k=max_k, cache=cache)
@@ -211,7 +211,7 @@ for on_value, k_set in requirements.items():
 
 No special casing by name. If a new output type needs kNN, it gets kNN — because a metric pointed at it and requested a k value.
 
-Eigenvalue prewarming follows the same pattern: if any metric's `on` value resolves to `module` and the module is available, prewarm eigenvalues. No target-string matching — the `on` value alone drives it.
+Eigenvalue prewarming follows the same pattern: if any metric's `at` value resolves to `module` and the module is available, prewarm eigenvalues. No target-string matching — the `at` value alone drives it.
 
 ### Output Naming Convention
 
@@ -229,14 +229,14 @@ The base class documents the convention. Subclasses that override `extra_outputs
 
 This is a **breaking change** to config structure. All metric configs are rewritten.
 
-- **Metric configs:** Moved from 3 subdirectories to flat `configs/metrics/`. Every config gets explicit `on:` field. Old `metrics/embedding=X` CLI syntax stops working; replaced by `metrics=X`.
-- **`input_space` param on DSE:** Removed. Replaced by `on:` field.
+- **Metric configs:** Moved from 3 subdirectories to flat `configs/metrics/`. Every config gets explicit `at:` field. Old `metrics/embedding=X` CLI syntax stops working; replaced by `metrics=X`.
+- **`input_space` param on DSE:** Removed. Replaced by `at:` field.
 - **Sampling configs:** Moved from `configs/metrics/sampling/` to `configs/sampling/`.
 - **Metric signature:** Unchanged. `fn(embeddings, dataset, module, cache)` is the protocol.
 - **Result key format:** Changes from `group.metric_name` to `metric_name` (no group prefix, since groups are gone). Sweep suffixes unchanged (`metric__param_value`).
 - **`evaluate_metrics()` (Hydra-free path):** Unchanged. Programmatic callers pass explicit arrays and metric names. No routing needed.
 - **`run_pipeline()`:** Removed. Multi-step workflows use the Python API or sequential CLI runs from precomputed embeddings.
-- **Duplicate configs removed:** `dataset/dse_knn.yaml` and `embedding/dse_knn.yaml` collapse to one `dse_knn.yaml` with `on: embedding`. For DSE on dataset space, use `on: dataset` override or `on: [embedding, dataset]` sweep.
+- **Duplicate configs removed:** `dataset/dse_knn.yaml` and `embedding/dse_knn.yaml` collapse to one `dse_knn.yaml` with `at: embedding`. For DSE on dataset space, use `at: dataset` override or `on: [embedding, dataset]` sweep.
 
 ### Validation
 
@@ -260,7 +260,7 @@ result = run(
         "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
         "_partial_": True,
         "n_neighbors": 5,
-        "on": "embedding",
+        at: "embedding",
     }},
     sampling={"embedding": {
         "_target_": "manylatents.utils.sampling.RandomSampling",
@@ -273,19 +273,19 @@ Both paths go through `evaluate_outputs()` and must produce the same scores for 
 
 ### Config Structure (Final)
 
-The 3 metric subdirectories are removed. All metrics live in a flat `configs/metrics/` directory. Every metric config has an explicit `on:` field. Hydra composition uses the single `metrics` config group.
+The 3 metric subdirectories are removed. All metrics live in a flat `configs/metrics/` directory. Every metric config has an explicit `at:` field. Hydra composition uses the single `metrics` config group.
 
 ```
 configs/
   metrics/
     null.yaml
     noop.yaml
-    trustworthiness.yaml       # on: embedding
-    continuity.yaml            # on: embedding
-    knn_preservation.yaml      # on: embedding
-    dse_knn.yaml               # on: embedding (default)
-    spectral_gap_ratio.yaml    # on: module
-    geodesic_distance_correlation.yaml  # on: dataset
+    trustworthiness.yaml       # at: embedding
+    continuity.yaml            # at: embedding
+    knn_preservation.yaml      # at: embedding
+    dse_knn.yaml               # at: embedding (default)
+    spectral_gap_ratio.yaml    # at: module
+    geodesic_distance_correlation.yaml  # at: dataset
     ...
   sampling/                    # NEW top-level config group
     balanced.yaml
@@ -302,7 +302,7 @@ trustworthiness:
   _target_: manylatents.metrics.trustworthiness.Trustworthiness
   _partial_: True
   n_neighbors: 5
-  on: embedding
+  at: embedding
 
 # configs/metrics/standard.yaml (bundle)
 defaults:
@@ -326,7 +326,7 @@ uv run python -m manylatents.main metrics=standard data=swissroll algorithms/lat
 uv run python -m manylatents.main metrics=standard metrics.trustworthiness.n_neighbors=25
 ```
 
-Bundles replace the old 3-subdirectory composition model. Unlike the old structure, a single bundle can mix metrics from any `on` target (embedding, dataset, module) — no need to compose across subgroups.
+Bundles replace the old 3-subdirectory composition model. Unlike the old structure, a single bundle can mix metrics from any `at` target (embedding, dataset, module) — no need to compose across subgroups.
 
 `flatten_and_unroll_metrics()` simplifies from two-level iteration (group → metric) to single-level:
 
@@ -380,10 +380,10 @@ pipeline: []
 ## Scope
 
 - `run_algorithm()` in experiment.py: full redesign of metric routing, sampling, and cache prewarming
-- `evaluate_outputs()`: rewritten to use `on` field routing and per-output sampling
-- `flatten_and_unroll_metrics()`: rewritten for flat config structure, `on` as sweepable field
-- `extract_k_requirements()` and `prewarm_cache()`: rewritten to derive from `on` values
-- All ~50 metric configs: rewritten as flat files with explicit `on:` field
+- `evaluate_outputs()`: rewritten to use `at` field routing and per-output sampling
+- `flatten_and_unroll_metrics()`: rewritten for flat config structure, `at` as sweepable field
+- `extract_k_requirements()` and `prewarm_cache()`: rewritten to derive from `at` values
+- All ~50 metric configs: rewritten as flat files with explicit `at:` field
 - Sampling configs: moved to top-level `configs/sampling/`
 - `run_pipeline()`: removed (multi-step via API or sequential CLI)
 - `config.yaml`: simplified (single `metrics` group, new `sampling` group)
@@ -391,11 +391,11 @@ pipeline: []
 
 ## Known Tension
 
-The metric protocol signature uses `embeddings` as the parameter name for primary data. Under routing, this parameter receives whatever `on` points to — which might be `dataset.data` or an `affinity` matrix, not embeddings. The name becomes misleading but the function works. Option 1 (accept the misnomer) was chosen for the initial implementation.
+The metric protocol signature uses `embeddings` as the parameter name for primary data. Under routing, this parameter receives whatever `at` points to — which might be `dataset.data` or an `affinity` matrix, not embeddings. The name becomes misleading but the function works. Option 1 (accept the misnomer) was chosen for the initial implementation.
 
 ## Asymmetry: Metric Routing vs Sampling
 
-Metric routing via `"on"` is fully dynamic — any key in the `outputs` dict is a valid target, and new outputs are automatically available via `module.extra_outputs()`.
+Metric routing via `at` is fully dynamic — any key in the `outputs` dict is a valid target, and new outputs are automatically available via `module.extra_outputs()`.
 
 Sampling is NOT dynamic. It has two fixed integration points hardcoded in the pipeline:
 
@@ -434,11 +434,11 @@ Standalone. No dependency on other commits.
 - Implement on `StratifiedSampling`, `FarthestPointSampling`, `FixedIndexSampling` (already exists on `RandomSampling`)
 - Unit tests for each implementation
 
-### Commit 4: Rewrite metric configs — flat structure with `on` field
+### Commit 4: Rewrite metric configs — flat structure with `at` field
 The big config change. Tests break until evaluate_outputs catches up (commit 5).
 - Move all ~50 metric configs from `embedding/`, `dataset/`, `module/` to flat `configs/metrics/`
-- Add explicit `on:` field to every config
-- Remove duplicate configs (e.g., `dataset/dse_knn.yaml` — collapsed into `dse_knn.yaml` with `on: embedding`)
+- Add explicit `at:` field to every config
+- Remove duplicate configs (e.g., `dataset/dse_knn.yaml` — collapsed into `dse_knn.yaml` with `at: embedding`)
 - Create bundle configs: `standard.yaml`, `noop.yaml` (updated), `null.yaml` (updated)
 - Delete `configs/metrics/embedding/`, `configs/metrics/dataset/`, `configs/metrics/module/` directories and their `__init__.py` files
 - Delete `configs/metrics/default.yaml`
@@ -449,11 +449,11 @@ The big config change. Tests break until evaluate_outputs catches up (commit 5).
 
 ### Commit 5: Rewrite `evaluate_outputs()` and cache prewarming
 Core routing change. Depends on commit 4.
-- Rewrite `flatten_and_unroll_metrics()` for single-level iteration, `on` as sweepable field
-- Rewrite `evaluate_outputs()`: build `outputs` dict, route metrics by `on` value, pop `on` before instantiation, loud skip on missing output
+- Rewrite `flatten_and_unroll_metrics()` for single-level iteration, `at` as sweepable field
+- Rewrite `evaluate_outputs()`: build `outputs` dict, route metrics by `at` value, pop `at` before instantiation, loud skip on missing output
 - Delete `_DATA_KNN_METRICS` and `_SPECTRAL_METRICS` frozensets
-- Rewrite `extract_k_requirements()`: group by `on` value, derive cache needs from config
-- Rewrite `prewarm_cache()`: iterate per-output kNN requirements, eigenvalue prewarming for `on: module`
+- Rewrite `extract_k_requirements()`: group by `at` value, derive cache needs from config
+- Rewrite `prewarm_cache()`: iterate per-output kNN requirements, eigenvalue prewarming for `at: module`
 
 ### Commit 6: Sampling config migration and pre-fit sampling
 Depends on commits 3 and 5.
@@ -461,13 +461,13 @@ Depends on commits 3 and 5.
 - Add `- optional sampling: null` to `config.yaml`
 - Implement pre-fit sampling in `run_algorithm()` (between tensor extraction and execute_step)
 - Update `evaluate_outputs()` to read sampling from `cfg.sampling` instead of `cfg.metrics.sampling`
-- Index propagation: embedding indices applied to dataset for cross-space metrics
+- Index propagatiat: embedding indices applied to dataset for cross-space metrics
 
 ### Commit 7: Update docs, CI, tests
 Depends on all previous commits.
 - Update CLAUDE.md: CLI examples, config directory listings
 - Update README.md: CLI examples, config patterns
-- Update CONTRIBUTING.md: new metric guide with `on:` field
+- Update CONTRIBUTING.md: new metric guide with `at:` field
 - Update `docs/metrics.md`, `docs/testing.md`, `docs/extensions.md`
 - Rewrite `docs/macros.py` `_metrics_table()` for flat structure
 - Rewrite `scripts/check_docs_coverage.py` for flat structure
@@ -479,14 +479,14 @@ Depends on all previous commits.
 ### Commit 8: Integration tests — CLI + API parity
 Final validation. Depends on all previous commits.
 - Test: CLI `metrics=trustworthiness` produces correct scores
-- Test: API `run(metrics={"trustworthiness": {..., "on": "embedding"}})` produces same scores
+- Test: API `run(metrics={"trustworthiness": {..., at: "embedding"}})` produces same scores
 - Test: `on: [embedding, dataset]` sweep produces two evaluations
-- Test: `on: module` correctly routes to module-level metrics
-- Test: `on: affinity` against PCA skips with warning
+- Test: `at: module` correctly routes to module-level metrics
+- Test: `at: affinity` against PCA skips with warning
 - Test: `sampling.dataset` subsamples before fit
 - Test: `sampling.embedding` subsamples before eval
 - Test: Cross-space metrics get matching indices from embedding sampler
-- Test: Cache isolation — different `on` values don't share cache entries
+- Test: Cache isolation — different `at` values don't share cache entries
 - Test: Bundle configs compose correctly
 
 ## Full Change Manifest
@@ -509,7 +509,7 @@ Final validation. Depends on all previous commits.
 | `configs/metrics/default.yaml` | 4 | Delete |
 | `configs/experiment/*.yaml` (4 files) | 4 | Update override syntax |
 | `metrics/diffusion_spectral_entropy.py` | 4 | Remove `input_space` |
-| `utils/metrics.py` (flatten_and_unroll) | 5 | Rewrite for flat + `on` |
+| `utils/metrics.py` (flatten_and_unroll) | 5 | Rewrite for flat + `at` |
 | `experiment.py` (evaluate_outputs) | 5 | Rewrite routing + cache |
 | `experiment.py` (frozensets) | 5 | Delete |
 | `configs/sampling/*.yaml` | 6 | New config group |

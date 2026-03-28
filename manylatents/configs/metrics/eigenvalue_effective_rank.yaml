@@ -3,4 +3,4 @@ eigenvalue_effective_rank:
   _partial_: True
   n_neighbors: 20
   output_mode: full
-  "on": embedding
+  at: embedding

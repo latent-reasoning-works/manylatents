@@ -27,12 +27,12 @@ def test_extract_k_requirements_and_prewarm():
         "knn_preservation": OmegaConf.create({
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
             "n_neighbors": 10,
-            "on": "embedding",
+            "at": "embedding",
         }),
         "lid": OmegaConf.create({
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 20,
-            "on": "embedding",
+            "at": "embedding",
         }),
     }
 
@@ -76,16 +76,16 @@ def test_full_pipeline_with_cache():
         "knn_preservation": OmegaConf.create({
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
             "n_neighbors": 10,
-            "on": "embedding",
+            "at": "embedding",
         }),
         "lid": OmegaConf.create({
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 5,
-            "on": "embedding",
+            "at": "embedding",
         }),
         "spectral_gap_ratio": OmegaConf.create({
             "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
-            "on": "module",
+            "at": "module",
         }),
     }
 

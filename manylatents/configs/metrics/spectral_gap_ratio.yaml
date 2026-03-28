@@ -1,4 +1,4 @@
 spectral_gap_ratio:
   _target_: manylatents.metrics.spectral_gap_ratio.SpectralGapRatio
   _partial_: True
-  "on": module
+  at: module
