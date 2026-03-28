@@ -44,7 +44,7 @@ def EffectiveNeighborhoodSize(
         )
 
     try:
-        W = module.affinity_matrix(ignore_diagonal=True, use_symmetric=False)
+        W = module.affinity(ignore_diagonal=True, use_symmetric=False)
     except NotImplementedError:
         raise ValueError(
             f"{module.__class__.__name__} does not expose an affinity_matrix. "

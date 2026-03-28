@@ -114,10 +114,10 @@ def DiffusionMapCorrelation(
         [corr(embed1, DM1), corr(embed2, DM2), ...].
         One correlation score per diffusion map coordinate.
     """
-    # Skip for modules that don't have kernel_matrix
-    if module is None or not hasattr(module, "kernel_matrix"):
+    # Skip for modules that don't have kernel
+    if module is None or not hasattr(module, "kernel"):
         warnings.warn(
-            "DiffusionMapCorrelation metric skipped: missing module.kernel_matrix.",
+            "DiffusionMapCorrelation metric skipped: missing module.kernel.",
             RuntimeWarning
         )
         return float("nan")
@@ -138,7 +138,7 @@ def DiffusionMapCorrelation(
         return float("nan")
 
     try:
-        kernel_matrix = module.kernel_matrix()
+        kernel_matrix = module.kernel()
     except (NotImplementedError, AttributeError):
         warnings.warn(
             f"DiffusionMapCorrelation metric skipped: {module_name} does not expose a kernel_matrix.",

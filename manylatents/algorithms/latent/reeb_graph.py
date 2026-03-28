@@ -369,7 +369,7 @@ class ReebGraphModule(LatentModule):
             raise RuntimeError("ReebGraphModule is not fitted. Call fit() first.")
         return _to_output(self._membership, x)
 
-    def adjacency_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def adjacency(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Return the Reeb graph adjacency as an (M, M) binary dense array.
 
         M is the number of Reeb nodes, not the number of data points.

@@ -149,7 +149,7 @@ class UMAPModule(LatentModule):
             row_sums[row_sums == 0] = 1
             return A / row_sums
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Returns UMAP kernel matrix.
 
         For UMAP, the fuzzy simplicial set serves as both the kernel

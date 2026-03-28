@@ -71,7 +71,7 @@ def DiffusionCurvature(
     """
     try:
         # Get row-stochastic transition matrix (1-step)
-        P = module.affinity_matrix(use_symmetric=False)
+        P = module.affinity(use_symmetric=False)
     except (NotImplementedError, AttributeError, TypeError):
         warnings.warn(
             f"DiffusionCurvature metric skipped: {module.__class__.__name__} does not expose an affinity_matrix method.",

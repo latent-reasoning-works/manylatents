@@ -131,7 +131,7 @@ def test_prewarm_cache_spectral():
     A = A @ A.T
 
     class FakeModule:
-        def affinity_matrix(self, use_symmetric=False):
+        def affinity(self, use_symmetric=False):
             return A
 
     class FakeDataset:

@@ -67,7 +67,7 @@ def test_full_pipeline_with_cache():
         data = high_dim
 
     class FakeModule:
-        def affinity_matrix(self, use_symmetric=False):
+        def affinity(self, use_symmetric=False):
             return A
 
     cfgs = {

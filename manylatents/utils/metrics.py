@@ -150,7 +150,7 @@ def compute_eigenvalues(
         return None
 
     try:
-        A = module.affinity_matrix(use_symmetric=True)
+        A = module.affinity(use_symmetric=True)
     except (NotImplementedError, AttributeError):
         return None
 
@@ -231,9 +231,9 @@ def resolve_matrix(module, source: str = "kernel", **kwargs) -> np.ndarray:
         NotImplementedError: If the module does not expose the requested matrix.
     """
     methods = {
-        "kernel": module.kernel_matrix,
-        "affinity": module.affinity_matrix,
-        "adjacency": module.adjacency_matrix,
+        "kernel": module.kernel,
+        "affinity": module.affinity,
+        "adjacency": module.adjacency,
     }
     if source not in methods:
         raise ValueError(
