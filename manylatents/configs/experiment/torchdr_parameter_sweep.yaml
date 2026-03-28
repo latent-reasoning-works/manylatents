@@ -15,8 +15,7 @@ name: torchdr_parameter_sweep
 
 defaults:
   - override /data: swissroll
-  - override /metrics/embedding: [trustworthiness, continuity, knn_preservation]
-  - override /metrics/module: [spectral_gap_ratio, spectral_decay_rate]
+  - override /metrics: torchdr_parameter_sweep
   - override /callbacks/embedding: default
 
 seed: 42

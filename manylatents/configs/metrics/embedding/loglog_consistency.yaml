@@ -1,6 +1,0 @@
-loglog_consistency:
-  _target_: manylatents.metrics.loglog_consistency.LogLogConsistency
-  _partial_: True
-  k: 200
-  k_min: 5
-  k_steps: 20

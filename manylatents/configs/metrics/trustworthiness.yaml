@@ -1,0 +1,6 @@
+trustworthiness:
+  _target_: manylatents.metrics.trustworthiness.Trustworthiness
+  _partial_: True
+  n_neighbors: 5
+  metric: euclidean
+  on: embedding

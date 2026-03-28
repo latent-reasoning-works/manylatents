@@ -1,4 +1,0 @@
-noop:
-  _target_: manylatents.metrics.noop.NoOp
-  _partial_: True
-  k: 25

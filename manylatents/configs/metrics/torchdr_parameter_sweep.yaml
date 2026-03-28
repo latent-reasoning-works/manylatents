@@ -1,0 +1,7 @@
+defaults:
+  - trustworthiness
+  - continuity
+  - knn_preservation
+  - spectral_gap_ratio
+  - spectral_decay_rate
+  - _self_

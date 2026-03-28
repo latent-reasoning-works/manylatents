@@ -8,9 +8,6 @@ defaults:
   - algorithms/latent: null
   - algorithms/lightning: null
   - metrics: null
-  - metrics/embedding: null
-  - metrics/module: null
-  - metrics/dataset: null
   - trainer: null # instantiate only if network is being passed
   - experiment: null
   - optional cluster: null  # NEW: enables cluster=mila

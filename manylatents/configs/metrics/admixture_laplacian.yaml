@@ -1,0 +1,4 @@
+admixture_laplacian:
+  _target_: manylatents.metrics.preservation.GroundTruthPreservation
+  _partial_: True
+  on: dataset

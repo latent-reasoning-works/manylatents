@@ -1,5 +1,0 @@
-diffusion_curvature:
-  _target_: manylatents.metrics.diffusion_curvature.DiffusionCurvature
-  _partial_: True
-  t: 3
-  percentile: 5

@@ -6,7 +6,7 @@ defaults:
   - override /data: swissroll
   - override /callbacks/embedding: default
   - override /trainer: default
-  - override /metrics/embedding: anisotropy
+  - override /metrics: anisotropy
 
 seed: 42
 project: your_project
