@@ -152,49 +152,30 @@ def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
 
 # --- Config sleuther ---
 
-# Metrics known to need dataset-space kNN (not just embedding-space)
-_DATA_KNN_METRICS = frozenset({
-    "manylatents.metrics.knn_preservation.KNNPreservation",
-    "manylatents.metrics.trustworthiness.Trustworthiness",
-    "manylatents.metrics.continuity.Continuity",
-})
-
-# Metrics known to need eigendecomposition of module affinity matrix
-_SPECTRAL_METRICS = frozenset({
-    "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
-    "manylatents.metrics.spectral_decay_rate.SpectralDecayRate",
-    "manylatents.metrics.affinity_spectrum.AffinitySpectrum",
-    "manylatents.metrics.dataset_topology_descriptor.DatasetTopologyDescriptor",
-})
-
 
 def extract_k_requirements(metrics) -> dict:
-    """Scan metrics for kNN and spectral requirements.
+    """Scan metrics for kNN and spectral requirements, grouped by ``on`` value.
 
     Args:
-        metrics: Either a Dict[str, DictConfig] (Hydra configs from flatten_and_unroll_metrics)
-                 or a list[str] (metric registry names).
+        metrics: Either a Dict[str, DictConfig] (Hydra configs from
+                 flatten_and_unroll_metrics) or a list[str] (metric registry
+                 names from the programmatic API).
 
     Returns:
         Dict with keys:
-            emb_k: set of k values needed on embeddings
-            data_k: set of k values needed on original data
+            knn: dict mapping on_value -> set of k values needed
             spectral: whether eigendecomposition is needed
     """
-    emb_k: set[int] = set()
-    data_k: set[int] = set()
+    knn: dict[str, set[int]] = {}
     spectral = False
 
     if isinstance(metrics, list):
+        # Registry path -- no ``on`` field, assume embedding
         import inspect
         from manylatents.metrics.registry import get_metric
 
         for name in metrics:
             spec = get_metric(name)
-            # Assumes metric functions are module-level (not nested/methods),
-            # enforced by @register_metric decorator pattern.
-            target = f"{spec.func.__module__}.{spec.func.__qualname__}"
-
             sig = inspect.signature(spec.func)
             k_val = None
             for param_name in ("k", "n_neighbors"):
@@ -210,17 +191,18 @@ def extract_k_requirements(metrics) -> dict:
                         break
 
             if k_val is not None:
-                if target in _DATA_KNN_METRICS:
-                    data_k.add(k_val)
-                emb_k.add(k_val)
+                knn.setdefault("embedding", set()).add(k_val)
 
-            if target in _SPECTRAL_METRICS:
-                spectral = True
     else:
-        # Existing DictConfig path
-        for metric_cfg in metrics.values():
-            target = getattr(metric_cfg, "_target_", "")
+        # DictConfig path -- use ``on`` field for routing
+        for metric_name, metric_cfg in metrics.items():
+            on_value = getattr(metric_cfg, "on", "embedding")
 
+            # Module metrics need eigendecomposition
+            if on_value == "module":
+                spectral = True
+
+            # Extract k value
             k_val = None
             for param in ("k", "n_neighbors"):
                 if hasattr(metric_cfg, param):
@@ -230,16 +212,9 @@ def extract_k_requirements(metrics) -> dict:
                         break
 
             if k_val is not None:
-                input_space = getattr(metric_cfg, "input_space", "embedding")
-                if input_space == "dataset" or target in _DATA_KNN_METRICS:
-                    data_k.add(k_val)
-                if input_space != "dataset":
-                    emb_k.add(k_val)
+                knn.setdefault(on_value, set()).add(k_val)
 
-            if target in _SPECTRAL_METRICS:
-                spectral = True
-
-    return {"emb_k": emb_k, "data_k": data_k, "spectral": spectral}
+    return {"knn": knn, "spectral": spectral}
 
 
 def prewarm_cache(
@@ -249,8 +224,12 @@ def prewarm_cache(
     module=None,
     knn_cache_dir=None,
     cache: Optional[dict] = None,
+    outputs: Optional[dict] = None,
 ) -> dict:
     """Pre-compute kNN and eigenvalues based on metric requirements.
+
+    Uses the ``on`` field from each metric config to determine which data
+    source needs kNN pre-computation.
 
     Args:
         metrics: Flattened metric configs (Dict[str, DictConfig]) or
@@ -260,6 +239,8 @@ def prewarm_cache(
         module: Optional fitted LatentModule.
         knn_cache_dir: Optional directory for disk-persisted dataset kNN.
         cache: Optional pre-existing cache dict. Created if None.
+        outputs: Optional dict mapping on_value -> data arrays, built by
+            evaluate_outputs. Allows prewarming for any ``on`` value.
 
     Returns:
         Populated cache dict.
@@ -268,32 +249,36 @@ def prewarm_cache(
     if cache is None:
         cache = {}
 
-    if reqs["emb_k"]:
-        max_k = max(reqs["emb_k"])
-        logger.info(f"Pre-warming cache: embedding kNN with max_k={max_k}")
-        compute_knn(embeddings, k=max_k, cache=cache)
+    # kNN for each on_value that has requirements
+    for on_value, k_set in reqs["knn"].items():
+        data = None
+        if outputs and on_value in outputs:
+            data = outputs[on_value]
+        elif on_value == "embedding":
+            data = embeddings
+        elif on_value == "dataset" and dataset is not None and hasattr(dataset, "data"):
+            data = dataset.data
 
-    if reqs["data_k"] and dataset is not None and hasattr(dataset, "data"):
-        max_k = max(reqs["data_k"])
-        content_hash = _content_key(dataset.data)
+        if data is not None and k_set:
+            max_k = max(k_set)
 
-        # Try loading from disk cache
-        loaded = False
-        if knn_cache_dir is not None:
-            from pathlib import Path
-            npz_path = Path(knn_cache_dir) / "knn" / f"{content_hash}_k{max_k}.npz"
-            if npz_path.exists():
-                saved = np.load(npz_path)
-                cache[content_hash] = (max_k, saved["distances"], saved["indices"])
-                logger.info(f"Loaded dataset kNN from disk cache: {npz_path}")
-                loaded = True
+            # Disk cache for dataset kNN
+            if on_value == "dataset" and knn_cache_dir is not None:
+                content_hash = _content_key(data)
+                from pathlib import Path
+                npz_path = Path(knn_cache_dir) / "knn" / f"{content_hash}_k{max_k}.npz"
+                if npz_path.exists():
+                    saved = np.load(npz_path)
+                    cache[content_hash] = (max_k, saved["distances"], saved["indices"])
+                    logger.info(f"Loaded dataset kNN from disk cache: {npz_path}")
+                    continue
 
-        if not loaded:
-            logger.info(f"Pre-warming cache: dataset kNN with max_k={max_k}")
-            compute_knn(dataset.data, k=max_k, cache=cache)
+            logger.info(f"Pre-warming cache: {on_value} kNN with max_k={max_k}")
+            compute_knn(data, k=max_k, cache=cache)
 
-            # Save to disk cache
-            if knn_cache_dir is not None:
+            # Save dataset kNN to disk cache
+            if on_value == "dataset" and knn_cache_dir is not None:
+                content_hash = _content_key(data)
                 from pathlib import Path
                 knn_dir = Path(knn_cache_dir) / "knn"
                 knn_dir.mkdir(parents=True, exist_ok=True)
@@ -302,6 +287,7 @@ def prewarm_cache(
                 np.savez(npz_path, distances=dists, indices=idxs)
                 logger.info(f"Saved dataset kNN to disk cache: {npz_path}")
 
+    # Eigenvalues if spectral metrics present
     if reqs["spectral"] and module is not None:
         logger.info("Pre-warming cache: eigenvalue decomposition")
         compute_eigenvalues(module, cache=cache)
@@ -320,6 +306,8 @@ def evaluate_outputs(
     datamodule,
     **kwargs,
 ) -> dict:
+    import copy as _copy
+
     if latent_outputs is None or latent_outputs.get("embeddings") is None:
         logger.warning("No embeddings available for evaluation.")
         return {}
@@ -341,34 +329,63 @@ def evaluate_outputs(
 
     logger.info(f"Reference data shape: {ds.data.shape}")
 
-    # Subsample for large datasets using pluggable sampling strategies
-    ds_sub, emb_sub = ds, embeddings
-    if cfg.metrics is not None:
-        sampling_cfg = cfg.metrics.get("sampling", None)
-        if sampling_cfg is not None:
-            sampler = hydra.utils.instantiate(sampling_cfg)
-            emb_sub, ds_sub, _ = sampler.sample(embeddings, ds)
-            logger.info(f"Sampled to {emb_sub.shape[0]} samples using {type(sampler).__name__}")
-
     module = kwargs.get("module", None)
+
+    # Build outputs dict -- maps on_value to data
+    outputs: dict[str, Any] = {}
+    outputs["dataset"] = ds.data if hasattr(ds, "data") else None
+    outputs["embedding"] = embeddings
+    if module is not None:
+        outputs["module"] = module
+        for key, val in module.extra_outputs().items():
+            outputs[key] = val
 
     # Log dataset capabilities
     from manylatents.data.capabilities import log_capabilities
-    log_capabilities(ds_sub)
+    log_capabilities(ds)
 
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
     # Pre-warm cache with optimal k values
     knn_cache_dir = getattr(cfg, "cache_dir", None)
-    cache = prewarm_cache(metric_cfgs, emb_sub, ds_sub, module, knn_cache_dir=knn_cache_dir)
+    cache = prewarm_cache(
+        metric_cfgs, embeddings, ds, module,
+        knn_cache_dir=knn_cache_dir, outputs=outputs,
+    )
 
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
-        metric_fn = hydra.utils.instantiate(metric_cfg)
+        # Read and pop 'on' before instantiation so it is not passed to the
+        # metric function as a keyword argument.
+        cfg_copy = _copy.deepcopy(metric_cfg)
+        on_value = getattr(cfg_copy, "on", "embedding")  # default for safety
+        if hasattr(cfg_copy, "on"):
+            try:
+                delattr(cfg_copy, "on")
+            except Exception:
+                pass  # read-only struct flags -- safe to ignore
 
+        # Resolve primary data from outputs dict
+        if on_value == "module":
+            # Module metrics don't substitute the embeddings kwarg
+            primary_data = None
+        else:
+            primary_data = outputs.get(on_value)
+            if primary_data is None:
+                algo_name = type(module).__name__ if module else "unknown"
+                logger.warning(
+                    f"Skipping metric '{metric_name}': output '{on_value}' "
+                    f"not available from {algo_name}. "
+                    f"Check that the algorithm produces this output."
+                )
+                continue
+
+        metric_fn = hydra.utils.instantiate(cfg_copy)
+
+        # Call with standard signature -- route primary data to embeddings kwarg
         raw_result = metric_fn(
-            embeddings=emb_sub,
-            dataset=ds_sub,
+            embeddings=primary_data if primary_data is not None else embeddings,
+            dataset=ds,
             module=module,
             cache=cache,
         )
