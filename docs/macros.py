@@ -145,9 +145,9 @@ def _metrics_table(context: str) -> str:
             if "_target_" not in inner:
                 continue
 
-        # Filter by on: field to match the requested context
-        on_value = inner.get("at", "")
-        if on_value != context:
+        # Filter by at: field to match the requested context
+        at_value = inner.get("at", "")
+        if at_value != context:
             continue
 
         target = inner.get("_target_", "")

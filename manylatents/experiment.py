@@ -342,6 +342,7 @@ def evaluate_outputs(
 
     # --- Post-fit sampling: dynamic over outputs dict ---
     sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
+    embedding_sample_indices = None
     if sampling_cfg is not None:
         for output_name, sampler_cfg in sampling_cfg.items():
             if output_name == "dataset":
@@ -349,14 +350,18 @@ def evaluate_outputs(
             if output_name not in outputs or not isinstance(outputs[output_name], np.ndarray):
                 continue
             sampler = hydra.utils.instantiate(sampler_cfg)
-            sample_indices = sampler.get_indices(outputs[output_name])
-            outputs[output_name] = outputs[output_name][sample_indices]
-            logger.info(f"Post-fit sampling on '{output_name}': {len(sample_indices)} samples using {type(sampler).__name__}")
+            indices = sampler.get_indices(outputs[output_name])
+            outputs[output_name] = outputs[output_name][indices]
+            logger.info(f"Post-fit sampling on '{output_name}': {len(indices)} samples using {type(sampler).__name__}")
+            if output_name == "embedding":
+                embedding_sample_indices = indices
         # If embedding was sampled, slice dataset to matching indices for cross-space metrics
-        if "embedding" in sampling_cfg and hasattr(ds, 'data'):
+        if embedding_sample_indices is not None and hasattr(ds, 'data'):
             from manylatents.utils.sampling import _subsample_dataset_metadata
-            ds = _subsample_dataset_metadata(ds, sample_indices)
+            ds = _subsample_dataset_metadata(ds, embedding_sample_indices)
             outputs["dataset"] = ds.data
+        # Sync local vars with sampled outputs
+        embeddings = outputs["embedding"]
 
     # Log dataset capabilities
     from manylatents.data.capabilities import log_capabilities
@@ -364,7 +369,7 @@ def evaluate_outputs(
 
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
-    # Pre-warm cache with optimal k values
+    # Pre-warm cache with optimal k values (uses sampled outputs)
     knn_cache_dir = getattr(cfg, "cache_dir", None)
     cache = prewarm_cache(
         metric_cfgs, embeddings, ds, module,
@@ -373,7 +378,7 @@ def evaluate_outputs(
 
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
-        # Read and pop 'on' before instantiation so it is not passed to the
+        # Read and pop 'at' before instantiation so it is not passed to the
         # metric function as a keyword argument.
         cfg_copy = _copy.deepcopy(metric_cfg)
         at_value = getattr(cfg_copy, "at", "embedding")  # default for safety
