@@ -53,12 +53,12 @@ manylatents algorithms/latent=umap data=swissroll
 
 # add metrics
 manylatents algorithms/latent=umap data=swissroll \
-  metrics/embedding=trustworthiness
+  metrics=trustworthiness
 
 # sweep algorithms
 manylatents --multirun \
   algorithms/latent=umap,phate,tsne \
-  data=swissroll metrics/embedding=trustworthiness
+  data=swissroll metrics=trustworthiness
 ```
 
 <details>
@@ -77,14 +77,14 @@ from manylatents.api import run
 result = run(
     data="swissroll",
     algorithms={"latent": "pca"},
-    metrics={"embedding": {"trustworthiness": {
+    metrics={"trustworthiness": {
         "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
         "_partial_": True, "n_neighbors": 5
-    }}}
+    }}
 )
 
 embeddings = result["embeddings"]   # (n, d) ndarray
-scores     = result["scores"]       # {"embedding.trustworthiness": 0.95}
+scores     = result["scores"]       # {"trustworthiness": 0.95}
 
 # chain: PCA 50d -> PHATE 2d
 result2 = run(input_data=result["embeddings"], algorithms={"latent": "phate"})
@@ -147,7 +147,7 @@ All metrics share a `cache` dict for deduplicated kNN computation.
 List-valued parameters expand via `flatten_and_unroll_metrics()` --
 one kNN computation covers the entire sweep.
 
-Config pattern: `metrics/embedding=<name>`, `metrics/module=<name>`, `metrics/dataset=<name>`
+Config pattern: `metrics=<name>` (each metric config has an `at:` field for evaluation context)
 
 ---
 

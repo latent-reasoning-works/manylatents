@@ -1,0 +1,6 @@
+# Random sampling on dataset space (pre-fit)
+# Usage: sampling=random_dataset
+dataset:
+  _target_: manylatents.utils.sampling.RandomSampling
+  seed: 42
+  fraction: 0.1

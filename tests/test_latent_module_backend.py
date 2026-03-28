@@ -37,7 +37,7 @@ def test_affinity_tensor_from_numpy():
     class TestModule(LatentModule):
         def fit(self, x, y=None): pass
         def transform(self, x): return x
-        def affinity_matrix(self, ignore_diagonal=False, use_symmetric=False):
+        def affinity(self, ignore_diagonal=False, use_symmetric=False):
             return np.eye(5, dtype=np.float64)
 
     m = TestModule()

@@ -109,12 +109,13 @@ def _get_registry_descriptions() -> dict[str, str]:
 def _metrics_table(context: str) -> str:
     """Build markdown table for metrics of a given context (embedding/module/dataset).
 
-    Walks configs/metrics/{context}/*.yaml and cross-references the metric registry.
+    Scans the flat configs/metrics/ directory, reads the ``on:`` field from each
+    metric config, and filters to those matching *context*.
     Columns: metric | config | default params | description
     """
-    config_dir = _CONFIGS / "metrics" / context
+    config_dir = _CONFIGS / "metrics"
     if not config_dir.is_dir():
-        return f"*No configs found at `configs/metrics/{context}/`*"
+        return f"*No configs found at `configs/metrics/`*"
 
     descs = _get_registry_descriptions()
     rows = []
@@ -125,6 +126,10 @@ def _metrics_table(context: str) -> str:
 
         cfg = _load_yaml(path)
         config_name = _config_name(path)
+
+        # Skip bundle configs (those with a defaults list)
+        if "defaults" in cfg:
+            continue
 
         # Metric configs are nested: {metric_name: {_target_: ..., ...}}
         inner = None
@@ -140,12 +145,17 @@ def _metrics_table(context: str) -> str:
             if "_target_" not in inner:
                 continue
 
+        # Filter by at: field to match the requested context
+        at_value = inner.get("at", "")
+        if at_value != context:
+            continue
+
         target = inner.get("_target_", "")
         func_name = _class_name_from_target(target)
-        override = f"`metrics/{context}={config_name}`"
+        override = f"`metrics={config_name}`"
 
         # Extract default params
-        skip_keys = {"_target_", "_partial_"}
+        skip_keys = {"_target_", "_partial_", "at"}
         params = {k: v for k, v in inner.items() if k not in skip_keys}
         param_str = ", ".join(f"{k}={v}" for k, v in params.items()) or "--"
 
@@ -157,7 +167,7 @@ def _metrics_table(context: str) -> str:
         rows.append(f"| {func_name} | {override} | {param_str} | {desc} |")
 
     if not rows:
-        return f"*No metric configs found in `configs/metrics/{context}/`*"
+        return f"*No metric configs found for context `{context}`*"
 
     header = "| metric | config | defaults | description |\n|---|---|---|---|"
     return header + "\n" + "\n".join(rows)

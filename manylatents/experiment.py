@@ -40,7 +40,7 @@ def should_disable_wandb(cfg: DictConfig) -> bool:
     2. debug mode is True (fast testing/CI)
     3. WANDB_MODE environment variable is set to 'disabled'
 
-    This ensures consistent behavior across run_algorithm() and run_pipeline().
+    This ensures consistent behavior across run_algorithm() invocations.
 
     Args:
         cfg: Hydra configuration
@@ -152,49 +152,30 @@ def evaluate(algorithm: Any, /, **kwargs) -> Tuple[str, Optional[float], dict]:
 
 # --- Config sleuther ---
 
-# Metrics known to need dataset-space kNN (not just embedding-space)
-_DATA_KNN_METRICS = frozenset({
-    "manylatents.metrics.knn_preservation.KNNPreservation",
-    "manylatents.metrics.trustworthiness.Trustworthiness",
-    "manylatents.metrics.continuity.Continuity",
-})
-
-# Metrics known to need eigendecomposition of module affinity matrix
-_SPECTRAL_METRICS = frozenset({
-    "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
-    "manylatents.metrics.spectral_decay_rate.SpectralDecayRate",
-    "manylatents.metrics.affinity_spectrum.AffinitySpectrum",
-    "manylatents.metrics.dataset_topology_descriptor.DatasetTopologyDescriptor",
-})
-
 
 def extract_k_requirements(metrics) -> dict:
-    """Scan metrics for kNN and spectral requirements.
+    """Scan metrics for kNN and spectral requirements, grouped by ``on`` value.
 
     Args:
-        metrics: Either a Dict[str, DictConfig] (Hydra configs from flatten_and_unroll_metrics)
-                 or a list[str] (metric registry names).
+        metrics: Either a Dict[str, DictConfig] (Hydra configs from
+                 flatten_and_unroll_metrics) or a list[str] (metric registry
+                 names from the programmatic API).
 
     Returns:
         Dict with keys:
-            emb_k: set of k values needed on embeddings
-            data_k: set of k values needed on original data
+            knn: dict mapping at_value -> set of k values needed
             spectral: whether eigendecomposition is needed
     """
-    emb_k: set[int] = set()
-    data_k: set[int] = set()
+    knn: dict[str, set[int]] = {}
     spectral = False
 
     if isinstance(metrics, list):
+        # Registry path -- no ``at`` field, assume embedding
         import inspect
         from manylatents.metrics.registry import get_metric
 
         for name in metrics:
             spec = get_metric(name)
-            # Assumes metric functions are module-level (not nested/methods),
-            # enforced by @register_metric decorator pattern.
-            target = f"{spec.func.__module__}.{spec.func.__qualname__}"
-
             sig = inspect.signature(spec.func)
             k_val = None
             for param_name in ("k", "n_neighbors"):
@@ -210,17 +191,18 @@ def extract_k_requirements(metrics) -> dict:
                         break
 
             if k_val is not None:
-                if target in _DATA_KNN_METRICS:
-                    data_k.add(k_val)
-                emb_k.add(k_val)
+                knn.setdefault("embedding", set()).add(k_val)
 
-            if target in _SPECTRAL_METRICS:
-                spectral = True
     else:
-        # Existing DictConfig path
-        for metric_cfg in metrics.values():
-            target = getattr(metric_cfg, "_target_", "")
+        # DictConfig path -- use ``at`` field for routing
+        for metric_name, metric_cfg in metrics.items():
+            at_value = getattr(metric_cfg, "at", "embedding")
 
+            # Module metrics need eigendecomposition
+            if at_value == "module":
+                spectral = True
+
+            # Extract k value
             k_val = None
             for param in ("k", "n_neighbors"):
                 if hasattr(metric_cfg, param):
@@ -230,16 +212,9 @@ def extract_k_requirements(metrics) -> dict:
                         break
 
             if k_val is not None:
-                input_space = getattr(metric_cfg, "input_space", "embedding")
-                if input_space == "dataset" or target in _DATA_KNN_METRICS:
-                    data_k.add(k_val)
-                if input_space != "dataset":
-                    emb_k.add(k_val)
+                knn.setdefault(at_value, set()).add(k_val)
 
-            if target in _SPECTRAL_METRICS:
-                spectral = True
-
-    return {"emb_k": emb_k, "data_k": data_k, "spectral": spectral}
+    return {"knn": knn, "spectral": spectral}
 
 
 def prewarm_cache(
@@ -249,8 +224,12 @@ def prewarm_cache(
     module=None,
     knn_cache_dir=None,
     cache: Optional[dict] = None,
+    outputs: Optional[dict] = None,
 ) -> dict:
     """Pre-compute kNN and eigenvalues based on metric requirements.
+
+    Uses the ``at`` field from each metric config to determine which data
+    source needs kNN pre-computation.
 
     Args:
         metrics: Flattened metric configs (Dict[str, DictConfig]) or
@@ -260,6 +239,8 @@ def prewarm_cache(
         module: Optional fitted LatentModule.
         knn_cache_dir: Optional directory for disk-persisted dataset kNN.
         cache: Optional pre-existing cache dict. Created if None.
+        outputs: Optional dict mapping at_value -> data arrays, built by
+            evaluate_outputs. Allows prewarming for any ``on`` value.
 
     Returns:
         Populated cache dict.
@@ -268,32 +249,36 @@ def prewarm_cache(
     if cache is None:
         cache = {}
 
-    if reqs["emb_k"]:
-        max_k = max(reqs["emb_k"])
-        logger.info(f"Pre-warming cache: embedding kNN with max_k={max_k}")
-        compute_knn(embeddings, k=max_k, cache=cache)
+    # kNN for each at_value that has requirements
+    for at_value, k_set in reqs["knn"].items():
+        data = None
+        if outputs and at_value in outputs:
+            data = outputs[at_value]
+        elif at_value == "embedding":
+            data = embeddings
+        elif at_value == "dataset" and dataset is not None and hasattr(dataset, "data"):
+            data = dataset.data
 
-    if reqs["data_k"] and dataset is not None and hasattr(dataset, "data"):
-        max_k = max(reqs["data_k"])
-        content_hash = _content_key(dataset.data)
+        if data is not None and k_set:
+            max_k = max(k_set)
 
-        # Try loading from disk cache
-        loaded = False
-        if knn_cache_dir is not None:
-            from pathlib import Path
-            npz_path = Path(knn_cache_dir) / "knn" / f"{content_hash}_k{max_k}.npz"
-            if npz_path.exists():
-                saved = np.load(npz_path)
-                cache[content_hash] = (max_k, saved["distances"], saved["indices"])
-                logger.info(f"Loaded dataset kNN from disk cache: {npz_path}")
-                loaded = True
+            # Disk cache for dataset kNN
+            if at_value == "dataset" and knn_cache_dir is not None:
+                content_hash = _content_key(data)
+                from pathlib import Path
+                npz_path = Path(knn_cache_dir) / "knn" / f"{content_hash}_k{max_k}.npz"
+                if npz_path.exists():
+                    saved = np.load(npz_path)
+                    cache[content_hash] = (max_k, saved["distances"], saved["indices"])
+                    logger.info(f"Loaded dataset kNN from disk cache: {npz_path}")
+                    continue
 
-        if not loaded:
-            logger.info(f"Pre-warming cache: dataset kNN with max_k={max_k}")
-            compute_knn(dataset.data, k=max_k, cache=cache)
+            logger.info(f"Pre-warming cache: {at_value} kNN with max_k={max_k}")
+            compute_knn(data, k=max_k, cache=cache)
 
-            # Save to disk cache
-            if knn_cache_dir is not None:
+            # Save dataset kNN to disk cache
+            if at_value == "dataset" and knn_cache_dir is not None:
+                content_hash = _content_key(data)
                 from pathlib import Path
                 knn_dir = Path(knn_cache_dir) / "knn"
                 knn_dir.mkdir(parents=True, exist_ok=True)
@@ -302,6 +287,7 @@ def prewarm_cache(
                 np.savez(npz_path, distances=dists, indices=idxs)
                 logger.info(f"Saved dataset kNN to disk cache: {npz_path}")
 
+    # Eigenvalues if spectral metrics present
     if reqs["spectral"] and module is not None:
         logger.info("Pre-warming cache: eigenvalue decomposition")
         compute_eigenvalues(module, cache=cache)
@@ -320,6 +306,8 @@ def evaluate_outputs(
     datamodule,
     **kwargs,
 ) -> dict:
+    import copy as _copy
+
     if latent_outputs is None or latent_outputs.get("embeddings") is None:
         logger.warning("No embeddings available for evaluation.")
         return {}
@@ -341,34 +329,86 @@ def evaluate_outputs(
 
     logger.info(f"Reference data shape: {ds.data.shape}")
 
-    # Subsample for large datasets using pluggable sampling strategies
-    ds_sub, emb_sub = ds, embeddings
-    if cfg.metrics is not None:
-        sampling_cfg = cfg.metrics.get("sampling", None)
-        if sampling_cfg is not None:
-            sampler = hydra.utils.instantiate(sampling_cfg)
-            emb_sub, ds_sub, _ = sampler.sample(embeddings, ds)
-            logger.info(f"Sampled to {emb_sub.shape[0]} samples using {type(sampler).__name__}")
-
     module = kwargs.get("module", None)
+
+    # Build outputs dict — maps output names to data
+    outputs: dict[str, Any] = {}
+    outputs["dataset"] = ds.data if hasattr(ds, "data") else None
+    outputs["embedding"] = embeddings
+    if module is not None:
+        outputs["module"] = module
+        for key, val in module.extra_outputs().items():
+            outputs[key] = val
+
+    # --- Post-fit sampling: dynamic over outputs dict ---
+    sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
+    embedding_sample_indices = None
+    if sampling_cfg is not None:
+        for output_name, sampler_cfg in sampling_cfg.items():
+            if output_name == "dataset":
+                continue  # pre-fit sampling handled in run_algorithm()
+            if output_name not in outputs or not isinstance(outputs[output_name], np.ndarray):
+                continue
+            sampler = hydra.utils.instantiate(sampler_cfg)
+            indices = sampler.get_indices(outputs[output_name])
+            outputs[output_name] = outputs[output_name][indices]
+            logger.info(f"Post-fit sampling on '{output_name}': {len(indices)} samples using {type(sampler).__name__}")
+            if output_name == "embedding":
+                embedding_sample_indices = indices
+        # If embedding was sampled, slice dataset to matching indices for cross-space metrics
+        if embedding_sample_indices is not None and hasattr(ds, 'data'):
+            from manylatents.utils.sampling import _subsample_dataset_metadata
+            ds = _subsample_dataset_metadata(ds, embedding_sample_indices)
+            outputs["dataset"] = ds.data
+        # Sync local vars with sampled outputs
+        embeddings = outputs["embedding"]
 
     # Log dataset capabilities
     from manylatents.data.capabilities import log_capabilities
-    log_capabilities(ds_sub)
+    log_capabilities(ds)
 
     metric_cfgs = flatten_and_unroll_metrics(cfg.metrics) if cfg.metrics is not None else {}
 
-    # Pre-warm cache with optimal k values
+    # Pre-warm cache with optimal k values (uses sampled outputs)
     knn_cache_dir = getattr(cfg, "cache_dir", None)
-    cache = prewarm_cache(metric_cfgs, emb_sub, ds_sub, module, knn_cache_dir=knn_cache_dir)
+    cache = prewarm_cache(
+        metric_cfgs, embeddings, ds, module,
+        knn_cache_dir=knn_cache_dir, outputs=outputs,
+    )
 
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metric_cfgs.items():
-        metric_fn = hydra.utils.instantiate(metric_cfg)
+        # Read and pop 'at' before instantiation so it is not passed to the
+        # metric function as a keyword argument.
+        cfg_copy = _copy.deepcopy(metric_cfg)
+        at_value = getattr(cfg_copy, "at", "embedding")  # default for safety
+        if hasattr(cfg_copy, "at"):
+            try:
+                delattr(cfg_copy, "at")
+            except Exception:
+                pass  # read-only struct flags -- safe to ignore
 
+        # Resolve primary data from outputs dict
+        if at_value == "module":
+            # Module metrics don't substitute the embeddings kwarg
+            primary_data = None
+        else:
+            primary_data = outputs.get(at_value)
+            if primary_data is None:
+                algo_name = type(module).__name__ if module else "unknown"
+                logger.warning(
+                    f"Skipping metric '{metric_name}': output '{at_value}' "
+                    f"not available from {algo_name}. "
+                    f"Check that the algorithm produces this output."
+                )
+                continue
+
+        metric_fn = hydra.utils.instantiate(cfg_copy)
+
+        # Call with standard signature -- route primary data to embeddings kwarg
         raw_result = metric_fn(
-            embeddings=emb_sub,
-            dataset=ds_sub,
+            embeddings=primary_data if primary_data is not None else embeddings,
+            dataset=ds,
             module=module,
             cache=cache,
         )
@@ -624,6 +664,20 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
                 train_labels = torch.tensor(labels) if not isinstance(labels, torch.Tensor) else labels
                 logger.info(f"Extracted {len(train_labels)} training labels for supervised learning")
 
+        # --- Pre-fit sampling (optional) ---
+        sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
+        pre_fit_indices = None
+        if sampling_cfg is not None and "dataset" in sampling_cfg:
+            dataset_sampler = hydra.utils.instantiate(sampling_cfg["dataset"])
+            pre_fit_indices = dataset_sampler.get_indices(
+                train_tensor.numpy() if torch.is_tensor(train_tensor) else train_tensor
+            )
+            train_tensor = train_tensor[pre_fit_indices]
+            test_tensor = test_tensor[pre_fit_indices]
+            if train_labels is not None:
+                train_labels = train_labels[pre_fit_indices]
+            logger.info(f"Pre-fit sampling: {len(pre_fit_indices)} samples using {type(dataset_sampler).__name__}")
+
         logger.info(
             f"Running algorithm on {data_source}:\n"
             f"Train tensor shape: {train_tensor.shape}\n"
@@ -716,279 +770,3 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
         wandb.finish()
 
     return embeddings
-
-
-def run_pipeline(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> Dict[str, Any]:
-    """
-    Execute a sequential multi-step pipeline workflow.
-
-    This orchestrator enables depth workflows (sequential chaining) where
-    the output embeddings of step N become the input data for step N+1.
-    Example: PCA (1000→50) → PHATE (50→2)
-
-    Args:
-        cfg: Hydra configuration containing a 'pipeline' key with list of steps
-
-    Returns:
-        Dictionary with keys: embeddings, label, metadata, scores (from final step)
-    """
-    setup_logging(debug=cfg.debug, log_level=getattr(cfg, "log_level", "warning"))
-    logger.info("Pipeline Config:\n" + OmegaConf.to_yaml(cfg))
-
-    if not hasattr(cfg, 'pipeline') or cfg.pipeline is None or len(cfg.pipeline) == 0:
-        raise ValueError("No pipeline configuration found. Use run_algorithm() for single runs.")
-
-    # Determine if WandB should be disabled using centralized check
-    wandb_disabled = should_disable_wandb(cfg) or wandb is None
-
-    # Initialize WandB based on configuration (respects logger=None, debug=True, and WANDB_MODE)
-    if wandb is not None:
-        if wandb_disabled:
-            logger.info("Initializing WandB in disabled mode")
-            wandb_context = wandb.init(
-                project=cfg.project,
-                name=cfg.name,
-                config=OmegaConf.to_container(cfg, resolve=True),
-                mode="disabled",
-                dir=os.environ.get("WANDB_DIR", "logs"),
-            )
-        else:
-            logger.info("Initializing WandB in online mode")
-            wandb_context = wandb.init(
-                project=cfg.project,
-                name=cfg.name,
-                config=OmegaConf.to_container(cfg, resolve=True),
-                mode="online",
-                dir=os.environ.get("WANDB_DIR", "logs"),
-            )
-    else:
-        from contextlib import nullcontext
-        wandb_context = nullcontext()
-
-    with wandb_context as run:
-        lightning.seed_everything(cfg.seed, workers=True)
-
-        # --- One-time setup: Create initial datamodule, trainer, callbacks ---
-        logger.info("Setting up pipeline infrastructure...")
-
-        # Initial datamodule (loads original data)
-        initial_datamodule = instantiate_datamodule(cfg, input_data_holder)
-        initial_datamodule.setup()
-
-        # Setup callbacks (shared across all steps)
-        trainer_cb_cfg = cfg.trainer.get("callbacks", {})
-        embedding_cb_cfg = cfg.get("callbacks", {}).get("embedding", {})
-        lightning_cbs, embedding_cbs = instantiate_callbacks(trainer_cb_cfg, embedding_cb_cfg)
-
-        if not embedding_cbs:
-            logger.info("No embedding callbacks configured.")
-
-        # Setup loggers (use same logic as run_algorithm for consistency)
-        loggers = []
-        if not wandb_disabled and cfg.logger is not None:
-            for lg_conf in cfg.trainer.get("logger", {}).values():
-                loggers.append(hydra.utils.instantiate(lg_conf))
-            logger.info(f"Trainer loggers enabled: {len(loggers)} logger(s)")
-        else:
-            logger.info("Trainer loggers disabled (WandB disabled)")
-
-        # Setup trainer (shared across all steps)
-        trainer = instantiate_trainer(
-            cfg,
-            lightning_callbacks=lightning_cbs,
-            loggers=loggers,
-        )
-
-        # --- Load initial data ---
-        logger.info("Loading initial data from datamodule...")
-        train_loader = initial_datamodule.train_dataloader()
-        test_loader = initial_datamodule.test_dataloader()
-        field_index, data_source = determine_data_source(train_loader)
-
-        initial_train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
-        initial_test_tensor = torch.cat([b[field_index].cpu() for b in test_loader], dim=0)
-
-        # Extract labels for supervised LatentModules (if available)
-        initial_train_labels = None
-        train_dataset = getattr(initial_datamodule, "train_dataset", None)
-        if train_dataset is not None and hasattr(train_dataset, "get_labels"):
-            labels = train_dataset.get_labels()
-            if labels is not None:
-                initial_train_labels = torch.tensor(labels) if not isinstance(labels, torch.Tensor) else labels
-                logger.info(f"Extracted {len(initial_train_labels)} training labels for supervised learning")
-
-        logger.info(
-            f"Initial data from {data_source}:\n"
-            f"  Train: {initial_train_tensor.shape}\n"
-            f"  Test: {initial_test_tensor.shape}"
-        )
-
-        # Track current embeddings and datamodule
-        current_train_tensor = initial_train_tensor
-        current_test_tensor = initial_test_tensor
-        current_train_labels = initial_train_labels
-        current_datamodule = initial_datamodule
-        final_algorithm = None
-
-        # --- Loop through pipeline steps ---
-        step_snapshots = []
-        step_times = []
-        t_total_start = time.perf_counter()
-        logger.info(f"Starting pipeline with {len(cfg.pipeline)} steps...\n")
-
-        for step_idx, step in enumerate(cfg.pipeline):
-            logger.info(f"{'='*60}")
-            logger.info(f"PIPELINE STEP {step_idx + 1}/{len(cfg.pipeline)}")
-            logger.info(f"{'='*60}")
-
-            # Merge step overrides with global config
-            # Need to disable struct mode to allow new keys
-            step_overrides = step.get('overrides', {})
-            OmegaConf.set_struct(cfg, False)
-            step_cfg = OmegaConf.merge(cfg, step_overrides)
-            OmegaConf.set_struct(step_cfg, True)
-
-            step_name = step.get('name', f'step_{step_idx}')
-            logger.info(f"Step name: {step_name}")
-            logger.info(f"Input shape: {current_test_tensor.shape}")
-
-            # Instantiate step-specific algorithm
-            if hasattr(step_cfg.algorithms, 'latent') and step_cfg.algorithms.latent is not None:
-                algorithm = instantiate_algorithm(step_cfg.algorithms.latent, current_datamodule)
-            elif hasattr(step_cfg.algorithms, 'lightning') and step_cfg.algorithms.lightning is not None:
-                algorithm = instantiate_algorithm(step_cfg.algorithms.lightning, current_datamodule)
-            else:
-                raise ValueError(f"No algorithm specified in pipeline step {step_idx + 1}")
-
-            logger.info(f"Algorithm: {type(algorithm).__name__}")
-
-            # Execute the step with current tensors
-            t_step_start = time.perf_counter()
-            latents = execute_step(
-                algorithm=algorithm,
-                train_tensor=current_train_tensor,
-                test_tensor=current_test_tensor,
-                trainer=trainer,
-                cfg=step_cfg,
-                datamodule=current_datamodule,
-                train_labels=current_train_labels,
-            )
-            step_time = time.perf_counter() - t_step_start
-            step_times.append(step_time)
-
-            if latents is None:
-                raise RuntimeError(
-                    f"Pipeline step {step_idx + 1} ({step_name}) failed to produce output embeddings"
-                )
-
-            # Convert to tensor for next step
-            if isinstance(latents, np.ndarray):
-                current_test_tensor = torch.from_numpy(latents).float()
-            else:
-                current_test_tensor = latents
-
-            # For sequential pipelines, use same data for train and test in subsequent steps
-            current_train_tensor = current_test_tensor
-            # Labels only apply to original data; clear for subsequent steps
-            current_train_labels = None
-
-            # Note: For next steps, we'd ideally create a PrecomputedDataModule from latents
-            # For now, we keep using initial_datamodule (algorithm only needs it for metadata)
-            # Future enhancement: Create in-memory PrecomputedDataModule
-
-            logger.info(f"Step {step_idx + 1} complete. Output shape: {current_test_tensor.shape}\n")
-
-            snapshot_np = (current_test_tensor.detach().cpu().numpy()
-                           if isinstance(current_test_tensor, torch.Tensor)
-                           else np.asarray(current_test_tensor))
-            step_snapshots.append({
-                "step_index": step_idx,
-                "step_name": step_name,
-                "algorithm": type(algorithm).__name__,
-                "output_shape": list(snapshot_np.shape),
-                "embedding": snapshot_np,
-                "step_time": step_time,
-            })
-
-            # Track final algorithm for metadata
-            final_algorithm = algorithm
-
-        # --- Final wrapping: Evaluate and callback on final embeddings ---
-        logger.info("Pipeline execution complete. Preparing final outputs...")
-
-        final_latents = current_test_tensor
-        if isinstance(final_latents, torch.Tensor):
-            final_latents = final_latents.detach().cpu().numpy()
-
-        embeddings = {
-            "embeddings": final_latents,
-            "label": getattr(getattr(initial_datamodule, "test_dataset", None), "get_labels", lambda: None)(),
-            "metadata": {
-                "source": "pipeline",
-                "num_steps": len(cfg.pipeline),
-                "final_algorithm_type": type(final_algorithm).__name__ if final_algorithm else "unknown",
-                "input_shape": initial_test_tensor.shape,
-                "output_shape": final_latents.shape,
-            },
-            "step_snapshots": step_snapshots,
-        }
-
-        # Attach extra outputs from final algorithm
-        if final_algorithm is not None and isinstance(final_algorithm, LatentModule):
-            extras = final_algorithm.extra_outputs()
-            for key, val in extras.items():
-                embeddings[key] = val
-                shape_info = f" shape={val.shape}" if hasattr(val, 'shape') else ""
-                logger.info(f"Extra output attached: {key}{shape_info}")
-
-        # Evaluate final embeddings
-        logger.info("Evaluating final embeddings from pipeline...")
-        t_eval_start = time.perf_counter()
-        embeddings["scores"] = evaluate(
-            embeddings,
-            cfg=cfg,
-            datamodule=initial_datamodule,
-            module=final_algorithm if isinstance(final_algorithm, LatentModule) else None
-        )
-        eval_time = time.perf_counter() - t_eval_start
-        total_time = time.perf_counter() - t_total_start
-
-        embeddings["metadata"]["step_times"] = step_times
-        embeddings["metadata"]["eval_time"] = eval_time
-        embeddings["metadata"]["total_time"] = total_time
-
-        # --- Callback processing ---
-        callback_outputs = {}
-        if embeddings and embedding_cbs:
-            logger.info("Running embedding callbacks...")
-            for cb in embedding_cbs:
-                cb_result = cb.on_latent_end(dataset=initial_datamodule.test_dataset, embeddings=embeddings)
-                # Merge callback outputs into the main callback_outputs dict
-                if isinstance(cb_result, dict):
-                    callback_outputs.update(cb_result)
-                    logger.info(f"Callback {cb.__class__.__name__} returned: {list(cb_result.keys())}")
-
-        # Add callback outputs to embeddings dict if any were generated
-        if callback_outputs:
-            embeddings['callback_outputs'] = callback_outputs
-            logger.info(f"Added callback outputs to embeddings: {list(callback_outputs.keys())}")
-
-        logger.info("Pipeline workflow complete.")
-
-        # Auto-log scores to wandb if active (works online and offline)
-        if wandb is not None and wandb.run and embeddings.get("scores"):
-            scores = embeddings["scores"]
-            scalar_metrics = {}
-            for name, val in scores.items():
-                if isinstance(val, tuple) and len(val) == 2:
-                    scalar_metrics[f"metrics/{name}"] = float(val[0])
-                elif np.ndim(val) == 0:
-                    scalar_metrics[f"metrics/{name}"] = float(val)
-            if scalar_metrics:
-                wandb.log(scalar_metrics)
-                logger.info(f"Auto-logged {len(scalar_metrics)} metrics to wandb: {list(scalar_metrics.keys())}")
-
-        if wandb is not None and wandb.run:
-            wandb.finish()
-
-        return embeddings

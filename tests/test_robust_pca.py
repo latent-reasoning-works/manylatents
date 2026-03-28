@@ -119,7 +119,7 @@ class TestPCAModuleRobust:
         assert 'robust_rank' in extras
         assert 'convergence_history' in extras
         assert extras['robust_rank'] == 5
-        assert 'kernel_matrix' in extras
+        assert 'kernel' in extras
 
     def test_robust_transform_new_data(self):
         from manylatents.algorithms.latent.pca import PCAModule

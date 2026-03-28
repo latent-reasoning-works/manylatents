@@ -68,15 +68,6 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     Both paths are called during a LightningModule run: first `evaluate_lightningmodule` during `execute_step()`, then `evaluate_outputs` on the extracted embeddings.
 
-    ### Pipeline Mode
-
-    `run_pipeline()` chains multiple steps sequentially, where step N's output embeddings become step N+1's input. The dispatch logic is reused per step via `execute_step()`.
-
-    ```bash
-    # PCA (1000→50) → PHATE (50→2)
-    uv run python -m manylatents.main experiment=my_pipeline
-    ```
-
 === "Sampling"
 
     ## Sampling Strategies
@@ -142,11 +133,11 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Deterministic Indices
 
-    `RandomSampling.get_indices()` precomputes indices without requiring data, enabling reproducible comparisons:
+    `RandomSampling.get_indices()` precomputes indices for reproducible comparisons:
 
     ```python
     sampler = RandomSampling(seed=42)
-    indices = sampler.get_indices(n_total=1000, fraction=0.1)
+    indices = sampler.get_indices(data, fraction=0.1)
     np.save('shared_indices.npy', indices)
 
     # Reuse across runs
@@ -227,9 +218,9 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
       n_neighbors: [5, 10, 20]
 
     # Expands to three separate evaluations:
-    # embedding.trustworthiness__n_neighbors_5
-    # embedding.trustworthiness__n_neighbors_10
-    # embedding.trustworthiness__n_neighbors_20
+    # trustworthiness__n_neighbors_5
+    # trustworthiness__n_neighbors_10
+    # trustworthiness__n_neighbors_20
     ```
 
     This expansion happens before kNN extraction, so all k values from expanded metrics contribute to the shared cache.

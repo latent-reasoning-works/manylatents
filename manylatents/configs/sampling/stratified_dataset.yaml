@@ -1,0 +1,7 @@
+# Stratified sampling on dataset space (pre-fit)
+# Usage: sampling=stratified_dataset
+dataset:
+  _target_: manylatents.utils.sampling.StratifiedSampling
+  stratify_by: population_label
+  seed: 42
+  fraction: 0.1

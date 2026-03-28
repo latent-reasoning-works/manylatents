@@ -12,7 +12,7 @@ def test_spectral_gap_ratio_basic():
 
     class FakeModule:
         backend = None
-        def affinity_matrix(self, use_symmetric=False):
+        def affinity(self, use_symmetric=False):
             return A
 
     result = SpectralGapRatio(

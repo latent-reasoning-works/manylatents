@@ -7,7 +7,7 @@ class FakeModule:
     def __init__(self, matrix):
         self._matrix = matrix
 
-    def affinity_matrix(self, use_symmetric=False):
+    def affinity(self, use_symmetric=False):
         return self._matrix
 
 

@@ -1,0 +1,7 @@
+# Farthest point sampling on embedding space (post-fit)
+# Usage: sampling=farthest_point_embedding
+# Note: O(n*k) complexity, slower than random for large datasets
+embedding:
+  _target_: manylatents.utils.sampling.FarthestPointSampling
+  seed: 42
+  fraction: 0.1

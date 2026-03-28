@@ -127,7 +127,7 @@ def _compute_mismatch_labels(
 
     # Step 2: effective-k from affinity matrix
     try:
-        W = module.affinity_matrix(ignore_diagonal=True, use_symmetric=False)
+        W = module.affinity(ignore_diagonal=True, use_symmetric=False)
     except NotImplementedError:
         logger.warning(
             f"{module.__class__.__name__} has no affinity_matrix. "
@@ -317,21 +317,21 @@ class SelectiveCorrectionModule(LatentModule):
         self._correction_loss_history = loss_history
         return coords.detach().numpy()
 
-    def affinity_matrix(
+    def affinity(
         self, ignore_diagonal: bool = False, use_symmetric: bool = False
     ) -> np.ndarray:
         """Delegate to inner module."""
-        return self.inner.affinity_matrix(
+        return self.inner.affinity(
             ignore_diagonal=ignore_diagonal, use_symmetric=use_symmetric
         )
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Delegate to inner module."""
-        return self.inner.kernel_matrix(ignore_diagonal=ignore_diagonal)
+        return self.inner.kernel(ignore_diagonal=ignore_diagonal)
 
-    def adjacency_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def adjacency(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Delegate to inner module."""
-        return self.inner.adjacency_matrix(ignore_diagonal=ignore_diagonal)
+        return self.inner.adjacency(ignore_diagonal=ignore_diagonal)
 
     def extra_outputs(self) -> dict:
         """Include mismatch diagnostics alongside inner module outputs."""

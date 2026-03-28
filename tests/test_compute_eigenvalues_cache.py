@@ -9,7 +9,7 @@ class FakeModule:
         self._matrix = matrix
         self.call_count = 0
 
-    def affinity_matrix(self, use_symmetric=False):
+    def affinity(self, use_symmetric=False):
         self.call_count += 1
         return self._matrix
 
@@ -50,7 +50,7 @@ def test_compute_eigenvalues_no_module():
 def test_compute_eigenvalues_no_affinity():
     """Returns None when module raises NotImplementedError."""
     class BadModule:
-        def affinity_matrix(self, use_symmetric=False):
+        def affinity(self, use_symmetric=False):
             raise NotImplementedError
     result = compute_eigenvalues(BadModule())
     assert result is None

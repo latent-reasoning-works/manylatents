@@ -105,7 +105,7 @@ class LeidenModule(LatentModule):
         self._is_fitted = True
         return self._labels
 
-    def adjacency_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def adjacency(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Return the binary kNN adjacency matrix as an (N, N) dense array."""
         if not self._is_fitted:
             raise RuntimeError("LeidenModule is not fitted. Call fit() first.")
@@ -115,7 +115,7 @@ class LeidenModule(LatentModule):
             np.fill_diagonal(A, 0)
         return A
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         if not self._is_fitted:
             raise RuntimeError("LeidenModule is not fitted. Call fit() first.")
         K = self._adjacency.toarray().astype(np.float64)

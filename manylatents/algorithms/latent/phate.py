@@ -201,7 +201,7 @@ class PHATEModule(LatentModule):
             self._is_fitted = True
         return _to_output(embedding_np, x)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Returns PHATE affinity matrix.
 
@@ -220,7 +220,7 @@ class PHATEModule(LatentModule):
             raise RuntimeError("PHATE model is not fitted yet. Call `fit` first.")
 
         if use_symmetric:
-            K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+            K = self.kernel(ignore_diagonal=ignore_diagonal)
             return symmetric_diffusion_operator(K)
         else:
             if self._resolved_backend in {"torchdr", "gpu_phate"}:
@@ -228,7 +228,7 @@ class PHATEModule(LatentModule):
                     A = self.model.diff_op_.detach().cpu().numpy()
                 else:
                     raise NotImplementedError(
-                        "affinity_matrix(use_symmetric=False) is not available for backend='torchdr' "
+                        "affinity(use_symmetric=False) is not available for backend='torchdr' "
                         "when diff_op_ is not exposed."
                     )
             else:
@@ -239,7 +239,7 @@ class PHATEModule(LatentModule):
                 A = A - np.diag(np.diag(A))
             return A
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """
         Returns kernel matrix used to build diffusion operator.
 
@@ -257,7 +257,7 @@ class PHATEModule(LatentModule):
                 K = self.model.kernel_.detach().cpu().numpy()
             else:
                 raise NotImplementedError(
-                    "kernel_matrix() is not available for backend='torchdr' when kernel_ is not exposed."
+                    "kernel() is not available for backend='torchdr' when kernel_ is not exposed."
                 )
         else:
             K = np.asarray(self.model.graph.K.todense())

@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC, abstractmethod
 from typing import Union
 
@@ -61,7 +62,7 @@ class LatentModule(ABC):
         self.fit(x, y)
         return self.transform(x)
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """
         Return the kernel matrix (similarity matrix) used by the algorithm.
 
@@ -80,11 +81,11 @@ class LatentModule(ABC):
             RuntimeError: If called before fitting the model.
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} does not expose a kernel_matrix. "
+            f"{self.__class__.__name__} does not expose a kernel. "
             "This may be because the algorithm does not use a kernel-based approach."
         )
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Return the affinity matrix (normalized transition matrix) used by the algorithm.
 
@@ -107,16 +108,16 @@ class LatentModule(ABC):
             RuntimeError: If called before fitting the model.
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} does not expose an affinity_matrix. "
+            f"{self.__class__.__name__} does not expose an affinity. "
             "This may be because the algorithm does not use a kernel-based approach."
         )
 
-    def adjacency_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def adjacency(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Return the adjacency matrix (binary connectivity) of the algorithm's graph.
 
         The adjacency matrix is a binary (0/1) matrix where entry (i,j) is 1 iff
-        nodes i and j are connected. Unlike kernel_matrix (weighted similarity)
-        or affinity_matrix (transition probabilities), this is unweighted.
+        nodes i and j are connected. Unlike kernel (weighted similarity)
+        or affinity (transition probabilities), this is unweighted.
 
         The matrix may be M×M where M differs from the number of input samples N
         (e.g., Reeb graph nodes vs data points).
@@ -131,15 +132,43 @@ class LatentModule(ABC):
             NotImplementedError: If the algorithm does not expose an adjacency matrix.
         """
         raise NotImplementedError(
-            f"{self.__class__.__name__} does not expose an adjacency_matrix. "
+            f"{self.__class__.__name__} does not expose an adjacency. "
             "This may be because the algorithm does not produce a graph structure."
         )
+
+    # Deprecated aliases — old _matrix suffix names
+    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """Deprecated: use kernel() instead."""
+        warnings.warn(
+            "kernel_matrix() is deprecated, use kernel() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.kernel(ignore_diagonal=ignore_diagonal)
+
+    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+        """Deprecated: use affinity() instead."""
+        warnings.warn(
+            "affinity_matrix() is deprecated, use affinity() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.affinity(ignore_diagonal=ignore_diagonal, use_symmetric=use_symmetric)
+
+    def adjacency_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+        """Deprecated: use adjacency() instead."""
+        warnings.warn(
+            "adjacency_matrix() is deprecated, use adjacency() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.adjacency(ignore_diagonal=ignore_diagonal)
 
     def extra_outputs(self) -> dict:
         """Collect extra outputs from the algorithm for attachment to LatentOutputs.
 
-        Base implementation collects trajectories, affinity_matrix, adjacency_matrix,
-        and kernel_matrix when available. Subclasses can override to add their own.
+        Base implementation collects trajectories, affinity, adjacency,
+        and kernel when available. Subclasses can override to add their own.
 
         Returns:
             dict of collected outputs (empty if nothing available).
@@ -153,11 +182,11 @@ class LatentModule(ABC):
                 traj = traj.detach().cpu().numpy()
             extras["trajectories"] = traj
 
-        # Matrix outputs via methods
+        # Matrix outputs via methods (short keys)
         for name, method_name in [
-            ("affinity_matrix", "affinity_matrix"),
-            ("adjacency_matrix", "adjacency_matrix"),
-            ("kernel_matrix", "kernel_matrix"),
+            ("affinity", "affinity"),
+            ("adjacency", "adjacency"),
+            ("kernel", "kernel"),
         ]:
             try:
                 val = getattr(self, method_name)()
@@ -181,5 +210,5 @@ class LatentModule(ABC):
         if self.backend == "torchdr" and hasattr(self, 'model') and hasattr(self.model, 'affinity_in_'):
             return self.model.affinity_in_.detach()
         return torch.from_numpy(
-            self.affinity_matrix(use_symmetric=True).astype('float32')
+            self.affinity(use_symmetric=True).astype('float32')
         )

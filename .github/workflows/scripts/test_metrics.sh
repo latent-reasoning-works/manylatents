@@ -1,6 +1,6 @@
 #!/bin/bash
 # Smoke test for all metric configs
-# Discovers metric configs across embedding/dataset/module and validates each
+# Discovers metric configs from flat configs/metrics/ directory and validates each
 
 set -e
 
@@ -12,34 +12,36 @@ METRICS_DIR="manylatents/configs/metrics"
 FAILED=()
 TESTED=0
 
-for subdir in embedding dataset module; do
-    DIR="$METRICS_DIR/$subdir"
-    [ -d "$DIR" ] || continue
+# Skip bundles (configs with 'defaults:' key), null, and noop
+CONFIGS=($(ls -1 "$METRICS_DIR"/*.yaml 2>/dev/null | xargs -n1 basename | sed 's/.yaml$//' | grep -v __init__ | grep -v noop | grep -v null))
 
-    CONFIGS=($(ls -1 "$DIR"/*.yaml 2>/dev/null | xargs -n1 basename | sed 's/.yaml$//' | grep -v __init__ | grep -v noop))
+for config in "${CONFIGS[@]}"; do
+    # Skip bundle configs (those containing a defaults: key)
+    if grep -q '^defaults:' "$METRICS_DIR/${config}.yaml" 2>/dev/null; then
+        echo "→ Skipping bundle: metrics=$config"
+        continue
+    fi
 
-    for config in "${CONFIGS[@]}"; do
-        echo "→ Testing: metrics/$subdir=$config"
-        TESTED=$((TESTED + 1))
+    echo "→ Testing: metrics=$config"
+    TESTED=$((TESTED + 1))
 
-        CMD="python -m manylatents.main \
-            algorithms/latent=pca \
-            data=swissroll \
-            data.n_distributions=5 \
-            data.n_points_per_distribution=20 \
-            data.rotate_to_dim=50 \
-            metrics/$subdir=$config \
-            callbacks/embedding=minimal \
-            logger=none"
+    CMD="python -m manylatents.main \
+        algorithms/latent=pca \
+        data=swissroll \
+        data.n_distributions=5 \
+        data.n_points_per_distribution=20 \
+        data.rotate_to_dim=50 \
+        metrics=$config \
+        callbacks/embedding=minimal \
+        logger=none"
 
-        if $CMD > /tmp/test_metric_${config}.log 2>&1; then
-            echo "  ✅ $config"
-        else
-            echo "  ❌ $config FAILED"
-            tail -5 /tmp/test_metric_${config}.log | sed 's/^/    /'
-            FAILED+=("$subdir/$config")
-        fi
-    done
+    if $CMD > /tmp/test_metric_${config}.log 2>&1; then
+        echo "  ✅ $config"
+    else
+        echo "  ❌ $config FAILED"
+        tail -5 /tmp/test_metric_${config}.log | sed 's/^/    /'
+        FAILED+=("$config")
+    fi
 done
 
 echo ""

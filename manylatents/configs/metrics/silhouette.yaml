@@ -1,0 +1,5 @@
+silhouette:
+  _target_: manylatents.metrics.silhouette.SilhouetteScore
+  _partial_: True
+  metric: "euclidean"
+  at: embedding

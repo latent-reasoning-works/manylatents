@@ -44,7 +44,7 @@ class DummyModule(LatentModule):
         emb = (x_np - self._mean) @ self._Vt.T
         return torch.tensor(emb, dtype=x.dtype)
 
-    def affinity_matrix(self, ignore_diagonal=False, use_symmetric=False):
+    def affinity(self, ignore_diagonal=False, use_symmetric=False):
         if not self._is_fitted:
             raise RuntimeError("Not fitted.")
         W = self._affinity.copy()
@@ -132,5 +132,5 @@ class TestSelectiveCorrectionModule:
             correction_k=15,
         )
         module.fit_transform(gaussian_data)
-        aff = module.affinity_matrix()
+        aff = module.affinity()
         assert aff.shape == (len(gaussian_data), len(gaussian_data))

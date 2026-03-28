@@ -53,13 +53,13 @@ If CI fails after pushing, fix immediately — do not leave main broken.
 
 ```bash
 # CLI — primary interface
-uv run python -m manylatents.main algorithms/latent=pca data=swissroll metrics/embedding=trustworthiness
+uv run python -m manylatents.main algorithms/latent=pca data=swissroll metrics=trustworthiness
 
 # LightningModule path
 uv run python -m manylatents.main algorithms/lightning=ae_reconstruction data=swissroll trainer.fast_dev_run=true
 
 # Multirun sweep
-uv run python -m manylatents.main --multirun algorithms/latent=umap,phate,tsne data=swissroll metrics/embedding=trustworthiness
+uv run python -m manylatents.main --multirun algorithms/latent=umap,phate,tsne data=swissroll metrics=trustworthiness
 
 # SLURM submission
 uv run python -m manylatents.main -m cluster=mila resources=gpu algorithms/latent=umap data=swissroll
@@ -67,9 +67,9 @@ uv run python -m manylatents.main -m cluster=mila resources=gpu algorithms/laten
 
 ```python
 from manylatents.api import run
-result = run(data="swissroll", algorithms={"latent": "pca"}, metrics={"embedding": {"trustworthiness": {"_target_": "manylatents.metrics.trustworthiness.Trustworthiness", "_partial_": True, "n_neighbors": 5}}})
+result = run(data="swissroll", algorithms={"latent": "pca"}, metrics={"trustworthiness": {"_target_": "manylatents.metrics.trustworthiness.Trustworthiness", "_partial_": True, "n_neighbors": 5}})
 result["embeddings"]  # (n, d) ndarray
-result["scores"]      # {"embedding.trustworthiness": 0.95}
+result["scores"]      # {"trustworthiness": 0.95}
 ```
 
 ## Core Abstractions
@@ -101,21 +101,20 @@ Hydra config groups live under `manylatents/configs/`. **Don't hardcode config n
 ls manylatents/configs/algorithms/latent/   # available LatentModule configs
 ls manylatents/configs/algorithms/lightning/ # available LightningModule configs
 ls manylatents/configs/data/                # datasets
-ls manylatents/configs/metrics/embedding/   # embedding metrics
-ls manylatents/configs/metrics/dataset/     # dataset metrics
-ls manylatents/configs/metrics/module/      # module metrics
+ls manylatents/configs/metrics/            # all metrics (flat, each has on: field)
 ls manylatents/configs/callbacks/embedding/ # callbacks
 ls manylatents/configs/cluster/             # cluster profiles
 ```
 
 For registered metrics: `uv run python -c "from manylatents.metrics import list_metrics; print(list_metrics())"`
 
-Metric configs use `_partial_: True` with nested structure:
+Metric configs use `_partial_: True` with an `at:` field indicating evaluation context:
 ```yaml
 trustworthiness:
   _target_: manylatents.metrics.trustworthiness.Trustworthiness
   _partial_: True
   n_neighbors: 25
+  at: embedding
 ```
 
 **Metric parameter sweeps use `flatten_and_unroll_metrics()`.** To sweep a metric parameter (e.g. `k`), set it to a list in the config — `flatten_and_unroll_metrics` does Cartesian expansion automatically. Never create separate YAML files per parameter value.
@@ -129,7 +128,7 @@ local_intrinsic_dimensionality:
 
 ## Adding New Components
 
-**New metric**: wrapper function → `@register_metric` decorator → config YAML → import in `__init__.py` → CI smoke test.
+**New metric**: wrapper function → `@register_metric` decorator → config YAML in `configs/metrics/<name>.yaml` (flat, with `at:` field) → import in `__init__.py` → CI smoke test.
 See `CONTRIBUTING.md` for the full 4-step pipeline.
 
 **New LatentModule** — there are exactly 4 files to touch:

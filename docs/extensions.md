@@ -243,10 +243,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
           network/      # Network architecture configs
           optimizer/    # Optimizer configs
       data/             # Dataset configs
-      metrics/
-        embedding/      # Embedding-level metric configs
-        dataset/        # Dataset-level metric configs
-        module/         # Module-level metric configs
+      metrics/          # All metric configs (flat, each has on: field)
         sampling/       # Metric sampling strategies
       callbacks/embedding/
       experiment/       # Experiment preset configs
@@ -316,8 +313,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     │           │   └── latent/
     │           │       └── your_algo.yaml
     │           ├── metrics/
-    │           │   └── dataset/
-    │           │       └── your_metric.yaml
+    │           │   └── your_metric.yaml
     │           └── experiment/
     │               └── your_experiment.yaml
     └── tests/
@@ -490,13 +486,15 @@ The genomics, population genetics, and single-cell extension for manyLatents.
         return float(np.mean(scores))
     ```
 
-    Config: `manylatents/yourext/configs/metrics/dataset/your_metric.yaml`
+    Config: `manylatents/yourext/configs/metrics/your_metric.yaml`
 
     ```yaml
-    _target_: manylatents.yourext.metrics.YourMetric
-    _partial_: true  # CRITICAL: deferred parameter binding
-    threshold: 0.5
-    return_per_sample: false
+    your_metric:
+      _target_: manylatents.yourext.metrics.YourMetric
+      _partial_: true  # CRITICAL: deferred parameter binding
+      threshold: 0.5
+      return_per_sample: false
+      at: dataset
     ```
 
     ### Experiment Config

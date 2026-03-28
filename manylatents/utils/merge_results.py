@@ -88,13 +88,15 @@ def load_all_runs_from_sweeps(
                         out = yaml.safe_load(stream)
                     except yaml.YAMLError as exc:
                         print(exc)
-                if 'dataset' in out['metrics'].keys():
-                    metric_keys.extend(list(out['metrics']['dataset'].keys()))
-                if 'embedding' in out['metrics'].keys():
-                    metric_keys.extend(list(out['metrics']['embedding'].keys()))
-                if 'module' in out['metrics'].keys():
-                    metric_keys.extend(list(out['metrics']['module'].keys()))
-                print('Did not pass metric_keys. Infered from metric config file')
+                # Flat metric config: keys are metric names directly under metrics
+                if out.get('metrics') and isinstance(out['metrics'], dict):
+                    skip = {'sampling', 'defaults', 'null'}
+                    for key, val in out['metrics'].items():
+                        if key in skip:
+                            continue
+                        if isinstance(val, dict) and '_target_' in val:
+                            metric_keys.append(key)
+                print('Did not pass metric_keys. Inferred from metric config file')
                 print(metric_keys)
 
             metrics = extract_selected_metrics_from_text(log_text, metric_keys)
@@ -173,7 +175,7 @@ def main():
         nargs='*',
         default=[
             "algorithm.latent_module",
-            "metrics.embedding.trustworthiness",
+            "trustworthiness",
         ],
         help="Config sections to extract (default: the four main ones)"
     )

@@ -31,7 +31,7 @@ class ModuleWithAffinity(MinimalModule):
         super().fit(x, y)
         self._n = x.shape[0]
 
-    def affinity_matrix(self, ignore_diagonal=False, use_symmetric=False):
+    def affinity(self, ignore_diagonal=False, use_symmetric=False):
         return np.eye(self._n)
 
 
@@ -47,8 +47,8 @@ class TestExtraOutputsBase:
         data = torch.randn(10, 3)
         m.fit(data)
         extras = m.extra_outputs()
-        assert "affinity_matrix" in extras
-        assert extras["affinity_matrix"].shape == (10, 10)
+        assert "affinity" in extras
+        assert extras["affinity"].shape == (10, 10)
 
     def test_tensor_trajectories_converted_to_numpy(self):
         m = ModuleWithTrajectories()
@@ -76,7 +76,7 @@ class TestExtraOutputsPCA:
         m = PCAModule(n_components=2)
         m.fit(data)
         extras = m.extra_outputs()
-        assert "affinity_matrix" in extras or "kernel_matrix" in extras
+        assert "affinity" in extras or "kernel" in extras
 
 
 class TestExtraOutputsReebGraph:
@@ -94,8 +94,8 @@ class TestExtraOutputsReebGraph:
         m.fit(data)
         extras = m.extra_outputs()
 
-        assert "adjacency_matrix" in extras
+        assert "adjacency" in extras
         assert "node_coordinates" in extras
         assert "structural_summary" in extras
-        assert extras["node_coordinates"].shape[0] == extras["adjacency_matrix"].shape[0]
+        assert extras["node_coordinates"].shape[0] == extras["adjacency"].shape[0]
         assert isinstance(extras["structural_summary"], dict)

@@ -677,7 +677,7 @@ class DiffusionMapModule(LatentModule):
             raise RuntimeError("Model is not fitted. Call fit() first.")
         return self._labels.copy()
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Returns diffusion operator.
 
@@ -720,7 +720,7 @@ class DiffusionMapModule(LatentModule):
 
         return result
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """
         Returns kernel matrix used to build diffusion operator.
 

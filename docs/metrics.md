@@ -1,30 +1,90 @@
 # Metrics
 
-The evaluation system for manyLatents: a three-level architecture for measuring embedding quality, dataset properties, and algorithm internals.
+The evaluation system for manyLatents: metrics for measuring embedding quality, dataset properties, and algorithm internals. All metric configs live in a flat `configs/metrics/` directory. Each config declares its evaluation target via the `at` field.
+
+## Pipeline Execution Model
+
+Metrics and sampling operate on **named pipeline outputs** — a dict built as `run_algorithm()` progresses. Understanding when each output becomes available is key to understanding what `at` and `sampling` can target.
+
+```
+run_algorithm()
+│
+├─ datamodule.setup()
+│   outputs["dataset"] = ds.data                          ← dataset available
+│
+├─ [sampling.dataset] ── subsample input before fit       ← POSITION 1
+│
+├─ algorithm.fit(train_tensor)
+├─ algorithm.transform(test_tensor) → embeddings
+│   outputs["embedding"] = embeddings                     ← embedding available
+│   outputs["module"]    = algorithm                      ← module available
+│   outputs["affinity"]  = algorithm.extra_outputs()      ← extras available
+│   outputs["kernel"]    = ...                              (algorithm-dependent)
+│   outputs["adjacency"] = ...
+│
+├─ evaluate_outputs()
+│   ├─ [sampling.embedding] ── subsample before metrics   ← POSITION 2
+│   ├─ prewarm_cache() ── kNN/eigenvalues per "on" value
+│   └─ for each metric:
+│       ├─ read `at` field → resolve from outputs dict
+│       └─ metric_fn(embeddings=..., dataset=..., module=..., cache=...)
+│
+└─ callbacks (receive full unsampled data + scores)
+```
+
+### Output availability
+
+| Output | Available after | Source | Always present |
+|---|---|---|---|
+| `dataset` | `datamodule.setup()` | `ds.data` | Yes |
+| `embedding` | `algorithm.transform()` | Embedding array | Yes |
+| `module` | `algorithm.fit()` | Fitted LatentModule | Yes (for LatentModules) |
+| `affinity` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+| `kernel` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+| `adjacency` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+
+New outputs can be added by having a LatentModule return them from `extra_outputs()`. Metrics can immediately target them via `at: "<key>"` — no code changes needed in the evaluation pipeline.
+
+### Sampling positions
+
+Sampling has two categories with different infrastructure:
+
+- **Pre-fit** (`sampling.dataset`): Fixed integration point in `run_algorithm()` BEFORE `fit()`. Reduces what the algorithm sees. This is inherently positional — it changes the algorithm's input, not just what metrics evaluate on.
+- **Post-fit** (any other key): Dynamic loop in `evaluate_outputs()` over the `outputs` dict. Any array-valued output can be sampled. If `sampling.embedding` is configured, the dataset is auto-sliced to matching indices for cross-space metrics.
+
+Post-fit sampling uses the same dynamic resolution as metric routing — it iterates the sampling config, matches keys against the `outputs` dict, and applies the sampler to any matching array. New outputs from `extra_outputs()` are automatically sampleable.
+
+The `get_indices()` method on samplers accepts `**kwargs` for future extensibility — complex samplers (e.g., diffusion condensation) may need access to the kNN cache, outputs dict, or fitted module to build their sampling operator.
+
+## Metric Selection
+
+Select metrics on the CLI with `metrics=<name>`:
+
+```bash
+# Single metric
+manylatents algorithms/latent=pca data=swissroll metrics=trustworthiness
+
+# Bundle (composes multiple metrics)
+manylatents algorithms/latent=pca data=swissroll metrics=standard
+```
 
 ## Embedding Metrics
 
-Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output.
+Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output. Config: `at: embedding`.
 
 {{ metrics_table("embedding") }}
 
-Config pattern: `metrics/embedding=<name>`
-
 ## Module Metrics
 
-Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity_matrix()` or `kernel_matrix()`.
+Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity()` or `kernel()`. Config: `at: module`.
 
 {{ metrics_table("module") }}
 
-Config pattern: `metrics/module=<name>`
-
 ## Dataset Metrics
 
-Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm.
+Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm. Config: `at: dataset`.
 
 {{ metrics_table("dataset") }}
-
-Config pattern: `metrics/dataset=<name>`
 
 ---
 
@@ -57,10 +117,12 @@ Config pattern: `metrics/dataset=<name>`
     Metrics use Hydra's `_partial_: True` for deferred parameter binding:
 
     ```yaml
-    # configs/metrics/embedding/trustworthiness.yaml
-    _target_: manylatents.metrics.trustworthiness.Trustworthiness
-    _partial_: true
-    n_neighbors: 5
+    # configs/metrics/trustworthiness.yaml
+    trustworthiness:
+      _target_: manylatents.metrics.trustworthiness.Trustworthiness
+      _partial_: true
+      n_neighbors: 5
+      at: embedding
     ```
 
     ### Multi-Scale Expansion
@@ -71,7 +133,7 @@ Config pattern: `metrics/dataset=<name>`
     n_neighbors: [5, 10, 20]  # Produces 3 separate evaluations
     ```
 
-    Naming convention: `embedding.trustworthiness__n_neighbors_5`, `embedding.trustworthiness__n_neighbors_10`, etc.
+    Naming convention: `trustworthiness__n_neighbors_5`, `trustworthiness__n_neighbors_10`, etc.
 
     ### Shared kNN Cache
 
@@ -96,19 +158,24 @@ Config pattern: `metrics/dataset=<name>`
         return score
     ```
 
-    ### Choosing the Right Level
+    ### Choosing the Right Context
 
-    - Only needs original data? → `metrics/dataset/`
-    - Compares original vs. reduced? → `metrics/embedding/`
-    - Needs algorithm internals? → `metrics/module/`
+    Set the `at` field in your config to target a pipeline output (see Pipeline Execution Model above):
+
+    - Only needs original data? → `at: dataset`
+    - Compares original vs. reduced? → `at: embedding`
+    - Needs algorithm internals (affinity, spectral properties)? → `at: module`
+    - Needs a specific matrix? → `at: affinity` / `at: kernel` / `at: adjacency` (algorithm must produce it)
 
     ### Config
 
     ```yaml
-    # configs/metrics/embedding/your_metric.yaml
-    _target_: manylatents.metrics.your_metric.YourMetric
-    _partial_: true
-    k: 10
+    # configs/metrics/your_metric.yaml
+    your_metric:
+      _target_: manylatents.metrics.your_metric.YourMetric
+      _partial_: true
+      k: 10
+      at: embedding
     ```
 
     ### Testing

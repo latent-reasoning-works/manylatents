@@ -65,7 +65,7 @@ def AffinitySpectrum(embeddings: np.ndarray, dataset=None,
 
     # Fallback: legacy path if compute_eigenvalues returned None
     try:
-        affinity_mat = module.affinity_matrix(use_symmetric=True)
+        affinity_mat = module.affinity(use_symmetric=True)
     except (NotImplementedError, AttributeError, TypeError):
         warnings.warn(
             f"AffinitySpectrum metric skipped: {module.__class__.__name__} does not expose an affinity_matrix method.",

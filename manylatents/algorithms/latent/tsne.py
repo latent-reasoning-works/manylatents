@@ -172,7 +172,7 @@ class TSNEModule(LatentModule):
             embedding_np = np.array(self.embedding_train)
         return _to_output(embedding_np, x)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Returns t-SNE affinity matrix.
 
@@ -192,7 +192,7 @@ class TSNEModule(LatentModule):
             raise RuntimeError("t-SNE model is not fitted yet. Call `fit` first.")
 
         if use_symmetric:
-            K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+            K = self.kernel(ignore_diagonal=ignore_diagonal)
             return symmetric_diffusion_operator(K)
         else:
             if self._resolved_backend == "torchdr":
@@ -208,7 +208,7 @@ class TSNEModule(LatentModule):
             row_sums[row_sums == 0] = 1  # Avoid division by zero
             return A / row_sums
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """
         Returns Gaussian kernel matrix built from raw knn distances.
 

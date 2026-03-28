@@ -1,0 +1,4 @@
+connected_components:
+  _target_: manylatents.metrics.connected_components.ConnectedComponents
+  _partial_: True
+  at: module

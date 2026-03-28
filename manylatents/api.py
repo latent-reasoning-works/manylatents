@@ -12,15 +12,7 @@ Example:
         algorithms={'latent': {'_target_': 'manylatents.algorithms.latent.pca.PCA', 'n_components': 10}}
     )
 
-    # Pipeline (in-memory chaining)
-    result = run(
-        pipeline=[
-            {'name': 'pca_step', 'overrides': {'algorithms': {'latent': {'n_components': 50}}}},
-            {'name': 'phate_step', 'overrides': {'algorithms': {'latent': {'_target_': '...PHATE'}}}}
-        ]
-    )
-
-    # Chaining with input_data
+    # Chaining with input_data (multi-step via sequential API calls)
     result1 = run(data='swissroll', algorithms={'latent': 'pca'})
     result2 = run(input_data=result1['embeddings'], algorithms={'latent': 'phate'})
 """
@@ -35,7 +27,7 @@ from omegaconf import DictConfig, OmegaConf
 
 # IMPORTANT: Import configs to register base_config with Hydra ConfigStore
 import manylatents.configs
-from manylatents.experiment import run_algorithm, run_pipeline
+from manylatents.experiment import run_algorithm
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +40,7 @@ def run(
     Programmatic entry point for manyLatents.
 
     This function provides a clean API for agents to run dimensionality reduction
-    algorithms either as single runs or sequential pipelines, with optional
-    in-memory data passing.
+    algorithms, with optional in-memory data passing for multi-step workflows.
 
     Args:
         input_data: Optional input tensor. If provided, this data will be used
@@ -57,7 +48,7 @@ def run(
                    chaining multiple API calls.
         **overrides: Configuration overrides as keyword arguments. These should
                     follow Hydra's structure (e.g., data='swissroll',
-                    algorithms={'latent': {...}}, pipeline=[...]).
+                    algorithms={'latent': {...}}).
 
     Returns:
         Dictionary with keys:
@@ -71,15 +62,9 @@ def run(
         >>> result = run(data='swissroll', algorithms={'latent': {'_target_': '...PCA', 'n_components': 10}})
         >>> embeddings = result['embeddings']
         >>>
-        >>> # Chained runs (manual pipeline)
+        >>> # Chained runs (multi-step via sequential API calls)
         >>> result1 = run(data='swissroll', algorithms={'latent': 'pca'})
         >>> result2 = run(input_data=result1['embeddings'], algorithms={'latent': 'phate'})
-        >>>
-        >>> # Automatic pipeline (config-driven)
-        >>> result = run(pipeline=[
-        ...     {'name': 'step1', 'overrides': {'algorithms': {'latent': 'pca'}}},
-        ...     {'name': 'step2', 'overrides': {'algorithms': {'latent': 'phate'}}}
-        ... ])
     """
     # Clear Hydra's global state if a caller (manyagents, geomancy, shop) already
     # initialized it. This is the single canonical location for this guard.
@@ -165,14 +150,5 @@ def run(
         }
         cfg.data = OmegaConf.create(data_cfg)
 
-    # Smart routing: mirror main.py logic
-    is_pipeline = hasattr(cfg, 'pipeline') and cfg.pipeline is not None and len(cfg.pipeline) > 0
-
-    if is_pipeline:
-        # Route to pipeline engine
-        logger.info("API detected pipeline configuration. Routing to run_pipeline()...")
-        return run_pipeline(cfg, input_data_holder=input_data_holder)
-    else:
-        # Route to single algorithm engine
-        logger.info("API detected single algorithm configuration. Routing to run_algorithm()...")
-        return run_algorithm(cfg, input_data_holder=input_data_holder)
+    logger.info("Routing to run_algorithm()...")
+    return run_algorithm(cfg, input_data_holder=input_data_holder)

@@ -1,17 +1,4 @@
-# Test metrics configuration - fast smoke test for all metric groups
-# This configuration tests the full metrics pipeline:
-# - dataset: Metrics on original high-dimensional data
-# - embedding: Metrics on reduced embeddings
-# - module: Metrics on model components (e.g., graph connectivity)
-#
-# All metrics use TestMetric which returns (0.0, zeros_array) instantly,
-# making this ideal for CI/testing and verifying wandb integration.
-
-defaults:
-  - dataset:
-    - noop
-  - embedding:
-    - noop
-  - module:
-    - noop
-  - _self_
+noop:
+  _target_: manylatents.metrics.noop.NoOp
+  _partial_: True
+  at: embedding

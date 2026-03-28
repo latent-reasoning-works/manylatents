@@ -30,7 +30,7 @@ def test_metrics_table_embedding():
 
     table = macros._metrics_table("embedding")
     assert "trustworthiness" in table.lower()
-    assert "`metrics/embedding=" in table
+    assert "`metrics=" in table
 
 
 def test_metrics_table_module():

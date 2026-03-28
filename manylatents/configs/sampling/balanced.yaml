@@ -1,0 +1,11 @@
+# Balanced sampling: stratified pre-fit + random post-fit
+# Usage: sampling=balanced
+dataset:
+  _target_: manylatents.utils.sampling.StratifiedSampling
+  stratify_by: population_label
+  seed: 42
+  fraction: 0.1
+embedding:
+  _target_: manylatents.utils.sampling.RandomSampling
+  seed: 42
+  fraction: 0.5

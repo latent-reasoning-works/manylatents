@@ -35,9 +35,9 @@ trustworthiness:
   n_neighbors: [5, 10, 20]
 
 # expands to three evaluations:
-# embedding.trustworthiness__n_neighbors_5
-# embedding.trustworthiness__n_neighbors_10
-# embedding.trustworthiness__n_neighbors_20
+# trustworthiness__n_neighbors_5
+# trustworthiness__n_neighbors_10
+# trustworthiness__n_neighbors_20
 ```
 
 All expanded k-values contribute to the shared cache — one kNN computation covers the entire sweep.
