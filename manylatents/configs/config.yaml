@@ -7,7 +7,6 @@ defaults:
   - logger: none  # Use logger=wandb to enable wandb logging
   - algorithms/latent: null
   - algorithms/lightning: null
-  - pipeline: null
   - metrics: null
   - metrics/embedding: null
   - metrics/module: null
@@ -16,5 +15,3 @@ defaults:
   - experiment: null
   - optional cluster: null  # NEW: enables cluster=mila
   - optional resources: null  # NEW: enables resources=gpu
-
-pipeline: []

@@ -1,7 +1,6 @@
 """Embedding-level callbacks for post-processing latent outputs."""
 from manylatents.callbacks.embedding.base import EmbeddingCallback, LatentOutputs, EmbeddingOutputs
 from manylatents.callbacks.embedding.save_outputs import SaveOutputs, SaveEmbeddings, StepLogger
-from manylatents.callbacks.embedding.save_trajectory import SaveTrajectory, load_trajectory
 from manylatents.callbacks.embedding.loadings_analysis import LoadingsAnalysisCallback
 
 __all__ = [
@@ -11,7 +10,5 @@ __all__ = [
     "SaveOutputs",
     "SaveEmbeddings",  # backwards-compat alias
     "StepLogger",
-    "SaveTrajectory",
     "LoadingsAnalysisCallback",
-    "load_trajectory",
 ]
