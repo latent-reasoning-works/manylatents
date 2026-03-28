@@ -1,7 +1,7 @@
 # Metric Routing and Sampling Unification
 
 **Date:** 2026-03-28
-**Status:** Draft
+**Status:** Implemented
 **Issues:** #218 (metric config groups disconnect), #249 (pre-algorithm sampling)
 
 ## Problem
@@ -391,12 +391,20 @@ pipeline: []
 
 ## Known Tension
 
-The metric protocol signature uses `embeddings` as the parameter name for primary data. Under routing, this parameter receives whatever `on` points to — which might be `dataset.data` or an `affinity` matrix, not embeddings. The name becomes misleading but the function works. Options:
+The metric protocol signature uses `embeddings` as the parameter name for primary data. Under routing, this parameter receives whatever `on` points to — which might be `dataset.data` or an `affinity` matrix, not embeddings. The name becomes misleading but the function works. Option 1 (accept the misnomer) was chosen for the initial implementation.
 
-1. **Accept the misnomer.** No breakage, no migration. Document that `embeddings` means "primary evaluation data."
-2. **Add a `data` kwarg.** Metrics receive both `data` (routed) and `embeddings` (always the embedding). Gradual migration — old metrics ignore `data`, new metrics use it. The `embeddings` param becomes deprecated for metrics that use `on`.
+## Asymmetry: Metric Routing vs Sampling
 
-This is a follow-up decision — the design works with either choice. Option 1 for the initial implementation, option 2 if the misnomer causes real confusion.
+Metric routing via `"on"` is fully dynamic — any key in the `outputs` dict is a valid target, and new outputs are automatically available via `module.extra_outputs()`.
+
+Sampling is NOT dynamic. It has two fixed integration points hardcoded in the pipeline:
+
+- `sampling.dataset` — wired in `run_algorithm()` before `execute_step()`
+- `sampling.embedding` — wired in `evaluate_outputs()` before the metric loop
+
+Other sampling keys (e.g., `sampling.affinity`) would be silently ignored. Adding a new sampling position requires adding an integration point in the pipeline code. This asymmetry exists because sampling affects pipeline execution order (pre-fit vs post-fit), while metric routing only affects which data is read at evaluation time.
+
+This asymmetry is documented in `docs/metrics.md` under "Pipeline Execution Model."
 
 ## Commit Plan
 

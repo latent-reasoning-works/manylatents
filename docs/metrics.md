@@ -1,6 +1,66 @@
 # Metrics
 
-The evaluation system for manyLatents: metrics for measuring embedding quality, dataset properties, and algorithm internals. All metric configs live in a flat `configs/metrics/` directory. Each config declares its evaluation context via the `on:` field.
+The evaluation system for manyLatents: metrics for measuring embedding quality, dataset properties, and algorithm internals. All metric configs live in a flat `configs/metrics/` directory. Each config declares its evaluation target via the `"on"` field.
+
+## Pipeline Execution Model
+
+Metrics and sampling operate on **named pipeline outputs** — a dict built as `run_algorithm()` progresses. Understanding when each output becomes available is key to understanding what `"on"` and `sampling` can target.
+
+```
+run_algorithm()
+│
+├─ datamodule.setup()
+│   outputs["dataset"] = ds.data                          ← dataset available
+│
+├─ [sampling.dataset] ── subsample input before fit       ← POSITION 1
+│
+├─ algorithm.fit(train_tensor)
+├─ algorithm.transform(test_tensor) → embeddings
+│   outputs["embedding"] = embeddings                     ← embedding available
+│   outputs["module"]    = algorithm                      ← module available
+│   outputs["affinity"]  = algorithm.extra_outputs()      ← extras available
+│   outputs["kernel"]    = ...                              (algorithm-dependent)
+│   outputs["adjacency"] = ...
+│
+├─ evaluate_outputs()
+│   ├─ [sampling.embedding] ── subsample before metrics   ← POSITION 2
+│   ├─ prewarm_cache() ── kNN/eigenvalues per "on" value
+│   └─ for each metric:
+│       ├─ read "on" field → resolve from outputs dict
+│       └─ metric_fn(embeddings=..., dataset=..., module=..., cache=...)
+│
+└─ callbacks (receive full unsampled data + scores)
+```
+
+### Output availability
+
+| Output | Available after | Source | Always present |
+|---|---|---|---|
+| `dataset` | `datamodule.setup()` | `ds.data` | Yes |
+| `embedding` | `algorithm.transform()` | Embedding array | Yes |
+| `module` | `algorithm.fit()` | Fitted LatentModule | Yes (for LatentModules) |
+| `affinity` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+| `kernel` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+| `adjacency` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+
+New outputs can be added by having a LatentModule return them from `extra_outputs()`. Metrics can immediately target them via `"on": "<key>"` — no code changes needed in the evaluation pipeline.
+
+### Sampling positions
+
+Sampling is keyed by output name but has **two fixed integration points**, not a dynamic loop:
+
+- **`sampling.dataset`** — runs in `run_algorithm()` BEFORE `fit()`. Reduces what the algorithm sees. Embeddings are only produced for the sampled points.
+- **`sampling.embedding`** — runs in `evaluate_outputs()` BEFORE metric evaluation. The algorithm sees all data, but metrics evaluate on a subset. Dataset is auto-sliced to matching indices for cross-space metrics.
+
+Other keys (e.g., `sampling.affinity`) are not currently wired. Adding a new sampling position requires adding an integration point in the pipeline code.
+
+### Metric routing vs sampling: what's dynamic, what's fixed
+
+| | Metrics (`"on"` field) | Sampling (config keys) |
+|---|---|---|
+| **Routing** | Fully dynamic — any key in outputs dict | Two fixed positions (`dataset`, `embedding`) |
+| **Adding new targets** | Just return it from `extra_outputs()` | Requires new code in pipeline |
+| **Shared vocabulary** | Yes — output names | Yes — same output names |
 
 ## Metric Selection
 
@@ -16,19 +76,19 @@ manylatents algorithms/latent=pca data=swissroll metrics=standard
 
 ## Embedding Metrics
 
-Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output. Config: `on: embedding`.
+Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output. Config: `"on": embedding`.
 
 {{ metrics_table("embedding") }}
 
 ## Module Metrics
 
-Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity_matrix()` or `kernel_matrix()`. Config: `on: module`.
+Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity()` or `kernel()`. Config: `"on": module`.
 
 {{ metrics_table("module") }}
 
 ## Dataset Metrics
 
-Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm. Config: `on: dataset`.
+Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm. Config: `"on": dataset`.
 
 {{ metrics_table("dataset") }}
 
@@ -106,11 +166,12 @@ Evaluate properties of the **original high-dimensional data**, independent of th
 
     ### Choosing the Right Context
 
-    Set the `on:` field in your config to declare evaluation context:
+    Set the `"on"` field in your config to target a pipeline output (see Pipeline Execution Model above):
 
-    - Only needs original data? → `on: dataset`
-    - Compares original vs. reduced? → `on: embedding`
-    - Needs algorithm internals? → `on: module`
+    - Only needs original data? → `"on": dataset`
+    - Compares original vs. reduced? → `"on": embedding`
+    - Needs algorithm internals (affinity, spectral properties)? → `"on": module`
+    - Needs a specific matrix? → `"on": affinity` / `"on": kernel` / `"on": adjacency` (algorithm must produce it)
 
     ### Config
 
