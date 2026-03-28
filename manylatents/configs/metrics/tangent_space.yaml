@@ -4,4 +4,4 @@ tangent_space:
   n_neighbors: 25
   variance_threshold: 0.95
   return_per_sample: True
-  on: embedding
+  "on": embedding

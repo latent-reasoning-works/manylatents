@@ -10,4 +10,4 @@ dse_dense:
   numerical_floor: 1.0e-6
   kernel: dense
   gaussian_kernel_sigma: 10
-  on: embedding
+  "on": embedding

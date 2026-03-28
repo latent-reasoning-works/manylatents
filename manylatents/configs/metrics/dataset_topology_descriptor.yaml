@@ -1,4 +1,4 @@
 dataset_topology_descriptor:
   _target_: manylatents.metrics.dataset_topology_descriptor.DatasetTopologyDescriptor
   _partial_: True
-  on: module
+  "on": module

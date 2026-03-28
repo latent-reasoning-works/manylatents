@@ -4,4 +4,4 @@ loglog_consistency:
   k: 200
   k_min: 5
   k_steps: 20
-  on: embedding
+  "on": embedding

@@ -3,4 +3,4 @@ outlier_score:
   _partial_: True
   k: 20
   return_scores: False
-  on: embedding
+  "on": embedding

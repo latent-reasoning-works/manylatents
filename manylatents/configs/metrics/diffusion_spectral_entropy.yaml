@@ -3,4 +3,4 @@ diffusion_spectral_entropy:
   _partial_: True
   t: 1
   gaussian_kernel_sigma: 10
-  on: embedding
+  "on": embedding

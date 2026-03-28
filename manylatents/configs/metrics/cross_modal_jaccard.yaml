@@ -3,4 +3,4 @@ cross_modal_jaccard:
   _partial_: True
   k: 20
   metric: euclidean
-  on: embedding
+  "on": embedding

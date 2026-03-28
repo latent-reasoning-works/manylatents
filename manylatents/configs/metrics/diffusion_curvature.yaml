@@ -3,4 +3,4 @@ diffusion_curvature:
   _partial_: True
   t: 3
   percentile: 5
-  on: embedding
+  "on": embedding

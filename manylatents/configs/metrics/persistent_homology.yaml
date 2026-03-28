@@ -5,4 +5,4 @@ persistent_homology:
   persistence_threshold: 0.1
   max_N: 2000
   random_seed: 0
-  on: embedding
+  "on": embedding

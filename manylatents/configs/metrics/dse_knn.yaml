@@ -12,4 +12,4 @@ dse_knn:
   kernel: knn
   k: ${neighborhood_size}
   alpha: 1.0
-  on: embedding
+  "on": embedding
