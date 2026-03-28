@@ -10,5 +10,6 @@ defaults:
   - metrics: null
   - trainer: null # instantiate only if network is being passed
   - experiment: null
+  - optional sampling: null
   - optional cluster: null  # NEW: enables cluster=mila
   - optional resources: null  # NEW: enables resources=gpu

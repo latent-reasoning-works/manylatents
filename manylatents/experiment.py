@@ -329,6 +329,18 @@ def evaluate_outputs(
 
     logger.info(f"Reference data shape: {ds.data.shape}")
 
+    # --- Post-fit sampling (optional, top-level cfg.sampling) ---
+    sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
+    if sampling_cfg is not None and "embedding" in sampling_cfg:
+        emb_sampler = hydra.utils.instantiate(sampling_cfg["embedding"])
+        sample_indices = emb_sampler.get_indices(embeddings)
+        embeddings = embeddings[sample_indices]
+        # Slice dataset to same indices for cross-space metrics
+        if hasattr(ds, 'data'):
+            from manylatents.utils.sampling import _subsample_dataset_metadata
+            ds = _subsample_dataset_metadata(ds, sample_indices)
+        logger.info(f"Post-fit sampling: {len(sample_indices)} samples using {type(emb_sampler).__name__}")
+
     module = kwargs.get("module", None)
 
     # Build outputs dict -- maps on_value to data
@@ -640,6 +652,20 @@ def run_algorithm(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> 
             if labels is not None:
                 train_labels = torch.tensor(labels) if not isinstance(labels, torch.Tensor) else labels
                 logger.info(f"Extracted {len(train_labels)} training labels for supervised learning")
+
+        # --- Pre-fit sampling (optional) ---
+        sampling_cfg = OmegaConf.to_container(cfg.sampling, resolve=True) if hasattr(cfg, 'sampling') and cfg.sampling is not None else None
+        pre_fit_indices = None
+        if sampling_cfg is not None and "dataset" in sampling_cfg:
+            dataset_sampler = hydra.utils.instantiate(sampling_cfg["dataset"])
+            pre_fit_indices = dataset_sampler.get_indices(
+                train_tensor.numpy() if torch.is_tensor(train_tensor) else train_tensor
+            )
+            train_tensor = train_tensor[pre_fit_indices]
+            test_tensor = test_tensor[pre_fit_indices]
+            if train_labels is not None:
+                train_labels = train_labels[pre_fit_indices]
+            logger.info(f"Pre-fit sampling: {len(pre_fit_indices)} samples using {type(dataset_sampler).__name__}")
 
         logger.info(
             f"Running algorithm on {data_source}:\n"

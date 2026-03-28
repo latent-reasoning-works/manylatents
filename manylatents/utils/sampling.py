@@ -19,7 +19,7 @@ Example:
 
     # Deterministic indices for reproducible comparisons
     sampler = RandomSampling(seed=42)
-    indices = sampler.get_indices(data, fraction=0.1)
+    indices = sampler.get_indices(n_total=1000, fraction=0.1)
     # Save indices for later comparison
     np.save('sample_indices.npy', indices)
 
@@ -43,12 +43,24 @@ class SamplingStrategy(Protocol):
 
     def get_indices(
         self,
-        data: np.ndarray,
+        data_or_n_total: Union[np.ndarray, int],
         n_samples: Optional[int] = None,
         fraction: Optional[float] = None,
-        seed: int = 42,
+        seed: Optional[int] = None,
     ) -> np.ndarray:
-        """Return subsample indices without slicing data."""
+        """
+        Compute sample indices from data or a total count.
+
+        Args:
+            data_or_n_total: Either a data array (uses its length) or
+                total number of samples as an int.
+            n_samples: Absolute number of samples to take.
+            fraction: Fraction of samples to take.
+            seed: Random seed for reproducibility.
+
+        Returns:
+            Sorted array of selected indices.
+        """
         ...
 
     def sample(
@@ -153,30 +165,31 @@ class RandomSampling:
 
     def get_indices(
         self,
-        data: np.ndarray,
+        data_or_n_total: Union[np.ndarray, int],
         n_samples: Optional[int] = None,
         fraction: Optional[float] = None,
         seed: Optional[int] = None,
     ) -> np.ndarray:
         """
-        Compute sample indices without slicing data.
+        Compute sample indices.
 
         Use this to precompute deterministic indices for reproducible
         comparisons across different settings or runs.
 
         Args:
-            data: The data array to sample from (only shape is used).
-            n_samples: Absolute number of samples (defaults to self.n_samples).
-            fraction: Fraction of samples (defaults to self.fraction).
+            data_or_n_total: Either a data array (uses its length) or
+                total number of samples as an int.
+            n_samples: Absolute number of samples to take.
+            fraction: Fraction of samples to take.
             seed: Random seed (overrides instance seed).
 
         Returns:
             Sorted array of selected indices.
         """
-        n_samples = n_samples if n_samples is not None else self.n_samples
-        fraction = fraction if fraction is not None else self.fraction
         seed = seed if seed is not None else self.seed
-        n_total = data.shape[0]
+        fraction = fraction if fraction is not None else self.fraction
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        n_total = data_or_n_total if isinstance(data_or_n_total, int) else len(data_or_n_total)
         rng = np.random.default_rng(seed)
         n = _compute_n_samples(n_total, n_samples, fraction)
         indices = rng.choice(n_total, size=n, replace=False)
@@ -205,11 +218,16 @@ class RandomSampling:
         Returns:
             Tuple of (embeddings, dataset, indices).
         """
+        # Use instance defaults if not overridden
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
         if indices is not None:
             logger.info(f"RandomSampling: using precomputed indices ({len(indices)} samples)")
         else:
-            indices = self.get_indices(embeddings, n_samples, fraction, seed)
-            logger.info(f"RandomSampling: {embeddings.shape[0]} -> {len(indices)} samples")
+            indices = self.get_indices(embeddings.shape[0], n_samples, fraction, seed)
+            logger.info(f"RandomSampling: {embeddings.shape[0]} -> {len(indices)} samples (seed={seed})")
 
         subsampled_embeddings = embeddings[indices]
         subsampled_ds = _subsample_dataset_metadata(dataset, indices)
@@ -249,22 +267,23 @@ class StratifiedSampling:
     def get_indices(
         self,
         data: np.ndarray,
+        dataset: Optional[object] = None,
         n_samples: Optional[int] = None,
         fraction: Optional[float] = None,
         seed: Optional[int] = None,
-        *,
-        dataset: Optional[object] = None,
     ) -> np.ndarray:
         """
-        Compute stratified sample indices without slicing data.
+        Compute stratified sample indices.
+
+        If dataset with stratification labels is not provided, falls back
+        to random sampling indices.
 
         Args:
-            data: The data array to sample from (only shape is used).
-            n_samples: Absolute number of samples (defaults to self.n_samples).
-            fraction: Fraction of samples (defaults to self.fraction).
+            data: Data array (used for total count).
+            dataset: Dataset object with stratification attribute.
+            n_samples: Absolute number of samples to take.
+            fraction: Fraction of samples to take.
             seed: Random seed (overrides instance seed).
-            dataset: Dataset with stratification attribute. Required for
-                stratified selection; falls back to random sampling if missing.
 
         Returns:
             Sorted array of selected indices.
@@ -272,22 +291,73 @@ class StratifiedSampling:
         n_samples = n_samples if n_samples is not None else self.n_samples
         fraction = fraction if fraction is not None else self.fraction
         seed = seed if seed is not None else self.seed
-
-        rng = np.random.default_rng(seed)
-        total = data.shape[0]
+        total = len(data)
         n = _compute_n_samples(total, n_samples, fraction)
 
-        # Fall back to random sampling if dataset or attribute is missing
+        # Need a dataset with stratification labels
         if dataset is None or not hasattr(dataset, self.stratify_by):
-            if dataset is not None:
-                logger.warning(
-                    f"Dataset missing '{self.stratify_by}', falling back to RandomSampling"
-                )
+            logger.warning(
+                f"No dataset or missing '{self.stratify_by}', falling back to random indices"
+            )
+            return RandomSampling(seed=seed).get_indices(total, n_samples=n)
+
+        rng = np.random.default_rng(seed)
+        labels = getattr(dataset, self.stratify_by)
+        if hasattr(labels, "values"):
+            labels = labels.values
+
+        unique_labels, label_indices = np.unique(labels, return_inverse=True)
+        n_strata = len(unique_labels)
+
+        counts = np.bincount(label_indices)
+        proportions = counts / total
+        samples_per_stratum = np.round(proportions * n).astype(int)
+
+        diff = n - samples_per_stratum.sum()
+        if diff != 0:
+            largest_strata = np.argsort(-samples_per_stratum)
+            for i in range(abs(diff)):
+                idx = largest_strata[i % n_strata]
+                samples_per_stratum[idx] += np.sign(diff)
+
+        selected_indices = []
+        for stratum_idx, stratum_n in enumerate(samples_per_stratum):
+            if stratum_n <= 0:
+                continue
+            stratum_mask = label_indices == stratum_idx
+            stratum_positions = np.where(stratum_mask)[0]
+            if stratum_n > len(stratum_positions):
+                selected_indices.extend(stratum_positions)
             else:
-                logger.warning(
-                    "No dataset provided for stratification, falling back to RandomSampling"
-                )
-            return RandomSampling(seed=seed).get_indices(data, n_samples=n)
+                sampled = rng.choice(stratum_positions, size=stratum_n, replace=False)
+                selected_indices.extend(sampled)
+
+        return np.sort(np.array(selected_indices))
+
+    def sample(
+        self,
+        embeddings: np.ndarray,
+        dataset: object,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> Tuple[np.ndarray, object, np.ndarray]:
+        """Sample proportionally from each stratum."""
+        # Use instance defaults if not overridden
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        rng = np.random.default_rng(seed)
+        total = embeddings.shape[0]
+        n = _compute_n_samples(total, n_samples, fraction)
+
+        # Get stratification labels
+        if not hasattr(dataset, self.stratify_by):
+            logger.warning(
+                f"Dataset missing '{self.stratify_by}', falling back to RandomSampling"
+            )
+            return RandomSampling(seed).sample(embeddings, dataset, n_samples=n)
 
         labels = getattr(dataset, self.stratify_by)
         if hasattr(labels, "values"):
@@ -329,20 +399,7 @@ class StratifiedSampling:
                 sampled = rng.choice(stratum_positions, size=stratum_n, replace=False)
                 selected_indices.extend(sampled)
 
-        return np.sort(np.array(selected_indices))
-
-    def sample(
-        self,
-        embeddings: np.ndarray,
-        dataset: object,
-        n_samples: Optional[int] = None,
-        fraction: Optional[float] = None,
-        seed: Optional[int] = None,
-    ) -> Tuple[np.ndarray, object, np.ndarray]:
-        """Sample proportionally from each stratum."""
-        indices = self.get_indices(
-            embeddings, n_samples, fraction, seed, dataset=dataset
-        )
+        indices = np.sort(np.array(selected_indices))
 
         subsampled_embeddings = embeddings[indices]
         subsampled_ds = _subsample_dataset_metadata(dataset, indices)
@@ -385,12 +442,12 @@ class FarthestPointSampling:
         seed: Optional[int] = None,
     ) -> np.ndarray:
         """
-        Compute farthest-point sample indices without slicing data.
+        Compute farthest point sample indices from a data array.
 
         Args:
-            data: The data array to sample from (used for distance computation).
-            n_samples: Absolute number of samples (defaults to self.n_samples).
-            fraction: Fraction of samples (defaults to self.fraction).
+            data: Data array to compute distances on.
+            n_samples: Absolute number of samples to take.
+            fraction: Fraction of samples to take.
             seed: Random seed (overrides instance seed).
 
         Returns:
@@ -401,25 +458,17 @@ class FarthestPointSampling:
         seed = seed if seed is not None else self.seed
 
         rng = np.random.default_rng(seed)
-        total = data.shape[0]
+        total = len(data)
         n = _compute_n_samples(total, n_samples, fraction)
 
-        logger.info(f"FarthestPointSampling: {total} -> {n} samples (seed={seed})")
-
-        # Start with a random point
         indices = [rng.integers(total)]
         min_distances = np.full(total, np.inf)
 
         for _ in range(n - 1):
-            # Update minimum distances to selected set
             last_selected = data[indices[-1]]
             distances = np.linalg.norm(data - last_selected, axis=1)
             min_distances = np.minimum(min_distances, distances)
-
-            # Mask already selected
             min_distances[indices] = -np.inf
-
-            # Select farthest point
             next_idx = np.argmax(min_distances)
             indices.append(next_idx)
 
@@ -434,7 +483,35 @@ class FarthestPointSampling:
         seed: Optional[int] = None,
     ) -> Tuple[np.ndarray, object, np.ndarray]:
         """Sample using farthest point algorithm."""
-        indices = self.get_indices(embeddings, n_samples, fraction, seed)
+        # Use instance defaults if not overridden
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        rng = np.random.default_rng(seed)
+        total = embeddings.shape[0]
+        n = _compute_n_samples(total, n_samples, fraction)
+
+        logger.info(f"FarthestPointSampling: {total} -> {n} samples (seed={seed})")
+
+        # Start with a random point
+        indices = [rng.integers(total)]
+        min_distances = np.full(total, np.inf)
+
+        for _ in range(n - 1):
+            # Update minimum distances to selected set
+            last_selected = embeddings[indices[-1]]
+            distances = np.linalg.norm(embeddings - last_selected, axis=1)
+            min_distances = np.minimum(min_distances, distances)
+
+            # Mask already selected
+            min_distances[indices] = -np.inf
+
+            # Select farthest point
+            next_idx = np.argmax(min_distances)
+            indices.append(next_idx)
+
+        indices = np.sort(np.array(indices))
 
         subsampled_embeddings = embeddings[indices]
         subsampled_ds = _subsample_dataset_metadata(dataset, indices)
@@ -452,7 +529,7 @@ class FixedIndexSampling:
     Example:
         # Precompute indices once
         sampler = RandomSampling(seed=42)
-        indices = sampler.get_indices(data, fraction=0.1)
+        indices = sampler.get_indices(n_total=1000, fraction=0.1)
         np.save('shared_indices.npy', indices)
 
         # Use same indices across different settings
@@ -472,28 +549,12 @@ class FixedIndexSampling:
 
     def get_indices(
         self,
-        data: np.ndarray,
+        data_or_n_total=None,
         n_samples: Optional[int] = None,
         fraction: Optional[float] = None,
         seed: Optional[int] = None,
     ) -> np.ndarray:
-        """
-        Return the fixed indices, validated against data size.
-
-        Args:
-            data: The data array (used only for bounds validation).
-            n_samples: Ignored (fixed indices are always returned).
-            fraction: Ignored (fixed indices are always returned).
-            seed: Ignored (fixed indices are always returned).
-
-        Returns:
-            The precomputed indices array.
-        """
-        if len(self.indices) > 0 and self.indices.max() >= data.shape[0]:
-            raise ValueError(
-                f"Index {self.indices.max()} out of bounds for data with "
-                f"{data.shape[0]} samples"
-            )
+        """Return the fixed indices (ignores all parameters)."""
         return self.indices
 
     def sample(
@@ -511,11 +572,16 @@ class FixedIndexSampling:
         All parameters except embeddings and dataset are ignored.
         The indices passed to __init__ are always used.
         """
-        idx = self.get_indices(embeddings)
+        # Validate indices against data size
+        if self.indices.max() >= embeddings.shape[0]:
+            raise ValueError(
+                f"Index {self.indices.max()} out of bounds for data with "
+                f"{embeddings.shape[0]} samples"
+            )
 
-        logger.info(f"FixedIndexSampling: using {len(idx)} precomputed indices")
+        logger.info(f"FixedIndexSampling: using {len(self.indices)} precomputed indices")
 
-        subsampled_embeddings = embeddings[idx]
-        subsampled_ds = _subsample_dataset_metadata(dataset, idx)
+        subsampled_embeddings = embeddings[self.indices]
+        subsampled_ds = _subsample_dataset_metadata(dataset, self.indices)
 
-        return subsampled_embeddings, subsampled_ds, idx
+        return subsampled_embeddings, subsampled_ds, self.indices

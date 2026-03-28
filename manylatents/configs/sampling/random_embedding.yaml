@@ -1,0 +1,6 @@
+# Random sampling on embedding space (post-fit)
+# Usage: sampling=random_embedding
+embedding:
+  _target_: manylatents.utils.sampling.RandomSampling
+  seed: 42
+  fraction: 0.1
