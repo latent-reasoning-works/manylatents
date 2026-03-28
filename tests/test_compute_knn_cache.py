@@ -101,9 +101,10 @@ def test_disk_cache_roundtrip(sample_data, tmp_path):
     from manylatents.experiment import prewarm_cache
 
     metric_cfgs = {
-        "embedding.trustworthiness": SimpleNamespace(
+        "trustworthiness": SimpleNamespace(
             _target_="manylatents.metrics.trustworthiness.Trustworthiness",
             n_neighbors=10,
+            on="dataset",
         ),
     }
     dataset = SimpleNamespace(data=sample_data)

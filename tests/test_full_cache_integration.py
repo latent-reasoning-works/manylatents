@@ -24,18 +24,20 @@ def test_extract_k_requirements_and_prewarm():
     from manylatents.experiment import extract_k_requirements, prewarm_cache
 
     cfgs = {
-        "embedding.knn_preservation": OmegaConf.create({
+        "knn_preservation": OmegaConf.create({
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
             "n_neighbors": 10,
+            "on": "embedding",
         }),
-        "embedding.lid": OmegaConf.create({
+        "lid": OmegaConf.create({
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 20,
+            "on": "embedding",
         }),
     }
 
     reqs = extract_k_requirements(cfgs)
-    assert reqs["emb_k"] == {10, 20}
+    assert reqs["knn"]["embedding"] == {10, 20}
 
     rng = np.random.RandomState(42)
     emb = rng.randn(30, 2).astype(np.float32)
@@ -71,30 +73,31 @@ def test_full_pipeline_with_cache():
             return A
 
     cfgs = {
-        "embedding.knn_preservation": OmegaConf.create({
+        "knn_preservation": OmegaConf.create({
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
             "n_neighbors": 10,
+            "on": "embedding",
         }),
-        "embedding.lid": OmegaConf.create({
+        "lid": OmegaConf.create({
             "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
             "k": 5,
+            "on": "embedding",
         }),
-        "module.spectral_gap_ratio": OmegaConf.create({
+        "spectral_gap_ratio": OmegaConf.create({
             "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
+            "on": "module",
         }),
     }
 
     # Sleuther extracts requirements
     reqs = extract_k_requirements(cfgs)
-    assert reqs["emb_k"] == {10, 5}
-    assert 10 in reqs["data_k"]
+    assert reqs["knn"]["embedding"] == {10, 5}
     assert reqs["spectral"] is True
 
     # Prewarm populates cache
     module = FakeModule()
     cache = prewarm_cache(cfgs, emb, FakeDS(), module=module)
     assert _content_key(emb) in cache
-    assert _content_key(high_dim) in cache
     assert "eigenvalues" in cache
 
     # Metrics use shared cache — no recomputation
