@@ -48,7 +48,7 @@ Testing strategy and CI pipeline for manyLatents.
     # PCA + SwissRoll with metrics
     uv run python -m manylatents.main \
       algorithms/latent=pca data=swissroll \
-      metrics/embedding=trustworthiness logger=none
+      metrics=trustworthiness logger=none
 
     # Autoencoder + SwissRoll (fast dev run)
     uv run python -m manylatents.main \
@@ -72,7 +72,7 @@ Testing strategy and CI pipeline for manyLatents.
 
     - `manylatents/configs/algorithms/latent/your_algo.yaml` — auto-discovered by `test_latent_algorithms.sh`
     - `manylatents/configs/algorithms/lightning/your_algo.yaml` — auto-discovered by `test_lightning_algorithms.sh`
-    - `manylatents/configs/metrics/embedding/your_metric.yaml` — auto-discovered by `test_metrics.sh`
+    - `manylatents/configs/metrics/your_metric.yaml` — auto-discovered by `test_metrics.sh`
 
     ## Failure Investigation
 

@@ -32,55 +32,58 @@ def check_metric_configs():
     registry = get_metric_registry()
     registry_func_names = {spec.func.__name__ for spec in registry.values()}
 
-    for context in ("embedding", "module", "dataset"):
-        config_dir = CONFIGS / "metrics" / context
-        if not config_dir.is_dir():
+    config_dir = CONFIGS / "metrics"
+    if not config_dir.is_dir():
+        return
+
+    for path in sorted(config_dir.glob("*.yaml")):
+        if path.name.startswith("_") or path.name == "noop.yaml" or path.name == "null.yaml":
             continue
 
-        for path in sorted(config_dir.glob("*.yaml")):
-            if path.name.startswith("_") or path.name == "noop.yaml":
-                continue
+        with open(path) as f:
+            cfg = yaml.safe_load(f) or {}
 
-            with open(path) as f:
-                cfg = yaml.safe_load(f) or {}
+        # Skip bundle configs (those with a defaults list)
+        if "defaults" in cfg:
+            continue
 
-            # Find _target_ (may be nested)
-            target = None
-            for key, val in cfg.items():
-                if isinstance(val, dict) and "_target_" in val:
-                    target = val["_target_"]
-                    break
-            if target is None:
-                target = cfg.get("_target_")
-            if target is None:
-                warnings.append(f"{path.name}: no _target_ found")
-                continue
+        # Find _target_ (may be nested)
+        target = None
+        for key, val in cfg.items():
+            if isinstance(val, dict) and "_target_" in val:
+                target = val["_target_"]
+                break
+        if target is None:
+            target = cfg.get("_target_")
+        if target is None:
+            warnings.append(f"{path.name}: no _target_ found")
+            continue
 
-            # Check target is importable
-            module_path, class_name = target.rsplit(".", 1)
-            try:
-                mod = importlib.import_module(module_path)
-                func = getattr(mod, class_name)
-            except ImportError as e:
-                # Missing module = likely optional dependency, warn only
-                warnings.append(f"{path.name}: _target_ '{target}' not importable: {e}")
-                continue
-            except AttributeError as e:
-                # Module exists but class missing = stale path, error
-                errors.append(f"{path.name}: _target_ '{target}' stale path: {e}")
-                continue
+        # Check target is importable
+        module_path, class_name = target.rsplit(".", 1)
+        try:
+            mod = importlib.import_module(module_path)
+            func = getattr(mod, class_name)
+        except ImportError as e:
+            # Missing module = likely optional dependency, warn only
+            warnings.append(f"{path.name}: _target_ '{target}' not importable: {e}")
+            continue
+        except AttributeError as e:
+            # Module exists but class missing = stale path, error
+            errors.append(f"{path.name}: _target_ '{target}' stale path: {e}")
+            continue
 
-            # Check function has docstring
-            doc = getattr(func, "__doc__", None)
-            if not doc or not doc.strip():
-                warnings.append(f"{path.name}: {class_name} has no docstring")
+        # Check function has docstring
+        doc = getattr(func, "__doc__", None)
+        if not doc or not doc.strip():
+            warnings.append(f"{path.name}: {class_name} has no docstring")
 
-            # Check function is in registry
-            if class_name not in registry_func_names:
-                warnings.append(
-                    f"{path.name}: {class_name} not found in metric registry "
-                    f"(missing @register_metric?)"
-                )
+        # Check function is in registry
+        if class_name not in registry_func_names:
+            warnings.append(
+                f"{path.name}: {class_name} not found in metric registry "
+                f"(missing @register_metric?)"
+            )
 
 
 def check_algorithm_configs():

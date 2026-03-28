@@ -1,30 +1,36 @@
 # Metrics
 
-The evaluation system for manyLatents: a three-level architecture for measuring embedding quality, dataset properties, and algorithm internals.
+The evaluation system for manyLatents: metrics for measuring embedding quality, dataset properties, and algorithm internals. All metric configs live in a flat `configs/metrics/` directory. Each config declares its evaluation context via the `on:` field.
+
+## Metric Selection
+
+Select metrics on the CLI with `metrics=<name>`:
+
+```bash
+# Single metric
+manylatents algorithms/latent=pca data=swissroll metrics=trustworthiness
+
+# Bundle (composes multiple metrics)
+manylatents algorithms/latent=pca data=swissroll metrics=standard
+```
 
 ## Embedding Metrics
 
-Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output.
+Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output. Config: `on: embedding`.
 
 {{ metrics_table("embedding") }}
 
-Config pattern: `metrics/embedding=<name>`
-
 ## Module Metrics
 
-Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity_matrix()` or `kernel_matrix()`.
+Evaluate **algorithm-specific internal components**. Require a fitted module exposing `affinity_matrix()` or `kernel_matrix()`. Config: `on: module`.
 
 {{ metrics_table("module") }}
 
-Config pattern: `metrics/module=<name>`
-
 ## Dataset Metrics
 
-Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm.
+Evaluate properties of the **original high-dimensional data**, independent of the DR algorithm. Config: `on: dataset`.
 
 {{ metrics_table("dataset") }}
-
-Config pattern: `metrics/dataset=<name>`
 
 ---
 
@@ -57,10 +63,12 @@ Config pattern: `metrics/dataset=<name>`
     Metrics use Hydra's `_partial_: True` for deferred parameter binding:
 
     ```yaml
-    # configs/metrics/embedding/trustworthiness.yaml
-    _target_: manylatents.metrics.trustworthiness.Trustworthiness
-    _partial_: true
-    n_neighbors: 5
+    # configs/metrics/trustworthiness.yaml
+    trustworthiness:
+      _target_: manylatents.metrics.trustworthiness.Trustworthiness
+      _partial_: true
+      n_neighbors: 5
+      on: embedding
     ```
 
     ### Multi-Scale Expansion
@@ -71,7 +79,7 @@ Config pattern: `metrics/dataset=<name>`
     n_neighbors: [5, 10, 20]  # Produces 3 separate evaluations
     ```
 
-    Naming convention: `embedding.trustworthiness__n_neighbors_5`, `embedding.trustworthiness__n_neighbors_10`, etc.
+    Naming convention: `trustworthiness__n_neighbors_5`, `trustworthiness__n_neighbors_10`, etc.
 
     ### Shared kNN Cache
 
@@ -96,19 +104,23 @@ Config pattern: `metrics/dataset=<name>`
         return score
     ```
 
-    ### Choosing the Right Level
+    ### Choosing the Right Context
 
-    - Only needs original data? → `metrics/dataset/`
-    - Compares original vs. reduced? → `metrics/embedding/`
-    - Needs algorithm internals? → `metrics/module/`
+    Set the `on:` field in your config to declare evaluation context:
+
+    - Only needs original data? → `on: dataset`
+    - Compares original vs. reduced? → `on: embedding`
+    - Needs algorithm internals? → `on: module`
 
     ### Config
 
     ```yaml
-    # configs/metrics/embedding/your_metric.yaml
-    _target_: manylatents.metrics.your_metric.YourMetric
-    _partial_: true
-    k: 10
+    # configs/metrics/your_metric.yaml
+    your_metric:
+      _target_: manylatents.metrics.your_metric.YourMetric
+      _partial_: true
+      k: 10
+      on: embedding
     ```
 
     ### Testing

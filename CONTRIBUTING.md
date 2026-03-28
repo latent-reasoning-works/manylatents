@@ -62,11 +62,11 @@ def YourMetric(
 
 **Return types:** `float`, `tuple[float, np.ndarray]` (scalar + per-sample), or `dict[str, Any]` (structured).
 
-**Evaluation context** determines the config directory:
+**Evaluation context** is declared via the `on:` field in the config:
 
-- Only needs original data? → `metrics/dataset/`
-- Compares original vs. reduced? → `metrics/embedding/`
-- Needs algorithm internals (graph, kernel)? → `metrics/module/`
+- Only needs original data? → `on: dataset`
+- Compares original vs. reduced? → `on: embedding`
+- Needs algorithm internals (graph, kernel)? → `on: module`
 
 ### Step 2: Register It
 
@@ -77,21 +77,22 @@ Import your metric in `manylatents/metrics/__init__.py` so the decorator fires a
 ### Step 3: Create the Config
 
 ```yaml
-# manylatents/configs/metrics/embedding/your_metric.yaml
+# manylatents/configs/metrics/your_metric.yaml
 your_metric:
   _target_: manylatents.metrics.your_metric.YourMetric
   _partial_: True
   k: 25
+  on: embedding
 ```
 
-Configs are **nested under the metric name** with `_partial_: True` so Hydra binds the params at config time and the engine calls it with `embeddings`, `dataset`, `module`, and `cache` at runtime.
+Configs are **nested under the metric name** with `_partial_: True` and an `on:` field declaring the evaluation context. Hydra binds the params at config time and the engine calls it with `embeddings`, `dataset`, `module`, and `cache` at runtime.
 
 ### Step 4: E2E Smoke Test
 
 ```bash
 # Verify your metric runs end-to-end
 manylatents algorithms/latent=pca data=swissroll \
-  metrics/embedding=your_metric logger=none
+  metrics=your_metric logger=none
 ```
 
 CI will auto-discover your new config and test it if `manylatents/metrics/` or `configs/metrics/` files are changed.
