@@ -142,11 +142,11 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Deterministic Indices
 
-    `RandomSampling.get_indices()` precomputes indices without requiring data, enabling reproducible comparisons:
+    `RandomSampling.get_indices()` precomputes indices for reproducible comparisons:
 
     ```python
     sampler = RandomSampling(seed=42)
-    indices = sampler.get_indices(n_total=1000, fraction=0.1)
+    indices = sampler.get_indices(data, fraction=0.1)
     np.save('shared_indices.npy', indices)
 
     # Reuse across runs
