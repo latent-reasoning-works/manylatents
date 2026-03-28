@@ -247,9 +247,9 @@ class MDSModule(LatentModule):
         self._is_fitted = True
         return _to_output(embedding_np, x)
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """
-        Returns Gram matrix (same as affinity_matrix for MDS).
+        Returns Gram matrix (same as affinity for MDS).
 
         MDS doesn't have a meaningful kernel matrix in the same sense as methods
         like UMAP or PHATE. The distance matrix is not appropriate for metrics
@@ -262,11 +262,11 @@ class MDSModule(LatentModule):
             ignore_diagonal: If True, set diagonal entries to zero. Default False.
 
         Returns:
-            N×N normalized Gram matrix (same as affinity_matrix).
+            N×N normalized Gram matrix (same as affinity).
         """
-        return self.affinity_matrix(ignore_diagonal=ignore_diagonal)
+        return self.affinity(ignore_diagonal=ignore_diagonal)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """
         Returns normalized Gram matrix (double-centered squared distance matrix / (n-1)).
 

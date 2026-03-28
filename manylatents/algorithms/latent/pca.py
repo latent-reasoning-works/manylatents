@@ -276,10 +276,10 @@ class PCAModule(LatentModule):
         return extras
 
     # ------------------------------------------------------------------
-    # kernel_matrix / affinity_matrix
+    # kernel / affinity
     # ------------------------------------------------------------------
 
-    def kernel_matrix(self, ignore_diagonal: bool = False) -> np.ndarray:
+    def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """Return the sample Gram matrix K = X_centered @ X_centered.T.
 
         For standard PCA, centres with ``self.model.mean_``.
@@ -295,7 +295,7 @@ class PCAModule(LatentModule):
             raise RuntimeError("PCA model is not fitted yet. Call `fit` first.")
 
         if self.method == 'robust_local':
-            raise NotImplementedError("kernel_matrix not available for robust_local")
+            raise NotImplementedError("kernel not available for robust_local")
 
         if self.method == 'standard':
             mean = self.model.mean_
@@ -310,7 +310,7 @@ class PCAModule(LatentModule):
 
         return K
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """Return the normalised covariance matrix K / (n-1).
 
         Args:
@@ -320,6 +320,6 @@ class PCAModule(LatentModule):
         Returns:
             N x N normalised covariance matrix.
         """
-        K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+        K = self.kernel(ignore_diagonal=ignore_diagonal)
         n = self._fit_data.shape[0]
         return K / (n - 1)

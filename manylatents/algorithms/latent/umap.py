@@ -116,7 +116,7 @@ class UMAPModule(LatentModule):
             self._is_fitted = True
         return _to_output(embedding_np, x)
 
-    def affinity_matrix(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
+    def affinity(self, ignore_diagonal: bool = False, use_symmetric: bool = False) -> np.ndarray:
         """Returns UMAP affinity matrix.
 
         UMAP's graph represents fuzzy membership strengths. This method can return
@@ -135,7 +135,7 @@ class UMAPModule(LatentModule):
             raise RuntimeError("UMAP model is not fitted yet. Call `fit` first.")
 
         if use_symmetric:
-            K = self.kernel_matrix(ignore_diagonal=ignore_diagonal)
+            K = self.kernel(ignore_diagonal=ignore_diagonal)
             return symmetric_diffusion_operator(K)
         else:
             if self._resolved_backend == "torchdr":
