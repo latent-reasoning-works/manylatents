@@ -15,6 +15,26 @@ from omegaconf import DictConfig, OmegaConf
 logger = logging.getLogger(__name__)
 
 
+def should_disable_wandb(cfg: DictConfig) -> bool:
+    """Determine if WandB should be disabled based on configuration.
+
+    WandB is disabled when:
+    1. logger is explicitly set to None (orchestrated by parent)
+    2. debug mode is True (fast testing/CI)
+    3. WANDB_MODE environment variable is set to 'disabled'
+    """
+    if cfg.logger is None:
+        logger.info("WandB disabled: logger=None (orchestrated by parent)")
+        return True
+    if cfg.debug:
+        logger.info("WandB disabled: debug=True")
+        return True
+    if os.environ.get('WANDB_MODE', '').lower() == 'disabled':
+        logger.info("WandB disabled: WANDB_MODE=disabled")
+        return True
+    return False
+
+
 class NumpyEncoder(json.JSONEncoder):
     """JSON encoder that handles numpy types."""
 
