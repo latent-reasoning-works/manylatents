@@ -250,7 +250,7 @@ def _evaluate_hydra(
         if hasattr(cfg_copy, "at"):
             try:
                 delattr(cfg_copy, "at")
-            except Exception:
+            except (AttributeError, TypeError):
                 pass  # read-only struct flags -- safe to ignore
 
         # Resolve primary data from outputs dict
@@ -350,8 +350,9 @@ def evaluate(
     outputs["embedding"] = embeddings
     if module is not None:
         outputs["module"] = module
-        for key, val in module.extra_outputs().items():
-            outputs[key] = val
+        if hasattr(module, "extra_outputs"):
+            for key, val in module.extra_outputs().items():
+                outputs[key] = val
 
     # --- Post-fit sampling: dynamic over outputs dict ---
     embedding_sample_indices = None
