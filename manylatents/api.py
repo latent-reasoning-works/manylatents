@@ -102,8 +102,14 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
 
         try:
             return get_datamodule(data, random_state=seed)
-        except (ValueError, TypeError):
+        except ValueError:
             pass
+        except TypeError:
+            # Constructor doesn't accept random_state — retry without it
+            try:
+                return get_datamodule(data)
+            except ValueError:
+                pass
 
         # Fallback: Hydra config lookup (extension datasets not in Python registry)
         import hydra as _hydra
@@ -166,7 +172,12 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
 
         try:
             cls = get_algorithm(algorithm)
-            return cls()  # default params
+            algo_kwargs = {}
+            if seed is not None:
+                algo_kwargs["random_state"] = seed
+            if neighborhood_size is not None:
+                algo_kwargs["neighborhood_size"] = neighborhood_size
+            return cls(**algo_kwargs)
         except KeyError:
             pass
         # Fallback: Hydra compose
@@ -202,7 +213,12 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
 
             try:
                 cls = get_algorithm(algo_value)
-                return cls()
+                algo_kwargs = {}
+                if seed is not None:
+                    algo_kwargs["random_state"] = seed
+                if neighborhood_size is not None:
+                    algo_kwargs["neighborhood_size"] = neighborhood_size
+                return cls(**algo_kwargs)
             except KeyError:
                 pass
 
