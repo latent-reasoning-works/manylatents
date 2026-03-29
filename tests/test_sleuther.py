@@ -28,7 +28,7 @@ def _make_metric_cfgs(metrics_dict):
 
 
 def test_extract_k_requirements_embedding_metrics():
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     cfgs = _make_metric_cfgs({
         "trustworthiness": {
             "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
@@ -47,7 +47,7 @@ def test_extract_k_requirements_embedding_metrics():
 
 
 def test_extract_k_requirements_data_metrics():
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     cfgs = _make_metric_cfgs({
         "knn_preservation": {
             "_target_": "manylatents.metrics.knn_preservation.KNNPreservation",
@@ -60,7 +60,7 @@ def test_extract_k_requirements_data_metrics():
 
 
 def test_extract_k_requirements_spectral():
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     cfgs = _make_metric_cfgs({
         "spectral_gap_ratio": {
             "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
@@ -72,14 +72,14 @@ def test_extract_k_requirements_spectral():
 
 
 def test_extract_k_requirements_empty():
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     reqs = extract_k_requirements({})
     assert reqs["knn"] == {}
     assert reqs["spectral"] is False
 
 
 def test_prewarm_cache_populates():
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
     rng = np.random.RandomState(42)
     emb = rng.randn(30, 2).astype(np.float32)
     data = rng.randn(30, 10).astype(np.float32)
@@ -101,7 +101,7 @@ def test_prewarm_cache_populates():
 
 
 def test_prewarm_cache_uses_max_k():
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
     rng = np.random.RandomState(42)
     emb = rng.randn(30, 2).astype(np.float32)
 
@@ -126,7 +126,7 @@ def test_prewarm_cache_uses_max_k():
 
 
 def test_prewarm_cache_spectral():
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
     rng = np.random.RandomState(42)
     emb = rng.randn(10, 2).astype(np.float32)
     A = rng.randn(10, 10)
@@ -151,7 +151,7 @@ def test_prewarm_cache_spectral():
 
 def test_prewarm_cache_no_data_attribute():
     """prewarm_cache should not crash if dataset lacks .data."""
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
     rng = np.random.RandomState(42)
     emb = rng.randn(20, 2).astype(np.float32)
 
@@ -171,7 +171,7 @@ def test_prewarm_cache_no_data_attribute():
 
 def test_extract_k_requirements_from_names():
     """extract_k_requirements accepts list[str] of metric names."""
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     reqs = extract_k_requirements(["Trustworthiness", "LocalIntrinsicDimensionality"])
     assert len(reqs["knn"].get("embedding", set())) > 0
 
@@ -180,14 +180,14 @@ def test_extract_k_requirements_from_names_spectral():
     """Registry path cannot detect spectral needs (no on field).
     Spectral prewarming for programmatic API is handled by evaluate_metrics()
     which always passes module when available."""
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     reqs = extract_k_requirements(["SpectralGapRatio"])
     # Registry path has no on field — spectral detection is config-driven
     assert reqs["spectral"] is False
 
 
 def test_extract_k_requirements_from_names_empty():
-    from manylatents.experiment import extract_k_requirements
+    from manylatents.evaluate import extract_k_requirements
     reqs = extract_k_requirements([])
     assert reqs["knn"] == {}
     assert reqs["spectral"] is False

@@ -194,7 +194,7 @@ def test_sampling_embedding_reduces_for_eval():
 
 def test_cache_isolation_across_on_values():
     """Different on values produce distinct cache entries (no cross-contamination)."""
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
     from manylatents.utils.metrics import _content_key
 
     rng = np.random.RandomState(42)

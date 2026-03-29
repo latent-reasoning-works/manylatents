@@ -14,6 +14,7 @@ except PackageNotFoundError:
 # (e.g., manylatents.omics).
 _LAZY_IMPORTS = {
     "evaluate_metrics": "manylatents.evaluate",
+    "evaluate": "manylatents.evaluate",
 }
 
 def __getattr__(name):

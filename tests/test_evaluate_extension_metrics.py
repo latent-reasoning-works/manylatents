@@ -19,7 +19,7 @@ if "manylatents.dogma" not in sys.modules:
 
 def test_legacy_metric_without_cache():
     """A metric without cache= should not crash; should retry without it."""
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
 
     call_log = []
 

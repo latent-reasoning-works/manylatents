@@ -21,7 +21,7 @@ if "manylatents.dogma" not in sys.modules:
 
 def test_extract_k_requirements_and_prewarm():
     """End-to-end: sleuther extracts requirements, prewarm populates cache."""
-    from manylatents.experiment import extract_k_requirements, prewarm_cache
+    from manylatents.evaluate import extract_k_requirements, prewarm_cache
 
     cfgs = {
         "knn_preservation": OmegaConf.create({
@@ -53,7 +53,7 @@ def test_extract_k_requirements_and_prewarm():
 
 def test_full_pipeline_with_cache():
     """End-to-end: sleuther + metrics all sharing one cache."""
-    from manylatents.experiment import extract_k_requirements, prewarm_cache
+    from manylatents.evaluate import extract_k_requirements, prewarm_cache
     from manylatents.metrics.knn_preservation import KNNPreservation
     from manylatents.metrics.lid import LocalIntrinsicDimensionality
     from manylatents.metrics.spectral_gap_ratio import SpectralGapRatio
