@@ -1,8 +1,10 @@
 """CLI entry point for manylatents experiments."""
+from __future__ import annotations
+
 import functools
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import hydra
 from lightning import Callback, LightningDataModule, Trainer
@@ -35,8 +37,6 @@ def _discover_extensions():
         except Exception:
             pass
 
-_discover_extensions()
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 def _instantiate_datamodule(
-    cfg: DictConfig, input_data_holder: Optional[Dict] = None
+    cfg: DictConfig, input_data_holder: dict[str, Any] | None = None
 ) -> LightningDataModule:
     """Instantiate a LightningDataModule from Hydra config."""
     check_or_make_dirs(cfg.cache_dir)
@@ -77,15 +77,15 @@ def _instantiate_algorithm(
 
 
 def _instantiate_callbacks(
-    trainer_cb_cfg: Dict[str, Any] = None,
-    embedding_cb_cfg: Dict[str, Any] = None,
-) -> Tuple[List[Callback], List[EmbeddingCallback]]:
+    trainer_cb_cfg: dict[str, Any] | None = None,
+    embedding_cb_cfg: dict[str, Any] | None = None,
+) -> tuple[list[Callback], list[EmbeddingCallback]]:
     """Instantiate Lightning and Embedding callbacks from config dicts."""
     trainer_cb_cfg = trainer_cb_cfg or {}
     embedding_cb_cfg = embedding_cb_cfg or {}
 
-    lightning_cbs: List[Callback] = []
-    embedding_cbs: List[EmbeddingCallback] = []
+    lightning_cbs: list[Callback] = []
+    embedding_cbs: list[EmbeddingCallback] = []
 
     for name, one_cfg in trainer_cb_cfg.items():
         cb = hydra.utils.instantiate(one_cfg)
@@ -106,8 +106,8 @@ def _instantiate_callbacks(
 
 def _instantiate_trainer(
     cfg: DictConfig,
-    lightning_callbacks: Optional[List] = None,
-    loggers: Optional[List] = None,
+    lightning_callbacks: list | None = None,
+    loggers: list | None = None,
 ) -> Trainer:
     """Hydra-instantiate cfg.trainer, manually handling callbacks and logger."""
     trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
@@ -125,7 +125,7 @@ def _instantiate_trainer(
     return Trainer(**trainer_kwargs)
 
 
-def _instantiate_sampling(cfg: DictConfig) -> Optional[Dict[str, Any]]:
+def _instantiate_sampling(cfg: DictConfig) -> dict[str, Any] | None:
     """Instantiate sampler objects from cfg.sampling."""
     sampling_cfg = (
         OmegaConf.to_container(cfg.sampling, resolve=True)
@@ -162,7 +162,8 @@ def _init_wandb(cfg: DictConfig):
 
 
 @hydra.main(config_path=None, config_name="config", version_base=None)
-def main(cfg: DictConfig) -> Dict[str, Any]:
+def main(cfg: DictConfig) -> dict[str, Any]:
+    _discover_extensions()
     setup_logging(debug=cfg.debug, log_level=getattr(cfg, "log_level", "warning"))
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
 
