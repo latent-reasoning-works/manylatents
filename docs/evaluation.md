@@ -43,30 +43,27 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Evaluation: `evaluate()` in `evaluate.py`
 
-    The `evaluate()` function (in `evaluate.py`) uses Python's `@functools.singledispatch` to dispatch on the first argument's type:
+    The unified `evaluate()` function (in `evaluate.py`) handles both metric formats:
 
     ```python
-    @functools.singledispatch
-    def evaluate(algorithm: Any, /, **kwargs):
-        raise NotImplementedError(...)
-
-    @evaluate.register(dict)
-    def _evaluate_outputs(latent_outputs: dict, *, metrics, datamodule, **kwargs):
-        # Handles embedding-level metrics (trustworthiness, continuity, etc.)
-        ...
-
-    @evaluate.register(LightningModule)
-    def _evaluate_lightningmodule(algorithm: LightningModule, *, metrics, trainer, datamodule, **kwargs):
-        # Handles trainer.test() and model-specific metrics
-        ...
+    def evaluate(
+        embeddings,
+        *,
+        dataset=None,
+        module=None,
+        metrics=None,       # list[str] OR dict[str, DictConfig]
+        sampling=None,       # dict of instantiated samplers
+        cache_dir=None,
+        cache=None,
+    ) -> dict[str, Any]:
     ```
 
-    | Dispatch Type | Handler | Evaluates |
-    |---------------|---------|-----------|
-    | `dict` (LatentOutputs) | `evaluate()` on dict | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
-    | `LightningModule` | `evaluate()` on LightningModule | `trainer.test()` results + custom model metrics |
+    | Metric format | Path | When used |
+    |---------------|------|-----------|
+    | `list[str]` (registry names) | `_evaluate_registry()` | Python API (`run(metrics=["trustworthiness"])`) |
+    | `dict[str, DictConfig]` (Hydra configs) | `_evaluate_hydra()` | CLI path (configs with `_target_` and `at` fields) |
 
-    Both paths are called during a LightningModule run: first `evaluate()` on the module during training, then `evaluate()` on the extracted embeddings dict.
+    For LightningModule runs, `_evaluate_lightningmodule()` in `experiment.py` handles model-level metrics (`trainer.test()`), then `evaluate()` runs on the extracted embeddings.
 
 === "Sampling"
 
@@ -105,28 +102,20 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Configuration
 
-    Sampling is configured under `metrics.sampling` in Hydra:
+    Sampling is configured under top-level `sampling` in Hydra, keyed by output name:
 
     ```yaml
-    # Random (default)
-    metrics:
-      sampling:
+    # Pre-fit: subsample dataset before algorithm fitting
+    sampling:
+      dataset:
         _target_: manylatents.utils.sampling.RandomSampling
         seed: 42
-        fraction: 0.1
+        fraction: 0.5
 
-    # Stratified by population label
-    metrics:
-      sampling:
-        _target_: manylatents.utils.sampling.StratifiedSampling
-        stratify_by: population_label
-        seed: 42
-        fraction: 0.1
-
-    # Farthest point (O(n*k) — slower but better coverage)
-    metrics:
-      sampling:
-        _target_: manylatents.utils.sampling.FarthestPointSampling
+    # Post-fit: subsample embeddings before metric evaluation
+    sampling:
+      embedding:
+        _target_: manylatents.utils.sampling.RandomSampling
         seed: 42
         fraction: 0.1
     ```
@@ -147,16 +136,19 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### How Sampling Integrates
 
-    In `evaluate()`, sampling runs before any metrics:
+    In `evaluate()`, post-fit sampling runs before any metrics:
 
     ```python
-    sampling_cfg = cfg.metrics.get("sampling", None)
-    if sampling_cfg is not None:
-        sampler = hydra.utils.instantiate(sampling_cfg)
-        emb_sub, ds_sub, _ = sampler.sample(embeddings, ds)
+    # sampling is a dict of pre-instantiated sampler objects
+    if sampling is not None:
+        for output_name, sampler in sampling.items():
+            if output_name == "dataset":
+                continue  # pre-fit sampling handled in run_engine()
+            indices = sampler.get_indices(outputs[output_name])
+            outputs[output_name] = outputs[output_name][indices]
     ```
 
-    All metrics then operate on the subsampled data. If no sampling config is provided, metrics run on the full dataset.
+    Pre-fit sampling (`sampling["dataset"]`) runs in `run_engine()` before `fit()`, reducing the data the algorithm sees. Post-fit sampling (e.g., `sampling["embedding"]`) runs in `evaluate()` before metrics. If no sampling is configured, metrics run on the full dataset.
 
 === "Caching"
 

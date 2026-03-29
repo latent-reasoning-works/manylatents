@@ -1,4 +1,4 @@
-"""Test evaluate_outputs handles metrics that don't accept cache=."""
+"""Test evaluate() handles metrics that don't accept cache=."""
 import sys
 import types
 import numpy as np
