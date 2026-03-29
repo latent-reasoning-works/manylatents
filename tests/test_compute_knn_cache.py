@@ -98,7 +98,7 @@ def test_compute_knn_content_key_matches(sample_data):
 def test_disk_cache_roundtrip(sample_data, tmp_path):
     """Disk cache saves and loads dataset kNN correctly."""
     from types import SimpleNamespace
-    from manylatents.experiment import prewarm_cache
+    from manylatents.evaluate import prewarm_cache
 
     metric_cfgs = {
         "trustworthiness": SimpleNamespace(

@@ -165,10 +165,10 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 
 | File | What it does |
 |------|-------------|
-| `main.py` | CLI entry point |
-| `api.py` | Python API (`run()`) |
-| `experiment.py` | Core engine: `run_algorithm()`, `evaluate_outputs()`, `prewarm_cache()` |
-| `evaluate.py` | Standalone evaluation: `evaluate_metrics()` for programmatic metric batches |
+| `main.py` | CLI entry point + Hydra instantiation layer |
+| `api.py` | Python API (`run()`) — Hydra-free |
+| `experiment.py` | Hydra-free engine: `run_engine()` |
+| `evaluate.py` | Unified `evaluate()`, `extract_k_requirements()`, `prewarm_cache()` |
 | `metrics/metric.py` | Metric protocol definition |
 | `metrics/registry.py` | `@register_metric` decorator, `list_metrics()`, `compute_metric()` |
 | `utils/metrics.py` | `compute_knn()`, `compute_svd_cache()` — shared cache infrastructure |
