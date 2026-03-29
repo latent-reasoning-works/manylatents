@@ -167,7 +167,7 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 |------|-------------|
 | `main.py` | CLI entry point + Hydra instantiation layer |
 | `api.py` | Python API (`run()`) — Hydra-free |
-| `experiment.py` | Hydra-free engine: `run_engine()` |
+| `experiment.py` | Hydra-free engine: `run_experiment()` |
 | `evaluate.py` | Unified `evaluate()`, `extract_k_requirements()`, `prewarm_cache()` |
 | `metrics/metric.py` | Metric protocol definition |
 | `metrics/registry.py` | `@register_metric` decorator, `list_metrics()`, `compute_metric()` |

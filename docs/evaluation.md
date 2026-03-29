@@ -10,7 +10,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Algorithm Resolution
 
-    `run_engine()` determines which algorithm type to instantiate from the algorithm dict:
+    `run_experiment()` determines which algorithm type to instantiate from the algorithm dict:
 
     ```python
     if "latent" in algorithms and algorithms["latent"] is not None:
@@ -25,7 +25,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Execution
 
-    `run_engine()` routes via `isinstance()` checks (the former `execute_step()` logic is now inlined in `run_engine()`):
+    `run_experiment()` routes via `isinstance()` checks (the former `execute_step()` logic is now inlined in `run_experiment()`):
 
     ```python
     if isinstance(algorithm, LatentModule):
@@ -143,12 +143,12 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
     if sampling is not None:
         for output_name, sampler in sampling.items():
             if output_name == "dataset":
-                continue  # pre-fit sampling handled in run_engine()
+                continue  # pre-fit sampling handled in run_experiment()
             indices = sampler.get_indices(outputs[output_name])
             outputs[output_name] = outputs[output_name][indices]
     ```
 
-    Pre-fit sampling (`sampling["dataset"]`) runs in `run_engine()` before `fit()`, reducing the data the algorithm sees. Post-fit sampling (e.g., `sampling["embedding"]`) runs in `evaluate()` before metrics. If no sampling is configured, metrics run on the full dataset.
+    Pre-fit sampling (`sampling["dataset"]`) runs in `run_experiment()` before `fit()`, reducing the data the algorithm sees. Post-fit sampling (e.g., `sampling["embedding"]`) runs in `evaluate()` before metrics. If no sampling is configured, metrics run on the full dataset.
 
 === "Caching"
 

@@ -71,7 +71,7 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
 
     ## Execution Flow
 
-    In `run_engine()`:
+    In `run_experiment()`:
 
     1. Callbacks instantiated from config
     2. Lightning callbacks passed to `Trainer(callbacks=[...])`

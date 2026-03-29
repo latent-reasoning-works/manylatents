@@ -93,7 +93,7 @@ def _load_precomputed_from_datamodule(datamodule: LightningDataModule) -> Option
 # ---------------------------------------------------------------------------
 
 
-def run_engine(
+def run_experiment(
     datamodule: LightningDataModule,
     algorithm,
     trainer: Trainer,

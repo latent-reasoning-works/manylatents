@@ -5,7 +5,7 @@ This module provides a Python function interface for manyAgents to call
 manyLatents directly without subprocess overhead. Instead of building a
 full Hydra DictConfig and routing through ``run_algorithm()``, the API
 resolves string names to Python objects (DataModules, algorithms, metrics)
-and delegates to :func:`~manylatents.experiment.run_engine`.
+and delegates to :func:`~manylatents.experiment.run_experiment`.
 
 Hydra is still used internally for *name resolution* (e.g. ``"swissroll"``
 -> ``SwissRollDataModule``, ``"pca"`` -> ``PCAModule``), but the engine
@@ -215,7 +215,7 @@ def _resolve_metrics(metrics=None):
 
     Returns:
         ``(engine_metrics, metrics_cfg)`` tuple where:
-        - *engine_metrics*: value suitable for ``run_engine(metrics=...)``,
+        - *engine_metrics*: value suitable for ``run_experiment(metrics=...)``,
           either ``list[str]``, ``dict[str, DictConfig]``, or ``None``.
         - *metrics_cfg*: raw metric DictConfig for LightningModule model
           metrics, or ``None``.
@@ -315,7 +315,7 @@ def run(
     Programmatic entry point for manyLatents.
 
     Resolves string names to Python objects and delegates to
-    :func:`~manylatents.experiment.run_engine`.
+    :func:`~manylatents.experiment.run_experiment`.
 
     Args:
         input_data: Optional input array. If provided, wraps in
@@ -364,7 +364,7 @@ def run(
     """
     from lightning import Trainer
 
-    from manylatents.experiment import run_engine
+    from manylatents.experiment import run_experiment
 
     neighborhood_size = kwargs.pop("neighborhood_size", None)
 
@@ -406,7 +406,7 @@ def run(
         f"seed={seed}"
     )
 
-    return run_engine(
+    return run_experiment(
         datamodule=datamodule,
         algorithm=algo,
         trainer=trainer,

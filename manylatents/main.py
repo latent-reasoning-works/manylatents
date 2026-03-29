@@ -16,12 +16,26 @@ except (ImportError, AttributeError):
 
 import manylatents.configs  # noqa: F401
 from manylatents.callbacks.embedding.base import EmbeddingCallback
-from manylatents.experiment import run_engine
-from manylatents.extensions import discover_extensions
+from manylatents.experiment import run_experiment
 from manylatents.utils.metrics import flatten_and_unroll_metrics
 from manylatents.utils.utils import check_or_make_dirs, setup_logging, should_disable_wandb
 
-discover_extensions()
+# Auto-discover extension plugins (omics, etc.) before @hydra.main fires
+def _discover_extensions():
+    from importlib.metadata import entry_points
+    from hydra.core.plugins import Plugins
+    from hydra.plugins.search_path_plugin import SearchPathPlugin
+    plugins = Plugins.instance()
+    existing = {type(p) for p in plugins.discover(SearchPathPlugin)}
+    for ep in entry_points(group="manylatents.extensions"):
+        try:
+            cls = ep.load()
+            if isinstance(cls, type) and issubclass(cls, SearchPathPlugin) and cls not in existing:
+                plugins.register(cls)
+        except Exception:
+            pass
+
+_discover_extensions()
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +205,7 @@ def main(cfg: DictConfig) -> Dict[str, Any]:
     )
     sampling = _instantiate_sampling(cfg)
 
-    result = run_engine(
+    result = run_experiment(
         datamodule=datamodule,
         algorithm=algorithm,
         trainer=trainer,
