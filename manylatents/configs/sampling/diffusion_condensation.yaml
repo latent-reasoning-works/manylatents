@@ -1,8 +1,8 @@
 # Unsupervised balanced sampling via diffusion condensation
 # Runs Multiscale PHATE to discover clusters, then median-truncated balanced subsampling
-# Usage: metrics.sampling=sampling/diffusion_condensation
 # Requires: multiscale_phate package
-sampling:
+# Best as pre-fit sampling (dataset key) to balance input before algorithm
+dataset:
   _target_: manylatents.utils.sampling.DiffusionCondensationSampling
   target_clusters: 10
   landmarks: 2000
