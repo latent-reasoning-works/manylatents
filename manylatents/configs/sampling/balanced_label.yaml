@@ -1,6 +1,6 @@
 # Balanced sampling via median truncation — caps large clusters at median size
-# Usage: metrics.sampling=sampling/balanced
-sampling:
+# Requires dataset with population_label (or custom stratify_by attribute)
+embedding:
   _target_: manylatents.utils.sampling.BalancedLabelSampling
   stratify_by: population_label
   seed: 42

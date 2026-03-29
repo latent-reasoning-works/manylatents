@@ -26,44 +26,10 @@ from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback, ColormapInfo
 from manylatents.utils.data import determine_data_source
 from manylatents.utils.metrics import _content_key, compute_knn, compute_eigenvalues, flatten_and_unroll_metrics
-from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging
+from manylatents.utils.utils import check_or_make_dirs, load_precomputed_embeddings, setup_logging, should_disable_wandb
 
 logger = logging.getLogger(__name__)
 
-
-def should_disable_wandb(cfg: DictConfig) -> bool:
-    """
-    Determine if WandB should be disabled based on configuration.
-
-    WandB is disabled when:
-    1. logger is explicitly set to None (orchestrated by parent like Geomancer)
-    2. debug mode is True (fast testing/CI)
-    3. WANDB_MODE environment variable is set to 'disabled'
-
-    This ensures consistent behavior across run_algorithm() invocations.
-
-    Args:
-        cfg: Hydra configuration
-
-    Returns:
-        True if WandB should be disabled, False otherwise
-    """
-    # Check explicit logger=None (orchestrated mode)
-    if cfg.logger is None:
-        logger.info("WandB disabled: logger=None (orchestrated by parent)")
-        return True
-
-    # Check debug mode
-    if cfg.debug:
-        logger.info("WandB disabled: debug=True")
-        return True
-
-    # Check environment variable (allows external override)
-    if os.environ.get('WANDB_MODE', '').lower() == 'disabled':
-        logger.info("WandB disabled: WANDB_MODE=disabled")
-        return True
-
-    return False
 
 
 def instantiate_datamodule(cfg: DictConfig, input_data_holder: Optional[Dict] = None) -> LightningDataModule:
