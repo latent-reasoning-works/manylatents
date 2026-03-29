@@ -71,13 +71,13 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
 
     ## Execution Flow
 
-    In `run_algorithm()`:
+    In `run_engine()`:
 
     1. Callbacks instantiated from config
     2. Lightning callbacks passed to `Trainer(callbacks=[...])`
     3. Algorithm executes (fit/transform or trainer.fit)
     4. Embeddings wrapped as `LatentOutputs` dict
-    5. Metrics evaluated
+    5. Metrics evaluated via `evaluate()` (evaluate.py)
     6. Each embedding callback's `on_latent_end()` called with dataset + embeddings
     7. Callback outputs merged into the embeddings dict
 

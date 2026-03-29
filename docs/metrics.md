@@ -4,10 +4,10 @@ The evaluation system for manyLatents: metrics for measuring embedding quality, 
 
 ## Pipeline Execution Model
 
-Metrics and sampling operate on **named pipeline outputs** — a dict built as `run_algorithm()` progresses. Understanding when each output becomes available is key to understanding what `at` and `sampling` can target.
+Metrics and sampling operate on **named pipeline outputs** — a dict built as `run_engine()` progresses. Understanding when each output becomes available is key to understanding what `at` and `sampling` can target.
 
 ```
-run_algorithm()
+run_engine()
 │
 ├─ datamodule.setup()
 │   outputs["dataset"] = ds.data                          ← dataset available
@@ -22,7 +22,7 @@ run_algorithm()
 │   outputs["kernel"]    = ...                              (algorithm-dependent)
 │   outputs["adjacency"] = ...
 │
-├─ evaluate_outputs()
+├─ evaluate()   [evaluate.py]
 │   ├─ [sampling.embedding] ── subsample before metrics   ← POSITION 2
 │   ├─ prewarm_cache() ── kNN/eigenvalues per "on" value
 │   └─ for each metric:
@@ -49,8 +49,8 @@ New outputs can be added by having a LatentModule return them from `extra_output
 
 Sampling has two categories with different infrastructure:
 
-- **Pre-fit** (`sampling.dataset`): Fixed integration point in `run_algorithm()` BEFORE `fit()`. Reduces what the algorithm sees. This is inherently positional — it changes the algorithm's input, not just what metrics evaluate on.
-- **Post-fit** (any other key): Dynamic loop in `evaluate_outputs()` over the `outputs` dict. Any array-valued output can be sampled. If `sampling.embedding` is configured, the dataset is auto-sliced to matching indices for cross-space metrics.
+- **Pre-fit** (`sampling.dataset`): Fixed integration point in `run_engine()` BEFORE `fit()`. Reduces what the algorithm sees. This is inherently positional — it changes the algorithm's input, not just what metrics evaluate on.
+- **Post-fit** (any other key): Dynamic loop in `evaluate()` over the `outputs` dict. Any array-valued output can be sampled. If `sampling.embedding` is configured, the dataset is auto-sliced to matching indices for cross-space metrics.
 
 Post-fit sampling uses the same dynamic resolution as metric routing — it iterates the sampling config, matches keys against the `outputs` dict, and applies the sampler to any matching array. New outputs from `extra_outputs()` are automatically sampleable.
 

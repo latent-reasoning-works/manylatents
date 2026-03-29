@@ -1,6 +1,6 @@
 # Evaluation
 
-How manyLatents dispatches, evaluates, and samples embeddings. The core engine lives in `experiment.py`.
+How manyLatents dispatches, evaluates, and samples embeddings. The core engine lives in `experiment.py`; evaluation helpers live in `evaluate.py`.
 
 === "Dispatch"
 
@@ -10,22 +10,22 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### Algorithm Resolution
 
-    `run_algorithm()` determines which algorithm type to instantiate from the Hydra config:
+    `run_engine()` determines which algorithm type to instantiate from the algorithm dict:
 
     ```python
-    if hasattr(cfg.algorithms, 'latent') and cfg.algorithms.latent is not None:
-        algorithm = instantiate_algorithm(cfg.algorithms.latent, datamodule)
-    elif hasattr(cfg.algorithms, 'lightning') and cfg.algorithms.lightning is not None:
-        algorithm = instantiate_algorithm(cfg.algorithms.lightning, datamodule)
+    if "latent" in algorithms and algorithms["latent"] is not None:
+        algorithm = instantiate_algorithm(algorithms["latent"], datamodule)
+    elif "lightning" in algorithms and algorithms["lightning"] is not None:
+        algorithm = instantiate_algorithm(algorithms["lightning"], datamodule)
     else:
         raise ValueError("No algorithm specified in configuration")
     ```
 
-    Only one of `algorithms/latent` or `algorithms/lightning` should be set per run. The config group determines which path is taken.
+    Only one of `algorithms["latent"]` or `algorithms["lightning"]` should be set per run. The key determines which path is taken.
 
-    ### Execution: `execute_step()`
+    ### Execution
 
-    `execute_step()` routes via `isinstance()` checks:
+    `run_engine()` routes via `isinstance()` checks (the former `execute_step()` logic is now inlined in `run_engine()`):
 
     ```python
     if isinstance(algorithm, LatentModule):
@@ -41,9 +41,9 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     **LightningModule path:** Full Lightning training loop via `trainer.fit()`, optional pretrained checkpoint loading, model evaluation via `evaluate()`, then embedding extraction via `encode()`.
 
-    ### Evaluation: `@functools.singledispatch`
+    ### Evaluation: `evaluate()` in `evaluate.py`
 
-    The `evaluate()` function uses Python's `@functools.singledispatch` to dispatch on the first argument's type:
+    The `evaluate()` function (in `evaluate.py`) uses Python's `@functools.singledispatch` to dispatch on the first argument's type:
 
     ```python
     @functools.singledispatch
@@ -51,22 +51,22 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
         raise NotImplementedError(...)
 
     @evaluate.register(dict)
-    def evaluate_outputs(latent_outputs: dict, *, cfg, datamodule, **kwargs):
+    def _evaluate_outputs(latent_outputs: dict, *, metrics, datamodule, **kwargs):
         # Handles embedding-level metrics (trustworthiness, continuity, etc.)
         ...
 
     @evaluate.register(LightningModule)
-    def evaluate_lightningmodule(algorithm: LightningModule, *, cfg, trainer, datamodule, **kwargs):
+    def _evaluate_lightningmodule(algorithm: LightningModule, *, metrics, trainer, datamodule, **kwargs):
         # Handles trainer.test() and model-specific metrics
         ...
     ```
 
     | Dispatch Type | Handler | Evaluates |
     |---------------|---------|-----------|
-    | `dict` (LatentOutputs) | `evaluate_outputs()` | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
-    | `LightningModule` | `evaluate_lightningmodule()` | `trainer.test()` results + custom model metrics |
+    | `dict` (LatentOutputs) | `evaluate()` on dict | Embedding metrics (trustworthiness, continuity, kNN preservation, etc.) |
+    | `LightningModule` | `evaluate()` on LightningModule | `trainer.test()` results + custom model metrics |
 
-    Both paths are called during a LightningModule run: first `evaluate_lightningmodule` during `execute_step()`, then `evaluate_outputs` on the extracted embeddings.
+    Both paths are called during a LightningModule run: first `evaluate()` on the module during training, then `evaluate()` on the extracted embeddings dict.
 
 === "Sampling"
 
@@ -147,7 +147,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### How Sampling Integrates
 
-    In `evaluate_outputs()`, sampling runs before any metrics:
+    In `evaluate()`, sampling runs before any metrics:
 
     ```python
     sampling_cfg = cfg.metrics.get("sampling", None)
@@ -166,7 +166,7 @@ How manyLatents dispatches, evaluates, and samples embeddings. The core engine l
 
     ### How It Works
 
-    `evaluate_outputs()` uses the config sleuther (`extract_k_requirements`) to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` to compute kNN and eigenvalues once with `max(k)`:
+    `evaluate()` uses the config sleuther (`extract_k_requirements`, in `evaluate.py`) to discover all `k`/`n_neighbors` values from metric configs, then calls `prewarm_cache()` (also in `evaluate.py`) to compute kNN and eigenvalues once with `max(k)`:
 
     ```python
     # 1. Sleuther extracts requirements from metric configs
