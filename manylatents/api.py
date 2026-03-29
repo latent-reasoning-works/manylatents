@@ -3,7 +3,7 @@ Programmatic API for agent-driven workflows.
 
 This module provides a Python function interface for manyAgents to call
 manyLatents directly without subprocess overhead. Instead of building a
-full Hydra DictConfig and routing through ``run_algorithm()``, the API
+full Hydra DictConfig and routing through a single Hydra config, the API
 resolves string names to Python objects (DataModules, algorithms, metrics)
 and delegates to :func:`~manylatents.experiment.run_experiment`.
 
@@ -23,10 +23,12 @@ Example:
     result2 = run(input_data=result1['embeddings'], algorithms={'latent': 'phate'})
 """
 
+from __future__ import annotations
+
 import functools
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -38,7 +40,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _hydra_compose(overrides: List[str]):
+def _hydra_compose(overrides: list[str]):
     """Compose a Hydra config with the given overrides.
 
     Manages GlobalHydra state so callers don't have to worry about
@@ -302,15 +304,15 @@ def _resolve_sampling(sampling=None):
 
 
 def run(
-    input_data: Optional[np.ndarray] = None,
-    data: Optional[str] = None,
+    input_data: np.ndarray | None = None,
+    data: str | None = None,
     algorithm=None,
-    algorithms: Optional[Dict[str, Any]] = None,
+    algorithms: dict[str, Any] | None = None,
     metrics=None,
     sampling=None,
     seed: int = 42,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Programmatic entry point for manyLatents.
 
