@@ -15,7 +15,6 @@ from typing import Any, Optional
 
 import numpy as np
 
-from manylatents.callbacks.embedding.base import ColormapInfo
 from manylatents.metrics.registry import get_metric
 from manylatents.utils.metrics import _content_key, compute_eigenvalues, compute_knn
 
@@ -240,6 +239,7 @@ def _evaluate_hydra(
         Flat dict of metric results (with ColormapInfo viz metadata).
     """
     import hydra as _hydra
+    from manylatents.callbacks.embedding.base import ColormapInfo
 
     results: dict[str, Any] = {}
     for metric_name, metric_cfg in metrics.items():
