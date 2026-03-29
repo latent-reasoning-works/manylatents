@@ -1,34 +1,23 @@
 """
 Programmatic API for agent-driven workflows.
 
-This module provides a Python function interface for manyAgents to call
-manyLatents directly without subprocess overhead. Instead of building a
-full Hydra DictConfig and routing through a single Hydra config, the API
-resolves string names to Python objects (DataModules, algorithms, metrics)
-and delegates to :func:`~manylatents.experiment.run_experiment`.
+Hydra-free Python interface for manyLatents. Resolves string names via
+Python registries, instantiates ``_target_`` dicts via importlib — no
+GlobalHydra, no config composition, no singleton state.
 
-Hydra is only used as a fallback for complex configs (dicts with
-``_target_`` keys or extension components not in the Python registry).
-Common string names (``"swissroll"``, ``"pca"``) resolve via Python
-registries without touching Hydra.
+The only Hydra fallback is for string metric bundle names (e.g.
+``"standard"``) which require Hydra defaults composition.
 
 Example:
-    # Single algorithm
-    result = run(
-        data='swissroll',
-        algorithms={'latent': {'_target_': 'manylatents.algorithms.latent.pca.PCA', 'n_components': 10}}
-    )
-
-    # Chaining with input_data (multi-step via sequential API calls)
-    result1 = run(data='swissroll', algorithms={'latent': 'pca'})
-    result2 = run(input_data=result1['embeddings'], algorithms={'latent': 'phate'})
+    result = run(data='swissroll', algorithm='pca', metrics=['trustworthiness'])
+    result = run(input_data=array, algorithm=PCAModule(n_components=5))
 """
 
 from __future__ import annotations
 
 import functools
+import importlib
 import logging
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -37,35 +26,29 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Hydra helpers (fallback for configs not in Python registries)
+# Instantiation helpers (no Hydra)
 # ---------------------------------------------------------------------------
 
 
-def _hydra_compose(overrides: list[str]):
-    """Compose a Hydra config with the given overrides.
+def _instantiate_target(cfg: dict, **extra) -> Any:
+    """Instantiate a class from a dict with ``_target_``.
 
-    Manages GlobalHydra state so callers don't have to worry about
-    leftover initializations from other libraries (manyagents, geomancy,
-    shop, etc.).
-
-    Returns an OmegaConf DictConfig.
+    Handles ``_partial_: True`` (returns functools.partial).
+    Replaces ``hydra.utils.instantiate`` for the API path.
     """
-    from hydra import compose, initialize_config_dir
-    from hydra.core.global_hydra import GlobalHydra
+    cfg = {**cfg, **extra}  # shallow merge, extra overrides cfg
+    target = cfg.pop("_target_")
+    partial = cfg.pop("_partial_", False)
+    cfg.pop("_recursive_", None)  # Hydra meta-key, not needed
+    cfg.pop("_convert_", None)
 
-    # IMPORTANT: Import configs to register base_config with Hydra ConfigStore
-    import manylatents.configs  # noqa: F401
+    module_path, class_name = target.rsplit(".", 1)
+    mod = importlib.import_module(module_path)
+    cls = getattr(mod, class_name)
 
-    if GlobalHydra.instance().is_initialized():
-        logger.debug("Clearing GlobalHydra before manylatents API call")
-        GlobalHydra.instance().clear()
-
-    config_dir = str((Path(__file__).parent / "configs").resolve())
-
-    with initialize_config_dir(config_dir=config_dir, version_base=None):
-        cfg = compose(config_name="config", overrides=overrides)
-
-    return cfg
+    if partial:
+        return functools.partial(cls, **cfg)
+    return cls(**cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -76,19 +59,8 @@ def _hydra_compose(overrides: list[str]):
 def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
     """Resolve data source to an instantiated LightningDataModule.
 
-    Args:
-        input_data: Optional np.ndarray of in-memory data.
-        data: Optional string dataset name (e.g. ``"swissroll"``).
-        seed: Random seed forwarded to the datamodule.
-        **kwargs: Extra keyword arguments forwarded to PrecomputedDataModule
-            when *input_data* is provided.
-
-    Returns:
-        A LightningDataModule instance (NOT yet ``.setup()``'d — the engine
-        handles that).
-
-    Raises:
-        ValueError: If neither *input_data* nor *data* is provided.
+    Fast path: Python registry (no Hydra).
+    Fallback: raises ValueError if not found.
     """
     if input_data is not None:
         from manylatents.data.precomputed_datamodule import PrecomputedDataModule
@@ -97,29 +69,15 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
         return PrecomputedDataModule(data=input_data, seed=seed, **kwargs)
 
     if data is not None:
-        # Fast path: Python registry (no Hydra)
         from manylatents.data import get_datamodule
 
         try:
             return get_datamodule(data, random_state=seed)
         except ValueError:
-            pass
+            raise
         except TypeError:
             # Constructor doesn't accept random_state — retry without it
-            try:
-                return get_datamodule(data)
-            except ValueError:
-                pass
-
-        # Fallback: Hydra config lookup (extension datasets not in Python registry)
-        import hydra as _hydra
-        from omegaconf import OmegaConf
-
-        cfg = _hydra_compose([f"data={data}"])
-        OmegaConf.set_struct(cfg, False)
-        datamodule_cfg = {k: v for k, v in cfg.data.items() if k != "debug"}
-        dm = _hydra.utils.instantiate(datamodule_cfg)
-        return dm
+            return get_datamodule(data)
 
     raise ValueError(
         "Either 'input_data' (np.ndarray) or 'data' (str dataset name) must be provided."
@@ -129,36 +87,15 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
 def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42, neighborhood_size=None, **kwargs):
     """Resolve algorithm specification to an instantiated module.
 
-    Priority: *algorithm* (instance or string) > *algorithms* (dict).
-
-    Args:
-        algorithm: A pre-built LatentModule/LightningModule instance, or a
-            string name (e.g. ``"pca"``).
-        algorithms: A dict in the old-style format, e.g.
-            ``{"latent": "pca"}`` or
-            ``{"latent": {"_target_": "...", "n_components": 2}}``.
-        datamodule: Optional datamodule passed to the algorithm constructor.
-        seed: Random seed.
-        neighborhood_size: Unified neighborhood parameter.
-        **kwargs: Ignored (absorbs extra keyword arguments from ``run()``).
-
-    Returns:
-        An instantiated algorithm object.
-
-    Raises:
-        ValueError: If no algorithm can be resolved.
+    Fast path: string name → Python registry.
+    Dict with ``_target_`` → importlib instantiation (no Hydra).
     """
-    import hydra as _hydra
-    from omegaconf import DictConfig, OmegaConf
-
     from manylatents.algorithms.latent.latent_module_base import LatentModule
 
     # --- Pass-through: already-instantiated instance ---
     if algorithm is not None and not isinstance(algorithm, str):
-        # Check it's a LatentModule or LightningModule instance
         from lightning import LightningModule
         if isinstance(algorithm, (LatentModule, LightningModule)):
-            logger.info(f"Using pre-built algorithm: {type(algorithm).__name__}")
             return algorithm
         raise TypeError(
             f"algorithm must be a LatentModule, LightningModule, or string, "
@@ -167,7 +104,6 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
 
     # --- String shorthand: algorithm="pca" ---
     if isinstance(algorithm, str):
-        # Fast path: Python registry (no Hydra)
         from manylatents.algorithms.latent import get_algorithm
 
         try:
@@ -179,9 +115,8 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                 algo_kwargs["neighborhood_size"] = neighborhood_size
             return cls(**algo_kwargs)
         except KeyError:
-            pass
-        # Fallback: Hydra compose
-        algorithms = {"latent": algorithm}
+            # Not in latent registry — try as algorithms dict
+            algorithms = {"latent": algorithm}
 
     if algorithms is None:
         raise ValueError(
@@ -189,9 +124,8 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
             "or 'algorithms' (dict)."
         )
 
-    # --- Dict resolution via Hydra ---
-    # Determine the config group and value
-    algo_type = None  # "latent" or "lightning"
+    # --- Dict resolution ---
+    algo_type = None
     algo_value = None
 
     for key in ("latent", "lightning"):
@@ -207,10 +141,9 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
         )
 
     if isinstance(algo_value, str):
-        # Fast path: Python registry (latent algorithms only)
+        # String in dict: {"latent": "pca"} — try registry
         if algo_type == "latent":
             from manylatents.algorithms.latent import get_algorithm
-
             try:
                 cls = get_algorithm(algo_value)
                 algo_kwargs = {}
@@ -222,63 +155,56 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
             except KeyError:
                 pass
 
-        # Fallback: Hydra compose
-        overrides = [f"algorithms/{algo_type}={algo_value}"]
-        if seed is not None:
-            overrides.append(f"seed={seed}")
-        if neighborhood_size is not None:
-            overrides.append(f"neighborhood_size={neighborhood_size}")
-        cfg = _hydra_compose(overrides)
-        algo_cfg = getattr(cfg.algorithms, algo_type)
-    elif isinstance(algo_value, dict):
-        # Dict config -> convert to DictConfig
-        algo_cfg = OmegaConf.create(algo_value)
-    elif isinstance(algo_value, DictConfig):
-        algo_cfg = algo_value
-    else:
-        raise TypeError(
-            f"algorithms['{algo_type}'] must be a string or dict, "
-            f"got {type(algo_value)}"
+        raise ValueError(
+            f"Algorithm '{algo_value}' not found in registry. "
+            f"Use a dict with '_target_' for custom algorithms."
         )
 
-    # Instantiate (handle _partial_ configs)
-    algo_or_partial = _hydra.utils.instantiate(algo_cfg, datamodule=datamodule)
-    if isinstance(algo_or_partial, functools.partial):
-        if datamodule:
-            return algo_or_partial(datamodule=datamodule)
-        return algo_or_partial()
-    return algo_or_partial
+    if isinstance(algo_value, dict):
+        # Dict with _target_: instantiate via importlib
+        algo_or_partial = _instantiate_target(algo_value, datamodule=datamodule)
+        if isinstance(algo_or_partial, functools.partial):
+            return algo_or_partial(datamodule=datamodule) if datamodule else algo_or_partial()
+        return algo_or_partial
+
+    raise TypeError(
+        f"algorithms['{algo_type}'] must be a string or dict, "
+        f"got {type(algo_value)}"
+    )
 
 
 def _resolve_metrics(metrics=None):
     """Resolve metrics specification.
 
-    Args:
-        metrics: One of:
-            - ``None`` -> no metrics
-            - ``list[str]`` -> registry metric names (passed through)
-            - ``dict`` -> Hydra-style metric configs (flattened + unrolled)
-            - ``str`` -> bundle name (e.g. ``"standard"``) composed via Hydra
+    - ``None`` → no metrics
+    - ``list[str]`` → registry names (passed through, no Hydra)
+    - ``dict`` → configs with ``_target_`` (flattened + unrolled, no Hydra)
+    - ``str`` → bundle name, requires Hydra compose (only Hydra touchpoint)
 
-    Returns:
-        ``(engine_metrics, metrics_cfg)`` tuple where:
-        - *engine_metrics*: value suitable for ``run_experiment(metrics=...)``,
-          either ``list[str]``, ``dict[str, DictConfig]``, or ``None``.
-        - *metrics_cfg*: raw metric DictConfig for LightningModule model
-          metrics, or ``None``.
+    Returns (engine_metrics, metrics_cfg) tuple.
     """
     if metrics is None:
         return None, None
 
-    # --- list[str]: registry names, pass through ---
+    # list[str]: registry names — no Hydra
     if isinstance(metrics, list):
         return metrics, None
 
-    # --- str: bundle name, compose via Hydra ---
+    # str: bundle name — this is the ONE path that needs Hydra
     if isinstance(metrics, str):
-        from omegaconf import OmegaConf
+        from hydra import compose, initialize_config_dir
+        from hydra.core.global_hydra import GlobalHydra
+        from pathlib import Path
 
-        cfg = _hydra_compose([f"metrics={metrics}"])
+        import manylatents.configs  # noqa: F401
+
+        if GlobalHydra.instance().is_initialized():
+            GlobalHydra.instance().clear()
+
+        config_dir = str((Path(__file__).parent / "configs").resolve())
+        with initialize_config_dir(config_dir=config_dir, version_base=None):
+            cfg = compose(config_name="config", overrides=[f"metrics={metrics}"])
+
         if cfg.metrics is None:
             return None, None
 
@@ -286,7 +212,7 @@ def _resolve_metrics(metrics=None):
         flattened = flatten_and_unroll_metrics(cfg.metrics)
         return flattened, cfg.metrics
 
-    # --- dict or DictConfig: flatten and unroll ---
+    # dict: configs with _target_ — no Hydra
     if isinstance(metrics, dict):
         from omegaconf import DictConfig, OmegaConf
         from manylatents.utils.metrics import flatten_and_unroll_metrics
@@ -307,38 +233,23 @@ def _resolve_metrics(metrics=None):
 def _resolve_sampling(sampling=None):
     """Resolve sampling specification to instantiated sampler objects.
 
-    Args:
-        sampling: One of:
-            - ``None`` -> no sampling
-            - ``dict`` with sampler instances (objects with ``get_indices``)
-              -> pass through
-            - ``dict`` with Hydra-style sampler configs (containing
-              ``_target_``) -> instantiate each
-
-    Returns:
-        Dict of instantiated sampler objects, or ``None``.
+    Sampler instances (with ``get_indices``) pass through.
+    Dicts with ``_target_`` are instantiated via importlib (no Hydra).
     """
     if sampling is None:
         return None
 
-    import hydra as _hydra
-
     result = {}
     for name, sampler_or_cfg in sampling.items():
-        # Already-instantiated sampler (has get_indices method)
         if hasattr(sampler_or_cfg, "get_indices"):
             result[name] = sampler_or_cfg
         elif isinstance(sampler_or_cfg, dict) and "_target_" in sampler_or_cfg:
-            result[name] = _hydra.utils.instantiate(sampler_or_cfg)
+            result[name] = _instantiate_target(sampler_or_cfg)
         else:
-            from omegaconf import DictConfig
-            if isinstance(sampler_or_cfg, DictConfig) and "_target_" in sampler_or_cfg:
-                result[name] = _hydra.utils.instantiate(sampler_or_cfg)
-            else:
-                raise TypeError(
-                    f"sampling['{name}'] must be a sampler instance (with get_indices) "
-                    f"or a dict with '_target_', got {type(sampler_or_cfg)}"
-                )
+            raise TypeError(
+                f"sampling['{name}'] must be a sampler instance (with get_indices) "
+                f"or a dict with '_target_', got {type(sampler_or_cfg)}"
+            )
 
     return result
 
@@ -359,98 +270,44 @@ def run(
     **kwargs,
 ) -> dict[str, Any]:
     """
-    Programmatic entry point for manyLatents.
-
-    Resolves string names to Python objects and delegates to
-    :func:`~manylatents.experiment.run_experiment`.
+    Run a manyLatents experiment.
 
     Args:
-        input_data: Optional input array. If provided, wraps in
-            PrecomputedDataModule instead of loading from a configured dataset.
-        data: Dataset name (e.g. ``"swissroll"``).  Mutually exclusive with
-            *input_data*.
-        algorithm: A pre-built LatentModule/LightningModule instance, or a
-            string name (e.g. ``"pca"``).
-        algorithms: Old-style dict, e.g. ``{"latent": "pca"}`` or
+        input_data: In-memory array (wraps in PrecomputedDataModule).
+        data: Dataset name (e.g. ``"swissroll"``).
+        algorithm: String name (``"pca"``), or pre-built instance.
+        algorithms: Dict config, e.g. ``{"latent": "pca"}`` or
             ``{"latent": {"_target_": "...", "n_components": 2}}``.
-        metrics: Metric specification — ``list[str]`` of registry names,
-            ``dict`` of Hydra-style configs, ``str`` bundle name, or ``None``.
-        sampling: Dict of sampler configs or pre-instantiated sampler objects.
+        metrics: ``list[str]`` of registry names, ``dict`` of configs
+            with ``_target_``, ``str`` bundle name, or ``None``.
+        sampling: Dict of sampler configs or instances.
         seed: Random seed (default 42).
-        **kwargs: Extra keyword arguments. Recognized keys:
-            - ``neighborhood_size``: Unified neighborhood parameter.
-            All others are silently ignored.
+        **kwargs: ``neighborhood_size`` forwarded to algorithm.
 
     Returns:
-        Dictionary with keys:
-            - embeddings: The computed embeddings (numpy array)
-            - label: Labels from the dataset (if available)
-            - metadata: Dictionary with run metadata
-            - scores: Evaluation metrics
+        Dict with keys: embeddings, label, metadata, scores.
 
     Examples:
-        >>> # Single run
-        >>> result = run(data='swissroll', algorithms={'latent': 'pca'})
-        >>> embeddings = result['embeddings']
-        >>>
-        >>> # With full config
-        >>> result = run(
-        ...     data='swissroll',
-        ...     algorithms={'latent': {'_target_': '...PCA', 'n_components': 10}},
-        ...     metrics={'trustworthiness': {'_target_': '...', '_partial_': True, 'n_neighbors': 5, 'at': 'embedding'}},
-        ... )
-        >>>
-        >>> # Chained runs
-        >>> result1 = run(data='swissroll', algorithms={'latent': 'pca'})
-        >>> result2 = run(input_data=result1['embeddings'], algorithms={'latent': 'phate'})
-        >>>
-        >>> # Pre-built algorithm
-        >>> from manylatents.algorithms.latent.pca import PCAModule
-        >>> pca = PCAModule(n_components=2)
-        >>> result = run(data='swissroll', algorithm=pca)
+        >>> result = run(data='swissroll', algorithm='pca')
+        >>> result = run(data='swissroll', algorithm='pca', metrics=['trustworthiness'])
+        >>> result = run(input_data=array, algorithm=PCAModule(n_components=5))
     """
     from lightning import Trainer
-
     from manylatents.experiment import run_experiment
 
     neighborhood_size = kwargs.pop("neighborhood_size", None)
 
-    # 1. Resolve data
-    datamodule = _resolve_datamodule(
-        input_data=input_data,
-        data=data,
-        seed=seed,
-    )
-
-    # 2. Resolve algorithm
+    datamodule = _resolve_datamodule(input_data=input_data, data=data, seed=seed)
     algo = _resolve_algorithm(
-        algorithm=algorithm,
-        algorithms=algorithms,
-        datamodule=datamodule,
-        seed=seed,
-        neighborhood_size=neighborhood_size,
+        algorithm=algorithm, algorithms=algorithms,
+        datamodule=datamodule, seed=seed, neighborhood_size=neighborhood_size,
     )
-
-    # 3. Resolve metrics
     engine_metrics, metrics_cfg = _resolve_metrics(metrics)
-
-    # 4. Resolve sampling
     engine_sampling = _resolve_sampling(sampling)
 
-    # 5. Create a minimal Trainer (API runs are always single-device, no logging)
     trainer = Trainer(
-        accelerator="auto",
-        devices=1,
-        logger=False,
-        enable_checkpointing=False,
-        enable_progress_bar=False,
-    )
-
-    # 6. Delegate to the Hydra-free engine
-    logger.info(
-        f"API run: algorithm={type(algo).__name__}, "
-        f"data={'input_data' if input_data is not None else data}, "
-        f"seed={seed}"
+        accelerator="auto", devices=1, logger=False,
+        enable_checkpointing=False, enable_progress_bar=False,
     )
 
     return run_experiment(
