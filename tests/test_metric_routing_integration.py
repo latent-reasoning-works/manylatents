@@ -159,6 +159,29 @@ def test_sampling_dataset_reduces_data_before_fit():
 
 
 # ---------------------------------------------------------------------------
+# 5b. Pre-fit sampling keeps result labels aligned with sampled embeddings
+# ---------------------------------------------------------------------------
+
+def test_sampling_dataset_keeps_labels_aligned_with_embeddings():
+    """sampling.dataset should propagate sampled labels to result['label']."""
+    result = run(
+        data="gaussian_blob",
+        algorithms=_PCA_ALGO,
+        sampling={
+            "dataset": {
+                "_target_": "manylatents.utils.sampling.RandomSampling",
+                "fraction": 0.5,
+                "seed": 42,
+            }
+        },
+    )
+
+    assert result.get("label") is not None
+    assert len(result["label"]) == result["embeddings"].shape[0]
+    assert result["embeddings"].shape[0] < 100
+
+
+# ---------------------------------------------------------------------------
 # 6. Post-fit sampling: full embeddings returned, evaluation on subset
 # ---------------------------------------------------------------------------
 
