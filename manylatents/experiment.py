@@ -170,17 +170,43 @@ def run_experiment(
                 train_labels = torch.tensor(labels) if not isinstance(labels, torch.Tensor) else labels
                 logger.info(f"Extracted {len(train_labels)} training labels for supervised learning")
 
+        # Labels to return with embeddings (used by plotting callbacks)
+        output_labels = None
+        test_dataset = getattr(datamodule, "test_dataset", None)
+        if test_dataset is not None and hasattr(test_dataset, "get_labels"):
+            output_labels = test_dataset.get_labels()
+
         # ---- 4c. Pre-fit sampling ----
         pre_fit_indices = None
         if sampling is not None and "dataset" in sampling:
             dataset_sampler = sampling["dataset"]
-            pre_fit_indices = dataset_sampler.get_indices(
-                train_tensor.numpy() if torch.is_tensor(train_tensor) else train_tensor
-            )
+            sampler_input = train_tensor.numpy() if torch.is_tensor(train_tensor) else train_tensor
+            sampler_kwargs: dict[str, Any] = {}
+            if train_dataset is not None:
+                sampler_kwargs["dataset"] = train_dataset
+            if train_labels is not None:
+                sampler_kwargs["labels"] = (
+                    train_labels.cpu().numpy()
+                    if isinstance(train_labels, torch.Tensor)
+                    else np.asarray(train_labels)
+                )
+            try:
+                pre_fit_indices = dataset_sampler.get_indices(
+                    sampler_input, **sampler_kwargs
+                )
+            except TypeError as exc:
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+                pre_fit_indices = dataset_sampler.get_indices(sampler_input)
             train_tensor = train_tensor[pre_fit_indices]
             test_tensor = test_tensor[pre_fit_indices]
             if train_labels is not None:
                 train_labels = train_labels[pre_fit_indices]
+            if output_labels is not None:
+                if isinstance(output_labels, torch.Tensor):
+                    output_labels = output_labels[torch.as_tensor(pre_fit_indices, dtype=torch.long)]
+                else:
+                    output_labels = np.asarray(output_labels)[pre_fit_indices]
             logger.info(f"Pre-fit sampling: {len(pre_fit_indices)} samples using {type(dataset_sampler).__name__}")
 
         logger.info(
@@ -243,7 +269,7 @@ def run_experiment(
         if latents is not None:
             results = {
                 "embeddings": latents,
-                "label": getattr(getattr(datamodule, "test_dataset", None), "get_labels", lambda: None)(),
+                "label": output_labels,
                 "metadata": {
                     "source": "single_algorithm",
                     "algorithm_type": type(algorithm).__name__,
