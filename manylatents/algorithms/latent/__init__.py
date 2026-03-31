@@ -11,6 +11,7 @@ from .classifier import ClassifierModule
 from .leiden import LeidenModule
 from .reeb_graph import ReebGraphModule
 from .selective_correction import SelectiveCorrectionModule
+from .foundation_encoder import FoundationEncoder
 
 __all__ = [
     "PCAModule",
@@ -26,6 +27,7 @@ __all__ = [
     "LeidenModule",
     "ReebGraphModule",
     "SelectiveCorrectionModule",
+    "FoundationEncoder",
     "get_algorithm",
     "list_algorithms",
 ]
