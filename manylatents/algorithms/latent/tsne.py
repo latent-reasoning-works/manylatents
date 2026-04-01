@@ -52,8 +52,8 @@ class TSNEModule(LatentModule):
             backend=backend, device=device,
             neighborhood_size=neighborhood_size, **kwargs,
         )
-        # perplexity ~ 3 * knn (entropy-calibrated effective neighborhood)
-        self.perplexity = float(neighborhood_size * 3) if neighborhood_size is not None else perplexity
+        # perplexity ≈ effective neighborhood size; OpenTSNE uses k = 3*perplexity for kNN search
+        self.perplexity = float(neighborhood_size) if neighborhood_size is not None else perplexity
         self.n_iter_early = n_iter_early
         self.n_iter_late = n_iter_late
         self.learning_rate = learning_rate
