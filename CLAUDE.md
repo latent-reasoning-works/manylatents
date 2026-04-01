@@ -188,6 +188,7 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 - **LightningModule unit tests** — must call `model.setup()` if not using `trainer.fit()`.
 - **`save_hyperparameters`** — always `ignore=["datamodule", "network", "loss"]`.
 - **Loss functions** — use project's `MSELoss` (`outputs, targets, **kwargs`), not `torch.nn.MSELoss`.
+- **`neighborhood_size` is the unified neighbor parameter** — always use `neighborhood_size=k` when constructing any LatentModule, NOT method-specific params (`n_neighbors`, `knn`, `perplexity`). The base class routes `neighborhood_size` to each method's internal param. Using `n_neighbors=k` on TSNEModule silently goes to `**kwargs` and is ignored (perplexity stays at default 30).
 
 ## Tests
 
