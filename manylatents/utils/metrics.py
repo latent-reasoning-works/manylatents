@@ -167,9 +167,9 @@ def flatten_and_unroll_metrics(
 ) -> Dict[str, DictConfig]:
     """
     Iterates over a flat dict of metric configs (each with a ``_target_`` and
-    an ``on`` field), and for any keys whose value is a list/ListConfig builds
+    an ``at`` field), and for any keys whose value is a list/ListConfig builds
     one sub-config per element (Cartesian-product if multiple list-valued keys
-    are present).  The ``on`` field participates in sweep expansion just like
+    are present).  The ``at`` field participates in sweep expansion just like
     any other parameter.
 
     Returns:
@@ -183,7 +183,7 @@ def flatten_and_unroll_metrics(
         if not (isinstance(metric_cfg, DictConfig) and "_target_" in metric_cfg):
             continue
 
-        # 1) collect all keys that are list-valued (including 'on')
+        # 1) collect all keys that are list-valued (including 'at')
         sweep_keys = []
         sweep_vals = []
         for k, v in metric_cfg.items():

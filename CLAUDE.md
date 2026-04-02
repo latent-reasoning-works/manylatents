@@ -2,19 +2,61 @@
 
 Unified dimensionality reduction and neural network analysis. PyTorch Lightning + Hydra + uv.
 
+**See [ARCHITECTURE.md](ARCHITECTURE.md) for the codebase map, data flow, and architectural invariants.**
+
 ## Before Starting Work
 
 - **Check for existing implementations** before building anything new. Run `git log --oneline main | head -30` and `gh pr list --state merged --limit 10` to avoid reimplementing features that already exist under different naming.
 - **Always use manylatents APIs** (e.g. `from manylatents.api import run`) for experiments and traces — never substitute with raw sklearn/numpy equivalents unless explicitly told to.
 - **Prefer minimal, scoped changes.** Do not proactively expand scope (adding config files, fixing docs, cleaning orphan configs) unless explicitly asked. Ask before doing extra work.
 
-## Releases
+## Using the Python API
 
-When tagging a release:
-1. **Bump `version` in `pyproject.toml` first** — PyPI rejects uploads if the version already exists.
-2. Run `uv run pytest tests/ -x -q` to verify.
-3. Commit the version bump, push to main, then create the tag/release.
-4. Watch the Publish to PyPI workflow with `gh run watch`.
+**Call `run()` directly with parameters. Do not wrap it.** The API is designed for functional composition — pass data, algorithms, and metrics as arguments. Do not create helper functions, wrapper classes, or "pipeline" abstractions around it.
+
+```python
+# CORRECT — direct functional call
+from manylatents.api import run
+
+result = run(
+    data="swissroll",
+    algorithms={"latent": "pca"},
+    metrics={"trustworthiness": {
+        "_target_": "manylatents.metrics.trustworthiness.Trustworthiness",
+        "_partial_": True, "n_neighbors": 5,
+    }},
+)
+result["embeddings"]  # (n, d) ndarray
+result["scores"]      # {"trustworthiness": 0.95}
+```
+
+```python
+# WRONG — unnecessary wrapper
+def run_pca_analysis(data_path, n_components=2):
+    """Don't do this."""
+    module = PCAModule(n_components=n_components)
+    data = load_data(data_path)
+    module.fit(data)
+    return module.transform(data)
+```
+
+When writing analysis scripts, parameterize through `run()` arguments or Hydra config overrides, not through custom wrapper functions. If you need to vary parameters, use a loop over `run()` calls or a Hydra multirun.
+
+## CLI Entry Points
+
+```bash
+# CLI — primary interface
+uv run python -m manylatents.main algorithms/latent=pca data=swissroll metrics=trustworthiness
+
+# LightningModule path
+uv run python -m manylatents.main algorithms/lightning=ae_reconstruction data=swissroll trainer.fast_dev_run=true
+
+# Multirun sweep
+uv run python -m manylatents.main --multirun algorithms/latent=umap,phate,tsne data=swissroll metrics=trustworthiness
+
+# SLURM submission
+uv run python -m manylatents.main -m cluster=mila resources=gpu algorithms/latent=umap data=swissroll
+```
 
 ## What belongs here
 
@@ -26,6 +68,14 @@ This is a **public** repo. Only core infrastructure goes here:
 Hydra instantiation configs (algorithm, data, metric, callback YAMLs) belong here — they're part of the core and CI depends on them.
 
 **Do NOT push** experiment configs (sweep definitions), analysis scripts, data prep scripts, or project-specific sweeps. Those belong in the downstream repo that consumes manylatents (expaper repos, practitioner repos, etc.) — each has its own `experiments/configs/manylatents/experiment/` directory and a local manylatents pin.
+
+## Releases
+
+When tagging a release:
+1. **Bump `version` in `pyproject.toml` first** — PyPI rejects uploads if the version already exists.
+2. Run `uv run pytest tests/ -x -q` to verify.
+3. Commit the version bump, push to main, then create the tag/release.
+4. Watch the Publish to PyPI workflow with `gh run watch`.
 
 ## Pre-push checklist
 
@@ -49,82 +99,24 @@ gh run watch   # watch the CI run after pushing
 
 If CI fails after pushing, fix immediately — do not leave main broken.
 
-## Entry Points
+## Running Experiments
 
-```bash
-# CLI — primary interface
-uv run python -m manylatents.main algorithms/latent=pca data=swissroll metrics=trustworthiness
+**Always run experiment submissions as background tasks.** SLURM submissions and multirun sweeps can take time to dispatch — use `run_in_background: true` on the Bash tool so the conversation isn't blocked waiting. This applies to any `uv run python -m manylatents.main` invocation that submits to a cluster or runs a sweep.
 
-# LightningModule path
-uv run python -m manylatents.main algorithms/lightning=ae_reconstruction data=swissroll trainer.fast_dev_run=true
+## Config Discovery
 
-# Multirun sweep
-uv run python -m manylatents.main --multirun algorithms/latent=umap,phate,tsne data=swissroll metrics=trustworthiness
-
-# SLURM submission
-uv run python -m manylatents.main -m cluster=mila resources=gpu algorithms/latent=umap data=swissroll
-```
-
-```python
-from manylatents.api import run
-result = run(data="swissroll", algorithms={"latent": "pca"}, metrics={"trustworthiness": {"_target_": "manylatents.metrics.trustworthiness.Trustworthiness", "_partial_": True, "n_neighbors": 5}})
-result["embeddings"]  # (n, d) ndarray
-result["scores"]      # {"trustworthiness": 0.95}
-```
-
-## Core Abstractions
-
-**Two algorithm base classes, one decision rule:**
-
-| If the algorithm... | Use | Interface |
-|---|---|---|
-| is self-contained | `LatentModule` (`algorithms.latent.latent_module_base`) | `fit(x)` / `transform(x)` |
-| needs Lightning Trainer features (callbacks, logging, checkpointing, multi-GPU) | `LightningModule` (`algorithms.lightning.*`) | `trainer.fit()` / `encode(x)` |
-
-A LatentModule may use gradients internally — the distinction is API surface, not whether backprop is involved.
-
-**Metric protocol** (`manylatents.metrics.metric`):
-
-```python
-def metric_fn(embeddings: np.ndarray, dataset=None, module=None, cache=None, **kwargs) -> float | dict
-```
-
-All metrics share a `cache` dict for deduplicated kNN/eigenvalue computation. Three evaluation contexts: `embedding`, `dataset`, `module`. Programmatic APIs: `compute_metric(name, embeddings=X, **kwargs)` for single metrics, `evaluate_metrics(names, embeddings=X)` for batched evaluation with shared cache. To add a parameter to a metric, add it to the function signature + `default_params` in `@register_metric` + config YAML.
-
-**Data contract**: `LatentOutputs = dict[str, Any]` — required key `"embeddings"`, optional `"scores"`, `"label"`, `"metadata"`. (`EmbeddingOutputs` is a deprecated alias.)
-
-## Config System
-
-Hydra config groups live under `manylatents/configs/`. **Don't hardcode config names** — discover them:
+**Don't hardcode config names** — discover them:
 
 ```bash
 ls manylatents/configs/algorithms/latent/   # available LatentModule configs
 ls manylatents/configs/algorithms/lightning/ # available LightningModule configs
 ls manylatents/configs/data/                # datasets
-ls manylatents/configs/metrics/            # all metrics (flat, each has on: field)
+ls manylatents/configs/metrics/             # all metrics (flat, each has at: field)
 ls manylatents/configs/callbacks/embedding/ # callbacks
 ls manylatents/configs/cluster/             # cluster profiles
 ```
 
 For registered metrics: `uv run python -c "from manylatents.metrics import list_metrics; print(list_metrics())"`
-
-Metric configs use `_partial_: True` with an `at:` field indicating evaluation context:
-```yaml
-trustworthiness:
-  _target_: manylatents.metrics.trustworthiness.Trustworthiness
-  _partial_: True
-  n_neighbors: 25
-  at: embedding
-```
-
-**Metric parameter sweeps use `flatten_and_unroll_metrics()`.** To sweep a metric parameter (e.g. `k`), set it to a list in the config — `flatten_and_unroll_metrics` does Cartesian expansion automatically. Never create separate YAML files per parameter value.
-```yaml
-# Sweeps k over 3 values, producing 3 metric evaluations
-local_intrinsic_dimensionality:
-  _target_: manylatents.metrics.local_intrinsic_dimensionality.LocalIntrinsicDimensionality
-  _partial_: True
-  k: [15, 50, 100]
-```
 
 ## Adding New Components
 
@@ -135,7 +127,7 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 
 1. **Module**: `manylatents/algorithms/latent/<name>.py`
    - Subclass `LatentModule`
-   - Accept `n_components`, `random_state`, `neighborhood_size`, `backend`, `device`, `**kwargs` and pass them to `super().__init__()`
+   - Subclasses accept `random_state` as a constructor param (familiar to sklearn users), then pass it to the base class as `init_seed`: `super().__init__(n_components=n_components, init_seed=random_state, neighborhood_size=neighborhood_size, backend=backend, device=device, **kwargs)`
    - `neighborhood_size` overrides any module-specific neighbor count (e.g. `self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors`)
    - `fit(x: Tensor)` — fit on data, set `self._is_fitted = True`
    - `transform(x: Tensor) -> Tensor` — return embeddings
@@ -148,58 +140,28 @@ See `CONTRIBUTING.md` for the full 4-step pipeline.
 
 3. **Hydra config**: `manylatents/configs/algorithms/latent/<name>.yaml`
    - `_target_: manylatents.algorithms.latent.<name>.<Name>Module`
-   - Include `random_state: ${seed}` and `neighborhood_size: ${neighborhood_size}`
-   - Set `backend: null` and `device: null` for TorchDR-capable modules
+   - Use `random_state: ${seed}` and `neighborhood_size: ${neighborhood_size}`
+   - Set `backend: null` and `device: null` only for TorchDR-capable modules; omit for others
 
 4. **Test**: `tests/test_<name>.py`
    - Use `pytest.importorskip("<optional_dep>")` at module level for optional deps
    - Test `fit_transform()` returns correct shape
    - Test the module `isinstance(m, LatentModule)`
-   - Test determinism (same seed → same output)
-
-**Do NOT** create new top-level packages (like `analysis/`) for algorithms. Everything that takes data and produces an output goes through the LatentModule or LightningModule interface.
+   - Test determinism (same seed → same output, use `np.allclose` for numerical methods)
 
 **New LightningModule**: subclass → implement `setup()` + `training_step()` + `encode()` + `configure_optimizers()` → config YAML.
-
-## Key Files
-
-| File | What it does |
-|------|-------------|
-| `main.py` | CLI entry point + Hydra instantiation layer |
-| `api.py` | Python API (`run()`) — Hydra-free |
-| `experiment.py` | Hydra-free engine: `run_experiment()` |
-| `evaluate.py` | Unified `evaluate()`, `extract_k_requirements()`, `prewarm_cache()` |
-| `metrics/metric.py` | Metric protocol definition |
-| `metrics/registry.py` | `@register_metric` decorator, `list_metrics()`, `compute_metric()` |
-| `utils/metrics.py` | `compute_knn()`, `compute_svd_cache()` — shared cache infrastructure |
-| `configs/__init__.py` | Hydra SearchPathPlugin + ConfigStore registration |
-| `data/capabilities.py` | Dataset capability detection |
-
-## Running Experiments
-
-**Always run experiment submissions as background tasks.** SLURM submissions and multirun sweeps can take time to dispatch — use `run_in_background: true` on the Bash tool so the conversation isn't blocked waiting. This applies to any `uv run python -m manylatents.main` invocation that submits to a cluster or runs a sweep.
 
 ## Gotchas
 
 - **`uv run`, not `python`** — always prefix with `uv run` or activate the venv.
-- **`scipy>=1.8,<1.15`** — pinned for archetypes/PHATE. Don't relax without testing.
 - **Hydra null** — CLI doesn't support `callbacks=null`. Use `logger=none` or explicit null configs.
-- **API metrics need `_target_`** — empty dicts `{}` are silently skipped by `flatten_and_unroll_metrics()`.
+- **API metrics need `_target_`** — empty dicts `{}` are silently skipped by `flatten_and_unroll_metrics()` in `utils/metrics.py`.
 - **LightningModule unit tests** — must call `model.setup()` if not using `trainer.fit()`.
 - **`save_hyperparameters`** — always `ignore=["datamodule", "network", "loss"]`.
 - **Loss functions** — use project's `MSELoss` (`outputs, targets, **kwargs`), not `torch.nn.MSELoss`.
 - **`neighborhood_size` is the unified neighbor parameter** — always use `neighborhood_size=k` when constructing any LatentModule, NOT method-specific params (`n_neighbors`, `knn`, `perplexity`). The base class routes `neighborhood_size` to each method's internal param. Using `n_neighbors=k` on TSNEModule silently goes to `**kwargs` and is ignored (perplexity stays at default 30).
+- **Metric `at:` contexts** — `embedding` passes the low-dim embeddings, `dataset` passes the original high-dim input data (as the `embeddings` arg — naming is confusing but intentional), `module` makes the fitted module available.
 
-## Tests
+---
 
-```bash
-uv run pytest tests/ -x -q                          # core tests (363 pass)
-uv run pytest manylatents/callbacks/tests/ -x -q     # callback tests
-uv run pytest manylatents/lightning/callbacks/tests/  # lightning callback tests
-uv run mkdocs build --strict                         # docs build
-uv run python3 scripts/check_docs_coverage.py        # config coverage
-```
-
-## Namespace Extensions
-
-`manylatents-omics` extends via `pkgutil.extend_path()`. Adds `manylatents.dogma` (foundation encoders), `manylatents.popgen` (population genetics), `manylatents.singlecell` (AnnData). Core never imports from extensions.
+*Last updated: 2026-04-01*
