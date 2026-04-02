@@ -1,0 +1,8 @@
+mismatch_ratio:
+  _target_: manylatents.metrics.mismatch_ratio.MismatchRatio
+  _partial_: True
+  k: 200
+  k_min: 5
+  k_steps: 20
+  r2_threshold: 0.95
+  at: embedding
