@@ -37,6 +37,8 @@ def _discover_extensions():
         except Exception:
             pass
 
+_discover_extensions()
+
 logger = logging.getLogger(__name__)
 
 
@@ -163,7 +165,6 @@ def _init_wandb(cfg: DictConfig):
 
 @hydra.main(config_path=None, config_name="config", version_base=None)
 def main(cfg: DictConfig) -> dict[str, Any]:
-    _discover_extensions()
     setup_logging(debug=cfg.debug, log_level=getattr(cfg, "log_level", "warning"))
     logger.info("Final Config:\n" + OmegaConf.to_yaml(cfg))
 
