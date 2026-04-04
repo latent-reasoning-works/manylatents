@@ -1,32 +1,11 @@
 # manylatents/data/text.py
 """Text data module for HuggingFace language models."""
-from dataclasses import dataclass
 from typing import Optional
 
 import torch
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset, Subset
 from transformers import AutoTokenizer
-
-
-@dataclass
-class HFTextDataConfig:
-    """Configuration for text data module.
-
-    Attributes:
-        dataset_name: HuggingFace dataset name (e.g., "wikitext")
-        dataset_config: Dataset config (e.g., "wikitext-2-raw-v1")
-        tokenizer_name: Tokenizer to use (defaults to model name)
-        max_length: Maximum sequence length
-        batch_size: Training batch size
-        num_workers: DataLoader workers
-    """
-    dataset_name: str = "wikitext"
-    dataset_config: str = "wikitext-2-raw-v1"
-    tokenizer_name: Optional[str] = None
-    max_length: int = 128
-    batch_size: int = 8
-    num_workers: int = 0
 
 
 class HFTextDataModule(LightningDataModule):
@@ -245,6 +224,5 @@ class TokenizedDataset(Dataset):
         return self._cache[real_idx]
 
 
-# Backward compatibility aliases
+# Backward compatibility alias
 TextDataModule = HFTextDataModule
-TextDataConfig = HFTextDataConfig

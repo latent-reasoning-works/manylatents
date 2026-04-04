@@ -1,6 +1,5 @@
 """Tests for HFTextDataModule local loading and scale controls."""
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
