@@ -139,7 +139,7 @@ class ActivationTrajectoryCallback(Callback):
                 raise ValueError(
                     "probe_loader not provided and datamodule has no probe_dataloader() method. "
                     "Either pass probe_loader to ActivationTrajectoryCallback or use a datamodule "
-                    "with probe_dataloader() (e.g., TextDataModule)."
+                    "with probe_dataloader() (e.g., HFTextDataModule)."
                 )
 
     def _sanitize_layer_name(self, layer: str) -> str:

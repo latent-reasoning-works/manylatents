@@ -10,7 +10,7 @@ from transformers import AutoTokenizer
 
 
 @dataclass
-class TextDataConfig:
+class HFTextDataConfig:
     """Configuration for text data module.
 
     Attributes:
@@ -29,7 +29,7 @@ class TextDataConfig:
     num_workers: int = 0
 
 
-class TextDataModule(LightningDataModule):
+class HFTextDataModule(LightningDataModule):
     """Lightning DataModule for text data with HuggingFace models.
 
     Loads a HuggingFace dataset, tokenizes it, and provides DataLoaders
@@ -180,3 +180,8 @@ class TokenizedDataset(Dataset):
                 "labels": tokenized["labels"][0],
             }
         return self._cache[real_idx]
+
+
+# Backward compatibility aliases
+TextDataModule = HFTextDataModule
+TextDataConfig = HFTextDataConfig

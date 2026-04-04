@@ -103,7 +103,7 @@ callbacks:
 
 ## Probe Dataloader
 
-Probing uses a fixed subset of data for consistent comparisons across training. The `TextDataModule` provides this via `probe_dataloader()`:
+Probing uses a fixed subset of data for consistent comparisons across training. The `HFTextDataModule` provides this via `probe_dataloader()`:
 
 ```yaml
 data:
