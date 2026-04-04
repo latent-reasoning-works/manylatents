@@ -72,3 +72,6 @@ class Config:
     """Unified neighborhood parameter. When set, overrides algorithm-specific kNN params
     (n_neighbors for UMAP, knn for PHATE/DiffusionMap, perplexity*3 for t-SNE).
     Algorithm-specific params still win if set explicitly via config override."""
+
+    sampling: Optional[Dict[str, Any]] = None
+    """Configuration for pre-fit and post-fit sampling strategies."""

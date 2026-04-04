@@ -9,7 +9,7 @@ defaults:
   - algorithms/lightning: null
   - metrics: null
   - trainer: null # instantiate only if network is being passed
-  - experiment: null
   - optional sampling: null
+  - experiment: null
   - optional cluster: null  # NEW: enables cluster=mila
   - optional resources: null  # NEW: enables resources=gpu
