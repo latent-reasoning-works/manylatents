@@ -21,6 +21,7 @@ class UMAPModule(LatentModule):
         n_epochs: Optional[int] = 200,
         learning_rate: float = 1.0,
         fit_fraction: float = 1.0,
+        negative_sample_rate: int | None = None,
         backend: str | None = None,
         device: str | None = None,
         neighborhood_size: Optional[int] = None,
@@ -37,6 +38,7 @@ class UMAPModule(LatentModule):
         self.n_epochs = n_epochs
         self.learning_rate = learning_rate
         self.fit_fraction = fit_fraction
+        self.negative_sample_rate = negative_sample_rate
         self.random_state = random_state
 
         self._resolved_backend = resolve_backend(backend)
@@ -56,6 +58,9 @@ class UMAPModule(LatentModule):
         else:
             from umap import UMAP
 
+            kwargs = {}
+            if self.negative_sample_rate is not None:
+                kwargs["negative_sample_rate"] = self.negative_sample_rate
             return UMAP(
                 n_components=self.n_components,
                 random_state=self.random_state,
@@ -64,6 +69,7 @@ class UMAPModule(LatentModule):
                 metric=self.metric,
                 n_epochs=self.n_epochs,
                 learning_rate=self.learning_rate,
+                **kwargs,
             )
 
     def fit(self, x, y=None) -> None:

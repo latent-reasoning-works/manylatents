@@ -26,6 +26,7 @@ class HFTrainerConfig:
         torch_dtype: Optional dtype for model (e.g., torch.bfloat16)
         trust_remote_code: Whether to trust remote code for model loading
         attn_implementation: Attention implementation (e.g., "flash_attention_2")
+        output_hidden_states: Whether to return hidden states from all layers
         device_map: Device placement strategy (e.g., "auto"). None lets
             Lightning/FSDP manage placement (existing behavior).
     """
@@ -37,6 +38,7 @@ class HFTrainerConfig:
     torch_dtype: Optional[torch.dtype] = None
     trust_remote_code: bool = False
     attn_implementation: Optional[str] = None
+    output_hidden_states: bool = False
     device_map: Optional[str] = None
 
 
@@ -82,7 +84,10 @@ class HFTrainerModule(LightningModule):
 
     def forward(self, **inputs) -> CausalLMOutput:
         """Forward pass through the model."""
-        return self.network(**inputs)
+        return self.network(
+            **inputs,
+            output_hidden_states=self.config.output_hidden_states,
+        )
 
     def training_step(self, batch: Dict[str, torch.Tensor], batch_idx: int):
         """Standard training step."""

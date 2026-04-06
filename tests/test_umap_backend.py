@@ -115,3 +115,39 @@ def test_umap_backend_output_agreement():
     # Kernel non-negative
     assert K_cpu.min() >= -1e-7, f"CPU kernel has negative values: {K_cpu.min()}"
     assert K_tdr.min() >= -1e-7, f"TorchDR kernel has negative values: {K_tdr.min()}"
+
+
+def test_umap_negative_sample_rate_affects_embedding():
+    """negative_sample_rate should reach sklearn UMAP and change the embedding."""
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    x = torch.randn(80, 10, generator=torch.Generator().manual_seed(0))
+
+    m1 = UMAPModule(
+        n_components=2, random_state=42, n_neighbors=10,
+        n_epochs=50, negative_sample_rate=1,
+    )
+    emb1 = m1.fit_transform(x)
+
+    m2 = UMAPModule(
+        n_components=2, random_state=42, n_neighbors=10,
+        n_epochs=50, negative_sample_rate=10,
+    )
+    emb2 = m2.fit_transform(x)
+
+    # Same seed, same data, different negative_sample_rate -> different embeddings
+    assert emb1.shape == emb2.shape == (80, 2)
+    assert not np.allclose(emb1, emb2, atol=1e-3), (
+        "Embeddings should differ when negative_sample_rate changes"
+    )
+
+
+def test_umap_negative_sample_rate_none_uses_default():
+    """negative_sample_rate=None should not change default sklearn behavior."""
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    m = UMAPModule(n_components=2, random_state=42, n_neighbors=5, n_epochs=10)
+    assert m.negative_sample_rate is None
+    # sklearn default is 5 — verify it's not overridden
+    from umap import UMAP as SklearnUMAP
+    assert m.model.negative_sample_rate == SklearnUMAP().negative_sample_rate

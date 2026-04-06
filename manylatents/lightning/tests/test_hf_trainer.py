@@ -120,3 +120,70 @@ def test_hf_trainer_with_activation_extractor():
     # Should have (batch_size, hidden_dim) after mean reduction
     assert activations["transformer.h[-1]"].shape[0] == 3  # 3 samples
     assert len(activations["transformer.h[-1]"].shape) == 2  # (batch, hidden)
+
+
+def test_hf_trainer_config_output_hidden_states_default():
+    """output_hidden_states should default to False."""
+    config = HFTrainerConfig(model_name_or_path="gpt2")
+    assert config.output_hidden_states is False
+
+
+@pytest.mark.slow
+def test_hf_trainer_output_hidden_states():
+    """forward() with output_hidden_states=True returns hidden state tuple."""
+    config = HFTrainerConfig(
+        model_name_or_path="sshleifer/tiny-gpt2",
+        output_hidden_states=True,
+    )
+    module = HFTrainerModule(config)
+    module.configure_model()
+
+    tokenizer = module.tokenizer
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    batch = tokenizer(
+        ["Hello world", "Test input"],
+        return_tensors="pt",
+        padding=True,
+        max_length=32,
+    )
+
+    module.eval()
+    with torch.no_grad():
+        outputs = module(**batch)
+
+    assert outputs.hidden_states is not None
+    # hidden_states is a tuple of (n_layers + 1) tensors (embedding + each layer)
+    n_layers = module.network.config.num_hidden_layers
+    assert len(outputs.hidden_states) == n_layers + 1
+    # Each tensor: (batch, seq_len, hidden_dim)
+    assert outputs.hidden_states[0].shape[0] == 2  # batch_size
+
+
+@pytest.mark.slow
+def test_hf_trainer_output_hidden_states_disabled():
+    """forward() with output_hidden_states=False returns None for hidden_states."""
+    config = HFTrainerConfig(
+        model_name_or_path="sshleifer/tiny-gpt2",
+        output_hidden_states=False,
+    )
+    module = HFTrainerModule(config)
+    module.configure_model()
+
+    tokenizer = module.tokenizer
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    batch = tokenizer(
+        ["Hello world"],
+        return_tensors="pt",
+        padding=True,
+        max_length=32,
+    )
+
+    module.eval()
+    with torch.no_grad():
+        outputs = module(**batch)
+
+    assert outputs.hidden_states is None

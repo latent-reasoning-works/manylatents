@@ -1,0 +1,21 @@
+# Pythia representation probe callback configuration
+# Layer path uses gpt_neox.layers[] (GPT-NeoX architecture)
+# Override layer_specs via CLI for multi-layer or specific-layer extraction
+probe:
+  _target_: manylatents.lightning.callbacks.activation_tracker.ActivationTrajectoryCallback
+  layer_specs:
+    - _target_: manylatents.lightning.hooks.LayerSpec
+      path: "gpt_neox.layers[-1]"
+      extraction_point: "output"
+      reduce: "mean"
+  trigger:
+    _target_: manylatents.lightning.callbacks.activation_tracker.ProbeTrigger
+    every_n_steps: 500
+    on_checkpoint: true
+    on_validation_end: true
+  gauge:
+    _target_: manylatents.callbacks.diffusion_operator.DiffusionGauge
+    knn: 15
+    alpha: 1.0
+    symmetric: false
+  log_to_wandb: true

@@ -65,7 +65,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # HuggingFace trainer support
-hf = ["transformers>=4.40"]
+hf = ["transformers>=4.40", "datasets>=3.0"]
 # GPU-accelerated DR via TorchDR
 torchdr = [
     "torchdr>=0.3,<0.4",

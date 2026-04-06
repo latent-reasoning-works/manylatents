@@ -1,0 +1,17 @@
+# The Pile — Pythia's training data, loaded from Mila cluster local shards
+# Uses jsonl.zst format; num_shards/max_train_samples control scale
+_target_: manylatents.data.text.HFTextDataModule
+dataset_name: null
+dataset_config: null
+data_dir: "/network/datasets/pile"
+train_files: "train/*.jsonl.zst"
+val_files: "val.jsonl.zst"
+text_column: "text"
+tokenizer_name: "EleutherAI/pythia-70m"
+max_length: 128
+batch_size: 8
+num_workers: 0
+probe_n_samples: 512
+num_shards: 1
+max_train_samples: 50000
+seed: ${seed}

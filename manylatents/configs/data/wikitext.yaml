@@ -2,7 +2,7 @@
 # Text data for HuggingFace language model training
 # Note: Does not inherit from default.yaml (different DataModule interface)
 
-_target_: manylatents.data.text.TextDataModule
+_target_: manylatents.data.text.HFTextDataModule
 
 dataset_name: "wikitext"
 dataset_config: "wikitext-2-raw-v1"

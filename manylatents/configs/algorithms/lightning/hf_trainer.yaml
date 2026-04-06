@@ -10,4 +10,5 @@ config:
   warmup_steps: 100
   adam_epsilon: 1e-8
   trust_remote_code: false
+  output_hidden_states: false
   # Optional: torch_dtype, attn_implementation
