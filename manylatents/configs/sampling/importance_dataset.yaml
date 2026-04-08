@@ -1,0 +1,8 @@
+# Density-inverse importance sampling on dataset space (pre-fit).
+# Upweights sparse regions so oversampled clusters are corrected.
+# Usage: sampling=importance_dataset
+dataset:
+  _target_: manylatents.utils.sampling.ImportanceSampling
+  k: 15
+  alpha: 1.0
+  fraction: 0.5
