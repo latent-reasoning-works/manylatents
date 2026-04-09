@@ -1,9 +1,13 @@
-"""Tests for ImportanceSampling and KStarWeightedSampling."""
+"""Tests for ImportanceSampling, KStarWeightedSampling, and GeosketchSampling."""
 
 import numpy as np
 import pytest
 
-from manylatents.utils.sampling import ImportanceSampling, KStarWeightedSampling
+from manylatents.utils.sampling import (
+    GeosketchSampling,
+    ImportanceSampling,
+    KStarWeightedSampling,
+)
 
 
 class MockDataset:
@@ -160,3 +164,62 @@ class TestKStarWeightedSampling:
         assert emb_sub.shape == (250, 10)
         assert len(idx) == 250
         assert isinstance(ds_sub, MockDataset)
+
+
+# ---------------------------------------------------------------------------
+# GeosketchSampling tests
+# ---------------------------------------------------------------------------
+
+geosketch = pytest.importorskip("geosketch")
+
+
+class TestGeosketchSampling:
+    def test_returns_correct_count_via_n_samples(self):
+        data = _make_data(500, 60)
+        sampler = GeosketchSampling(n_samples=100, seed=0)
+        idx = sampler.get_indices(data)
+        assert len(idx) == 100
+
+    def test_returns_correct_count_via_fraction(self):
+        data = _make_data(500, 60)
+        sampler = GeosketchSampling(fraction=0.4, seed=0)
+        idx = sampler.get_indices(data)
+        assert len(idx) == 200
+
+    def test_indices_sorted(self):
+        data = _make_data(300, 60)
+        sampler = GeosketchSampling(fraction=0.5, seed=0)
+        idx = sampler.get_indices(data)
+        assert np.all(idx[:-1] <= idx[1:])
+
+    def test_indices_in_range(self):
+        n = 400
+        data = _make_data(n, 60)
+        sampler = GeosketchSampling(fraction=0.5, seed=0)
+        idx = sampler.get_indices(data)
+        assert idx.min() >= 0 and idx.max() < n
+
+    def test_raises_without_count_or_fraction(self):
+        data = _make_data(300, 60)
+        sampler = GeosketchSampling()
+        with pytest.raises(ValueError):
+            sampler.get_indices(data)
+
+    def test_only_first_50_dims_used(self):
+        data = _make_data(300, 200)
+        sampler = GeosketchSampling(fraction=0.5, seed=0)
+        idx = sampler.get_indices(data)
+        assert len(idx) == 150
+
+    def test_seed_override(self):
+        data = _make_data(500, 60)
+        sampler = GeosketchSampling(fraction=0.5, seed=0)
+        idx1 = sampler.get_indices(data, seed=0)
+        idx2 = sampler.get_indices(data, seed=0)
+        assert np.array_equal(idx1, idx2)
+
+    def test_n_samples_override_at_call_time(self):
+        data = _make_data(500, 60)
+        sampler = GeosketchSampling(fraction=0.5, seed=0)
+        idx = sampler.get_indices(data, n_samples=50)
+        assert len(idx) == 50

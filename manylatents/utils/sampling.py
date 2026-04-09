@@ -789,6 +789,95 @@ class KStarWeightedSampling:
         return subsampled_embeddings, subsampled_ds, indices
 
 
+class GeosketchSampling:
+    """
+    Geometric sketching — targets spatial uniformity in PCA space.
+
+    Uses the ``geosketch`` library (Hie et al., 2019) to select a subset
+    that is approximately uniformly distributed in high-dimensional PCA
+    space. Unlike random subsampling, geometric sketching preserves rare
+    cell populations and avoids over-representing dense clusters.
+
+    Requires the optional ``geosketch`` package::
+
+        pip install geosketch
+
+    Note:
+        geosketch operates on the raw coordinate matrix. If your data has
+        more than 50 dimensions, only the first 50 are used (PCA50 is the
+        intended input).
+    """
+
+    def __init__(
+        self,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: int = 42,
+    ):
+        """
+        Initialize GeosketchSampling.
+
+        Args:
+            n_samples: Number of points to keep. Mutually exclusive with
+                ``fraction``.
+            fraction: Fraction of points to keep. Mutually exclusive with
+                ``n_samples``.
+            seed: Random seed passed to geosketch.
+        """
+        self.n_samples = n_samples
+        self.fraction = fraction
+        self.seed = seed
+
+    def get_indices(
+        self,
+        data: np.ndarray,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """
+        Return sorted indices selected by geometric sketching.
+
+        Args:
+            data: High-dimensional data array of shape (n, d). Only the
+                first 50 dimensions are passed to geosketch.
+            n_samples: Number of points to keep (overrides instance default).
+            fraction: Fraction to keep (overrides instance default).
+            seed: Random seed (overrides instance default).
+
+        Returns:
+            Sorted integer array of selected indices.
+
+        Raises:
+            ImportError: If the ``geosketch`` package is not installed.
+            ValueError: If neither ``n_samples`` nor ``fraction`` is set.
+        """
+        try:
+            from geosketch import gs
+        except ImportError as e:
+            raise ImportError(
+                "GeosketchSampling requires the 'geosketch' package. "
+                "Install it with: pip install geosketch"
+            ) from e
+
+        seed = seed if seed is not None else self.seed
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+
+        data = np.asarray(data)
+        n = len(data)
+        if n_samples is not None:
+            n_keep = n_samples
+        elif fraction is not None:
+            n_keep = int(n * fraction)
+        else:
+            raise ValueError("Either n_samples or fraction must be set.")
+
+        sketch = gs(data[:, :50], n_keep, seed=seed)
+        return np.sort(np.array(sketch))
+
+
 class FixedIndexSampling:
     """
     Use precomputed indices for reproducible cross-setting comparisons.
