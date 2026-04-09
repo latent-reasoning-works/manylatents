@@ -526,6 +526,269 @@ class FarthestPointSampling:
         return subsampled_embeddings, subsampled_ds, indices
 
 
+class ImportanceSampling:
+    """
+    Density-inverse sampling via kNN radius weighting.
+
+    Assigns each point a weight proportional to the distance to its k-th
+    nearest neighbor raised to a power alpha. Points in sparse regions
+    (large kNN radius) receive higher sampling probability, counteracting
+    density bias.
+
+    Weights are capped at the 99th percentile to prevent outlier
+    oversampling, and zero weights are replaced with the minimum nonzero
+    weight.
+    """
+
+    def __init__(
+        self,
+        k: int = 15,
+        alpha: float = 1.0,
+        seed: int = 42,
+        fraction: Optional[float] = None,
+        n_samples: Optional[int] = None,
+    ):
+        """
+        Initialize ImportanceSampling.
+
+        Args:
+            k: Number of neighbors for kNN radius computation.
+            alpha: Exponent for the distance weight (higher = stronger
+                density correction).
+            seed: Default random seed (can be overridden at call time).
+            fraction: Default fraction of samples.
+            n_samples: Default number of samples.
+        """
+        self.k = k
+        self.alpha = alpha
+        self.seed = seed
+        self.fraction = fraction
+        self.n_samples = n_samples
+
+    def get_indices(
+        self,
+        data_or_n_total: Union[np.ndarray, int],
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> np.ndarray:
+        """
+        Compute density-inverse sample indices from a data array.
+
+        Args:
+            data_or_n_total: Data array to compute kNN distances on.
+                Must be an ndarray (integer input is rejected).
+            n_samples: Absolute number of samples to take.
+            fraction: Fraction of samples to take.
+            seed: Random seed (overrides instance seed).
+
+        Returns:
+            Sorted array of selected indices.
+
+        Raises:
+            TypeError: If data_or_n_total is an integer (kNN requires data).
+        """
+        if isinstance(data_or_n_total, int):
+            raise TypeError(
+                "ImportanceSampling requires a data array for kNN computation, "
+                "got an integer. Pass the data matrix instead."
+            )
+
+        from sklearn.neighbors import NearestNeighbors
+
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        data = data_or_n_total
+        n = len(data)
+        n_keep = _compute_n_samples(n, n_samples, fraction)
+        rng = np.random.default_rng(seed)
+
+        # Compute distance to k-th nearest neighbor for each point
+        nn = NearestNeighbors(n_neighbors=self.k + 1, algorithm="auto")
+        nn.fit(data)
+        distances, _ = nn.kneighbors(data)
+        # distances[:, 0] is self-distance (0); k-th neighbor is at index k
+        radii = distances[:, self.k]
+
+        # Compute weights: w_i = r_i^alpha
+        weights = radii ** self.alpha
+
+        # Cap at 99th percentile to prevent outlier oversampling
+        cap = np.percentile(weights, 99)
+        weights = np.minimum(weights, cap)
+
+        # Replace zero weights with minimum nonzero weight
+        nonzero_mask = weights > 0
+        if nonzero_mask.any():
+            weights[~nonzero_mask] = weights[nonzero_mask].min()
+
+        # Probabilistic draw without replacement
+        prob = weights / weights.sum()
+        indices = rng.choice(n, size=n_keep, replace=False, p=prob)
+
+        logger.info(
+            f"ImportanceSampling: {n} -> {n_keep} samples "
+            f"(k={self.k}, alpha={self.alpha}, seed={seed})"
+        )
+
+        return np.sort(indices)
+
+    def sample(
+        self,
+        embeddings: np.ndarray,
+        dataset: object,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> Tuple[np.ndarray, object, np.ndarray]:
+        """Sample using density-inverse kNN weighting."""
+        # Use instance defaults if not overridden
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        indices = self.get_indices(embeddings, n_samples, fraction, seed)
+
+        subsampled_embeddings = embeddings[indices]
+        subsampled_ds = _subsample_dataset_metadata(dataset, indices)
+
+        return subsampled_embeddings, subsampled_ds, indices
+
+
+class KStarWeightedSampling:
+    """
+    Geometry-aware sampling that preserves manifold boundary points.
+
+    Computes per-point k* (the neighborhood scale at which local geometry
+    breaks down) and upweights points with low k*, which tend to lie at
+    manifold boundaries, high-curvature regions, or density transitions.
+
+    Note on circularity: k* is computed from the same kNN graph structure
+    used by the mismatch ratio diagnostic. When this sampler is used
+    upstream of mismatch ratio evaluation, the sampling and evaluation
+    share geometric assumptions. This is intentional — the sampler
+    preserves the boundary points that the mismatch ratio is designed
+    to detect — but users should be aware of the shared structure.
+
+    Weights: ``w_i = k_max - k_star_i + 1`` (low k* -> high weight).
+    """
+
+    def __init__(
+        self,
+        k_max: int = 200,
+        seed: int = 42,
+        fraction: Optional[float] = None,
+        n_samples: Optional[int] = None,
+    ):
+        """
+        Initialize KStarWeightedSampling.
+
+        Args:
+            k_max: Maximum neighborhood size for k* computation.
+            seed: Default random seed (can be overridden at call time).
+            fraction: Default fraction of samples.
+            n_samples: Default number of samples.
+        """
+        self.k_max = k_max
+        self.seed = seed
+        self.fraction = fraction
+        self.n_samples = n_samples
+
+    def get_indices(
+        self,
+        data_or_n_total: Union[np.ndarray, int],
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> np.ndarray:
+        """
+        Compute geometry-aware sample indices from a data array.
+
+        Points with low k* (boundary/high-curvature regions) receive
+        higher sampling probability.
+
+        Args:
+            data_or_n_total: Data array to compute k* on.
+                Must be an ndarray (integer input is rejected).
+            n_samples: Absolute number of samples to take.
+            fraction: Fraction of samples to take.
+            seed: Random seed (overrides instance seed).
+
+        Returns:
+            Sorted array of selected indices.
+
+        Raises:
+            TypeError: If data_or_n_total is an integer (k* requires data).
+        """
+        if isinstance(data_or_n_total, int):
+            raise TypeError(
+                "KStarWeightedSampling requires a data array for k* computation, "
+                "got an integer. Pass the data matrix instead."
+            )
+
+        from manylatents.metrics.mismatch_ratio import _compute_kstar
+
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        data = data_or_n_total
+        n = len(data)
+        n_keep = _compute_n_samples(n, n_samples, fraction)
+        rng = np.random.default_rng(seed)
+
+        # Compute per-point k*
+        k_star, _ = _compute_kstar(data, k_max=self.k_max)
+
+        # Weights: low k* -> high weight
+        weights = (self.k_max - k_star + 1).astype(np.float64)
+
+        # Safety: clamp non-positive weights
+        weights[weights <= 0] = 1.0
+
+        # Log boundary point statistics
+        median_kstar = np.median(k_star)
+        n_boundary = int(np.sum(k_star < median_kstar))
+        logger.info(
+            f"KStarWeightedSampling: {n_boundary}/{n} boundary points "
+            f"(k* < median={median_kstar:.0f})"
+        )
+
+        # Probabilistic draw without replacement
+        prob = weights / weights.sum()
+        indices = rng.choice(n, size=n_keep, replace=False, p=prob)
+
+        logger.info(
+            f"KStarWeightedSampling: {n} -> {n_keep} samples "
+            f"(k_max={self.k_max}, seed={seed})"
+        )
+
+        return np.sort(indices)
+
+    def sample(
+        self,
+        embeddings: np.ndarray,
+        dataset: object,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> Tuple[np.ndarray, object, np.ndarray]:
+        """Sample using k*-weighted geometry-aware selection."""
+        # Use instance defaults if not overridden
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        indices = self.get_indices(embeddings, n_samples, fraction, seed)
+
+        subsampled_embeddings = embeddings[indices]
+        subsampled_ds = _subsample_dataset_metadata(dataset, indices)
+
+        return subsampled_embeddings, subsampled_ds, indices
+
+
 class FixedIndexSampling:
     """
     Use precomputed indices for reproducible cross-setting comparisons.
