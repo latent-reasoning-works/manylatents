@@ -25,7 +25,7 @@ Labels
 """
 
 import os
-from typing import Optional
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
@@ -60,9 +60,10 @@ class CircleInterpolation(SyntheticDataset):
     n_sectors : int
         Number of population sectors / clusters.  Sector centres are
         placed at evenly-spaced angles starting at 0.
-    oversample_factor : float
+    oversample_factor : float or list of float
         Extra density multiplier near each sector centre.  5.0 means
-        each cluster arc contains ~5x the uniform density.
+        each cluster arc contains ~5x the uniform density.  Pass a list
+        of length n_sectors for per-sector control, e.g. [200, 50, 50].
     cluster_arc_deg : float
         Angular half-width (degrees) of the von Mises oversampling kernel.
     alpha : float
@@ -88,7 +89,7 @@ class CircleInterpolation(SyntheticDataset):
         self,
         n_base: int = 1000,
         n_sectors: int = 3,
-        oversample_factor: float = 5.0,
+        oversample_factor: Union[float, list] = 5.0,
         cluster_arc_deg: float = 15.0,
         alpha: float = 0.0,
         circle_noise: float = 0.01,
@@ -122,12 +123,23 @@ class CircleInterpolation(SyntheticDataset):
         cluster_arc_rad = np.deg2rad(cluster_arc_deg)
         kappa = 1.0 / (cluster_arc_rad ** 2)
         arc_fraction = (2 * cluster_arc_rad) / (2 * np.pi)
-        n_extra = int(round(oversample_factor * arc_fraction * n_base))
+
+        # Normalise oversample_factor to a per-sector list
+        if isinstance(oversample_factor, (int, float)):
+            factors = [float(oversample_factor)] * n_sectors
+        else:
+            factors = list(oversample_factor)
+            if len(factors) != n_sectors:
+                raise ValueError(
+                    f"oversample_factor list length ({len(factors)}) must equal "
+                    f"n_sectors ({n_sectors})."
+                )
 
         thetas = [rng.uniform(0, 2 * np.pi, size=n_base)]
         sector_src = [np.full(n_base, -1, dtype=np.int64)]  # -1 = uniform
 
-        for k, mu in enumerate(self._sector_mus):
+        for k, (mu, factor) in enumerate(zip(self._sector_mus, factors)):
+            n_extra = int(round(factor * arc_fraction * n_base))
             cluster_theta = rng.vonmises(mu=mu, kappa=kappa, size=n_extra)
             thetas.append(cluster_theta % (2 * np.pi))
             sector_src.append(np.full(n_extra, k, dtype=np.int64))
@@ -181,28 +193,21 @@ class CircleInterpolation(SyntheticDataset):
     def _build_popbridge(
         self, theta: np.ndarray, sector_labels: np.ndarray, rng: np.random.Generator
     ):
-        """Build X_popbridge and bridge_score for every point."""
-        n = len(theta)
+        """Build X_popbridge and bridge_score for every point (vectorised)."""
         half_sector = np.pi / self.n_sectors
 
-        X = np.zeros((n, 2), dtype=np.float64)
-        bridge_score = np.zeros(n, dtype=np.float64)
+        mu_s    = self._sector_mus[sector_labels]                          # (N,)
+        mu_next = self._sector_mus[(sector_labels + 1) % self.n_sectors]   # (N,)
 
-        for i in range(n):
-            s = sector_labels[i]
-            mu_s = self._sector_mus[s]
-            mu_next = self._sector_mus[(s + 1) % self.n_sectors]
+        offset       = np.abs(_circular_diff(theta, mu_s))                 # (N,)
+        bridge_score = np.clip(offset / half_sector, 0.0, 1.0)            # (N,)
 
-            offset = abs(float(_circular_diff(np.array([theta[i]]), mu_s)[0]))
-            bs = min(offset / half_sector, 1.0)
-            bridge_score[i] = bs
+        P_s    = np.stack([np.cos(mu_s),    np.sin(mu_s)],    axis=1)     # (N, 2)
+        P_next = np.stack([np.cos(mu_next), np.sin(mu_next)], axis=1)     # (N, 2)
+        bs = bridge_score[:, None]
+        X = (1 - bs) * P_s + bs * P_next
 
-            P_s = np.array([np.cos(mu_s), np.sin(mu_s)])
-            P_next = np.array([np.cos(mu_next), np.sin(mu_next)])
-            pos = (1 - bs) * P_s + bs * P_next
-            X[i] = pos
-
-        noise = rng.normal(0, self.pop_noise, size=(n, 2))
+        noise = rng.normal(0, self.pop_noise, size=X.shape)
         return X + noise, bridge_score
 
     # ------------------------------------------------------------------
@@ -319,7 +324,7 @@ class CircleInterpolationDataModule(LightningDataModule):
         mode: str = "full",
         n_base: int = 1000,
         n_sectors: int = 3,
-        oversample_factor: float = 5.0,
+        oversample_factor: Union[float, list] = 5.0,
         cluster_arc_deg: float = 15.0,
         alpha: float = 0.0,
         circle_noise: float = 0.01,
