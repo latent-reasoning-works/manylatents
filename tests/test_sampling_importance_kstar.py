@@ -7,6 +7,7 @@ from manylatents.utils.sampling import (
     GeosketchSampling,
     ImportanceSampling,
     KStarWeightedSampling,
+    MismatchAwareSampling,
 )
 
 
@@ -161,6 +162,52 @@ class TestKStarWeightedSampling:
         sampler = KStarWeightedSampling(k_max=50, seed=42)
         emb_sub, ds_sub, idx = sampler.sample(data, ds, fraction=0.5)
 
+        assert emb_sub.shape == (250, 10)
+        assert len(idx) == 250
+        assert isinstance(ds_sub, MockDataset)
+
+
+# ---------------------------------------------------------------------------
+# TestMismatchAwareSampling
+# ---------------------------------------------------------------------------
+
+class TestMismatchAwareSampling:
+    def test_output_size(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx = sampler.get_indices(data, fraction=0.5)
+        assert len(idx) == 250
+
+    def test_sorted_indices(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx = sampler.get_indices(data, fraction=0.5)
+        assert np.all(np.diff(idx) >= 0)
+
+    def test_no_duplicates(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx = sampler.get_indices(data, fraction=0.5)
+        assert len(set(idx)) == len(idx)
+
+    def test_deterministic(self):
+        data = _make_data(500, 10)
+        s1 = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        s2 = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx1 = s1.get_indices(data, fraction=0.5)
+        idx2 = s2.get_indices(data, fraction=0.5)
+        np.testing.assert_array_equal(idx1, idx2)
+
+    def test_int_input_rejected(self):
+        sampler = MismatchAwareSampling(k_ref=15, seed=42)
+        with pytest.raises(TypeError):
+            sampler.get_indices(500, fraction=0.5)
+
+    def test_sample_method(self):
+        data = _make_data(500, 10)
+        ds = MockDataset()
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        emb_sub, ds_sub, idx = sampler.sample(data, ds, fraction=0.5)
         assert emb_sub.shape == (250, 10)
         assert len(idx) == 250
         assert isinstance(ds_sub, MockDataset)

@@ -1,0 +1,5 @@
+shepard_residual:
+  _target_: manylatents.metrics.shepard_residual.ShepardResidual
+  _partial_: True
+  k: 15
+  at: embedding

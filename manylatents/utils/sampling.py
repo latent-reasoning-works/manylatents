@@ -1188,3 +1188,92 @@ class DiffusionCondensationSampling:
         subsampled_embeddings = embeddings[indices]
         subsampled_ds = _subsample_dataset_metadata(dataset, indices)
         return subsampled_embeddings, subsampled_ds, indices
+
+
+class MismatchAwareSampling:
+    """Recovery-direction sampler that down-weights over-boundary points.
+
+    Companion to ``KStarWeightedSampling``. Where ``KStarWeightedSampling``
+    upweights low-:math:`k^{*}` boundary points (preservation), this
+    sampler downweights points whose mismatch ratio
+    :math:`v = k_{ref}/k^{*}` is large. Used for spike-and-recover and
+    other density-rebalancing interventions.
+
+    Weights: ``w_i = 1 / max(v_i, eps) ** alpha``. ``alpha=1`` is straight
+    inverse-:math:`v` sampling.
+    """
+
+    def __init__(
+        self,
+        k_ref: int,
+        k_max: int = 200,
+        alpha: float = 1.0,
+        eps: float = 1e-3,
+        seed: int = 42,
+        fraction: Optional[float] = None,
+        n_samples: Optional[int] = None,
+    ):
+        self.k_ref = k_ref
+        self.k_max = k_max
+        self.alpha = alpha
+        self.eps = eps
+        self.seed = seed
+        self.fraction = fraction
+        self.n_samples = n_samples
+
+    def get_indices(
+        self,
+        data: np.ndarray,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Compute mismatch-aware sample indices.
+
+        Computes :math:`v = k_{ref}/k^{*}` from ``data`` and samples without
+        replacement using inverse-:math:`v` weights.
+        """
+        if isinstance(data, int):
+            raise TypeError(
+                "MismatchAwareSampling needs the data array for k_star "
+                "computation, got an integer."
+            )
+        data = np.asarray(data)
+        n_total = len(data)
+
+        from manylatents.metrics.mismatch_ratio import _compute_kstar
+
+        k_star, _ = _compute_kstar(data, k_max=self.k_max)
+        v = np.where(k_star > 0, float(self.k_ref) / k_star, 0.0)
+
+        n_samples = n_samples if n_samples is not None else self.n_samples
+        fraction = fraction if fraction is not None else self.fraction
+        seed = seed if seed is not None else self.seed
+
+        n_keep = _compute_n_samples(n_total, n_samples, fraction)
+        rng = np.random.default_rng(seed)
+
+        weights = 1.0 / np.maximum(v, self.eps) ** self.alpha
+        prob = weights / weights.sum()
+        indices = rng.choice(n_total, size=n_keep, replace=False, p=prob)
+
+        logger.info(
+            f"MismatchAwareSampling: {n_total} -> {n_keep} samples "
+            f"(over-boundary {int((v > 1).sum())}/{n_total}, "
+            f"median v={float(np.median(v)):.3f}, alpha={self.alpha}, seed={seed})"
+        )
+        return np.sort(indices)
+
+    def sample(
+        self,
+        embeddings: np.ndarray,
+        dataset: object,
+        n_samples: Optional[int] = None,
+        fraction: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> Tuple[np.ndarray, object, np.ndarray]:
+        indices = self.get_indices(
+            embeddings, n_samples=n_samples, fraction=fraction, seed=seed
+        )
+        return embeddings[indices], _subsample_dataset_metadata(dataset, indices), indices

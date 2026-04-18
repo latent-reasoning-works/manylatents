@@ -1,0 +1,11 @@
+# Mismatch-aware sampling — down-weights over-boundary (high v) points.
+# Companion to k_star_weighted (which up-weights low k_star boundary points).
+# v is computed internally from data as k_ref / k_star.
+dataset:
+  _target_: manylatents.utils.sampling.MismatchAwareSampling
+  k_ref: 15
+  k_max: 200
+  alpha: 1.0
+  eps: 1.0e-3
+  seed: 42
+  fraction: 0.8
