@@ -34,7 +34,6 @@ class TestShepardResidual:
             "mean_residual",
             "median_residual",
             "std_residual",
-            "mean_residual_normalized",
         ):
             assert key in out
 

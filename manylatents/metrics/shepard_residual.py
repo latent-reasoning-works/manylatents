@@ -115,7 +115,6 @@ def ShepardResidual(
         "mean_residual": mean_r,
         "median_residual": float(np.median(residual)),
         "std_residual": float(residual.std()),
-        "mean_residual_normalized": mean_r / alpha if alpha != 0 else float("nan"),
     }
 
     logger.info(

@@ -83,10 +83,6 @@ def density_spike(
     n_duplicates_per_point = multiplier - 1
     n_duplicates = n_region * n_duplicates_per_point
 
-    if n_duplicates == 0:
-        # multiplier == 1 — return originals with all-zero label
-        return data.copy(), np.zeros(n, dtype=np.int8)
-
     rng = np.random.default_rng(random_state)
     region_points = data[region_mask]
     duplicates = np.repeat(region_points, n_duplicates_per_point, axis=0)

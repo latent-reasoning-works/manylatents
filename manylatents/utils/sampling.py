@@ -1195,29 +1195,17 @@ class MismatchAwareSampling:
 
     Companion to ``KStarWeightedSampling``. Where ``KStarWeightedSampling``
     upweights low-:math:`k^{*}` boundary points (preservation), this
-    sampler downweights points whose mismatch ratio :math:`v = k_{ref}/k^{*}`
-    is large (over-boundary). Used for spike-and-recover experiments and
-    for any sampling intervention that aims to rebalance density-induced
-    over-boundary regions.
+    sampler downweights points whose mismatch ratio
+    :math:`v = k_{ref}/k^{*}` is large. Used for spike-and-recover and
+    other density-rebalancing interventions.
 
-    Two construction modes:
-        - ``v=array``: caller has precomputed per-point mismatch ratios
-          (e.g. from a prior ``MismatchRatio`` evaluation) and passes them
-          directly. The sampler does no extra computation on the data.
-        - ``k_ref=int``: only :math:`k_{ref}` is given; the sampler computes
-          :math:`v = k_{ref}/k^{*}` from the data itself, treating
-          :math:`k_{ref}` as the fixed neighborhood size the downstream
-          algorithm will request. This is the mode used for pre-fit
-          sampling, where the algorithm has not been instantiated yet.
-
-    Weights: ``w_i = 1 / max(v_i, eps) ** alpha``. With ``alpha=1`` this
-    is straight inverse-:math:`v` sampling.
+    Weights: ``w_i = 1 / max(v_i, eps) ** alpha``. ``alpha=1`` is straight
+    inverse-:math:`v` sampling.
     """
 
     def __init__(
         self,
-        k_ref: Optional[int] = None,
-        v: Optional[np.ndarray] = None,
+        k_ref: int,
         k_max: int = 200,
         alpha: float = 1.0,
         eps: float = 1e-3,
@@ -1225,32 +1213,7 @@ class MismatchAwareSampling:
         fraction: Optional[float] = None,
         n_samples: Optional[int] = None,
     ):
-        """Initialize MismatchAwareSampling.
-
-        Args:
-            k_ref: Reference neighborhood size for computing
-                ``v = k_ref / k_star`` from data. Mutually exclusive with
-                ``v``.
-            v: Precomputed per-point mismatch ratios. Mutually exclusive
-                with ``k_ref``.
-            k_max: Maximum k for the ``k_star`` log-log sweep when computing
-                ``v`` internally. Ignored when ``v`` is provided.
-            alpha: Exponent on the inverse-:math:`v` weight. Larger
-                ``alpha`` more aggressively downweights high-:math:`v`
-                points.
-            eps: Floor on :math:`v` to avoid division by zero in the
-                weight expression.
-            seed: Default random seed (overridable at call time).
-            fraction: Default sampling fraction.
-            n_samples: Default sample count.
-
-        Raises:
-            ValueError: If neither or both of ``k_ref`` and ``v`` are set.
-        """
-        if (k_ref is None) == (v is None):
-            raise ValueError("Provide exactly one of `k_ref` or `v`.")
         self.k_ref = k_ref
-        self.v = None if v is None else np.asarray(v, dtype=np.float64)
         self.k_max = k_max
         self.alpha = alpha
         self.eps = eps
@@ -1258,25 +1221,9 @@ class MismatchAwareSampling:
         self.fraction = fraction
         self.n_samples = n_samples
 
-    def _resolve_v(self, data: np.ndarray) -> np.ndarray:
-        """Return per-point v, either precomputed or computed from data."""
-        if self.v is not None:
-            if len(self.v) != len(data):
-                raise ValueError(
-                    f"Precomputed v has length {len(self.v)} but data has "
-                    f"{len(data)} rows."
-                )
-            return self.v
-
-        from manylatents.metrics.mismatch_ratio import _compute_kstar
-
-        k_star, _ = _compute_kstar(data, k_max=self.k_max)
-        v = np.where(k_star > 0, float(self.k_ref) / k_star, 0.0)
-        return v
-
     def get_indices(
         self,
-        data_or_n_total: Union[np.ndarray, int],
+        data: np.ndarray,
         n_samples: Optional[int] = None,
         fraction: Optional[float] = None,
         seed: Optional[int] = None,
@@ -1284,37 +1231,25 @@ class MismatchAwareSampling:
     ) -> np.ndarray:
         """Compute mismatch-aware sample indices.
 
-        Args:
-            data_or_n_total: Data array. Integer input is rejected unless
-                ``v`` was precomputed at construction (in which case the
-                integer is used as the total count).
-            n_samples: Absolute sample count.
-            fraction: Sampling fraction.
-            seed: Random seed (overrides instance seed).
-
-        Returns:
-            Sorted array of selected indices.
-
-        Raises:
-            TypeError: If ``data_or_n_total`` is an integer and ``v`` was
-                not precomputed (k_star needs the data).
+        Computes :math:`v = k_{ref}/k^{*}` from ``data`` and samples without
+        replacement using inverse-:math:`v` weights.
         """
+        if isinstance(data, int):
+            raise TypeError(
+                "MismatchAwareSampling needs the data array for k_star "
+                "computation, got an integer."
+            )
+        data = np.asarray(data)
+        n_total = len(data)
+
+        from manylatents.metrics.mismatch_ratio import _compute_kstar
+
+        k_star, _ = _compute_kstar(data, k_max=self.k_max)
+        v = np.where(k_star > 0, float(self.k_ref) / k_star, 0.0)
+
         n_samples = n_samples if n_samples is not None else self.n_samples
         fraction = fraction if fraction is not None else self.fraction
         seed = seed if seed is not None else self.seed
-
-        if isinstance(data_or_n_total, int):
-            if self.v is None:
-                raise TypeError(
-                    "MismatchAwareSampling with k_ref needs the data array for "
-                    "k_star computation, got an integer."
-                )
-            n_total = data_or_n_total
-            v = self.v
-        else:
-            data = np.asarray(data_or_n_total)
-            n_total = len(data)
-            v = self._resolve_v(data)
 
         n_keep = _compute_n_samples(n_total, n_samples, fraction)
         rng = np.random.default_rng(seed)
@@ -1323,10 +1258,9 @@ class MismatchAwareSampling:
         prob = weights / weights.sum()
         indices = rng.choice(n_total, size=n_keep, replace=False, p=prob)
 
-        n_over = int((v > 1).sum())
         logger.info(
             f"MismatchAwareSampling: {n_total} -> {n_keep} samples "
-            f"(over-boundary points {n_over}/{n_total}, "
+            f"(over-boundary {int((v > 1).sum())}/{n_total}, "
             f"median v={float(np.median(v)):.3f}, alpha={self.alpha}, seed={seed})"
         )
         return np.sort(indices)
@@ -1339,10 +1273,7 @@ class MismatchAwareSampling:
         fraction: Optional[float] = None,
         seed: Optional[int] = None,
     ) -> Tuple[np.ndarray, object, np.ndarray]:
-        """Down-weight high-v points and subsample (legacy interface)."""
         indices = self.get_indices(
             embeddings, n_samples=n_samples, fraction=fraction, seed=seed
         )
-        subsampled_embeddings = embeddings[indices]
-        subsampled_ds = _subsample_dataset_metadata(dataset, indices)
-        return subsampled_embeddings, subsampled_ds, indices
+        return embeddings[indices], _subsample_dataset_metadata(dataset, indices), indices
