@@ -7,6 +7,7 @@ from manylatents.utils.sampling import (
     GeosketchSampling,
     ImportanceSampling,
     KStarWeightedSampling,
+    MismatchAwareSampling,
 )
 
 
@@ -159,6 +160,84 @@ class TestKStarWeightedSampling:
         data = _make_data(500, 10)
         ds = MockDataset()
         sampler = KStarWeightedSampling(k_max=50, seed=42)
+        emb_sub, ds_sub, idx = sampler.sample(data, ds, fraction=0.5)
+
+        assert emb_sub.shape == (250, 10)
+        assert len(idx) == 250
+        assert isinstance(ds_sub, MockDataset)
+
+
+# ---------------------------------------------------------------------------
+# TestMismatchAwareSampling
+# ---------------------------------------------------------------------------
+
+class TestMismatchAwareSampling:
+    def test_output_size_with_kref(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx = sampler.get_indices(data, fraction=0.5)
+        assert len(idx) == 250
+
+    def test_output_size_with_precomputed_v(self):
+        n = 500
+        rng = np.random.default_rng(0)
+        v = rng.uniform(0.1, 3.0, size=n)
+        sampler = MismatchAwareSampling(v=v, seed=42)
+        idx = sampler.get_indices(n, fraction=0.5)
+        assert len(idx) == 250
+
+    def test_sorted_indices(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx = sampler.get_indices(data, fraction=0.5)
+        assert np.all(np.diff(idx) >= 0)
+
+    def test_no_duplicates(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx = sampler.get_indices(data, fraction=0.5)
+        assert len(set(idx)) == len(idx)
+
+    def test_deterministic(self):
+        data = _make_data(500, 10)
+        s1 = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        s2 = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
+        idx1 = s1.get_indices(data, fraction=0.5)
+        idx2 = s2.get_indices(data, fraction=0.5)
+        np.testing.assert_array_equal(idx1, idx2)
+
+    def test_high_v_downweighted(self):
+        # Construct precomputed v: half the points have v=0.1, half have v=10.
+        # The high-v half should be sampled rarely.
+        n = 1000
+        v = np.concatenate([np.full(500, 0.1), np.full(500, 10.0)])
+        sampler = MismatchAwareSampling(v=v, alpha=1.0, seed=42)
+        idx = sampler.get_indices(n, fraction=0.5)
+        # Indices from the high-v block (>= 500) should be a small minority.
+        n_high = int(np.sum(idx >= 500))
+        assert n_high < 50  # expected ~5 (1/100 weight ratio); allow slack
+
+    def test_construction_requires_one_of_kref_or_v(self):
+        with pytest.raises(ValueError):
+            MismatchAwareSampling()
+        with pytest.raises(ValueError):
+            MismatchAwareSampling(k_ref=15, v=np.array([1.0, 2.0]))
+
+    def test_int_input_with_kref_rejected(self):
+        sampler = MismatchAwareSampling(k_ref=15, seed=42)
+        with pytest.raises(TypeError):
+            sampler.get_indices(500, fraction=0.5)
+
+    def test_v_length_mismatch_raises(self):
+        data = _make_data(500, 10)
+        sampler = MismatchAwareSampling(v=np.ones(100), seed=42)
+        with pytest.raises(ValueError):
+            sampler.get_indices(data, fraction=0.5)
+
+    def test_sample_method(self):
+        data = _make_data(500, 10)
+        ds = MockDataset()
+        sampler = MismatchAwareSampling(k_ref=15, k_max=50, seed=42)
         emb_sub, ds_sub, idx = sampler.sample(data, ds, fraction=0.5)
 
         assert emb_sub.shape == (250, 10)

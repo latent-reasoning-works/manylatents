@@ -106,6 +106,7 @@ from manylatents.metrics.trajectory_geometry import (
 # Geometric diagnostics
 from manylatents.metrics.effective_neighborhood_size import EffectiveNeighborhoodSize
 from manylatents.metrics.mismatch_ratio import MismatchRatio
+from manylatents.metrics.shepard_residual import ShepardResidual
 
 # Post-hoc analysis
 from manylatents.metrics.metric_agreement import MetricAgreement
@@ -178,6 +179,7 @@ __all__ = [
     # Geometric diagnostics
     "EffectiveNeighborhoodSize",
     "MismatchRatio",
+    "ShepardResidual",
     # Post-hoc analysis
     "MetricAgreement",
 ]
