@@ -16,16 +16,21 @@ def test_isinstance_synthetic_dataset():
     assert isinstance(_make(), SyntheticDataset)
 
 
+def _n_handle(n_prong, ratio, handle_length=2.0, half_gap=0.15, prong_length=3.0):
+    arm_arc = half_gap + prong_length
+    return max(1, int(ratio * n_prong * handle_length / arm_arc))
+
+
 def test_shape_default():
-    ds = _make(n_prong=50, handle_prong_ratio=0.2)
-    n_handle = int(0.2 * 50)
-    assert ds.data.shape == (n_handle + 2 * 50, 2)
+    ds = _make(n_prong=50, handle_prong_ratio=1.0)
+    nh = _n_handle(50, 1.0)
+    assert ds.data.shape == (nh + 2 * 50, 2)
 
 
 def test_shape_total_n():
     ds = _make(n_prong=100, handle_prong_ratio=0.5)
-    n_handle = int(0.5 * 100)
-    assert ds.data.shape == (n_handle + 200, 2)
+    nh = _n_handle(100, 0.5)
+    assert ds.data.shape == (nh + 200, 2)
 
 
 def test_labels_three_values():
@@ -37,8 +42,8 @@ def test_label_counts():
     n_prong = 80
     ratio = 0.25
     ds = TuningFork(n_prong=n_prong, handle_prong_ratio=ratio, random_state=0)
-    n_handle = int(ratio * n_prong)
-    assert np.sum(ds.metadata == 0) == n_handle
+    nh = _n_handle(n_prong, ratio)
+    assert np.sum(ds.metadata == 0) == nh
     assert np.sum(ds.metadata == 1) == n_prong
     assert np.sum(ds.metadata == 2) == n_prong
 

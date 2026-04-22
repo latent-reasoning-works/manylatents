@@ -1977,7 +1977,7 @@ class TuningFork(SyntheticDataset):
     def __init__(
         self,
         n_prong: int = 500,
-        handle_prong_ratio: float = 0.2,
+        handle_prong_ratio: float = 1.0,
         dist_between_prongs: float = 0.3,
         prong_length: float = 3.0,
         handle_length: float = 2.0,
@@ -1992,9 +1992,10 @@ class TuningFork(SyntheticDataset):
         ----------
         n_prong : int, default=500
             Number of points per prong arm (bend + straight section).
-        handle_prong_ratio : float, default=0.2
-            Handle gets n_handle = int(handle_prong_ratio * n_prong) points.
-            Total N = n_handle + 2 * n_prong.
+        handle_prong_ratio : float, default=1.0
+            Density ratio relative to prongs. 1.0 = same points-per-unit-arc-length
+            as each prong arm. Values < 1 make the handle sparser. n_handle is
+            computed as int(handle_prong_ratio * n_prong * handle_length / arm_arc).
         dist_between_prongs : float, default=0.3
             Euclidean gap between the two parallel prong lines. Keep small so
             k-NN crosses prongs, demonstrating the neighborhood scale tradeoff.
@@ -2028,7 +2029,10 @@ class TuningFork(SyntheticDataset):
         # This guarantees all left-arm points have x ≤ 0 and right-arm x ≥ 0,
         # so cross-arm Euclidean distance ≥ dist_between_prongs everywhere.
         arm_arc = half_gap + prong_length
-        n_handle = int(handle_prong_ratio * n_prong)
+        # handle_prong_ratio is a density ratio: 1.0 = same pts/unit-arc as prongs.
+        # n_handle scales by the handle's arc length relative to one arm so that
+        # equal ratio means equal spatial density, not equal count.
+        n_handle = max(1, int(handle_prong_ratio * n_prong * handle_length / arm_arc))
 
         # Handle: vertical segment from (0,0) to (0, handle_length)
         h_pos = rng.uniform(0.0, handle_length, size=n_handle)
