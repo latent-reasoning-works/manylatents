@@ -1956,3 +1956,199 @@ if __name__ == "__main__":
         plt.figure(figsize=(8, 6))
         plt.scatter(phate_data[:, 0], phate_data[:, 1], c=labels, cmap="tab20", s=10)
     plt.savefig(f"{data_name}.png", bbox_inches='tight')
+
+
+class TuningFork(SyntheticDataset):
+    """
+    Synthetic tuning-fork manifold with heterogeneous density.
+
+    Geometry: a 1D manifold embedded in 2D (optionally rotated to higher D)
+    consisting of a sparse handle and two dense parallel prongs (U-shape).
+    The prongs are close in Euclidean space so large neighborhoods create
+    spurious cross-prong connections in manifold learning methods.
+
+    Labels: 0 = handle, 1 = left prong (incl. bend), 2 = right prong (incl. bend).
+    """
+
+    def __init__(
+        self,
+        n_prong: int = 500,
+        handle_prong_ratio: float = 0.2,
+        dist_between_prongs: float = 0.3,
+        prong_length: float = 3.0,
+        handle_length: float = 2.0,
+        noise: float = 0.02,
+        rotate_to_dim: int = 2,
+        random_state: int = 42,
+        save_viz: bool = False,
+        save_dir: str = "outputs",
+    ):
+        """
+        Parameters
+        ----------
+        n_prong : int, default=500
+            Number of points per prong arm (bend + straight section).
+        handle_prong_ratio : float, default=0.2
+            Handle gets n_handle = int(handle_prong_ratio * n_prong) points.
+            Total N = n_handle + 2 * n_prong.
+        dist_between_prongs : float, default=0.3
+            Euclidean gap between the two parallel prong lines. Keep small so
+            k-NN crosses prongs, demonstrating the neighborhood scale tradeoff.
+        prong_length : float, default=3.0
+            Length of the straight prong section.
+        handle_length : float, default=2.0
+            Length of the handle segment.
+        noise : float, default=0.02
+            Isotropic Gaussian noise std added to all points.
+        rotate_to_dim : int, default=2
+            If > 2, randomly rotate data into this many dimensions (like SwissRoll).
+        random_state : int, default=42
+            RNG seed for reproducibility.
+        save_viz : bool, default=False
+            If True, save ground truth PNG on instantiation.
+        save_dir : str, default="outputs"
+            Directory for saved PNG.
+        """
+        super().__init__()
+        np.random.seed(random_state)
+        rng = np.random.default_rng(random_state)
+
+        self.save_viz = save_viz
+        self.save_dir = save_dir
+        self._handle_length = handle_length
+
+        half_gap = dist_between_prongs / 2.0
+        bend_arc = np.pi / 2.0 * half_gap
+        arm_arc = bend_arc + prong_length
+        n_handle = int(handle_prong_ratio * n_prong)
+
+        # Handle: vertical segment from (0,0) to (0, handle_length)
+        h_pos = rng.uniform(0.0, handle_length, size=n_handle)
+        handle_pts = np.stack([np.zeros(n_handle), h_pos], axis=1)
+
+        def _sample_arm(n, sign):
+            """Sample n points uniformly by arc length on one arm.
+
+            sign=-1 for left arm, sign=+1 for right arm.
+            Bend: quarter-circle from junction (0, handle_length) to
+                  (sign*half_gap, handle_length+half_gap).
+            Straight: runs up from bend end at x=sign*half_gap.
+            """
+            s = rng.uniform(0.0, arm_arc, size=n)
+            x = np.empty(n)
+            y = np.empty(n)
+            on_bend = s < bend_arc
+            # Quarter-circle bend
+            theta = s[on_bend] / half_gap  # theta in [0, pi/2]
+            x[on_bend] = sign * half_gap - sign * half_gap * np.cos(theta)
+            y[on_bend] = handle_length + half_gap * np.sin(theta)
+            # Straight prong at x = sign * half_gap
+            straight_s = s[~on_bend] - bend_arc
+            x[~on_bend] = sign * half_gap
+            y[~on_bend] = handle_length + half_gap + straight_s
+            return np.stack([x, y], axis=1)
+
+        left_pts = _sample_arm(n_prong, sign=-1)
+        right_pts = _sample_arm(n_prong, sign=+1)
+
+        # Arc-length section and position for each point (used by get_gt_dists)
+        self._arc_section = np.concatenate([
+            np.zeros(n_handle, dtype=int),
+            np.ones(n_prong, dtype=int),
+            np.full(n_prong, 2, dtype=int),
+        ])
+
+        def _arc_pos_from_pts(pts, section):
+            """Recover arc-length position within a section from clean 2D points."""
+            if section == 0:
+                return pts[:, 1]  # y = arc pos along handle
+            # For arms: determine if on bend or straight from y coordinate
+            on_straight = pts[:, 1] > (handle_length + half_gap)
+            pos = np.empty(len(pts))
+            pos[on_straight] = bend_arc + pts[on_straight, 1] - (handle_length + half_gap)
+            bend_mask = ~on_straight
+            if bend_mask.any():
+                sin_theta = np.clip(
+                    (pts[bend_mask, 1] - handle_length) / half_gap, -1.0, 1.0
+                )
+                pos[bend_mask] = half_gap * np.arcsin(sin_theta)
+            return pos
+
+        self._arc_pos = np.concatenate([
+            _arc_pos_from_pts(handle_pts, 0),
+            _arc_pos_from_pts(left_pts, 1),
+            _arc_pos_from_pts(right_pts, 2),
+        ])
+
+        data = np.concatenate([handle_pts, left_pts, right_pts], axis=0)
+        labels = np.concatenate([
+            np.zeros(n_handle, dtype=int),
+            np.ones(n_prong, dtype=int),
+            np.full(n_prong, 2, dtype=int),
+        ])
+
+        data = data + rng.normal(0.0, noise, size=data.shape)
+
+        self.data = data
+        self.metadata = labels
+
+        if rotate_to_dim > 2:
+            self.data = self.rotate_to_dim(rotate_to_dim)
+
+        if save_viz:
+            self._save_figure()
+
+    def get_gt_dists(self):
+        """Pairwise geodesic distances along the tuning-fork manifold.
+
+        Cross-arm geodesics route through the junction (handle tip).
+        Same-section geodesics use direct arc-length difference.
+        """
+        sec = self._arc_section  # (n,) 0=handle, 1=left, 2=right
+        pos = self._arc_pos      # (n,) arc-length within section
+
+        # Distance from each point to the junction
+        # Handle: junction at arc-pos == handle_length → dist = handle_length - pos
+        # Arms:   junction at arc-pos == 0             → dist = pos
+        dist_to_junc = np.where(sec == 0, self._handle_length - pos, pos)
+
+        same_section = sec[:, None] == sec[None, :]  # (n, n) bool
+        D = np.where(
+            same_section,
+            np.abs(pos[:, None] - pos[None, :]),
+            dist_to_junc[:, None] + dist_to_junc[None, :],
+        )
+        return D
+
+    def _save_figure(self):
+        import os
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        os.makedirs(self.save_dir, exist_ok=True)
+
+        colors = {0: "#4c96e8", 1: "#3fb950", 2: "#f78166"}
+        label_names = {0: "handle", 1: "left prong", 2: "right prong"}
+
+        fig, ax = plt.subplots(figsize=(4, 8))
+
+        if self.data.shape[1] == 2:
+            for label in [0, 1, 2]:
+                mask = self._arc_section == label
+                pts = self.data[mask]
+                ax.scatter(pts[:, 0], pts[:, 1], s=6, c=colors[label],
+                           label=label_names[label], alpha=0.7, linewidths=0)
+            ax.set_aspect("equal")
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+        else:
+            ax.text(0.5, 0.5, f"Data in {self.data.shape[1]}D — 2D plot unavailable",
+                    ha="center", va="center", transform=ax.transAxes)
+
+        ax.legend(loc="upper right", fontsize=8)
+        ax.set_title("Tuning Fork — Ground Truth")
+
+        path = os.path.join(self.save_dir, "tuning_fork_ground_truth.png")
+        plt.savefig(path, bbox_inches="tight", dpi=120)
+        plt.close(fig)

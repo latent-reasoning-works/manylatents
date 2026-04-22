@@ -1,0 +1,17 @@
+defaults:
+  - default
+
+_target_: manylatents.data.tuning_fork.TuningForkDataModule
+n_prong: 100
+handle_prong_ratio: 0.2
+dist_between_prongs: 0.3
+prong_length: 3.0
+handle_length: 2.0
+noise: 0.02
+rotate_to_dim: 2
+random_state: ${seed}
+save_viz: false
+save_dir: ${hydra:runtime.output_dir}
+mode: full
+test_split: 0.2
+shuffle_traindata: false
