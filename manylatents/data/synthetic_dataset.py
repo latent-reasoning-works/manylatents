@@ -1970,6 +1970,10 @@ class TuningFork(SyntheticDataset):
     Labels: 0 = handle, 1 = left prong (incl. bend), 2 = right prong (incl. bend).
     """
 
+    # Shared color palette used by both ground truth plot and embedding callback
+    LABEL_COLORS = {0: "#4c96e8", 1: "#3fb950", 2: "#f78166"}
+    LABEL_NAMES  = {0: "handle",  1: "left prong", 2: "right prong"}
+
     def __init__(
         self,
         n_prong: int = 500,
@@ -2098,6 +2102,14 @@ class TuningFork(SyntheticDataset):
         if save_viz:
             self._save_figure()
 
+    def get_colormap_info(self):
+        from manylatents.callbacks.embedding.base import ColormapInfo
+        return ColormapInfo(
+            cmap=self.LABEL_COLORS,
+            label_names=self.LABEL_NAMES,
+            is_categorical=True,
+        )
+
     def get_gt_dists(self):
         """Pairwise geodesic distances along the tuning-fork manifold.
 
@@ -2128,8 +2140,8 @@ class TuningFork(SyntheticDataset):
 
         os.makedirs(self.save_dir, exist_ok=True)
 
-        colors = {0: "#4c96e8", 1: "#3fb950", 2: "#f78166"}
-        label_names = {0: "handle", 1: "left prong", 2: "right prong"}
+        colors = self.LABEL_COLORS
+        label_names = self.LABEL_NAMES
 
         fig, ax = plt.subplots(figsize=(4, 8))
 
