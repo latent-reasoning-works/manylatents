@@ -222,3 +222,10 @@ def test_hydra_instantiate_sparse_control(tmp_path):
     dm = hydra.utils.instantiate(cfg.data)
     dm.setup()
     assert dm.train_dataset is not None
+
+
+def test_hydra_instantiate_pathological(tmp_path):
+    cfg = _compose(["data=tuning_fork_pathological", f"data.save_dir={tmp_path}"])
+    dm = hydra.utils.instantiate(cfg.data)
+    dm.setup()
+    assert dm.train_dataset is not None
