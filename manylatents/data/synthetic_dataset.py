@@ -2022,8 +2022,12 @@ class TuningFork(SyntheticDataset):
         self._handle_length = handle_length
 
         half_gap = dist_between_prongs / 2.0
-        bend_arc = np.pi / 2.0 * half_gap
-        arm_arc = bend_arc + prong_length
+        # Each arm = horizontal shoulder (half_gap) + vertical prong (prong_length)
+        # T-junction: handle ends at (0, handle_length); shoulders go horizontally
+        # to (±half_gap, handle_length); prongs go straight up from there.
+        # This guarantees all left-arm points have x ≤ 0 and right-arm x ≥ 0,
+        # so cross-arm Euclidean distance ≥ dist_between_prongs everywhere.
+        arm_arc = half_gap + prong_length
         n_handle = int(handle_prong_ratio * n_prong)
 
         # Handle: vertical segment from (0,0) to (0, handle_length)
@@ -2034,22 +2038,19 @@ class TuningFork(SyntheticDataset):
             """Sample n points uniformly by arc length on one arm.
 
             sign=-1 for left arm, sign=+1 for right arm.
-            Bend: quarter-circle from junction (0, handle_length) to
-                  (sign*half_gap, handle_length+half_gap).
-            Straight: runs up from bend end at x=sign*half_gap.
+            Shoulder: horizontal from (0, handle_length) to (sign*half_gap, handle_length).
+            Prong: vertical from (sign*half_gap, handle_length) upward.
             """
             s = rng.uniform(0.0, arm_arc, size=n)
             x = np.empty(n)
             y = np.empty(n)
-            on_bend = s < bend_arc
-            # Quarter-circle bend
-            theta = s[on_bend] / half_gap  # theta in [0, pi/2]
-            x[on_bend] = sign * half_gap - sign * half_gap * np.cos(theta)
-            y[on_bend] = handle_length + half_gap * np.sin(theta)
-            # Straight prong at x = sign * half_gap
-            straight_s = s[~on_bend] - bend_arc
-            x[~on_bend] = sign * half_gap
-            y[~on_bend] = handle_length + half_gap + straight_s
+            on_shoulder = s < half_gap
+            # Horizontal shoulder
+            x[on_shoulder] = sign * s[on_shoulder]
+            y[on_shoulder] = handle_length
+            # Vertical prong
+            x[~on_shoulder] = sign * half_gap
+            y[~on_shoulder] = handle_length + (s[~on_shoulder] - half_gap)
             return np.stack([x, y], axis=1)
 
         left_pts = _sample_arm(n_prong, sign=-1)
@@ -2066,16 +2067,11 @@ class TuningFork(SyntheticDataset):
             """Recover arc-length position within a section from clean 2D points."""
             if section == 0:
                 return pts[:, 1]  # y = arc pos along handle
-            # For arms: determine if on bend or straight from y coordinate
-            on_straight = pts[:, 1] > (handle_length + half_gap)
+            # Shoulder: pos = |x|; Prong: pos = half_gap + (y - handle_length)
+            on_prong = pts[:, 1] > handle_length
             pos = np.empty(len(pts))
-            pos[on_straight] = bend_arc + pts[on_straight, 1] - (handle_length + half_gap)
-            bend_mask = ~on_straight
-            if bend_mask.any():
-                sin_theta = np.clip(
-                    (pts[bend_mask, 1] - handle_length) / half_gap, -1.0, 1.0
-                )
-                pos[bend_mask] = half_gap * np.arcsin(sin_theta)
+            pos[~on_prong] = np.abs(pts[~on_prong, 0])
+            pos[on_prong] = half_gap + pts[on_prong, 1] - handle_length
             return pos
 
         self._arc_pos = np.concatenate([
