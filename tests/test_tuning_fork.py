@@ -198,22 +198,22 @@ def _compose(overrides):
         return compose(config_name="config", overrides=overrides)
 
 
-def test_hydra_instantiate_positive():
-    cfg = _compose(["data=tuning_fork_positive"])
+def test_hydra_instantiate_positive(tmp_path):
+    cfg = _compose(["data=tuning_fork_positive", f"data.save_dir={tmp_path}"])
     dm = hydra.utils.instantiate(cfg.data)
     dm.setup()
     assert dm.train_dataset is not None
 
 
-def test_hydra_instantiate_dense_control():
-    cfg = _compose(["data=tuning_fork_dense_control"])
+def test_hydra_instantiate_dense_control(tmp_path):
+    cfg = _compose(["data=tuning_fork_dense_control", f"data.save_dir={tmp_path}"])
     dm = hydra.utils.instantiate(cfg.data)
     dm.setup()
     assert dm.train_dataset is not None
 
 
-def test_hydra_instantiate_sparse_control():
-    cfg = _compose(["data=tuning_fork_sparse_control"])
+def test_hydra_instantiate_sparse_control(tmp_path):
+    cfg = _compose(["data=tuning_fork_sparse_control", f"data.save_dir={tmp_path}"])
     dm = hydra.utils.instantiate(cfg.data)
     dm.setup()
     assert dm.train_dataset is not None
