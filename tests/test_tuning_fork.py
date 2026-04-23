@@ -63,8 +63,8 @@ def test_different_seeds_differ():
 
 def test_len():
     ds = _make(n_prong=50, handle_prong_ratio=0.4)
-    n_handle = int(0.4 * 50)
-    assert len(ds) == n_handle + 100
+    nh = _n_handle(50, 0.4)
+    assert len(ds) == nh + 100
 
 
 def test_getitem_keys():
@@ -88,8 +88,8 @@ def test_rotate_to_dim():
     ratio = 0.2
     ds = TuningFork(n_prong=n_prong, handle_prong_ratio=ratio,
                     rotate_to_dim=50, random_state=0)
-    n_handle = int(ratio * n_prong)
-    assert ds.data.shape == (n_handle + 2 * n_prong, 50)
+    nh = _n_handle(n_prong, ratio)
+    assert ds.data.shape == (nh + 2 * n_prong, 50)
 
 
 def test_handle_sparser_than_prongs():
@@ -166,8 +166,7 @@ def test_datamodule_setup_split():
     dm = TuningForkDataModule(n_prong=100, handle_prong_ratio=0.2,
                               mode="split", test_split=0.2, random_state=0)
     dm.setup()
-    n_handle = int(0.2 * 100)
-    total = n_handle + 200
+    total = _n_handle(100, 0.2) + 200
     assert len(dm.train_dataset) + len(dm.test_dataset) == total
 
 
