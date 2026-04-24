@@ -1,0 +1,40 @@
+# manylatents/configs/algorithms/lightning/distillation/base.yaml
+# Pure task training against a pre-materialized ActivationSnapshot.
+# alignment_weight=0 means the snapshot is carried but the alignment
+# regularizer never runs - useful as a task-only control, or as the
+# default entry point when the consumer will override alignment_weight.
+#
+# Required overrides from the consumer:
+#   student           _target_ pointing at an nn.Module builder
+#   activation_snapshot.path  path to a saved snapshot on disk
+#   layer_pairs       list of {student, teacher, weight} dicts
+_target_: manylatents.algorithms.lightning.distillation.Distillation
+_recursive_: false
+
+datamodule: ${data}
+
+# Consumer must override `student._target_`. No default - there's no
+# sensible generic student nn.Module for this library.
+student: ???
+
+# Snapshot is loaded from disk. Build with:
+#   ActivationSnapshot.from_model(teacher, ...).save(path)
+# in a one-off materialization job, then point the path here.
+activation_snapshot:
+  _target_: manylatents.lightning.activation_snapshot.ActivationSnapshot.load
+  path: ???
+
+# Consumer must override. Shape:
+#   [{student: <student_path>, teacher: <snapshot_key>, weight: <float>}, ...]
+layer_pairs: []
+
+optimizer:
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 1e-8
+
+alignment_weight: 0.0
+alignment_batch_size: 16
+init_seed: 42
+lr_scheduler: null
