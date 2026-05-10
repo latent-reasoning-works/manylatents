@@ -1,0 +1,33 @@
+# manylatents/configs/algorithms/lightning/distillation/control_task_only.yaml
+# Task-only control: no alignment regularizer, aligned layers frozen from
+# step 0. Baseline that matches the staged run's *trainable* parameter
+# budget without giving the student access to teacher activations.
+#
+# Consumer wires the callback with phase3_start_step: 0:
+#   trainer:
+#     callbacks:
+#       - _target_: manylatents.lightning.callbacks.staged_training.StagedTrainingCallback
+#         phase3_start_step: 0
+#         frozen_prefixes_phase2: [bert.encoder.layer.m2]
+_target_: manylatents.algorithms.lightning.distillation.Distillation
+_recursive_: false
+
+datamodule: ${data}
+student: ???
+
+activation_snapshot:
+  _target_: manylatents.lightning.activation_snapshot.ActivationSnapshot.load
+  path: ???
+
+layer_pairs: []
+
+optimizer:
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 1e-8
+
+alignment_weight: 0.0
+alignment_batch_size: 16
+init_seed: 42
+lr_scheduler: null

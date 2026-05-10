@@ -94,8 +94,9 @@ class ActivationExtractor:
         activations = extractor.get_activations()
     """
 
-    def __init__(self, layer_specs: List[LayerSpec]):
+    def __init__(self, layer_specs: List[LayerSpec], detach: bool = True):
         self.layer_specs = layer_specs
+        self._detach = detach
         self._activations: Dict[str, List[Tensor]] = {}
         self._handles: List = []
 
@@ -113,7 +114,7 @@ class ActivationExtractor:
 
             if spec.path not in self._activations:
                 self._activations[spec.path] = []
-            self._activations[spec.path].append(tensor.detach())
+            self._activations[spec.path].append(tensor.detach() if self._detach else tensor)
 
         return hook
 
