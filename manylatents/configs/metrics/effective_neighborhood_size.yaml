@@ -2,3 +2,10 @@ effective_neighborhood_size:
   _target_: manylatents.metrics.effective_neighborhood_size.EffectiveNeighborhoodSize
   _partial_: True
   at: module
+  # "native" reads module.affinity() (original behavior, cross-family unsafe).
+  # "common_kernel" builds a shared kNN Gaussian kernel on the embedding so
+  # k_eff is comparable across DR families (PCA/MDS/Sammon included).
+  mode: native
+  # Neighborhood size used only by common_kernel mode (native reads the
+  # module's internal graph directly).
+  k: 15
