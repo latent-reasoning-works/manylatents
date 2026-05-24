@@ -134,6 +134,22 @@ class ActivationExtractor:
         else:
             return tensor
 
+    @classmethod
+    def extract_once(
+        cls, model: nn.Module, forward_fn, layer_specs: List[LayerSpec],
+    ) -> Dict[str, Tensor]:
+        """One-shot capture: register hooks for `layer_specs`, run a single
+        `forward_fn()`, remove the hooks, and return {path: activation}.
+
+        Convenience for single-forward extraction (e.g. encoding one sequence
+        and reading several layers). For repeated/accumulating capture across
+        many forwards, use the capture() context manager directly.
+        """
+        extractor = cls(layer_specs)
+        with extractor.capture(model):
+            forward_fn()
+        return extractor.get_activations()
+
     @contextmanager
     def capture(self, model: nn.Module):
         """Context manager to capture activations during forward pass."""
