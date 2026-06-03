@@ -273,6 +273,11 @@ def compute_geodesic_distances(embedding, k=10, metric='euclidean', verbose=0):
         embedding, n_neighbors=k, mode='distance',
         metric=metric, include_self=False
     )
+    # scipy's shortest_path Cython kernel expects int32 ('const int') index
+    # arrays; sklearn's kneighbors_graph yields int64 on numpy>=2, which raises
+    # "Buffer dtype mismatch, expected 'const int' but got 'long'". Cast down.
+    knn_graph.indices = knn_graph.indices.astype(np.int32, copy=False)
+    knn_graph.indptr = knn_graph.indptr.astype(np.int32, copy=False)
     n_components, labels = connected_components(knn_graph, directed=False)
     if n_components > 1:
         if verbose:
