@@ -140,6 +140,7 @@ class TestLatentODELightningModule:
 
         loader = DataLoader(DictDataset(X), batch_size=16)
         trainer = L.Trainer(
+            accelerator="cpu",  # torchdiffeq needs float64; MPS (auto on macOS) has none
             max_epochs=3,
             enable_checkpointing=False,
             enable_progress_bar=False,
@@ -171,3 +172,52 @@ class TestLatentODEHydra:
         net = instantiate(cfg)
         assert isinstance(net, LatentODENetwork)
         assert net.latent_dim == 8
+
+
+class TestLatentODEThroughRunExperiment:
+    """End-to-end: latent_ode as a runnable op via run_experiment (issue #269)."""
+
+    def test_run_experiment_returns_latent_outputs(self):
+        """Toy input -> run_experiment -> assert a non-empty LatentOutputs dict."""
+        import numpy as np
+        from lightning import Trainer
+
+        from manylatents.algorithms.lightning.latent_ode import LatentODE
+        from manylatents.algorithms.lightning.losses.mse import MSELoss
+        from manylatents.algorithms.lightning.networks.latent_ode import LatentODENetwork
+        from manylatents.callbacks.embedding.base import validate_latent_outputs
+        from manylatents.data.precomputed_datamodule import PrecomputedDataModule
+        from manylatents.experiment import run_experiment
+
+        # Toy input: 40 samples x 6 features.
+        X = np.random.default_rng(0).standard_normal((40, 6)).astype("float32")
+        datamodule = PrecomputedDataModule(data=X, seed=0)
+
+        net = LatentODENetwork(
+            input_dim=6, latent_dim=4, hidden_dim=16,
+            encoder_hidden_dims=[16], decoder_hidden_dims=[16], ode_n_layers=1,
+        )
+        model = LatentODE(
+            network=net,
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            loss=MSELoss(),
+        )
+
+        # accelerator="cpu" is deliberate: torchdiffeq builds float64 solver
+        # tolerances, which MPS cannot represent. The default accelerator="auto"
+        # would select MPS on macOS and crash. (Captured as M1 friction.)
+        trainer = Trainer(
+            accelerator="cpu", devices=1, max_epochs=1, logger=False,
+            enable_checkpointing=False, enable_progress_bar=False,
+        )
+
+        result = run_experiment(
+            datamodule=datamodule, algorithm=model, trainer=trainer, seed=0
+        )
+
+        # Assert the contract via the codebase's own validator (dict + "embeddings").
+        validate_latent_outputs(result)
+        emb = result["embeddings"]
+        assert emb.ndim == 2, f"expected 2-D embeddings, got shape {emb.shape}"
+        assert emb.shape[0] > 0, "embeddings must be non-empty"
+        assert np.isfinite(emb).all(), "embeddings contain NaN/Inf"
