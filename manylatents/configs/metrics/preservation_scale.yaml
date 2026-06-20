@@ -1,0 +1,9 @@
+preservation_scale:
+  _target_: manylatents.metrics.preservation_diagnostics.PreservationScale
+  _partial_: True
+  tau: 0.5
+  k_graph: 8
+  k_max: 200
+  k_min: 2
+  n_steps: 20
+  at: embedding

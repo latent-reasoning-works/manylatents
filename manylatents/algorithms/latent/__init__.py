@@ -12,8 +12,10 @@ from .leiden import LeidenModule
 from .reeb_graph import ReebGraphModule
 from .selective_correction import SelectiveCorrectionModule
 from .foundation_encoder import FoundationEncoder
+from .sammon import SammonModule
 
 __all__ = [
+    "SammonModule",
     "PCAModule",
     "TSNEModule",
     "UMAPModule",

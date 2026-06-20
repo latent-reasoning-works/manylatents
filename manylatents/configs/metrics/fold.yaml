@@ -1,0 +1,6 @@
+fold:
+  _target_: manylatents.metrics.preservation_diagnostics.Fold
+  _partial_: True
+  k_ref: 30
+  k_graph: 8
+  at: embedding
