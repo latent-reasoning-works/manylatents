@@ -1,6 +1,8 @@
 """Tests for PlotEmbeddings callback."""
 
+import json
 import os
+import re
 import tempfile
 import warnings
 from typing import Optional
@@ -558,3 +560,73 @@ class TestColorByFullPipeline:
             result = callback.on_latent_end(dataset, embeddings)
 
             assert os.path.exists(result["embedding_plot_path"])
+
+
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+class TestExportPlotData:
+    """Tests for the machine-readable plot-data sidecar (issue #273)."""
+
+    @_disable_wandb
+    def test_categorical_export_writes_npz_and_json(self):
+        """Categorical run writes coords + color_values .npz and a faithful .json."""
+        labels = np.array([0, 1, 0, 2, 1, 2])
+        embeddings = {
+            "embeddings": np.array(
+                [[0, 0], [1, 1], [0.5, 0.5], [2, 2], [1.5, 1.5], [2.5, 2.5]]
+            ),
+            "label": labels,
+        }
+        dataset = MockDataset(labels)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, legend=True, enable_wandb_upload=False
+            )
+            result = callback.on_latent_end(dataset, embeddings)
+
+            # Sidecar paths registered and on disk
+            assert "embedding_data_path" in result
+            assert "embedding_data_meta_path" in result
+            npz_path = result["embedding_data_path"]
+            json_path = result["embedding_data_meta_path"]
+            assert npz_path.endswith(".npz") and os.path.exists(npz_path)
+            assert json_path.endswith(".json") and os.path.exists(json_path)
+
+            # .npz: coords (n, 2) and color_values (n,)
+            data = np.load(npz_path)
+            assert data["coords"].shape == (6, 2)
+            assert data["coords"].dtype == np.float32
+            assert data["color_values"].shape == (6,)
+
+            # .json: categorical metadata with a faithful category->hex map
+            with open(json_path) as f:
+                meta = json.load(f)
+            assert meta["is_categorical"] is True
+            assert meta["n_points"] == 6
+            assert set(meta["category_colors"].keys()) == {
+                str(v) for v in np.unique(labels)
+            }
+            for hex_color in meta["category_colors"].values():
+                assert _HEX_RE.match(hex_color), hex_color
+
+    @_disable_wandb
+    def test_export_disabled_writes_no_sidecar(self):
+        """With export_plot_data=False, no sidecar output is registered."""
+        labels = np.array([0, 1, 0, 1])
+        embeddings = {
+            "embeddings": np.array([[0, 0], [1, 1], [0.5, 0.5], [1.5, 1.5]]),
+            "label": labels,
+        }
+        dataset = MockDataset(labels)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, enable_wandb_upload=False, export_plot_data=False
+            )
+            result = callback.on_latent_end(dataset, embeddings)
+
+            assert "embedding_plot_path" in result
+            assert "embedding_data_path" not in result
+            assert "embedding_data_meta_path" not in result

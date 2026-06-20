@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import warnings
@@ -58,6 +59,7 @@ class PlotEmbeddings(EmbeddingCallback):
         alpha: float = 0.8,
         log_key: str = "embedding_plot",
         enable_wandb_upload: bool = True,
+        export_plot_data: bool = True,
         # User overrides for colormap (take precedence over metric/dataset)
         cmap_override: str = None,
         is_categorical_override: bool = None,
@@ -87,6 +89,9 @@ class PlotEmbeddings(EmbeddingCallback):
             alpha: Transparency of the points (0 = transparent, 1 = opaque).
             log_key: Key for WandB logging. Can be customized for step-aware logging.
             enable_wandb_upload: Whether to upload to WandB when available.
+            export_plot_data: Whether to also write a machine-readable sidecar
+                (coords + per-point color values + resolved colormap) next to the
+                PNG, so downstream tools can re-color the embedding interactively.
             cmap_override: Override colormap (e.g., "viridis", "plasma"). Takes precedence
                           over metric-declared and dataset-declared colormaps.
             is_categorical_override: Override categorical/continuous treatment.
@@ -119,6 +124,7 @@ class PlotEmbeddings(EmbeddingCallback):
         self.alpha = alpha
         self.log_key = log_key
         self.enable_wandb_upload = enable_wandb_upload
+        self.export_plot_data = export_plot_data
         # User overrides
         self.cmap_override = cmap_override
         self.is_categorical_override = is_categorical_override
@@ -412,6 +418,63 @@ class PlotEmbeddings(EmbeddingCallback):
             fontsize=8,
         )
 
+    def _resolve_category_colors(self, color_array, cmap_info) -> Dict[str, str]:
+        """Map each unique categorical label to the hex color used in the plot.
+
+        Mirrors ``_add_categorical_legend_from_data`` so the exported colors match
+        the rendered scatter exactly.
+        """
+        unique_labels = sorted(set(color_array))
+        category_colors = {}
+        for lbl in unique_labels:
+            if isinstance(cmap_info.cmap, dict):
+                color = cmap_info.cmap.get(lbl, "#808080")
+            elif isinstance(cmap_info.cmap, ListedColormap):
+                colors = cmap_info.cmap.colors
+                idx = lbl if isinstance(lbl, (int, np.integer)) else hash(lbl)
+                color = colors[int(idx) % len(colors)]
+            else:
+                cmap = plt.colormaps.get_cmap(cmap_info.cmap)
+                idx = unique_labels.index(lbl)
+                color = cmap(idx / max(1, len(unique_labels) - 1))
+            category_colors[str(lbl)] = mcolors.to_hex(color)
+        return category_colors
+
+    def _export_plot_data(
+        self, embeddings_to_plot, color_array, cmap_info, base_name
+    ) -> None:
+        """Write ``{base_name}.npz`` (coords + color_values) and ``{base_name}.json`` (metadata)."""
+        npz_path = os.path.join(self.save_dir, f"{base_name}.npz")
+        json_path = os.path.join(self.save_dir, f"{base_name}.json")
+        os.makedirs(self.save_dir, exist_ok=True)
+        arrays = {"coords": np.asarray(embeddings_to_plot, dtype=np.float32)}
+        meta = {
+            "color_by": self.color_by or self.label_col,
+            "is_categorical": bool(cmap_info.is_categorical),
+            "n_points": int(embeddings_to_plot.shape[0]),
+        }
+        if color_array is not None:
+            arrays["color_values"] = np.asarray(color_array)
+            if cmap_info.is_categorical:
+                meta["category_colors"] = self._resolve_category_colors(
+                    color_array, cmap_info
+                )
+            else:
+                finite = np.asarray(color_array, dtype=float)
+                finite = finite[np.isfinite(finite)]
+                if len(finite):
+                    meta["vmin"] = float(finite.min())
+                    meta["vmax"] = float(finite.max())
+                meta["cmap"] = (
+                    cmap_info.cmap if isinstance(cmap_info.cmap, str) else "viridis"
+                )
+        np.savez_compressed(npz_path, **arrays)
+        with open(json_path, "w") as f:
+            json.dump(meta, f, indent=2)
+        logger.info(f"Saved plot data sidecar to {npz_path} and {json_path}")
+        self.register_output("embedding_data_path", npz_path)
+        self.register_output("embedding_data_meta_path", json_path)
+
     def _upload_to_wandb(self) -> None:
         """Upload plot to WandB if enabled and run is active."""
         if self.enable_wandb_upload and wandb is not None and wandb.run is not None:
@@ -560,6 +623,15 @@ class PlotEmbeddings(EmbeddingCallback):
         plt.close(fig)
 
         logger.info(f"Saved 2D embeddings plot to {self.save_path}")
+
+        # Machine-readable sidecar (paired with the PNG via the same timestamp)
+        if self.export_plot_data:
+            self._export_plot_data(
+                embeddings_to_plot,
+                color_array,
+                cmap_info,
+                f"embedding_data_{self.experiment_name}_{timestamp}",
+            )
 
         # WandB upload
         self._upload_to_wandb()
