@@ -630,3 +630,73 @@ class TestExportPlotData:
             assert "embedding_plot_path" in result
             assert "embedding_data_path" not in result
             assert "embedding_data_meta_path" not in result
+
+
+class TestCategoricalColorValueConsistency:
+    """Issue #277: legend + sidecar colors must match the scatter (by value, not rank)."""
+
+    def test_sidecar_matches_scatter_for_nonuniform_labels(self):
+        """Gappy integer labels [0,1,10] -> sidecar hex == the color the scatter draws.
+
+        The categorical string-cmap scatter normalizes by value over [min,max];
+        the old rank-based mapping disagreed (label 1 -> rank 0.5 vs value 0.1).
+        """
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import Normalize
+
+        labels = np.array([0, 1, 10, 0, 1, 10])
+        cmap_name = "viridis"
+
+        # Ground truth: the color matplotlib's scatter assigns each value.
+        norm = Normalize(vmin=labels.min(), vmax=labels.max())
+        cmap = plt.colormaps.get_cmap(cmap_name)
+        expected = {str(v): mcolors.to_hex(cmap(norm(v))) for v in np.unique(labels)}
+
+        cmap_info = ColormapInfo(cmap=cmap_name, label_names=None, is_categorical=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cb = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
+            got = cb._resolve_category_colors(labels, cmap_info)
+
+        assert got == expected
+        # The rank-based bug would map label 1 -> 0.5; value-based maps it -> 0.1.
+        assert got["1"] != mcolors.to_hex(cmap(0.5))
+
+    def test_legend_and_sidecar_agree_for_nonuniform_labels(self):
+        """The same resolver feeds both, so legend swatches == sidecar hexes."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+
+        labels = np.array([0, 1, 10])
+        cmap_info = ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cb = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
+            sidecar = cb._resolve_category_colors(labels, cmap_info)
+
+            fig, ax = plt.subplots()
+            cb._add_categorical_legend_from_data(ax, labels, cmap_info)
+            legend = ax.get_legend()
+            handles = getattr(legend, "legend_handles", None) or legend.legendHandles
+            legend_colors = {
+                text.get_text(): mcolors.to_hex(handle.get_facecolor())
+                for handle, text in zip(handles, legend.get_texts())
+            }
+            plt.close(fig)
+
+        assert legend_colors == sidecar
+
+    def test_uniform_labels_unchanged(self):
+        """Evenly-spaced labels: value-normalization equals the old rank mapping."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+
+        labels = np.array([0, 1, 2])
+        cmap = plt.colormaps.get_cmap("viridis")
+        # rank == value for 0,1,2 over [0,2]
+        expected = {str(v): mcolors.to_hex(cmap(v / 2)) for v in labels}
+
+        cmap_info = ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cb = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
+            assert cb._resolve_category_colors(labels, cmap_info) == expected

@@ -378,6 +378,50 @@ class PlotEmbeddings(EmbeddingCallback):
             fontsize=8,
         )
 
+    @staticmethod
+    def _category_color_basis(color_array):
+        """Compute (unique_labels, numeric, vmin, vmax) for categorical coloring.
+
+        ``vmin``/``vmax`` mirror the implicit ``Normalize`` the categorical
+        scatter applies: ``ax.scatter(c=color_array, cmap=...)`` with no explicit
+        norm normalizes over ``[min, max]`` of the values.
+        """
+        unique_labels = sorted(set(color_array))
+        arr = np.asarray(color_array)
+        numeric = arr.size > 0 and np.issubdtype(arr.dtype, np.number)
+        vmin = float(arr.min()) if numeric else 0.0
+        vmax = float(arr.max()) if numeric else 0.0
+        return unique_labels, numeric, vmin, vmax
+
+    def _category_color(self, lbl, cmap_info, unique_labels, numeric, vmin, vmax):
+        """Resolve one categorical label to the exact color the scatter draws.
+
+        Shared by the legend (``_add_categorical_legend_from_data``) and the
+        exported sidecar (``_resolve_category_colors``) so the two cannot drift
+        (issue #277). For non-dict colormaps the categorical scatter lets
+        matplotlib's ``Normalize`` map each point by **value** over
+        ``[vmin, vmax]``; indexing by **rank** instead disagrees for
+        non-uniformly-spaced integer labels (e.g. ``[0, 1, 10]``: value
+        ``1 -> 0.1`` but rank ``1 -> 0.5``). We mirror the value normalization so
+        the PNG, its legend, and the sidecar agree. The dict-cmap path is exact
+        and is used as the reference.
+        """
+        if isinstance(cmap_info.cmap, dict):
+            return cmap_info.cmap.get(lbl, "#808080")
+        cmap = (
+            cmap_info.cmap
+            if isinstance(cmap_info.cmap, ListedColormap)
+            else plt.colormaps.get_cmap(cmap_info.cmap)
+        )
+        if numeric:
+            # Match the scatter's value normalization over [vmin, vmax].
+            frac = (float(lbl) - vmin) / ((vmax - vmin) or 1.0)
+        else:
+            # Non-numeric labels never reach the value-normalized scatter path;
+            # fall back to rank so legend/sidecar stay defined and consistent.
+            frac = unique_labels.index(lbl) / max(1, len(unique_labels) - 1)
+        return cmap(frac)
+
     def _add_categorical_legend_from_data(
         self,
         ax: plt.Axes,
@@ -387,28 +431,25 @@ class PlotEmbeddings(EmbeddingCallback):
         """
         Add categorical legend when no label_names provided, using unique labels from data.
 
+        Colors are resolved via :meth:`_category_color` so each legend swatch
+        matches the color the scatter actually draws for that label (issue #277).
+
         Args:
             ax: Matplotlib axes object.
             labels: Array of label values.
             cmap_info: ColormapInfo containing the colormap.
         """
-        unique_labels = sorted(set(labels))
+        unique_labels, numeric, vmin, vmax = self._category_color_basis(labels)
 
-        patches = []
-        for lbl in unique_labels:
-            if isinstance(cmap_info.cmap, dict):
-                color = cmap_info.cmap.get(lbl, "#808080")
-            elif isinstance(cmap_info.cmap, ListedColormap):
-                colors = cmap_info.cmap.colors
-                # For numeric labels, use as index; for others, use hash
-                idx = lbl if isinstance(lbl, (int, np.integer)) else hash(lbl)
-                color = colors[int(idx) % len(colors)]
-            else:
-                cmap = plt.colormaps.get_cmap(cmap_info.cmap)
-                n_unique = len(unique_labels)
-                idx = unique_labels.index(lbl)
-                color = cmap(idx / max(1, n_unique - 1))
-            patches.append(Patch(facecolor=color, label=str(lbl)))
+        patches = [
+            Patch(
+                facecolor=self._category_color(
+                    lbl, cmap_info, unique_labels, numeric, vmin, vmax
+                ),
+                label=str(lbl),
+            )
+            for lbl in unique_labels
+        ]
 
         ax.legend(
             handles=patches,
@@ -419,26 +460,19 @@ class PlotEmbeddings(EmbeddingCallback):
         )
 
     def _resolve_category_colors(self, color_array, cmap_info) -> Dict[str, str]:
-        """Map each unique categorical label to the hex color used in the plot.
+        """Map each unique categorical label to the hex color the scatter draws.
 
-        Mirrors ``_add_categorical_legend_from_data`` so the exported colors match
-        the rendered scatter exactly.
+        Uses the same value-normalized resolver as the legend
+        (:meth:`_category_color`) so the PNG, its legend, and the exported
+        sidecar agree even for non-uniformly-spaced labels (issue #277).
         """
-        unique_labels = sorted(set(color_array))
-        category_colors = {}
-        for lbl in unique_labels:
-            if isinstance(cmap_info.cmap, dict):
-                color = cmap_info.cmap.get(lbl, "#808080")
-            elif isinstance(cmap_info.cmap, ListedColormap):
-                colors = cmap_info.cmap.colors
-                idx = lbl if isinstance(lbl, (int, np.integer)) else hash(lbl)
-                color = colors[int(idx) % len(colors)]
-            else:
-                cmap = plt.colormaps.get_cmap(cmap_info.cmap)
-                idx = unique_labels.index(lbl)
-                color = cmap(idx / max(1, len(unique_labels) - 1))
-            category_colors[str(lbl)] = mcolors.to_hex(color)
-        return category_colors
+        unique_labels, numeric, vmin, vmax = self._category_color_basis(color_array)
+        return {
+            str(lbl): mcolors.to_hex(
+                self._category_color(lbl, cmap_info, unique_labels, numeric, vmin, vmax)
+            )
+            for lbl in unique_labels
+        }
 
     def _export_plot_data(
         self, embeddings_to_plot, color_array, cmap_info, base_name
