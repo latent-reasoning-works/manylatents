@@ -12,6 +12,7 @@ from .leiden import LeidenModule
 from .reeb_graph import ReebGraphModule
 from .selective_correction import SelectiveCorrectionModule
 from .foundation_encoder import FoundationEncoder
+from .trajectory_aligner import TrajectoryAligner
 
 __all__ = [
     "PCAModule",
@@ -28,6 +29,7 @@ __all__ = [
     "ReebGraphModule",
     "SelectiveCorrectionModule",
     "FoundationEncoder",
+    "TrajectoryAligner",
     "get_algorithm",
     "list_algorithms",
 ]
