@@ -499,9 +499,11 @@ class PlotEmbeddings(EmbeddingCallback):
                 if len(finite):
                     meta["vmin"] = float(finite.min())
                     meta["vmax"] = float(finite.max())
-                meta["cmap"] = (
-                    cmap_info.cmap if isinstance(cmap_info.cmap, str) else "viridis"
-                )
+                # Derive the real colormap name for non-string cmaps (Colormap/
+                # ListedColormap) so the sidecar records what the PNG actually used,
+                # instead of silently falling back to "viridis".
+                cm = cmap_info.cmap
+                meta["cmap"] = cm if isinstance(cm, str) else getattr(cm, "name", "viridis")
         np.savez_compressed(npz_path, **arrays)
         with open(json_path, "w") as f:
             json.dump(meta, f, indent=2)
