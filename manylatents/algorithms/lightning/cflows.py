@@ -40,12 +40,22 @@ Time enters via ``batch["time"]``: cells are grouped by unique sorted timepoint,
 and each consecutive pair's ``t_span`` is built from those *actual* timepoint
 values (not a global constant) and handed to the ODE solver.
 
+Granger GRN head (built here):
+    ``gene_trajectory()`` decodes the trained flow's latent trajectory back to
+    gene (data) space, and ``extra_outputs()`` runs the Granger-causality
+    estimator (:func:`manylatents.algorithms.cflows_granger.granger_grn`) on the
+    decoded *population* trajectory to emit a directed, signed, weighted gene
+    regulatory network — the causal-network output that makes Cflows more than a
+    trajectory model. The head is self-contained: the training population is
+    cached during ``shared_step`` / ``on_fit_end`` so ``extra_outputs()`` (called
+    with no args by the engine) has cells to integrate, and it is fully guarded
+    (returns ``{}`` before any fit, or if the estimator/trajectory is
+    unavailable, rather than crashing the run).
+
 DEFERRED (intentionally NOT built here — clear extension points):
     * Geodesic-autoencoder latent (geometry-preserving encoder pretraining).
     * Growth-rate / unbalanced-OT (cell birth-death, non-uniform marginals).
     * The GLOBAL regime (integrate the full trajectory end-to-end in one shot).
-    * The decoder + Granger GRN head (a separate task).
-    ``extra_outputs()`` returns ``{}`` for now.
 """
 
 import functools
@@ -105,6 +115,12 @@ class Cflows(LightningModule):
         lambda_energy: float = 0.0,
         energy_steps: int = 10,
         density_top_k: int = 5,
+        grn_gene_names: list | None = None,
+        grn_regulators: list | None = None,
+        grn_targets: list | None = None,
+        grn_n_bins: int = 64,
+        grn_downsample: int = 1,
+        grn_direction: str = "forward",
     ):
         super().__init__()
         self.datamodule = datamodule
@@ -118,10 +134,24 @@ class Cflows(LightningModule):
         self.energy_steps = energy_steps
         self.density_top_k = density_top_k
 
+        # --- Granger GRN head config -------------------------------------- #
+        # gene_names default to range(n_genes) at call time (kept None here).
+        # regulators/targets default to "all genes are both" inside granger_grn.
+        self.grn_gene_names = grn_gene_names
+        self.grn_regulators = grn_regulators
+        self.grn_targets = grn_targets
+        self.grn_n_bins = grn_n_bins          # fine time grid for the decoded trajectory
+        self.grn_downsample = grn_downsample  # granger ::downsample (1 for our own grid)
+        self.grn_direction = grn_direction    # "forward" (t_min->t_max) or "backward"
+
         self.save_hyperparameters(ignore=["datamodule", "network", "loss"])
         self.network: nn.Module | None = None
         self.ot_loss: nn.Module | None = None
         self.density_loss: nn.Module | None = None
+
+        # Population cached during fit so extra_outputs() is self-contained.
+        self._fit_cells: Tensor | None = None
+        self._fit_times: Tensor | None = None
 
     # ------------------------------------------------------------------ #
     # Setup / construction (mirrors LatentODE)
@@ -201,6 +231,11 @@ class Cflows(LightningModule):
                 )
         else:
             t = batch[1]
+
+        # Cache the training population the first time we see it (self-contained
+        # GRN head: extra_outputs() integrates these cells with no args).
+        if phase == "train":
+            self._cache_fit_population(x, t)
 
         groups = self._group_by_time(x, t)
         device = x.device
@@ -290,9 +325,136 @@ class Cflows(LightningModule):
         x_pred, _z_T = self.network(x0, t_span)
         return x_pred
 
+    # ------------------------------------------------------------------ #
+    # Granger GRN head
+    # ------------------------------------------------------------------ #
+    def gene_trajectory(self, x0: Tensor, t_grid: Tensor) -> Tensor:
+        """Decode the trained flow's latent trajectory back to gene (data) space.
+
+        From the starting cells ``x0`` (a cloud at the initial timepoint), encode
+        to the latent, integrate the trained ODE over the fine grid ``t_grid``,
+        and decode **every** latent timepoint back to gene space.
+
+        Args:
+            x0: ``(n_cells, n_genes)`` starting cells (data space).
+            t_grid: ``(T,)`` evaluation timepoints for the ODE solver.
+
+        Returns:
+            ``(T, n_cells, n_genes)`` gene-space trajectory (``T == len(t_grid)``).
+            The decoder is a per-feature MLP, so applying it to the
+            ``(T, n_cells, latent)`` latent trajectory broadcasts over the leading
+            time and cell axes and yields gene space on the last axis.
+
+        Integration direction (documented per the task): the trajectory is
+        integrated over ``t_grid`` **as given**. A monotonically INCREASING grid
+        (``t_min -> t_max``) is the default FORWARD direction — evolve cells
+        forward in (developmental) time. A DECREASING grid integrates BACKWARD,
+        tracing where a later cloud came from. ``extra_outputs()`` uses FORWARD
+        from ``t_min`` (override via ``grn_direction="backward"``).
+        """
+        assert self.network is not None, "Network not configured. Call setup() first."
+        t_grid = torch.as_tensor(t_grid, device=x0.device, dtype=x0.dtype)
+        # get_latent_trajectory: (T, n_cells, latent); decode -> (T, n_cells, n_genes).
+        z_traj = self.network.get_latent_trajectory(x0, t_grid)
+        gene_traj = self.network.decoder(z_traj)
+        return gene_traj
+
+    def _cache_fit_population(
+        self, batch_x: Tensor | None = None, batch_t: Tensor | None = None
+    ) -> None:
+        """Cache the full training population (cells + per-cell timepoints).
+
+        Prefers the datamodule's complete tensor (all cells, robust to
+        mini-batching); falls back to the current batch. Idempotent — the first
+        successful cache wins. Stored detached on CPU so ``extra_outputs()`` can
+        re-integrate them after fit with no arguments.
+        """
+        if self._fit_cells is not None and self._fit_times is not None:
+            return
+        x = t = None
+        dm = self.datamodule
+        if dm is not None:
+            try:
+                x = dm.get_tensor()
+                t = getattr(dm, "time_tensor", None)
+            except Exception:
+                x = t = None
+        if x is None or t is None:
+            x, t = batch_x, batch_t
+        if x is None or t is None:
+            return
+        self._fit_cells = x.detach().to("cpu")
+        self._fit_times = t.detach().to("cpu").reshape(-1)
+
+    def on_fit_end(self):
+        """Backstop the population cache in case ``shared_step`` never captured it."""
+        self._cache_fit_population()
+
     def extra_outputs(self) -> dict:
-        """DEFERRED: trajectory / GRN extras not built in v0."""
-        return {}
+        """Decode the population trajectory to gene space and run the Granger GRN.
+
+        Self-contained: integrates all cached training cells at the minimum
+        timepoint FORWARD over a fine time grid (``grn_n_bins`` steps between the
+        min and max training timepoint), decodes each step to gene (data) space,
+        and hands the ``(T, n_cells, n_genes)`` trajectory to
+        :func:`~manylatents.algorithms.cflows_granger.granger_grn`.
+
+        Returns:
+            ``{"grn_edges", "grn_weights", "grn_node_ids"}`` — the exact triple
+            that feeds ``manykinds.SparseGraph`` (int ``(E, 2)`` edges into
+            ``node_ids``, one aligned float weight per edge). Returns ``{}`` if no
+            fit has happened yet, or if the estimator / trajectory is unavailable
+            (guarded — never crashes the run).
+
+        ``gene_names`` default to ``range(n_genes)`` unless ``grn_gene_names`` is
+        set; ``grn_regulators`` / ``grn_targets`` default (``None``) to *all genes
+        are both regulators and targets*.
+        """
+        if self.network is None:
+            return {}
+        if self._fit_cells is None or self._fit_times is None:
+            self._cache_fit_population()
+        if self._fit_cells is None or self._fit_times is None:
+            return {}  # no fit yet -> nothing to integrate
+
+        try:
+            from manylatents.algorithms.cflows_granger import granger_grn
+        except Exception as exc:  # estimator deps (statsmodels) missing, etc.
+            logger.warning("granger_grn unavailable (%s); extra_outputs() -> {}", exc)
+            return {}
+
+        try:
+            device = next(self.network.parameters()).device
+            times = self._fit_times.reshape(-1)
+            t_min, t_max = float(times.min()), float(times.max())
+            if not (t_max > t_min):
+                return {}  # single timepoint -> no trajectory to build
+
+            x0 = self._fit_cells[times == times.min()].to(device)
+            n_bins = max(int(self.grn_n_bins), 2)
+            lo, hi = (t_max, t_min) if self.grn_direction == "backward" else (t_min, t_max)
+            t_grid = torch.linspace(lo, hi, n_bins, device=device, dtype=x0.dtype)
+
+            with torch.no_grad():
+                gene_traj = self.gene_trajectory(x0, t_grid)  # (T, n_cells, n_genes)
+            gene_traj_np = gene_traj.detach().cpu().numpy()
+
+            n_genes = gene_traj_np.shape[-1]
+            gene_names = (
+                self.grn_gene_names if self.grn_gene_names is not None else list(range(n_genes))
+            )
+            edges, node_ids, weights = granger_grn(
+                gene_traj_np,
+                gene_names,
+                regulators=self.grn_regulators,
+                targets=self.grn_targets,
+                downsample=max(int(self.grn_downsample), 1),
+            )
+        except Exception as exc:  # degenerate trajectory / solver / estimator failure
+            logger.warning("GRN head failed (%s); extra_outputs() -> {}", exc)
+            return {}
+
+        return {"grn_edges": edges, "grn_weights": weights, "grn_node_ids": node_ids}
 
     # ------------------------------------------------------------------ #
     # Optimizer (mirrors LatentODE)
