@@ -6,4 +6,5 @@ plot_embeddings:
   label_col: Population
   legend: false
   color_by: null
+  export_plot_data: true
 
