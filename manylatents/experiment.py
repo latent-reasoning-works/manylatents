@@ -282,8 +282,10 @@ def run_experiment(
             if model_metrics:
                 results.setdefault("scores", {}).update(model_metrics)
 
-            # ---- 4g. Attach extra outputs from LatentModule ----
-            if isinstance(algorithm, LatentModule):
+            # ---- 4g. Attach extra outputs from any algorithm that exposes them ----
+            # LatentModule declares extra_outputs() on the ABC; LightningModule
+            # algorithms (e.g. Cflows' GRN head) may define it too — merge either.
+            if hasattr(algorithm, "extra_outputs"):
                 extras = algorithm.extra_outputs()
                 for key, val in extras.items():
                     results[key] = val
