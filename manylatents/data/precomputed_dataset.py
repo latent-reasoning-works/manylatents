@@ -25,17 +25,27 @@ class InMemoryDataset(Dataset):
             "label": tensor,       # Optional labels
         }
     """
-    def __init__(self, data_tensor: torch.Tensor, labels: Optional[torch.Tensor] = None):
+    def __init__(
+        self,
+        data_tensor: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+        time: Optional[torch.Tensor] = None,
+    ):
         """
         Args:
             data_tensor (torch.Tensor): The embeddings tensor
             labels (torch.Tensor, optional): Optional labels tensor
+            time (torch.Tensor, optional): Optional per-cell timepoint labels. Registered
+                in ``embedding_outputs`` so each batch dict carries a ``"time"`` key —
+                the seam trajectory algorithms (LatentODE, Cflows) read in ``shared_step``.
         """
         self.data = data_tensor
         self.embedding_outputs = {"embeddings": data_tensor}
 
         if labels is not None:
             self.embedding_outputs["label"] = labels
+        if time is not None:
+            self.embedding_outputs["time"] = time
 
     def __len__(self):
         return len(self.data)
@@ -61,6 +71,13 @@ class InMemoryDataset(Dataset):
             labels = self.embedding_outputs["label"]
             return labels.numpy() if isinstance(labels, torch.Tensor) else labels
         return np.zeros(len(self.data))
+
+    def get_time(self):
+        """Returns all per-cell timepoint labels, or None if unset (mirrors get_labels)."""
+        if "time" in getattr(self, "embedding_outputs", {}):
+            t = self.embedding_outputs["time"]
+            return t.numpy() if isinstance(t, torch.Tensor) else t
+        return None
 
 
 class PrecomputedDataset(Dataset):
@@ -191,6 +208,13 @@ class PrecomputedDataset(Dataset):
             labels = self.embedding_outputs["label"]
             return labels.numpy() if isinstance(labels, torch.Tensor) else labels
         return np.zeros(len(self.data))
+
+    def get_time(self):
+        """Returns all per-cell timepoint labels, or None if unset (mirrors get_labels)."""
+        if "time" in getattr(self, "embedding_outputs", {}):
+            t = self.embedding_outputs["time"]
+            return t.numpy() if isinstance(t, torch.Tensor) else t
+        return None
 
 
 class MultiChannelDataset(Dataset):
