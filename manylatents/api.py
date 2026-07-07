@@ -56,7 +56,7 @@ def _instantiate_target(cfg: dict, **extra) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
+def _resolve_datamodule(input_data=None, data=None, seed=42, time=None, **kwargs):
     """Resolve data source to an instantiated LightningDataModule.
 
     Fast path: Python registry (no Hydra).
@@ -66,7 +66,8 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
         from manylatents.data.precomputed_datamodule import PrecomputedDataModule
 
         logger.info(f"Wrapping input_data (shape={input_data.shape}) in PrecomputedDataModule")
-        return PrecomputedDataModule(data=input_data, seed=seed, **kwargs)
+        # ``time`` only applies to the in-memory path; named datasets carry their own.
+        return PrecomputedDataModule(data=input_data, seed=seed, time=time, **kwargs)
 
     if data is not None:
         from manylatents.data import get_datamodule
@@ -267,6 +268,7 @@ def run(
     metrics=None,
     sampling=None,
     seed: int = 42,
+    time: np.ndarray | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """
@@ -282,6 +284,9 @@ def run(
             with ``_target_``, ``str`` bundle name, or ``None``.
         sampling: Dict of sampler configs or instances.
         seed: Random seed (default 42).
+        time: Optional per-cell timepoint labels (in-memory path only), threaded to the
+            datamodule so trajectory algorithms (LatentODE, Cflows) receive ``batch["time"]``.
+            ``None`` (default) leaves every existing result unchanged.
         **kwargs: ``neighborhood_size`` forwarded to algorithm.
 
     Returns:
@@ -297,7 +302,7 @@ def run(
 
     neighborhood_size = kwargs.pop("neighborhood_size", None)
 
-    datamodule = _resolve_datamodule(input_data=input_data, data=data, seed=seed)
+    datamodule = _resolve_datamodule(input_data=input_data, data=data, seed=seed, time=time)
     algo = _resolve_algorithm(
         algorithm=algorithm, algorithms=algorithms,
         datamodule=datamodule, seed=seed, neighborhood_size=neighborhood_size,
