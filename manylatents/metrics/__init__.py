@@ -45,6 +45,7 @@ except ImportError:
     pass
 from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis, ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
+from manylatents.metrics.score_jacobian_id import ScoreJacobianID
 from manylatents.metrics.loglog_consistency import LogLogConsistency
 from manylatents.metrics.trustworthiness import Trustworthiness
 
@@ -128,6 +129,7 @@ __all__ = [
     "LocalSpectralAnalysis",
     "ParticipationRatio",
     "LocalIntrinsicDimensionality",
+    "ScoreJacobianID",
     "LogLogConsistency",
     "Trustworthiness",
     # Additional metrics
