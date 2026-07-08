@@ -1,0 +1,4 @@
+score_jacobian_id:
+  _target_: manylatents.metrics.score_jacobian_id.ScoreJacobianID
+  _partial_: True
+  at: module
