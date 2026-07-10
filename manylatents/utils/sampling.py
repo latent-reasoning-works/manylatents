@@ -547,6 +547,7 @@ class ImportanceSampling:
         seed: int = 42,
         fraction: Optional[float] = None,
         n_samples: Optional[int] = None,
+        n_dims: Optional[int] = None,
     ):
         """
         Initialize ImportanceSampling.
@@ -558,12 +559,17 @@ class ImportanceSampling:
             seed: Default random seed (can be overridden at call time).
             fraction: Default fraction of samples.
             n_samples: Default number of samples.
+            n_dims: If set, only the first n_dims columns of the data
+                are used for kNN weight computation. Useful when data
+                has many PCs but weights should reflect low-dim geometry
+                (e.g. n_dims=2 uses only the first 2 PCs for weighting).
         """
         self.k = k
         self.alpha = alpha
         self.seed = seed
         self.fraction = fraction
         self.n_samples = n_samples
+        self.n_dims = n_dims
 
     def get_indices(
         self,
@@ -605,10 +611,13 @@ class ImportanceSampling:
         n_keep = _compute_n_samples(n, n_samples, fraction)
         rng = np.random.default_rng(seed)
 
+        # Optionally restrict to first n_dims columns for weight computation
+        weight_data = data[:, : self.n_dims] if self.n_dims is not None else data
+
         # Compute distance to k-th nearest neighbor for each point
         nn = NearestNeighbors(n_neighbors=self.k + 1, algorithm="auto")
-        nn.fit(data)
-        distances, _ = nn.kneighbors(data)
+        nn.fit(weight_data)
+        distances, _ = nn.kneighbors(weight_data)
         # distances[:, 0] is self-distance (0); k-th neighbor is at index k
         radii = distances[:, self.k]
 
@@ -628,9 +637,10 @@ class ImportanceSampling:
         prob = weights / weights.sum()
         indices = rng.choice(n, size=n_keep, replace=False, p=prob)
 
+        dims_str = f", n_dims={self.n_dims}" if self.n_dims is not None else ""
         logger.info(
             f"ImportanceSampling: {n} -> {n_keep} samples "
-            f"(k={self.k}, alpha={self.alpha}, seed={seed})"
+            f"(k={self.k}, alpha={self.alpha}, seed={seed}{dims_str})"
         )
 
         return np.sort(indices)
