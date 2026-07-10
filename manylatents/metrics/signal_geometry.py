@@ -43,26 +43,50 @@ class LayerGeometry:
     dim: int  # per-variant layer vector dimensionality
 
 
-def _separation_auroc(vectors: np.ndarray, labels: np.ndarray) -> float:
-    """AUROC of the two classes projected onto their class-mean-difference axis.
+def _axis_projection(vectors: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Project onto the class-mean-difference axis (positive class = higher)."""
+    axis = vectors[y == 1].mean(axis=0) - vectors[y == 0].mean(axis=0)
+    # Elementwise-then-sum rather than ``vectors @ axis``: the BLAS matmul loop
+    # emits spurious FP RuntimeWarnings once torch has touched the FP control word.
+    return (vectors * axis).sum(axis=1)
+
+
+def _separation_auroc(
+    vectors: np.ndarray, labels: np.ndarray, cv: int | None = None
+) -> float:
+    """AUROC of the two classes along their class-mean-difference axis.
 
     A cheap, modality-agnostic linear-separability score: project each variant
     onto ``mean(positive) - mean(negative)``, then score with ``roc_auc_score``.
-    The axis sign is fixed by the mean difference, so the axis-aligned AUROC is
-    always ``>= 0.5`` (0.5 == the layer carries no class signal; 1.0 == perfectly
-    separable). This is an in-cohort separability read, not a held-out classifier.
+
+    ``cv=None`` (default): in-cohort read — the axis is fit on the same variants
+    it scores, so it is always ``>= 0.5`` and optimistic on small N.
+    ``cv=k``: honest read — stratified k-fold; the axis is fit on each train
+    split and scores the held-out fold, projections pooled for one AUROC. A layer
+    with no class signal then sits at ~0.5 (and may dip below), which is the
+    point: it stops the within-cohort optimism from masking a null layer.
     """
     labels = np.asarray(labels)
     classes = np.unique(labels)
     if classes.size != 2:
         raise ValueError(f"AUROC needs exactly 2 classes, got {classes.tolist()}")
     neg, pos = classes
-    axis = vectors[labels == pos].mean(axis=0) - vectors[labels == neg].mean(axis=0)
-    # Elementwise-then-sum rather than ``vectors @ axis``: the BLAS matmul loop
-    # emits spurious FP RuntimeWarnings once torch has touched the FP control word.
-    projection = (vectors * axis).sum(axis=1)
     y = (labels == pos).astype(int)
-    return float(roc_auc_score(y, projection))
+
+    if not cv:
+        return float(roc_auc_score(y, _axis_projection(vectors, y)))
+
+    from sklearn.model_selection import StratifiedKFold
+
+    proj = np.empty(y.shape[0], dtype=float)
+    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=0)
+    for train_idx, test_idx in skf.split(vectors, y):
+        axis = (
+            vectors[train_idx][y[train_idx] == 1].mean(axis=0)
+            - vectors[train_idx][y[train_idx] == 0].mean(axis=0)
+        )
+        proj[test_idx] = (vectors[test_idx] * axis).sum(axis=1)
+    return float(roc_auc_score(y, proj))
 
 
 def layer_geometry(
@@ -70,13 +94,18 @@ def layer_geometry(
     labels: np.ndarray,
     layer: str = "",
     k: int = 20,
+    cv: int | None = None,
 ) -> LayerGeometry:
-    """LID@k + class-separation AUROC for a single layer's per-variant vectors."""
+    """LID@k + class-separation AUROC for a single layer's per-variant vectors.
+
+    ``cv`` forwards to :func:`_separation_auroc` (``None`` = in-cohort read;
+    ``k``-fold = honest held-out AUROC).
+    """
     vectors = np.asarray(vectors, dtype=float)
     if vectors.ndim != 2:
         raise ValueError(f"layer '{layer}': expected (N, D) vectors, got {vectors.shape}")
     lid = float(LocalIntrinsicDimensionality(vectors, k=k))
-    auroc = _separation_auroc(vectors, labels)
+    auroc = _separation_auroc(vectors, labels, cv=cv)
     return LayerGeometry(
         layer=layer,
         lid=lid,
@@ -90,6 +119,7 @@ def signal_manifold_geometry(
     layer_vectors: dict[str, np.ndarray],
     labels: np.ndarray,
     k: int = 20,
+    cv: int | None = None,
 ) -> dict[str, LayerGeometry]:
     """Per-layer LID@k + AUROC over a variant cohort's per-layer signal vectors.
 
@@ -107,7 +137,7 @@ def signal_manifold_geometry(
     """
     labels = np.asarray(labels)
     return {
-        layer: layer_geometry(vecs, labels, layer=layer, k=k)
+        layer: layer_geometry(vecs, labels, layer=layer, k=k, cv=cv)
         for layer, vecs in layer_vectors.items()
     }
 

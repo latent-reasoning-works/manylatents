@@ -40,6 +40,26 @@ def test_signal_manifold_geometry_smoke():
     )
 
 
+def test_cv_auroc_is_honest_on_null_layers():
+    """5-fold CV pulls pure-noise layers to ~0.5 while separable layers stay high.
+
+    The in-cohort read is optimistic (>= 0.5 by construction); the CV read fits
+    the axis out-of-fold, so a null layer is free to sit at or below 0.5.
+    """
+    separable = ("rna", "splice")
+    layer_vectors, labels = make_synthetic_cohort(
+        n_per_class=80, dim=16, separable_layers=separable, shift=4.0, seed=0
+    )
+
+    cv = signal_manifold_geometry(layer_vectors, labels, k=20, cv=5)
+
+    for layer in separable:
+        assert cv[layer].auroc > 0.9
+    for layer in SIGNAL_LAYERS:
+        if layer not in separable:
+            assert cv[layer].auroc < 0.7, f"{layer} noise AUROC(cv) too high: {cv[layer].auroc:.3f}"
+
+
 def test_auroc_requires_two_classes():
     import pytest
 
