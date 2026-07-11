@@ -81,9 +81,10 @@ docs = [
 ]
 # Omics extension (popgen, singlecell, dogma encoders)
 omics = ["manylatents-omics"]
-# Cflows: neural-ODE trajectory + Granger GRN estimator (needs statsmodels;
-# imported by tests/test_cflows_granger.py, which otherwise fails collection).
-cflows = ["statsmodels>=0.14"]
+# Cflows: neural-ODE trajectory + Granger GRN estimator. statsmodels (Granger,
+# tests/test_cflows_granger.py) and manykinds (GRN head, tests/test_cflows_grn_head.py)
+# are both imported by cflows tests but were absent from [all].
+cflows = ["statsmodels>=0.14", "manykinds>=0.1"]
 # All optional extras (excluding docs/dev)
 all = [
     "manylatents[hf,torchdr,jax,omics,cflows]",
