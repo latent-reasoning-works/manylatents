@@ -67,3 +67,27 @@ def test_auroc_requires_two_classes():
     single_class = np.zeros(40, int)
     with pytest.raises(ValueError):
         signal_manifold_geometry({"rna": vectors}, single_class, k=20)
+
+
+def test_cv_clamps_folds_to_smallest_class():
+    """cv larger than a class size clamps instead of raising sklearn's error."""
+    layer_vectors, labels = make_synthetic_cohort(
+        n_per_class=3, dim=8, separable_layers=("rna",), shift=4.0, seed=0
+    )
+    # cv=5 > 3 per class must NOT raise; folds clamp to 3.
+    results = signal_manifold_geometry(layer_vectors, labels, k=2, cv=5)
+    assert set(results) == set(SIGNAL_LAYERS)
+    for g in results.values():
+        assert 0.0 <= g.auroc <= 1.0
+
+
+def test_cv_raises_on_singleton_class():
+    """A class with < 2 members can't be cross-validated — fail with a clear message."""
+    import pytest
+
+    from manylatents.metrics.signal_geometry import _separation_auroc
+
+    vectors = np.random.default_rng(0).standard_normal((5, 4))
+    labels = np.array([0, 0, 0, 0, 1])  # class 1 has a single member
+    with pytest.raises(ValueError, match=r">= 2 samples per class"):
+        _separation_auroc(vectors, labels, cv=3)

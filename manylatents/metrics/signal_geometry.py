@@ -78,13 +78,26 @@ def _separation_auroc(
 
     from sklearn.model_selection import StratifiedKFold
 
+    # Clamp folds to the smallest class so StratifiedKFold can't raise on a
+    # small (e.g. rare-pathogenic) class; need >= 2 per class to CV at all.
+    smallest_class = int(np.bincount(y).min())
+    if smallest_class < 2:
+        raise ValueError(
+            f"cv AUROC needs >= 2 samples per class; smallest class has {smallest_class}"
+        )
+    n_splits = min(cv, smallest_class)
+
     proj = np.empty(y.shape[0], dtype=float)
-    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=0)
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=0)
     for train_idx, test_idx in skf.split(vectors, y):
         axis = (
             vectors[train_idx][y[train_idx] == 1].mean(axis=0)
             - vectors[train_idx][y[train_idx] == 0].mean(axis=0)
         )
+        # Unit-normalize per fold so out-of-fold projections pool on ONE scale:
+        # un-normalized per-fold axes have different norms, which distorts the
+        # ranks when projections from all folds are scored by one roc_auc_score.
+        axis /= np.linalg.norm(axis) + 1e-12
         proj[test_idx] = (vectors[test_idx] * axis).sum(axis=1)
     return float(roc_auc_score(y, proj))
 
@@ -129,6 +142,9 @@ def signal_manifold_geometry(
             any keys are accepted (protein-side layers work identically).
         labels: ``(N,)`` binary class labels (e.g. pathogenic vs benign).
         k: neighbors for LID (default 20; matches ``metrics/lid.py``).
+        cv: if set, per-layer AUROC is a stratified ``cv``-fold held-out read
+            (axis fit out-of-fold, unit-normalized, projections pooled); folds
+            are clamped to the smallest class. ``None`` = in-cohort read.
 
     Returns:
         ``{layer_name -> LayerGeometry}`` — the per-layer geometry baseline. The
