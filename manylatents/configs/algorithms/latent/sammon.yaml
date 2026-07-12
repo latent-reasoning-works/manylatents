@@ -1,0 +1,8 @@
+_target_: manylatents.algorithms.latent.sammon.SammonModule
+n_components: 2
+random_state: ${seed}
+distance_metric: euclidean  # only 'euclidean' is supported
+max_iter: 500
+tol: 1e-6
+eps: 1e-10
+verbose: False

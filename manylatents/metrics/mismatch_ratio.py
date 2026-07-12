@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 import numpy as np
 
+from manylatents.metrics.effective_neighborhood_size import _k_eff_common_kernel
 from manylatents.metrics.registry import register_metric
 from manylatents.utils.knn import compute_knn
 
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def _compute_kstar(
     data: np.ndarray,
-    k_max: int = 200,
+    k_max: int = 500,
     k_min: int = 5,
     k_steps: int = 20,
     r2_threshold: float = 0.95,
@@ -79,6 +80,15 @@ def _compute_kstar(
         mask = (r2 >= r2_threshold) & (k_star <= k_values[0])
         k_star[mask] = float(sub_k[-1])
 
+    ceiling = float(k_values[-1])
+    frac_saturated = float((k_star >= ceiling).mean())
+    if frac_saturated >= 0.25:
+        logger.warning(
+            f"_compute_kstar: {100 * frac_saturated:.1f}% of points saturate at "
+            f"k_max={ceiling:g}. k* is right-censored and v-metrics using it will "
+            f"be compressed into [−1, 0]. Raise k_max if the manifold supports it."
+        )
+
     return k_star, k_values
 
 
@@ -95,26 +105,40 @@ def _compute_keff(module) -> np.ndarray:
 
 @register_metric(
     aliases=["mismatch_ratio", "v_ratio", "mismatch"],
-    default_params={"k": 200, "k_min": 5, "k_steps": 20, "r2_threshold": 0.95},
+    default_params={
+        "k": 500, "k_min": 5, "k_steps": 20, "r2_threshold": 0.95,
+        "mode": "native", "k_kernel": 15,
+    },
     description="Per-point mismatch ratio v = k_eff / k_star",
 )
 def MismatchRatio(
     embeddings: np.ndarray,
     dataset=None,
     module=None,
-    k: int = 200,
+    k: int = 500,
     k_min: int = 5,
     k_steps: int = 20,
     r2_threshold: float = 0.95,
+    mode: str = "native",
+    k_kernel: int = 15,
     cache: Optional[dict] = None,
     **kwargs,
 ) -> dict[str, Any]:
     """Compute per-point mismatch ratio v = k_eff / k_star.
 
     k_star is computed on the **dataset** (input space, e.g. PCA-50).
-    k_eff is computed from the **module**'s internal affinity matrix.
+    k_eff source depends on ``mode``:
 
-    Requires both a dataset (with .data attribute) and a fitted module.
+    - ``mode="native"`` (default): from the module's internal affinity matrix
+      via ``module.affinity()``. Degenerate for methods with signed Gram matrices
+      (PCA, MDS, Sammon) — row-sum cancellation collapses k_eff.
+    - ``mode="common_kernel"``: from a DR-method-agnostic Gaussian kNN kernel
+      on the embedding (bandwidth ``k_kernel``). Works uniformly across DR
+      families. Required for cross-family comparisons including distance-
+      preserving baselines.
+
+    Native mode requires both dataset and fitted module. Common-kernel mode
+    requires dataset + embeddings; module is unused.
 
     Returns dict with:
         k_star: (n,) per-point Poisson-valid scale
@@ -148,23 +172,36 @@ def MismatchRatio(
         r2_threshold=r2_threshold, cache=cache,
     )
 
-    # k_eff from module's affinity matrix
-    if module is not None:
-        try:
-            k_eff = _compute_keff(module)
-            if len(k_eff) != n_points:
-                logger.warning(
-                    f"MismatchRatio: k_eff length {len(k_eff)} != n_points {n_points} "
-                    f"(likely landmarks). Using mean k_eff={k_eff.mean():.1f}."
-                )
-                k_eff = np.full(n_points, k_eff.mean())
-        except (NotImplementedError, AttributeError) as e:
-            ns = getattr(module, 'neighborhood_size', None) or 15
-            logger.warning(f"MismatchRatio: affinity unavailable ({e}). Using uniform k_eff={ns}.")
-            k_eff = np.full(n_points, float(ns))
+    if mode == "common_kernel":
+        if embeddings is None:
+            raise ValueError(
+                "MismatchRatio(mode='common_kernel') requires embeddings to build "
+                "the shared kNN kernel."
+            )
+        k_eff = _k_eff_common_kernel(
+            np.asarray(embeddings), k=int(k_kernel), cache=cache
+        )
+    elif mode == "native":
+        if module is not None:
+            try:
+                k_eff = _compute_keff(module)
+                if len(k_eff) != n_points:
+                    logger.warning(
+                        f"MismatchRatio: k_eff length {len(k_eff)} != n_points {n_points} "
+                        f"(likely landmarks). Using mean k_eff={k_eff.mean():.1f}."
+                    )
+                    k_eff = np.full(n_points, k_eff.mean())
+            except (NotImplementedError, AttributeError) as e:
+                ns = getattr(module, 'neighborhood_size', None) or 15
+                logger.warning(f"MismatchRatio: affinity unavailable ({e}). Using uniform k_eff={ns}.")
+                k_eff = np.full(n_points, float(ns))
+        else:
+            logger.warning("MismatchRatio: no module provided. Cannot compute k_eff.")
+            k_eff = np.full(n_points, np.nan)
     else:
-        logger.warning("MismatchRatio: no module provided. Cannot compute k_eff.")
-        k_eff = np.full(n_points, np.nan)
+        raise ValueError(
+            f"MismatchRatio: unknown mode={mode!r}. Expected 'native' or 'common_kernel'."
+        )
 
     # v = k_eff / k_star
     v = np.where(k_star > 0, k_eff / k_star, 0.0)
