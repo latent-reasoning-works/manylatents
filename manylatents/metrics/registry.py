@@ -13,7 +13,6 @@ from typing import Any, Callable, Dict, List, Optional, Union
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
-from manylatents.metrics.metric import Metric
 
 logger = logging.getLogger(__name__)
 
