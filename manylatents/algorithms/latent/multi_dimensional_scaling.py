@@ -229,22 +229,40 @@ class MDSModule(LatentModule):
         # embed_MDS will compute and store distance matrix in self.model.distance_matrix
         emb = self.model.embed_MDS(x_np[:n_fit])
         self._is_fitted = True
+        self._remember_fit_input(x)
 
     def transform(self, x):
-        """Transforms data using the fitted MDS model. MDS can't be extend to new data, so we just return the embedding of the fitted data."""
+        """The embedding of the fitted rows. MDS cannot be extended to new data.
+
+        The docstring here already said as much, and the method returned the fit-time
+        embedding regardless of `x` anyway — so when `run_experiment` fit the shuffled train
+        tensor and transformed the unshuffled test tensor, the returned coordinates were
+        paired with the wrong rows, silently. Declaring the limitation lets the caller's
+        existing NotImplementedError fallback re-fit on the array actually being embedded.
+        """
         if not self._is_fitted:
             raise RuntimeError("MDS model is not fitted yet. Call `fit` first.")
-
+        if not self._same_as_fit_input(x):
+            raise NotImplementedError(
+                "MDSModule is transductive: it cannot embed rows it was not fitted on. "
+                "Call fit_transform(x) on the data you want embedded."
+            )
         embedding_np = self.model.embedding
         return _to_output(embedding_np, x)
 
     def fit_transform(self, x, y=None):
-        """Fit and then transform on same data."""
+        """Fit and then transform on same data.
+
+        This overrides the base `fit(x); transform(x)`, so it must record the fit fingerprint
+        itself — otherwise a later `transform(x)` on the SAME array raises the transductive
+        guard, with a message instructing the caller to do exactly what they just did.
+        """
         x_np = _to_numpy(x)
 
         # embed_MDS will compute and store distance matrix in self.model.distance_matrix
         embedding_np = self.model.embed_MDS(x_np)
         self._is_fitted = True
+        self._remember_fit_input(x)
         return _to_output(embedding_np, x)
 
     def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:

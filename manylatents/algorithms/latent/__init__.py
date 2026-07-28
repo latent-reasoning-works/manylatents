@@ -48,16 +48,53 @@ def _to_snake_case(name: str) -> str:
 
 
 def _build_registry() -> None:
-    """Scan __all__ exports and register each class under multiple name variants."""
+    """Discover algorithm classes from the .py files in this directory.
+
+    This used to iterate the hand-maintained ``__all__`` above, which made the registry a
+    record of what someone remembered to export rather than of what exists. Two working
+    modules were invisible because of it — ``aa.py`` (ArchetypalAnalysisModule) and
+    ``dr_noop.py`` (NoOpModule) — and a prior audit concluded from ``list_algorithms()`` that
+    archetypal analysis did not exist in this engine at all. Two entries were visible that are
+    not algorithms: ``ChannelLoadings`` (a dataclass) and ``FoundationEncoder`` (abstract).
+
+    Scanning the filesystem and filtering on ``issubclass(LatentModule)`` fixes both
+    directions at once, and is the pattern ``manylatents/data/__init__.py`` already uses.
+    ``__all__`` remains the re-export surface; it is simply no longer the source of truth.
+    """
+    import importlib
+    import inspect
+    from pathlib import Path
+
+    from .latent_module_base import LatentModule
+
     global _ALGORITHM_REGISTRY
     _ALGORITHM_REGISTRY.clear()
 
-    current_module_globals = globals()
-    for export_name in __all__:
-        obj = current_module_globals.get(export_name)
-        if obj is None or not isinstance(obj, type):
+    here = Path(__file__).parent
+    discovered: dict[str, type] = {}
+    # Non-recursive glob, so nested test/helper directories are not swept in.
+    for path in sorted(here.glob("*.py")):
+        if path.stem.startswith("_"):
             continue
+        try:
+            module = importlib.import_module(f".{path.stem}", package=__name__)
+        except Exception:  # noqa: BLE001 - an unimportable module is not an algorithm
+            continue
+        members = [
+            obj for _, obj in inspect.getmembers(module, inspect.isclass)
+            if issubclass(obj, LatentModule)
+            and obj is not LatentModule
+            and not inspect.isabstract(obj)          # drops FoundationEncoder
+            and obj.__module__ == module.__name__    # only classes DEFINED here, not imported
+        ]
+        for obj in members:
+            discovered[obj.__name__] = obj
+        # The file stem is an alias when a module defines exactly one algorithm — this is what
+        # makes the packaged config basenames (`aa`, `noop`) resolve by name.
+        if len(members) == 1:
+            _ALGORITHM_REGISTRY.setdefault(path.stem.lower(), members[0])
 
+    for obj in discovered.values():
         class_name = obj.__name__
         # Base name: strip trailing "Module" if present
         base_name = class_name[: -len("Module")] if class_name.endswith("Module") else class_name
@@ -108,12 +145,11 @@ def list_algorithms() -> List[str]:
     if not _ALGORITHM_REGISTRY:
         _build_registry()
 
-    # Canonical names: snake_case of the base name (no "Module" suffix)
+    # Canonical names come from the REGISTRY, not from `__all__` — otherwise this reports what
+    # someone remembered to export rather than what is actually resolvable, which is exactly
+    # how `aa` and `noop` came to be missing from the catalogue while working fine.
     canonical = set()
-    for export_name in __all__:
-        obj = globals().get(export_name)
-        if obj is None or not isinstance(obj, type):
-            continue
+    for obj in set(_ALGORITHM_REGISTRY.values()):
         class_name = obj.__name__
         base_name = class_name[: -len("Module")] if class_name.endswith("Module") else class_name
         canonical.add(_to_snake_case(base_name))

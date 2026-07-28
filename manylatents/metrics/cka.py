@@ -13,6 +13,10 @@ import numpy as np
 
 from manylatents.metrics.registry import register_metric
 
+_SINGLE_ARRAY_NOTE = (
+    "These are CROSS-MODAL metrics: they compare two or more embeddings of the same"
+)
+
 
 def _ensure_2d(arr: np.ndarray) -> np.ndarray:
     """Ensure array is 2D, squeezing if needed."""
@@ -134,7 +138,10 @@ def CKA(
     """
     # Single array case
     if isinstance(embeddings, np.ndarray):
-        return 1.0  # Self-similarity
+        raise ValueError(
+            "CKA compares two or more embeddings and cannot score a single array. Pass a "
+            "dict of named embeddings, e.g. {'esm3': A, 'evo2': B}.\n\n    " + _SINGLE_ARRAY_NOTE
+        )
 
     # Multi-modal case
     modality_names = list(embeddings.keys())

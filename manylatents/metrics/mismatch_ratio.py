@@ -97,6 +97,9 @@ def _compute_keff(module) -> np.ndarray:
     aliases=["mismatch_ratio", "v_ratio", "mismatch"],
     default_params={"k": 200, "k_min": 5, "k_steps": 20, "r2_threshold": 0.95},
     description="Per-point mismatch ratio v = k_eff / k_star",
+    # Pins the value this already recorded; without it `_to_scalar` now raises
+    # rather than picking a key by insertion order. (median_v is arguably the better statistic, but changing it here would be a tuning, not a fix.)
+    scalar_key="mean_v",
 )
 def MismatchRatio(
     embeddings: np.ndarray,

@@ -16,7 +16,13 @@ ALGO_DIR="manylatents/configs/algorithms/lightning"
 #                  which the swissroll smoke data doesn't carry. Covered instead
 #                  by tests/algorithms/test_mioflow_lightning.py
 #                  (TestMIOFlowThroughRunExperiment) on toy time-labeled data.
-ALGORITHMS=($(ls -1 "$ALGO_DIR"/*.yaml 2>/dev/null | xargs -n1 basename | sed 's/.yaml$//' | grep -v __init__ | grep -v default | grep -v hf_trainer | grep -v aanet_reconstruction | grep -v mioflow))
+#   cflows       — same case as mioflow, and it says so itself: "Cflows requires
+#                  per-cell timepoints under batch['time']". swissroll has no time
+#                  axis, so this could only ever have failed here. Covered instead
+#                  by tests/test_cflows_model.py, which trains it on K=4 real
+#                  timepoints. (This job is path-filtered on algorithms/**, so it
+#                  had not run since cflows landed — the failure is not new.)
+ALGORITHMS=($(ls -1 "$ALGO_DIR"/*.yaml 2>/dev/null | xargs -n1 basename | sed 's/.yaml$//' | grep -v __init__ | grep -v default | grep -v hf_trainer | grep -v aanet_reconstruction | grep -v mioflow | grep -v cflows))
 
 echo "Discovered ${#ALGORITHMS[@]} algorithms from $ALGO_DIR:"
 printf '  - %s\n' "${ALGORITHMS[@]}"

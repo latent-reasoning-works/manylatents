@@ -1,3 +1,4 @@
+import hashlib
 import warnings
 from abc import ABC, abstractmethod
 from typing import Union
@@ -40,7 +41,21 @@ class LatentModule(ABC):
         self.neighborhood_size = neighborhood_size
         # Flexible handling: if datamodule is passed, store it as a weak port
         self.datamodule = kwargs.pop('datamodule', None)
-        # Ignore any other unexpected kwargs to maintain compatibility
+        # `random_state` is the seed under its sklearn name; api.py passes it to every module
+        # by that name, and subclasses that declare it explicitly never reach here.
+        if 'random_state' in kwargs:
+            self.init_seed = kwargs.pop('random_state')
+        # Anything still here is a caller mistake. This used to read "Ignore any other
+        # unexpected kwargs to maintain compatibility", which meant a misspelling was
+        # indistinguishable from a default: `PCAModule(n_compnents=7).n_components` was 2, and
+        # two sweep arms that differed only in a typo'd parameter produced byte-identical
+        # results while appearing to be different configurations.
+        if kwargs:
+            raise TypeError(
+                f"{type(self).__name__} got unexpected keyword argument(s) "
+                f"{sorted(kwargs)}. Check the spelling — a silently ignored parameter makes "
+                "two different configurations return identical results."
+            )
         self._is_fitted = False
 
     @abstractmethod
@@ -61,6 +76,35 @@ class LatentModule(ABC):
     def fit_transform(self, x: ArrayLike, y: ArrayLike | None = None) -> ArrayLike:
         self.fit(x, y)
         return self.transform(x)
+
+    # ── transductive support ────────────────────────────────────────────────────────────
+    # Some modules (Leiden, MDS) cannot embed unseen points: their output is defined only on
+    # the rows they were fitted on. Those must not silently return their fit-order output
+    # when handed a DIFFERENT array — `run_experiment` fits on the train tensor and transforms
+    # the test tensor, and every named datamodule shuffles the train loader, so the returned
+    # rows were being paired with the wrong inputs. Measured on gaussian_blob: ARI against
+    # ground truth -0.0012 shuffled versus +1.0000 unshuffled, with no error and correct shape.
+    #
+    # Declaring the limitation honestly is enough to fix it: `run_experiment` already catches
+    # NotImplementedError from transform() and falls back to fit_transform() on the test
+    # tensor, which is the correct behaviour for a transductive method.
+
+    def _remember_fit_input(self, x: ArrayLike) -> None:
+        """Record a fingerprint of the fitted rows. Call at the end of `fit`."""
+        arr = np.ascontiguousarray(_to_numpy(x))
+        self._fit_fingerprint = (arr.shape, hashlib.sha1(arr.view(np.uint8)).hexdigest())
+
+    def _same_as_fit_input(self, x: ArrayLike) -> bool:
+        """True iff `x` is (byte-identically) the array this module was fitted on.
+
+        Order-sensitive on purpose — a permutation of the fit rows is exactly the case that
+        was silently wrong, and a shape or sum check would not catch it.
+        """
+        fp = getattr(self, "_fit_fingerprint", None)
+        if fp is None:
+            return False
+        arr = np.ascontiguousarray(_to_numpy(x))
+        return fp == (arr.shape, hashlib.sha1(arr.view(np.uint8)).hexdigest())
 
     def kernel(self, ignore_diagonal: bool = False) -> np.ndarray:
         """

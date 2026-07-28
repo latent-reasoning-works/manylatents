@@ -40,6 +40,12 @@ dependencies = [
     "umap-learn>=0.5",
     "opentsne>=1.0",
     "multiscale-phate",
+    # NOTE: aa.py is written against the 0.11 `method`/`method_kwargs` API, but
+    # `archetypes>=0.11` is UNSATISFIABLE under the `scipy<1.15` bound above (uv: "your
+    # project's requirements are unsatisfiable"). That conflict is why the fake
+    # dependency-metadata block existed — it made an unresolvable pin look resolved by
+    # installing the package without its dependencies. Resolve the scipy bound or port
+    # aa.py to the 0.6 API; do not paper over it again.
     "archetypes>=0.6",
     # Graph tools (used by phate/graphtools)
     "graphtools>=2.0",
@@ -128,7 +134,13 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 
-[[tool.uv.dependency-metadata]]
-name = "archetypes"
-version = "0.11.1"
-requires-dist = ["scipy>=1.8,<1.15"]
+# NOTE: a `[[tool.uv.dependency-metadata]]` block for `archetypes` used to live here,
+# declaring `requires-dist = ["scipy>=1.8,<1.15"]`. That is a hand-written OVERRIDE of the
+# wheel's real metadata, and uv trusts it completely — so it installed `archetypes` and none
+# of its actual dependencies. The wheel requires `opt-einsum` and `pykronecker`, neither of
+# which was ever pulled, and `ArchetypalAnalysisModule` (algorithms/latent/aa.py) therefore
+# failed at import with `ModuleNotFoundError: opt_einsum`. Archetypal analysis had never run
+# in this environment, for a reason no error message pointed at.
+#
+# The scipy upper bound the override existed to enforce is already declared directly, at the
+# top-level dependency `scipy>=1.8,<1.15`, so pinning it a second time here bought nothing.

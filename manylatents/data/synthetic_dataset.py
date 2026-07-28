@@ -628,7 +628,13 @@ class DLAtree(SyntheticDataset):
         gap_multiplier: float = 0,
         random_state: int = 42,
         sigma: float = 4,
-        disconnect_branches: Optional[List[int]] = [5,15],  # Branch indices to disconnect
+        # No disconnection by default. The previous default `[5, 15]` was internally
+        # inconsistent with `gap_multiplier=0`: a zero-mean jump leaves the branch within
+        # `rand_multiplier` of its neighbours, so the proximity check below always raised and
+        # `DLAtree()` could not be constructed at all. Disconnection needs BOTH arguments —
+        # see configs/data/dla_tree.yaml, which pairs it with `gap_multiplier: 7`.
+        # (Also a mutable default, which this avoids.)
+        disconnect_branches: Optional[List[int]] = None,  # Branch indices to disconnect
         sampling_density_factors: Optional[Dict[int, float]] = None,  # Reduce density of certain branches
     ):
         """

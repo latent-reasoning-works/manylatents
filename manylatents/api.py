@@ -73,16 +73,67 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, time=None, **kwargs
         from manylatents.data import get_datamodule
 
         try:
-            return get_datamodule(data, random_state=seed)
+            return get_datamodule(data, random_state=seed, **kwargs)
         except ValueError:
             raise
-        except TypeError:
-            # Constructor doesn't accept random_state — retry without it
-            return get_datamodule(data)
+        except TypeError as e:
+            # The retry exists for constructors that take no ``random_state``. Scope it to
+            # exactly that: a TypeError naming any OTHER argument means a caller's
+            # ``data_kwargs`` key is wrong, and swallowing it is how a parameterised dataset
+            # silently becomes the default one — the caller then compares two configurations
+            # that were never different.
+            if "random_state" not in str(e):
+                raise
+            return get_datamodule(data, **kwargs)
 
     raise ValueError(
         "Either 'input_data' (np.ndarray) or 'data' (str dataset name) must be provided."
     )
+
+
+#: Hydra meta-keys that are directives to the composer, not constructor arguments.
+_META_KEYS = ("_target_", "_recursive_", "_convert_", "_partial_")
+
+
+def _lightning_config(name: str):
+    """The packaged config for a named lightning algorithm, or None if there isn't one.
+
+    Located via ``importlib.resources`` rather than ``__file__`` so it survives being
+    installed as a wheel. Interpolations are deliberately NOT resolved: every one of these
+    configs carries ``datamodule: ${data}``, which only Hydra can fill, and which
+    :func:`_instantiate_lightning` overrides with the real datamodule anyway.
+    """
+    from importlib import resources
+
+    from omegaconf import OmegaConf
+
+    path = resources.files("manylatents") / "configs" / "algorithms" / "lightning" / f"{name}.yaml"
+    if not path.is_file():
+        return None
+    cfg = OmegaConf.load(str(path))
+    # `default.yaml` is a composition stub with no `_target_` — not an algorithm.
+    return cfg if "_target_" in cfg else None
+
+
+def _instantiate_lightning(cfg, datamodule):
+    """Build a LightningModule from a packaged config node.
+
+    Nested `network` / `loss` / `optimizer` nodes are passed through AS CONFIGS, not
+    instantiated: every one of these configs sets ``_recursive_: false`` because the modules
+    instantiate their own sub-components in ``setup()``, once the input dimension is known
+    from the data. Converting them to plain dicts here would break that — `Reconstruction`
+    reads ``self.network_config.input_dim`` by attribute.
+    """
+    target = str(cfg["_target_"])
+    # Skip `datamodule` by KEY rather than reading and overriding it: OmegaConf resolves
+    # interpolations on value access, so merely iterating `.items()` raises
+    # InterpolationKeyError on `${data}`. We supply the real datamodule below regardless.
+    kwargs = {k: cfg[k] for k in cfg.keys()
+              if k not in _META_KEYS and k != "datamodule"}
+    kwargs["datamodule"] = datamodule
+    module_path, class_name = target.rsplit(".", 1)
+    cls = getattr(importlib.import_module(module_path), class_name)
+    return cls(**kwargs)
 
 
 def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42, neighborhood_size=None, **kwargs):
@@ -109,7 +160,12 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
 
         try:
             cls = get_algorithm(algorithm)
-            algo_kwargs = {}
+            # Remaining kwargs go to the algorithm constructor. They used to be dropped here:
+            # only `random_state` and `neighborhood_size` were forwarded, so
+            # `run(algorithm='pca', n_components=5)` silently returned a 2-column embedding,
+            # and `diffusion_map` was unreachable by name at any dataset under 2000 rows
+            # because its `n_landmark=2000` default could not be overridden.
+            algo_kwargs = dict(kwargs)
             if seed is not None:
                 algo_kwargs["random_state"] = seed
             if neighborhood_size is not None:
@@ -147,7 +203,12 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
             from manylatents.algorithms.latent import get_algorithm
             try:
                 cls = get_algorithm(algo_value)
-                algo_kwargs = {}
+                # Mirrors the `algorithm='<name>'` branch above. This was `{}`, so the two
+                # string forms disagreed: `run(algorithm='pca', n_components=3)` honoured it
+                # while `run(algorithms={'latent': 'pca'}, n_components=3)` silently returned
+                # two columns — and the dict form is what geomancer's runner uses, so recipe
+                # `params` never reached an algorithm through it.
+                algo_kwargs = dict(kwargs)
                 if seed is not None:
                     algo_kwargs["random_state"] = seed
                 if neighborhood_size is not None:
@@ -155,6 +216,24 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                 return cls(**algo_kwargs)
             except KeyError:
                 pass
+
+        # String in dict: {"lightning": "mioflow"} — resolve the packaged config by name.
+        #
+        # This branch did not exist: the registry lookup above was gated on `latent`, so a
+        # string under `lightning` fell straight through to the raise below and EVERY
+        # lightning algorithm was unreachable by name through the public API — mioflow,
+        # cflows, latent_ode, aanet_reconstruction, ae_reconstruction alike. Only a
+        # hand-written `_target_` dict worked, which meant a caller had to already know the
+        # network, loss and optimizer wiring that the packaged configs exist to express.
+        #
+        # The unit resolved here is the CONFIG, not the class, because that is the useful
+        # unit: `Reconstruction` is archetypal analysis only when its `network` is AAnet, and
+        # `aanet_reconstruction.yaml` is what says so. Class-name lookup would have made
+        # "reconstruction" ambiguous between AAnet and a plain autoencoder.
+        if algo_type == "lightning":
+            cfg = _lightning_config(algo_value)
+            if cfg is not None:
+                return _instantiate_lightning(cfg, datamodule)
 
         raise ValueError(
             f"Algorithm '{algo_value}' not found in registry. "
@@ -269,6 +348,7 @@ def run(
     sampling=None,
     seed: int = 42,
     time: np.ndarray | None = None,
+    data_kwargs: dict[str, Any] | None = None,
     **kwargs,
 ) -> dict[str, Any]:
     """
@@ -287,7 +367,23 @@ def run(
         time: Optional per-cell timepoint labels (in-memory path only), threaded to the
             datamodule so trajectory algorithms (LatentODE, Cflows) receive ``batch["time"]``.
             ``None`` (default) leaves every existing result unchanged.
-        **kwargs: ``neighborhood_size`` forwarded to algorithm.
+        data_kwargs: Constructor kwargs for the named dataset's DataModule — the generation
+            parameters of a synthetic dataset (``n_samples``, ``centers``, ``cluster_std``,
+            ``n_branch``, ``concentration``, ``noise``, …). A separate channel from
+            ``**kwargs`` on purpose: those go to the *algorithm*, and one bag for both would
+            make ``n_components`` ambiguous. Unknown keys raise from the DataModule rather
+            than being dropped.
+        **kwargs: Constructor arguments for the ALGORITHM (``n_components``, ``knn``,
+            ``n_landmark``, ``resolution``, …), on **both** string forms —
+            ``algorithm='pca'`` and ``algorithms={'latent': 'pca'}``. Previously nothing but
+            ``neighborhood_size`` was forwarded on either, so ``run(algorithm='pca',
+            n_components=5)`` quietly returned two columns.
+
+            A ``_target_`` dict is self-contained and does not consume these: put the
+            arguments inside the dict instead.
+
+            Dataset generation parameters go through ``data_kwargs`` — the two are separate
+            channels because ``n_components`` would otherwise be ambiguous between them.
 
     Returns:
         Dict with keys: embeddings, label, metadata, scores.
@@ -296,16 +392,20 @@ def run(
         >>> result = run(data='swissroll', algorithm='pca')
         >>> result = run(data='swissroll', algorithm='pca', metrics=['trustworthiness'])
         >>> result = run(input_data=array, algorithm=PCAModule(n_components=5))
+        >>> result = run(data='gaussian_blob', algorithm='pca',
+        ...              data_kwargs={'centers': 5, 'cluster_std': 0.4})
     """
     from lightning import Trainer
     from manylatents.experiment import run_experiment
 
     neighborhood_size = kwargs.pop("neighborhood_size", None)
 
-    datamodule = _resolve_datamodule(input_data=input_data, data=data, seed=seed, time=time)
+    datamodule = _resolve_datamodule(input_data=input_data, data=data, seed=seed, time=time,
+                                     **(data_kwargs or {}))
     algo = _resolve_algorithm(
         algorithm=algorithm, algorithms=algorithms,
         datamodule=datamodule, seed=seed, neighborhood_size=neighborhood_size,
+        **kwargs,          # remaining kwargs are ALGORITHM constructor args; see below
     )
     engine_metrics, metrics_cfg = _resolve_metrics(metrics)
     engine_sampling = _resolve_sampling(sampling)

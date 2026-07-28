@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
     aliases=["shepard_residual", "shepard"],
     default_params={"k": 15},
     description="Per-point Shepard residual on local-rank neighborhoods",
+    # Without this the recorded number was `alpha` — the OLS SLOPE, first key in the dict —
+    # under a metric named "residual". The slope is a nuisance parameter of the fit; the
+    # residual is the measurement.
+    scalar_key="mean_residual",
 )
 def ShepardResidual(
     embeddings: np.ndarray,
@@ -61,7 +65,7 @@ def ShepardResidual(
             residual: ``(n,)`` per-point Shepard residual.
             alpha: Global slope from the through-origin OLS fit.
             mean_residual, median_residual, std_residual: summary stats.
-            mean_residual_normalized: ``mean_residual / alpha`` — scale-free
+            (there is no ``mean_residual_normalized`` key; it was documented but never returned)
                 summary in units of "ambient distance".
     """
     if cache is None:

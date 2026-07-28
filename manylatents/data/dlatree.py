@@ -22,7 +22,8 @@ class DLATreeDataModule(LightningDataModule):
         sigma: float = 4.0,
         random_state: int = 42,
         n_dim: int = 3,
-        disconnect_branches: Optional[List[int]] = [5,15],
+        # None, not [5, 15] — see DLAtree: the old default crashed against gap_multiplier=0.
+        disconnect_branches: Optional[List[int]] = None,
         sampling_density_factors: Optional[Dict[int, float]] = None,
         mode: str = 'full',
     ):

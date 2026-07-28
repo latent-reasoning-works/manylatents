@@ -5,6 +5,7 @@ Ensures multi-process writes don't corrupt data on cluster nodes.
 """
 
 import json
+import os
 import tempfile
 import numpy as np
 from pathlib import Path
@@ -78,25 +79,33 @@ def write_embedding_outputs_atomic(
         prefix='.tmp_'
     ) as tmp:
         json.dump(serialized, tmp, indent=2)
+        tmp.flush()
+        os.fsync(tmp.fileno())      # the rename is atomic; the CONTENT must be on disk first
         tmp_path = Path(tmp.name)
-    
+
     # Atomic rename (POSIX guarantees atomicity)
     tmp_path.rename(output_path)
-    
+
     # Save embeddings separately as binary (also atomic)
     if save_embeddings:
         embeddings_path = output_path.with_suffix('.npy')
-        
-        # Write to temp, then rename
+
+        # The temp file MUST end in `.npy`. `np.save` appends that extension when the target
+        # does not already have it, so writing to a `.tmp` path put the array in
+        # `<tmp>.tmp.npy` while the rename below moved the still-EMPTY `<tmp>.tmp` over
+        # outputs.npy — a zero-byte result, the real array orphaned beside it, and a
+        # successful return. Measured: outputs.npy 0 bytes, orphan 12928 bytes.
         with tempfile.NamedTemporaryFile(
             dir=embeddings_path.parent,
             delete=False,
-            suffix='.tmp',
+            suffix='.npy',
             prefix='.tmp_embeddings_'
         ) as tmp:
+            np.save(tmp, outputs['embeddings'])   # write through the open handle
+            tmp.flush()
+            os.fsync(tmp.fileno())
             tmp_embeddings_path = Path(tmp.name)
-        
-        np.save(tmp_embeddings_path, outputs['embeddings'])
+
         tmp_embeddings_path.rename(embeddings_path)
 
 
