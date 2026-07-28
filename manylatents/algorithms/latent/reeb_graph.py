@@ -72,16 +72,31 @@ _LENS_REGISTRY = {
 # Vietoris-Rips and Reeb graph construction
 # ---------------------------------------------------------------------------
 
-def _vietoris_rips(D, min_rad_factor=1.5, max_dim=2, sparse=0.5, min_rad=None):
+def _vietoris_rips(D, min_rad_factor=1.5, max_dim=2, sparse=None, min_rad=None):
     from ripser import ripser
     import gudhi as gd
 
     if min_rad is None:
         min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
     radius = min_rad_factor * min_rad
+    # `sparse` defaults to None (exact complex), not 0.5. gudhi's sparse Rips approximation
+    # draws on an RNG this code never seeds, which was invisible while the filtration below
+    # was being consumed before use — every skeleton past the 0th came back empty regardless.
+    # Materializing the filtration exposed it: the embedding WIDTH (one column per Reeb node)
+    # varied across calls at a fixed seed in a single process — measured 12, 12, 12, 11 over
+    # four runs. A feature matrix whose column count is not a function of its inputs cannot be
+    # stacked into a results table or chained into a next step, so exactness wins over the
+    # approximation's speed here. Callers who want the approximation can pass `sparse=` and
+    # own the nondeterminism.
     rips = gd.RipsComplex(distance_matrix=D, max_edge_length=radius, sparse=sparse)
     st = rips.create_simplex_tree(max_dimension=max_dim)
-    filt = st.get_filtration()
+    # `list(...)`, not the bare generator: gudhi's get_filtration() yields once, so the first
+    # comprehension below consumed it and `one_skel` / `two_skel` were ALWAYS empty. With no
+    # 1-simplices the Reeb graph has no real edges — only bin-overlap duplicates of single
+    # points — so `structural_summary["n_branch_points"]` was a constant 0 for a path, a Y, a
+    # double bifurcation and blobs alike. Measured on the same complex: as written
+    # `zero=200 one=0 two=0`; materialized `zero=200 one=1277 two=3203`.
+    filt = list(st.get_filtration())
     zero_skel = [s[0][0] for s in filt if len(s[0]) == 1]
     one_skel = [s[0] for s in filt if len(s[0]) == 2]
     two_skel = [s[0] for s in filt if len(s[0]) == 3]
@@ -231,8 +246,10 @@ class ReebGraphModule(LatentModule):
         Neighbourhood size for density / diffusion lenses.
     lens_t : int
         Diffusion time for the diffusion1 lens.
-    sparse : float
-        Sparsity parameter for the Vietoris-Rips complex.
+    sparse : float or None
+        Sparsity parameter for the Vietoris-Rips complex. ``None`` (default) builds the exact
+        complex; a float invokes gudhi's unseeded sparse approximation, which makes the output
+        width nondeterministic.
     min_rad_factor : float
         Multiplier on the minimum radius for the VR complex.
     density_factor : float
@@ -247,7 +264,13 @@ class ReebGraphModule(LatentModule):
         lens: str = "default",
         lens_k: int = 15,
         lens_t: int = 1,
-        sparse: float = 0.5,
+        # None = exact complex. `0.5` invoked gudhi's sparse Rips approximation, whose RNG is
+        # never seeded here, which made the embedding WIDTH (one column per Reeb node) vary
+        # across calls at a fixed random_state — 12, 12, 12, 11 over four runs in one process.
+        # A feature matrix whose column count is not a function of its inputs cannot be
+        # stacked into a results table or chained into a next step. Pass `sparse=0.5` to opt
+        # back into the approximation and own the nondeterminism.
+        sparse: float | None = None,
         min_rad_factor: float = 2,
         density_factor: float = 0.0,
         random_state: int = 42,
@@ -355,6 +378,7 @@ class ReebGraphModule(LatentModule):
 
         self.structural_summary = _structural_summary(G)
         self._is_fitted = True
+        self._remember_fit_input(x)
 
         logger.info(
             f"ReebGraphModule(lens={self.lens}, overlap={self.overlap}): "
@@ -364,9 +388,21 @@ class ReebGraphModule(LatentModule):
         )
 
     def transform(self, x):
-        """Return (N, M) binary membership matrix. Matches input type."""
+        """Return the (N, M) binary membership matrix for the FITTED rows.
+
+        Transductive: a Reeb node is a connected component of the fit-time graph, so there is
+        no assignment for unseen points. This previously returned `self._membership` whatever
+        `x` was — including a shorter array, which produced fit-row-count output paired with
+        the caller's rows. Measured on gaussian_blob through `run_experiment`: AMI against
+        ground truth -0.0098, no error, plausible shape.
+        """
         if not self._is_fitted:
             raise RuntimeError("ReebGraphModule is not fitted. Call fit() first.")
+        if not self._same_as_fit_input(x):
+            raise NotImplementedError(
+                "ReebGraphModule is transductive: Reeb-node membership is defined only for "
+                "the rows it was fitted on. Call fit_transform(x) instead."
+            )
         return _to_output(self._membership, x)
 
     def adjacency(self, ignore_diagonal: bool = False) -> np.ndarray:

@@ -338,6 +338,17 @@ class MergingModule(LatentModule):
         """
         all_embeddings = self._get_embeddings()
         channels, embeddings = self._prepare_channels(all_embeddings)
+        # This module is a data SOURCE wearing a transform's interface: `x` is ignored and the
+        # rows come from the constructor's embeddings. Declaring that lets `run_experiment`
+        # route it to the fit_transform fallback instead of tripping the row-cardinality
+        # postcondition with a hard ValueError whenever the eval array is a different length.
+        # (The honest fix is that this should probably not be a LatentModule at all.)
+        n_rows = embeddings[0].shape[0] if embeddings else 0
+        if getattr(x, "shape", (n_rows,))[0] != n_rows:
+            raise NotImplementedError(
+                f"MergingModule emits {n_rows} rows from its configured channel embeddings "
+                "and ignores its input; it cannot transform a different array."
+            )
 
         if not self.channel_dims:
             self.channel_dims = {ch: e.shape[-1] for ch, e in zip(channels, embeddings)}
