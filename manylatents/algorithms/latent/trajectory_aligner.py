@@ -61,8 +61,18 @@ class TrajectoryAligner(LatentModule):
 
     def fit(self, x: ArrayLike, y: ArrayLike | None = None) -> None:
         source = _to_numpy(x)
-        # y is the reference trajectory; None -> self-align (identity bound).
-        reference = source if y is None else _to_numpy(y)
+        # `y` means something different here than everywhere else: LatentModule documents it as
+        # "Optional labels of shape (N,)", while this module reads it as a REFERENCE
+        # TRAJECTORY of shape (n_steps, d). `run_experiment` passes the datamodule's labels,
+        # so driving this module through the standard path raised
+        # `source and reference must be 2-D` on every dataset that carries labels — i.e.
+        # always. Only a 2-D `y` is a reference; a 1-D one is labels this module has no use
+        # for, so fall back to self-alignment rather than rejecting the caller's contract.
+        reference = source
+        if y is not None:
+            y_arr = _to_numpy(y)
+            if y_arr.ndim == 2:
+                reference = y_arr
         if source.ndim != 2 or reference.ndim != 2:
             raise ValueError("source and reference must be 2-D (n_steps, d) trajectories")
         if source.shape[1] != reference.shape[1]:
