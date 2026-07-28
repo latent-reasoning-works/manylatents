@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
     aliases=["loglog_consistency", "power_law_consistency", "lid_reliability"],
     default_params={"k": 200, "k_min": 5, "k_steps": 20},
     description="Per-point log-log power law consistency of kNN distance scaling",
+    # Pins the value this already recorded; without it `_to_scalar` now raises
+    # rather than picking a key by insertion order. (the LID scaling law's fit quality — the other keys are its spread and slope.)
+    scalar_key="mean_r_squared",
 )
 def LogLogConsistency(
     embeddings: np.ndarray,

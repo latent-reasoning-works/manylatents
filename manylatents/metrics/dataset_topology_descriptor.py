@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
     aliases=["dataset_topology", "topology_descriptor"],
     default_params={},
     description="Topological descriptor of the dataset structure",
+    # `n_samples` is the first key, so a metric named "topology_descriptor" was recording the
+    # ROW COUNT — exactly 300.0 across five adversarial scenarios. `effective_dim` is the one
+    # that describes structure; `spectral_gap` duplicates SpectralGapRatio and saturates.
+    scalar_key="effective_dim",
 )
 def DatasetTopologyDescriptor(
     embeddings: np.ndarray,
@@ -70,7 +74,7 @@ def DatasetTopologyDescriptor(
             result["spectral_participation_ratio"] = float(eig_sum ** 2 / eig_sq_sum)
     else:
         result["spectral_gap"] = float("nan")
-        result["effective_dim"] = -1
+        result["effective_dim"] = float("nan")   # not -1: a sentinel that arithmetic treats as data
         result["spectral_participation_ratio"] = float("nan")
 
     logger.info(f"DatasetTopologyDescriptor: {result}")

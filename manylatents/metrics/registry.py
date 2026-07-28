@@ -25,6 +25,10 @@ class MetricSpec:
     func: Callable  # The actual metric function
     params: Dict[str, Any] = field(default_factory=dict)  # Default params for this alias
     description: str = ""
+    #: Which key of a dict return is THE scalar. Without it `_to_scalar` took whichever key
+    #: came first, so `connected_components` recorded 66.667 — the mean of the component
+    #: SIZES — under a description promising "Number of connected components".
+    scalar_key: Optional[str] = None
 
     def __call__(
         self,
@@ -47,6 +51,7 @@ def register_metric(
     aliases: Optional[List[str]] = None,
     default_params: Optional[Dict[str, Any]] = None,
     description: str = "",
+    scalar_key: Optional[str] = None,
 ):
     """Decorator to register a metric function with optional aliases.
 
@@ -57,6 +62,9 @@ def register_metric(
         aliases: Additional names that map to this metric with default_params.
         default_params: Parameters to apply when using the aliases.
         description: Human-readable description of what this alias computes.
+        scalar_key: For a metric returning a dict, which key IS the recorded number. Omit
+            only when the dict has exactly one numeric value; otherwise `_to_scalar` raises
+            rather than picking by insertion order.
 
     Example:
         @register_metric(
@@ -75,7 +83,8 @@ def register_metric(
 
     def decorator(fn: Callable) -> Callable:
         # Always register the function under its own name (no preset params)
-        _REGISTRY[fn.__name__] = MetricSpec(func=fn, params={}, description=fn.__doc__ or "")
+        _REGISTRY[fn.__name__] = MetricSpec(func=fn, params={}, description=fn.__doc__ or "",
+                                            scalar_key=scalar_key)
 
         # Register aliases with preset params
         if aliases:
@@ -84,6 +93,7 @@ def register_metric(
                     func=fn,
                     params=default_params or {},
                     description=description or fn.__doc__ or "",
+                    scalar_key=scalar_key,
                 )
                 logger.debug(f"Registered metric alias: {alias} -> {fn.__name__}")
 
@@ -135,8 +145,19 @@ def list_metrics() -> List[str]:
     return sorted(_REGISTRY.keys())
 
 
-def _to_scalar(raw: Any) -> float:
-    """Normalize any metric return type to a single float."""
+def _to_scalar(raw: Any, scalar_key: Optional[str] = None) -> float:
+    """Normalize any metric return type to a single float.
+
+    For a dict return, `scalar_key` names which entry IS the metric. Without it this took
+    whichever key happened to come first, which is insertion order, which is whatever the
+    author wrote first — not a decision anyone made. Three metrics were recording the wrong
+    number under a description promising something else: `connected_components` reported
+    66.667 (the mean component SIZE) for a 3-component graph, `shepard_residual` reported the
+    OLS slope rather than a residual, and `topology_descriptor` reported `n_samples`.
+
+    Falling back is safe only when there is exactly one numeric value and therefore nothing to
+    choose between. Otherwise raise: a silently arbitrary pick is how those three survived.
+    """
     if isinstance(raw, (int, float, np.integer, np.floating)):
         return float(raw)
     if isinstance(raw, tuple) and len(raw) >= 1:
@@ -144,10 +165,22 @@ def _to_scalar(raw: Any) -> float:
     if isinstance(raw, np.ndarray):
         return float(np.mean(raw))
     if isinstance(raw, dict):
-        for v in raw.values():
-            if isinstance(v, (int, float, np.integer, np.floating)):
-                return float(v)
-        raise ValueError(f"Dict metric has no scalar value: {list(raw.keys())}")
+        if scalar_key is not None:
+            if scalar_key not in raw:
+                raise ValueError(
+                    f"scalar_key {scalar_key!r} not in metric result {sorted(raw)}"
+                )
+            return float(raw[scalar_key])
+        numeric = {k: v for k, v in raw.items()
+                   if isinstance(v, (int, float, np.integer, np.floating))}
+        if len(numeric) == 1:
+            return float(next(iter(numeric.values())))
+        if not numeric:
+            raise ValueError(f"Dict metric has no scalar value: {list(raw.keys())}")
+        raise ValueError(
+            f"Ambiguous dict metric with keys {sorted(numeric)} — declare scalar_key on its "
+            "register_metric() so the recorded number is chosen rather than stumbled into."
+        )
     return float(raw)
 
 
@@ -175,7 +208,7 @@ def compute_metric(
     """
     spec = get_metric(name)
     raw = spec(embeddings=embeddings, dataset=dataset, module=module, cache=cache, **kwargs)
-    return _to_scalar(raw)
+    return _to_scalar(raw, spec.scalar_key)
 
 
 def compute_metric_detailed(
@@ -212,7 +245,7 @@ def compute_metric_detailed(
         per_sample = raw
 
     return {
-        "value": _to_scalar(raw),
+        "value": _to_scalar(raw, spec.scalar_key),
         "per_sample": per_sample,
         "raw": raw,
     }

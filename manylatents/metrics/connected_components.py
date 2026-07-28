@@ -43,7 +43,14 @@ def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule, i
         matrix_source: Which matrix to use: "kernel", "affinity", or "adjacency".
 
     Returns:
-        Array of component sizes, or [nan] if matrix not available.
+        `(n_components, component_sizes)` — the scalar the name promises, plus the raw sizes.
+        `(nan, [nan])` if the matrix is not available.
+
+    This returned only the component SIZES array, which `_to_scalar` then averaged: a graph
+    with sizes [67, 67, 66] recorded **66.667** under a description reading "Number of
+    connected components". Worse, the recorded value grew as the true count fell, so it was
+    anti-correlated with the thing it claimed to measure. The `(scalar, raw)` tuple is the
+    convention the registry already handles.
     """
     try:
         mat = resolve_matrix(module, source=matrix_source, ignore_diagonal=ignore_diagonal)
@@ -53,6 +60,7 @@ def ConnectedComponents(dataset, embeddings: np.ndarray, module: LatentModule, i
             f"does not expose a {matrix_source}_matrix.",
             RuntimeWarning
         )
-        return np.array([np.nan])
+        return float("nan"), np.array([np.nan])
 
-    return connected_components(kernel_matrix=mat)
+    component_sizes = connected_components(kernel_matrix=mat)
+    return float(len(component_sizes)), component_sizes
