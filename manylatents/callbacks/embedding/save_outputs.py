@@ -127,7 +127,10 @@ class SaveOutputs(EmbeddingCallback):
 
     def _save_single_file(self, embeddings: dict, X: np.ndarray) -> None:
         """Save using existing utility function."""
-        metadata = embeddings.get("metadata", {})
+        # Copy before injecting: this used to mutate the CALLER's metadata dict in place,
+        # putting an ndarray into it. Anything that later json-dumped that dict then failed,
+        # which is how a run could finish its work and never write its completion marker.
+        metadata = dict(embeddings.get("metadata", {}))
         if "label" in embeddings and "labels" not in metadata:
             metadata["labels"] = embeddings["label"]
         save_embeddings(X, self.save_path, format=self.save_format, metadata=metadata)

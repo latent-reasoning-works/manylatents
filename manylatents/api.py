@@ -203,7 +203,12 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
             from manylatents.algorithms.latent import get_algorithm
             try:
                 cls = get_algorithm(algo_value)
-                algo_kwargs = {}
+                # Mirrors the `algorithm='<name>'` branch above. This was `{}`, so the two
+                # string forms disagreed: `run(algorithm='pca', n_components=3)` honoured it
+                # while `run(algorithms={'latent': 'pca'}, n_components=3)` silently returned
+                # two columns — and the dict form is what geomancer's runner uses, so recipe
+                # `params` never reached an algorithm through it.
+                algo_kwargs = dict(kwargs)
                 if seed is not None:
                     algo_kwargs["random_state"] = seed
                 if neighborhood_size is not None:
@@ -369,20 +374,16 @@ def run(
             make ``n_components`` ambiguous. Unknown keys raise from the DataModule rather
             than being dropped.
         **kwargs: Constructor arguments for the ALGORITHM (``n_components``, ``knn``,
-            ``n_landmark``, ``resolution``, …), **on the ``algorithm='<name>'` string form
-            only**. Previously nothing but ``neighborhood_size`` was forwarded, so
-            ``run(algorithm='pca', n_components=5)`` quietly returned two columns.
+            ``n_landmark``, ``resolution``, …), on **both** string forms —
+            ``algorithm='pca'`` and ``algorithms={'latent': 'pca'}``. Previously nothing but
+            ``neighborhood_size`` was forwarded on either, so ``run(algorithm='pca',
+            n_components=5)`` quietly returned two columns.
 
-            .. warning::
-               The ``algorithms={'latent': '<name>'}`` dict form still DROPS these — see
-               ``_resolve_algorithm``. Forwarding them there too is correct and intended, but
-               it is a coordinated change: manyagents' adapter passes ``project``/``logger``/
-               ``debug`` through that path and currently survives only because they are
-               dropped. Until that lands, put constructor arguments in a ``_target_`` dict
-               when using the dict form.
+            A ``_target_`` dict is self-contained and does not consume these: put the
+            arguments inside the dict instead.
 
-            Dataset generation parameters go through ``data_kwargs`` instead — the two are
-            separate channels because ``n_components`` would otherwise be ambiguous.
+            Dataset generation parameters go through ``data_kwargs`` — the two are separate
+            channels because ``n_components`` would otherwise be ambiguous between them.
 
     Returns:
         Dict with keys: embeddings, label, metadata, scores.
