@@ -22,6 +22,10 @@ class UMAPModule(LatentModule):
         learning_rate: float = 1.0,
         fit_fraction: float = 1.0,
         negative_sample_rate: int | None = None,
+        densmap: bool = False,
+        dens_lambda: float = 2.0,
+        dens_frac: float = 0.3,
+        dens_var_shift: float = 0.1,
         backend: str | None = None,
         device: str | None = None,
         neighborhood_size: Optional[int] = None,
@@ -39,6 +43,10 @@ class UMAPModule(LatentModule):
         self.learning_rate = learning_rate
         self.fit_fraction = fit_fraction
         self.negative_sample_rate = negative_sample_rate
+        self.densmap = densmap
+        self.dens_lambda = dens_lambda
+        self.dens_frac = dens_frac
+        self.dens_var_shift = dens_var_shift
         self.random_state = random_state
 
         self._resolved_backend = resolve_backend(backend)
@@ -46,6 +54,11 @@ class UMAPModule(LatentModule):
 
     def _create_model(self):
         if self._resolved_backend == "torchdr":
+            if self.densmap:
+                raise ValueError(
+                    "densmap=True is not supported by the 'torchdr' UMAP backend; "
+                    "use the default umap-learn backend for densMAP."
+                )
             from torchdr import UMAP
 
             return UMAP(
@@ -61,6 +74,13 @@ class UMAPModule(LatentModule):
             kwargs = {}
             if self.negative_sample_rate is not None:
                 kwargs["negative_sample_rate"] = self.negative_sample_rate
+            if self.densmap:
+                kwargs.update(
+                    densmap=True,
+                    dens_lambda=self.dens_lambda,
+                    dens_frac=self.dens_frac,
+                    dens_var_shift=self.dens_var_shift,
+                )
             return UMAP(
                 n_components=self.n_components,
                 random_state=self.random_state,

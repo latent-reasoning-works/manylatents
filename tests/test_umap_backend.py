@@ -151,3 +151,44 @@ def test_umap_negative_sample_rate_none_uses_default():
     # sklearn default is 5 — verify it's not overridden
     from umap import UMAP as SklearnUMAP
     assert m.model.negative_sample_rate == SklearnUMAP().negative_sample_rate
+
+
+def test_umap_densmap_reaches_model():
+    """densmap=True should reach the underlying umap-learn model, not be swallowed by **kwargs."""
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    m_off = UMAPModule(n_components=2, random_state=42, n_neighbors=5, n_epochs=10)
+    assert m_off.densmap is False and m_off.model.densmap is False
+
+    m_on = UMAPModule(n_components=2, random_state=42, n_neighbors=5, n_epochs=10,
+                      densmap=True, dens_lambda=2.0)
+    assert m_on.densmap is True
+    assert m_on.model.densmap is True
+    assert m_on.model.dens_lambda == 2.0
+
+
+def test_umap_densmap_affects_embedding():
+    """densmap=True should reach umap-learn and change the embedding (regression: was a silent no-op)."""
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    x = torch.randn(80, 10, generator=torch.Generator().manual_seed(0))
+
+    emb_umap = UMAPModule(n_components=2, random_state=42, n_neighbors=10,
+                          n_epochs=50).fit_transform(x)
+    emb_dens = UMAPModule(n_components=2, random_state=42, n_neighbors=10,
+                          n_epochs=50, densmap=True).fit_transform(x)
+
+    assert emb_umap.shape == emb_dens.shape == (80, 2)
+    assert not np.allclose(emb_umap, emb_dens, atol=1e-3), (
+        "densMAP embedding should differ from plain UMAP (densmap flag was being dropped into **kwargs)"
+    )
+
+
+@pytest.mark.skipif(not TORCHDR_AVAILABLE, reason="torchdr not installed")
+def test_umap_densmap_torchdr_raises():
+    """densmap=True is unsupported on the torchdr backend and should fail loudly, not silently."""
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    with pytest.raises(ValueError, match="densmap"):
+        UMAPModule(n_components=2, random_state=42, n_neighbors=5,
+                   backend="torchdr", device="cpu", densmap=True)
