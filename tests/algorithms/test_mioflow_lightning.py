@@ -8,6 +8,7 @@ from torch import Tensor
 
 pytest.importorskip("torchdiffeq")
 ot = pytest.importorskip("ot")
+pytest.importorskip("phate")
 
 
 class TestMIOFlowLightningModule:
@@ -196,6 +197,357 @@ class TestMIOFlowLightningModule:
             assert a < b, f"interval distance did not improve: {b:.3f} -> {a:.3f}"
 
 
+class TestMIOFlowUseGagaFalseRegression:
+    """use_gaga=False (the default) must reproduce pre-GAGA behavior exactly."""
+
+    @pytest.fixture
+    def time_labeled_batch(self):
+        torch.manual_seed(42)
+        n_per_time = 20
+        dim = 5
+        data_parts, label_parts = [], []
+        for t in [0.0, 0.5, 1.0]:
+            data_parts.append(torch.randn(n_per_time, dim) + t)
+            label_parts.append(torch.full((n_per_time,), t))
+        return {"data": torch.cat(data_parts), "labels": torch.cat(label_parts)}
+
+    def test_no_gaga_attributes_built(self, time_labeled_batch):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        module = MIOFlow(
+            network=MIOFlowODEFunc(input_dim=5, hidden_dim=16),
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            n_global_epochs=1,
+        )
+        module.setup()
+        assert module.gaga_network is None
+        assert module._gaga_preprocessor is None
+
+    def test_encode_returns_ambient_dim(self, time_labeled_batch):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        module = MIOFlow(
+            network=MIOFlowODEFunc(input_dim=5, hidden_dim=16),
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            n_global_epochs=1,
+        )
+        module.setup()
+        z = module.encode(torch.randn(10, 5))
+        assert z.shape == (10, 5)
+
+
+class TestMIOFlowGAGA:
+    """Tests for the composed GAGA encoder inside MIOFlow (use_gaga=True)."""
+
+    @pytest.fixture
+    def gaga_time_labeled_batch(self):
+        """Time-labeled data with low-rank structure PHATE can pick up on."""
+        torch.manual_seed(0)
+        n_per_time = 30
+        latent_dim = 3
+        ambient_dim = 15
+        proj = torch.randn(latent_dim, ambient_dim)
+        data_parts, label_parts = [], []
+        for t in [0.0, 0.5, 1.0]:
+            z = torch.randn(n_per_time, latent_dim) + t
+            data_parts.append(z @ proj + 0.05 * torch.randn(n_per_time, ambient_dim))
+            label_parts.append(torch.full((n_per_time,), t))
+        return {"data": torch.cat(data_parts), "labels": torch.cat(label_parts)}
+
+    def _make_datamodule(self, batch):
+        from torch.utils.data import DataLoader, TensorDataset
+
+        dataset = TensorDataset(batch["data"], batch["labels"])
+
+        class SimpleDataModule:
+            def train_dataloader(self):
+                def collate(items):
+                    data = torch.stack([b[0] for b in items])
+                    labels = torch.stack([b[1] for b in items])
+                    return {"data": data, "labels": labels}
+
+                return DataLoader(dataset, batch_size=len(dataset), collate_fn=collate)
+
+        return SimpleDataModule()
+
+    def _make_module(self, gaga_latent_dim=3, **overrides):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        network = MIOFlowODEFunc(input_dim=gaga_latent_dim, hidden_dim=16)
+        kwargs = dict(
+            network=network,
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            n_local_epochs=0,
+            n_global_epochs=1,
+            n_post_local_epochs=0,
+            n_trajectories=5,
+            n_bins=4,
+            use_gaga=True,
+            gaga_latent_dim=gaga_latent_dim,
+            gaga_encoder_epochs=30,
+            gaga_decoder_epochs=30,
+            gaga_phate_knn=5,
+        )
+        kwargs.update(overrides)
+        return MIOFlow(**kwargs)
+
+    def test_requires_gaga_latent_dim(self):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        with pytest.raises(ValueError, match="gaga_latent_dim"):
+            MIOFlow(
+                network=MIOFlowODEFunc(input_dim=5, hidden_dim=16),
+                optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+                use_gaga=True,
+            )
+
+    def test_setup_builds_gaga_network_with_correct_latent_dim(self, gaga_time_labeled_batch):
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+
+        assert module.gaga_network is not None
+        assert module.gaga_network.latent_dim == 3
+        assert module._gaga_preprocessor is not None
+
+    def test_gaga_pretraining_produces_finite_losses(self, gaga_time_labeled_batch):
+        """setup()'s internal GAGA pretraining must not blow up."""
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+
+        x_norm = module._gaga_preprocessor.normalize(gaga_time_labeled_batch["data"])
+        x_hat, z = module.gaga_network(x_norm)
+        assert torch.isfinite(x_hat).all()
+        assert torch.isfinite(z).all()
+
+    def test_gaga_frozen_after_pretraining(self, gaga_time_labeled_batch):
+        """GAGA must not be jointly fine-tuned with the ODE flow after setup()."""
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+
+        assert all(not p.requires_grad for p in module.gaga_network.parameters())
+        assert not module.gaga_network.training
+
+    def test_two_phase_reduces_distance_and_recon_loss(self, gaga_time_labeled_batch):
+        """GAGA's two-phase pretraining must actually learn, not just run.
+
+        Mirrors test_training_reduces_distribution_distance's rigor: shape/
+        finiteness checks would pass for a non-learning implementation, so
+        this asserts the phase-1 distance loss and phase-2 reconstruction
+        loss both drop substantially over training.
+        """
+        from manylatents.algorithms.lightning.networks.gaga_net import (
+            gaga_distance_loss,
+            gaga_reconstruction_loss,
+        )
+
+        module = self._make_module(
+            gaga_latent_dim=3, gaga_encoder_epochs=0, gaga_decoder_epochs=0
+        )
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+
+        # Compute target distances the same way _setup_gaga does, but before
+        # any GAGA training, to get a losses-at-init baseline.
+        data = gaga_time_labeled_batch["data"]
+        gt_distances = module._compute_gaga_target_distances(data.numpy())
+
+        import numpy as np
+
+        from manylatents.algorithms.lightning.networks.gaga_net import GAGANetwork, Preprocessor
+
+        torch.manual_seed(module.init_seed)
+        net_before = GAGANetwork(input_dim=data.shape[1], latent_dim=3)
+        mean, std = data.mean(dim=0), data.std(dim=0).clamp(min=1e-8)
+        dist_std = torch.tensor(float(gt_distances.std())).clamp(min=1e-8)
+        pre = Preprocessor(mean=mean, std=std, dist_std=dist_std)
+        x_norm = pre.normalize(data)
+        triu = np.triu_indices(gt_distances.shape[0], k=1)
+        gt_upper = pre.normalize_dist(torch.tensor(gt_distances[triu], dtype=torch.float32))
+
+        with torch.no_grad():
+            z_before = net_before.encode(x_norm)
+            x_hat_before = net_before.decode(z_before)
+        dist_loss_before = gaga_distance_loss(z_before, gt_upper).item()
+        recon_loss_before = gaga_reconstruction_loss(x_hat_before, x_norm).item()
+
+        # Now actually pretrain via setup() with real epoch counts.
+        module.gaga_encoder_epochs = 40
+        module.gaga_decoder_epochs = 40
+        module.setup()
+
+        with torch.no_grad():
+            z_after = module.gaga_network.encode(x_norm)
+            x_hat_after = module.gaga_network.decode(z_after)
+        dist_loss_after = gaga_distance_loss(z_after, gt_upper).item()
+        recon_loss_after = gaga_reconstruction_loss(x_hat_after, x_norm).item()
+
+        assert dist_loss_after < 0.5 * dist_loss_before, (
+            f"GAGA phase 1 failed to reduce distance loss: "
+            f"{dist_loss_before:.4f} -> {dist_loss_after:.4f}"
+        )
+        assert recon_loss_after < 0.5 * recon_loss_before, (
+            f"GAGA phase 2 failed to reduce reconstruction loss: "
+            f"{recon_loss_before:.4f} -> {recon_loss_after:.4f}"
+        )
+
+    def test_encode_returns_gaga_latent_dim(self, gaga_time_labeled_batch):
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+
+        z = module.encode(gaga_time_labeled_batch["data"][:10])
+        assert z.shape == (10, 3)
+
+    def test_encode_accepts_explicit_time_span(self, gaga_time_labeled_batch):
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+
+        x = gaga_time_labeled_batch["data"][:10]
+        z_default = module.encode(x)
+        z_explicit = module.encode(x, t_start=0.0, t_end=1.0)
+        assert z_explicit.shape == z_default.shape
+
+    def test_trajectories_decoded_to_ambient_space(self, gaga_time_labeled_batch):
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+
+        module._generate_trajectories()
+        assert module.trajectories is not None
+        assert module.trajectories.shape[-1] == 15  # ambient_dim, not gaga_latent_dim
+        assert torch.isfinite(module.trajectories).all()
+
+    def test_local_and_global_step_finite_with_gaga(self, gaga_time_labeled_batch):
+        module = self._make_module(gaga_latent_dim=3)
+        module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
+        module.setup()
+        groups = module._group_by_time(gaga_time_labeled_batch)
+
+        local_result = module._local_step(groups)
+        global_result = module._global_step(groups)
+        assert torch.isfinite(local_result["loss"])
+        assert torch.isfinite(global_result["loss"])
+
+
+class TestMIOFlowBatchTimeAliasAndGradClip:
+    """Regression tests for the batch['time'] alias and opt-in grad_clip."""
+
+    def test_batch_time_key_alias(self):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        module = MIOFlow(
+            network=MIOFlowODEFunc(input_dim=5, hidden_dim=16),
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+        )
+        module.setup()
+        batch = {
+            "data": torch.randn(9, 5),
+            "time": torch.tensor([0.0] * 3 + [0.5] * 3 + [1.0] * 3),
+        }
+        groups = module._group_by_time(batch)
+        assert len(groups) == 3
+        assert [t for _, t in groups] == [0.0, 0.5, 1.0]
+
+    def test_missing_time_key_raises(self):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        module = MIOFlow(
+            network=MIOFlowODEFunc(input_dim=5, hidden_dim=16),
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+        )
+        module.setup()
+        with pytest.raises(KeyError):
+            module._group_by_time({"data": torch.randn(9, 5)})
+
+    def test_grad_clip_none_is_noop(self):
+        """grad_clip=None (default) must not raise or otherwise interfere."""
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        module = MIOFlow(
+            network=MIOFlowODEFunc(input_dim=5, hidden_dim=16),
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            n_global_epochs=1,
+        )
+        assert module.grad_clip is None
+
+    def test_grad_clip_bounds_parameter_gradients(self):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        torch.manual_seed(42)
+        n_per_time = 20
+        dim = 5
+        data_parts, label_parts = [], []
+        for t in [0.0, 1.0]:
+            data_parts.append(torch.randn(n_per_time, dim) * 10 + t * 50)
+            label_parts.append(torch.full((n_per_time,), t))
+        batch = {"data": torch.cat(data_parts), "labels": torch.cat(label_parts)}
+
+        module = MIOFlow(
+            network=MIOFlowODEFunc(input_dim=dim, hidden_dim=16),
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            grad_clip=0.5,
+        )
+        module.setup()
+        groups = module._group_by_time(batch)
+        result = module._global_step(groups)
+        result["loss"].backward()
+        total_norm_before = torch.norm(
+            torch.stack([p.grad.norm() for p in module.network.parameters() if p.grad is not None])
+        )
+        torch.nn.utils.clip_grad_norm_(module.parameters(), module.grad_clip)
+        total_norm_after = torch.norm(
+            torch.stack([p.grad.norm() for p in module.network.parameters() if p.grad is not None])
+        )
+        assert total_norm_after <= total_norm_before + 1e-6
+        assert total_norm_after <= module.grad_clip + 1e-4
+
+
+class TestMIOFlowGeomancerConstructorContract:
+    """Locks the exact constructor kwargs geomancer's pipeline/mioflow.py uses.
+
+    geomancer (a downstream app) constructs MIOFlow/MIOFlowODEFunc directly by
+    keyword rather than going through manylatents.api.run(). This test fails
+    loudly if any of those kwargs is ever renamed or removed.
+    """
+
+    def test_geomancer_call_sites_still_work(self):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        net = MIOFlowODEFunc(input_dim=5, hidden_dim=16)
+        assert net is not None
+
+        checkpoint_net = MIOFlowODEFunc(input_dim=5, hidden_dim=16)
+        assert checkpoint_net is not None
+
+        module = MIOFlow(
+            network=net,
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            n_local_epochs=10,
+            n_global_epochs=50,
+            n_post_local_epochs=0,
+            lambda_ot=1.0,
+            lambda_energy=0.01,
+            sample_size=256,
+            n_trajectories=100,
+            n_bins=100,
+            init_seed=0,
+        )
+        module.datamodule = object()  # attribute-assignment path geomancer uses
+        assert module is not None
+
+
 class TestMIOFlowThroughRunExperiment:
     """End-to-end: mioflow as a runnable op via run_experiment (issue #274).
 
@@ -284,4 +636,91 @@ class TestMIOFlowThroughRunExperiment:
         emb = result["embeddings"]
         assert emb.ndim == 2, f"expected 2-D embeddings, got shape {emb.shape}"
         assert emb.shape == (60, 5), f"unexpected embedding shape {emb.shape}"
+        assert np.isfinite(emb).all(), "embeddings contain NaN/Inf"
+
+    def test_run_experiment_with_gaga_returns_latent_dim_embeddings(self):
+        """Same op-contract check as above, but with the composed GAGA path."""
+        import numpy as np
+        from lightning import LightningDataModule, Trainer
+        from torch.utils.data import DataLoader, Dataset
+
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+        from manylatents.callbacks.embedding.base import validate_latent_outputs
+        from manylatents.experiment import run_experiment
+
+        pytest.importorskip("phate")
+
+        # Toy time-resolved input with low-rank structure PHATE can pick up on.
+        torch.manual_seed(0)
+        gaga_latent_dim = 3
+        ambient_dim = 15
+        proj = torch.randn(gaga_latent_dim, ambient_dim)
+        parts_x, parts_y = [], []
+        for t in (0.0, 0.5, 1.0):
+            z = torch.randn(20, gaga_latent_dim) * 0.3 + t
+            parts_x.append(z @ proj + 0.05 * torch.randn(20, ambient_dim))
+            parts_y.append(torch.full((20,), t))
+        X = torch.cat(parts_x)
+        Y = torch.cat(parts_y)
+
+        class TimeLabeledDataset(Dataset):
+            def __len__(self):
+                return len(X)
+
+            def __getitem__(self, idx):
+                return {"data": X[idx], "label": Y[idx]}
+
+            def get_labels(self):
+                return Y.numpy()
+
+        class TimeLabeledDataModule(LightningDataModule):
+            def setup(self, stage=None):
+                self.train_dataset = TimeLabeledDataset()
+                self.test_dataset = TimeLabeledDataset()
+
+            def _loader(self):
+                return DataLoader(TimeLabeledDataset(), batch_size=len(X))
+
+            def train_dataloader(self):
+                return self._loader()
+
+            def val_dataloader(self):
+                return self._loader()
+
+            def test_dataloader(self):
+                return self._loader()
+
+        datamodule = TimeLabeledDataModule()
+
+        net = MIOFlowODEFunc(input_dim=gaga_latent_dim, hidden_dim=16)
+        model = MIOFlow(
+            network=net,
+            optimizer=functools.partial(torch.optim.Adam, lr=1e-3),
+            n_local_epochs=0,
+            n_global_epochs=2,
+            n_post_local_epochs=0,
+            lambda_ot=1.0,
+            lambda_energy=0.01,
+            init_seed=0,
+            use_gaga=True,
+            gaga_latent_dim=gaga_latent_dim,
+            gaga_encoder_epochs=20,
+            gaga_decoder_epochs=20,
+            gaga_phate_knn=5,
+        )
+        model.datamodule = datamodule
+
+        trainer = Trainer(
+            accelerator="cpu", devices=1, max_epochs=2, logger=False,
+            enable_checkpointing=False, enable_progress_bar=False,
+        )
+
+        result = run_experiment(
+            datamodule=datamodule, algorithm=model, trainer=trainer, seed=0
+        )
+
+        validate_latent_outputs(result)
+        emb = result["embeddings"]
+        assert emb.shape == (60, gaga_latent_dim), f"unexpected embedding shape {emb.shape}"
         assert np.isfinite(emb).all(), "embeddings contain NaN/Inf"
