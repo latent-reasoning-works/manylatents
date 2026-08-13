@@ -206,7 +206,13 @@ def test_collect_outputs_does_not_run_the_generic_pass_twice():
     """Measured: one generic collect on PCAModule at N=3000 is ~10 ms and an NxN
     allocation, and ``PCAModule.affinity()`` already calls ``kernel()`` internally.
     Two calls is the floor (registry ``kernel`` + ``affinity``->``kernel``); four
-    means the inherited shim ran as well."""
+    means the inherited shim ran as well.
+
+    NOTE, measured: this does NOT catch removal of ``@generic_default``. ``PCAModule``
+    overrides ``extra_outputs`` WITHOUT the marker, so the marker never applies to it and
+    deleting it leaves this test green. The marker's effect is pinned by
+    ``test_the_marker_stops_the_inherited_shim_running_the_registry_twice``, which uses a
+    module that inherits ``extra_outputs`` — the common shape."""
     from manylatents.algorithms.latent import PCAModule
 
     m = PCAModule(n_components=2)
@@ -230,3 +236,70 @@ def test_extractors_take_exactly_one_argument():
     """Registration contract: an extractor is ``fn(algorithm) -> dict``."""
     for spec in get_output_registry().values():
         assert len(inspect.signature(spec.func).parameters) == 1
+
+
+def test_a_property_that_raises_when_unfitted_reads_as_an_absent_output():
+    """REGRESSION. A hook may be a `@property`, and one that raises "not fitted" on ACCESS is
+    stating an absent output rather than failing.
+
+    `LatentModule.extra_outputs` treated it that way before this module existed — its `getattr`
+    sat inside the try at `latent_module_base.py:238`. Moving the collect out here left the read
+    bare, so the exception escaped `collect_outputs()` and aborted a run that used to complete.
+    Measured against the unguarded version: RuntimeError propagates out of `collect_outputs`.
+    """
+    class Unfitted:
+        @property
+        def kernel(self):
+            raise RuntimeError("not fitted")
+
+    assert collect_outputs(Unfitted()) == {}
+
+
+def test_a_bug_inside_a_real_accessor_still_propagates():
+    """The other half, and why the guard is on the READ and not the CALL. An exception from
+    INSIDE a hook that exists and is callable is a genuine failure, and recording it as an absent
+    output would turn a broken run into a quiet one."""
+    class Broken:
+        def kernel(self):
+            raise ValueError("this is a real bug")
+
+    with pytest.raises(ValueError, match="this is a real bug"):
+        collect_outputs(Broken())
+
+
+def test_the_marker_stops_the_inherited_shim_running_the_registry_twice():
+    """What `@generic_default` is FOR, on a module that actually inherits `extra_outputs`.
+
+    The sibling counting test above cannot see this: it uses `PCAModule`, whose `extra_outputs`
+    is an UNMARKED override, so the marker never applies to it. MEASURED — deleting
+    `@generic_default` from `latent_module_base` leaves that test green, which is why the claim
+    that it "fails if anyone drops the marker" was wrong.
+
+    Most latent modules take the inherited path (PHATE, tSNE, DiffusionMap, MDS all do), so this
+    is the common case rather than the exotic one. Marker present -> one `kernel()` call from the
+    registry pass. Marker gone -> two, because `collect_outputs` runs the registry AND then calls
+    the inherited shim, which runs the registry again for an identical result.
+    """
+    class OnlyKernel(LatentModule):
+        """A LatentModule that inherits `extra_outputs` untouched — the common shape."""
+
+        def fit(self, x, y=None):
+            self._n = len(x)
+
+        def transform(self, x):
+            return np.zeros((len(x), 2))
+
+        def kernel(self, ignore_diagonal: bool = False):
+            calls.append(1)
+            return np.eye(self._n)
+
+    calls: list = []
+    m = OnlyKernel()
+    m.fit(np.zeros((6, 3)))
+
+    out = collect_outputs(m)
+
+    assert len(calls) == 1, (
+        f"the registry pass ran {len(calls)} times — the inherited `extra_outputs` shim is "
+        "running it again, which is what @generic_default exists to prevent")
+    assert "kernel" in out

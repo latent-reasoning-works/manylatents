@@ -105,7 +105,17 @@ def _accessor(algorithm, name: str):
       * an ``nn.Module`` — a LAYER named ``kernel`` on a LightningModule. Calling it
         would run a forward pass, which is not reading an output.
     """
-    fn = getattr(algorithm, name, None)
+    # THE READ IS GUARDED, THE CALL IS NOT, and the asymmetry is the point. A hook may be a
+    # `@property`, and a property that raises "not fitted" on access is stating an ABSENT output
+    # — which is how `LatentModule.extra_outputs` treated it before this module existed, because
+    # its `getattr` sat INSIDE the try at latent_module_base.py:238. Leaving the read bare here
+    # let that exception escape `collect_outputs()` and abort a run that previously completed.
+    # Narrow, and the same three the extractors swallow: a genuine bug inside a real `affinity()`
+    # still propagates, because that happens at CALL time, below.
+    try:
+        fn = getattr(algorithm, name, None)
+    except (NotImplementedError, AttributeError, RuntimeError):
+        return None
     if not callable(fn) or isinstance(fn, torch.nn.Module):
         return None
     try:
