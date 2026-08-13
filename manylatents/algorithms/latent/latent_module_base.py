@@ -7,6 +7,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from manylatents.outputs import collect_registered_outputs, generic_default
+
 ArrayLike = Union[np.ndarray, Tensor]
 
 
@@ -208,37 +210,25 @@ class LatentModule(ABC):
         )
         return self.adjacency(ignore_diagonal=ignore_diagonal)
 
+    @generic_default
     def extra_outputs(self) -> dict:
-        """Collect extra outputs from the algorithm for attachment to LatentOutputs.
+        """Collect the generic outputs (trajectories/affinity/adjacency/kernel).
 
-        Base implementation collects trajectories, affinity, adjacency,
-        and kernel when available. Subclasses can override to add their own.
+        BACK-COMPAT SHIM. The collect itself now lives in ``manylatents.outputs`` as
+        registered extractors, so it reaches any algorithm rather than only the classes
+        that inherit this one: MIOFlow computes ``.trajectories`` and could never emit
+        them precisely because it is a LightningModule (#295).
+
+        Overriding this to add algorithm-specific keys is still correct. Calling
+        ``super().extra_outputs()`` from the override is no longer needed and is a
+        second, redundant registry pass — the engine adds the generics itself via
+        ``outputs.collect_outputs()``, which skips this method by its
+        ``@generic_default`` marker for exactly that reason.
 
         Returns:
             dict of collected outputs (empty if nothing available).
         """
-        extras = {}
-
-        # Trajectories (stored as attribute, not a method)
-        traj = getattr(self, "trajectories", None)
-        if traj is not None:
-            if isinstance(traj, Tensor):
-                traj = traj.detach().cpu().numpy()
-            extras["trajectories"] = traj
-
-        # Matrix outputs via methods (short keys)
-        for name, method_name in [
-            ("affinity", "affinity"),
-            ("adjacency", "adjacency"),
-            ("kernel", "kernel"),
-        ]:
-            try:
-                val = getattr(self, method_name)()
-                extras[name] = val
-            except (NotImplementedError, AttributeError, RuntimeError):
-                pass
-
-        return extras
+        return collect_registered_outputs(self)
 
     def affinity_tensor(self) -> 'torch.Tensor':
         """Return affinity matrix as a torch.Tensor.

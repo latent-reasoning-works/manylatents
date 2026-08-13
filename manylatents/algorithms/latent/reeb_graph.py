@@ -418,8 +418,13 @@ class ReebGraphModule(LatentModule):
         return A
 
     def extra_outputs(self) -> dict:
-        """Collect ReebGraph-specific outputs in addition to base outputs."""
-        extras = super().extra_outputs()
+        """Collect ReebGraph's OWN outputs — the node geometry and the summary.
+
+        No `super()`: `adjacency` is collected generically by `manylatents.outputs`,
+        and the engine merges both halves (`outputs.collect_outputs`). Calling super()
+        here would just recompute the registry pass.
+        """
+        extras: dict = {}
         if getattr(self, "node_coordinates", None) is not None:
             extras["node_coordinates"] = self.node_coordinates
         if getattr(self, "structural_summary", None) is not None:

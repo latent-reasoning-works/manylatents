@@ -334,8 +334,14 @@ class SelectiveCorrectionModule(LatentModule):
         return self.inner.adjacency(ignore_diagonal=ignore_diagonal)
 
     def extra_outputs(self) -> dict:
-        """Include mismatch diagnostics alongside inner module outputs."""
-        extras = super().extra_outputs()
+        """The mismatch diagnostics — this wrapper's OWN outputs.
+
+        No `super()`: the generic extractors call `affinity`/`kernel`/`adjacency` on the
+        wrapper, which delegates each to `self.inner` (see the three methods above), so
+        the inner module's matrices still reach the results dict via
+        `outputs.collect_outputs` — without a second registry pass.
+        """
+        extras: dict = {}
         if self._mismatched is not None:
             extras["mismatch_labels"] = self._mismatched
             extras["mismatch_ratio"] = self._mismatch_ratio

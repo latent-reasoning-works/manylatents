@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from manylatents.metrics.registry import get_metric
+from manylatents.outputs import collect_outputs
 from manylatents.utils.metrics import _content_key, compute_eigenvalues, compute_knn
 
 logger = logging.getLogger(__name__)
@@ -352,9 +353,13 @@ def evaluate(
     outputs["embedding"] = embeddings
     if module is not None:
         outputs["module"] = module
-        if hasattr(module, "extra_outputs"):
-            for key, val in module.extra_outputs().items():
-                outputs[key] = val
+        # The SAME collect as experiment.py's — this is the second merge point, and it is
+        # the one `at: <key>` routing reads from (`data = outputs[at_value]` below). Once
+        # the subclass overrides stopped calling super().extra_outputs(), reading
+        # `module.extra_outputs()` here would have made `at: affinity` resolve to nothing
+        # for PCA/Reeb/SelectiveCorrection while still working for PHATE/UMAP/tSNE — a
+        # silent, per-algorithm hole in the routing surface.
+        outputs.update(collect_outputs(module))
 
     # --- Post-fit sampling: dynamic over outputs dict ---
     embedding_sample_indices = None
