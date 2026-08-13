@@ -325,7 +325,8 @@ def test_lightning_string_form_forwards_kwargs():
     never passed `**kwargs`, so the packaged yaml won every argument the caller named.
     Measured on the broken code, `algorithms={'lightning': 'mioflow'}` with
     `n_global_epochs=3, lambda_energy=0.5, n_bins=7` trained mioflow.yaml's 100 / 0.01 / 100.
-    The two latent string forms above (api.py:168, api.py:211) each already forward, after
+    The two latent string forms above (api.py:231, api.py:274 — the two `algo_kwargs =
+    dict(kwargs)` lines) each already forward, after
     two earlier rounds of exactly this bug — this key was the one added later and missed.
     """
     from manylatents.api import _resolve_algorithm, _resolve_datamodule

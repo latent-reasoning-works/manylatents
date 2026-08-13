@@ -164,6 +164,17 @@ def _instantiate_lightning(cfg, datamodule, **overrides):
     would make a routine override unreachable through the only form that patches. Checking
     here rather than letting `hydra_zen.instantiate` raise buys the error a full dataload
     earlier, in the caller's vocabulary rather than hydra's.
+
+    TWO SIDE EFFECTS OF FORWARDING AT ALL, both measured and both benign, named here because
+    "the kwargs now arrive" does not imply either:
+
+    * A caller passing hydra's own meta-key ``_recursive_=True`` now raises ``TypeError`` from
+      the constructor. It was silently dropped before, because ``_META_KEYS`` strips meta-keys
+      from the YAML side only, never from an override. A meta-key in ``**kwargs`` was always
+      a mistake; it now says so.
+    * A dict override for a key with no ``DictConfig`` node in the packaged yaml arrives as a
+      ``DictConfig`` rather than a plain dict (``sample_size={'a': 1}``, say). It matters only
+      for a constructor that type-checks its argument, and no current one does.
     """
     from omegaconf import DictConfig, OmegaConf
 
@@ -311,10 +322,19 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                     # `seed_everything(seed)`, so they OVERRIDE the global seed:
                     # `run(seed=7, algorithms={'lightning': ...})` initialised at 42 anyway,
                     # and `seed` was a no-op over the one thing it most obviously names.
-                    # `setdefault`, so an explicit `init_seed=` still wins. No packaged
-                    # lightning yaml declares `init_seed` and every class defaults it to 42 —
-                    # the same value as `run`'s default — so at the default seed this line
-                    # changes nothing.
+                    # `setdefault`, so an explicit `init_seed=` still wins, and at the
+                    # default seed this line changes nothing — but BOTH halves of the original
+                    # claim here were false and are corrected rather than dropped:
+                    #   * `distillation/{base,staged,control_task_only}.yaml` DO declare
+                    #     `init_seed: 42`. Harmless today (42 is also `run`'s default, and all
+                    #     three fail earlier on `MissingMandatoryValue: student`), but a yaml
+                    #     value would now be overridden by `seed` for any caller who fixed that.
+                    #   * `HFTrainerModule.__init__(self, config, datamodule=None)`
+                    #     (lightning/hf_trainer.py:54) accepts neither `init_seed` nor
+                    #     `**kwargs`, and `hf_trainer.yaml` carries a `_target_`, so it IS
+                    #     reachable — it now raises TypeError naming the class instead of
+                    #     ConfigValueError from `save_hyperparameters`. Louder, and still a
+                    #     failure either way.
                     kwargs.setdefault("init_seed", seed)
                 return _instantiate_lightning(cfg, datamodule, **kwargs)
 
@@ -474,10 +494,14 @@ def run(
             that one key and keeps the packaged config's ``_target_`` and siblings. Pass a
             different ``_target_`` inside the node to swap the component wholesale.
 
-            ``neighborhood_size`` is the one argument the lightning path still drops: it is a
-            named parameter of ``run`` for the metric layer, no LightningModule accepts it,
-            and forwarding it would break a mixed latent+lightning sweep that sets one value
-            for both.
+            ``neighborhood_size`` is the one argument the lightning path still drops. It is
+            NOT a named parameter of ``run`` — ``run``'s signature is ``(input_data, data,
+            algorithm, algorithms, metrics, sampling, seed, time, data_kwargs, **kwargs)`` — it
+            reaches ``_resolve_algorithm`` as a named parameter of THAT (api.py:202) out of
+            ``**kwargs``. It is dropped because no LightningModule accepts it and forwarding it
+            would break a mixed latent+lightning sweep that sets one value for both. Measured:
+            ``neighborhood_size=5`` on the lightning path is silently ignored and does not
+            raise.
 
             Dataset generation parameters go through ``data_kwargs`` — the two are separate
             channels because ``n_components`` would otherwise be ambiguous between them.
