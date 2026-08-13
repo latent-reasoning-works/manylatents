@@ -409,6 +409,23 @@ def test_run_lightning_override_changes_the_answer():
     assert np.asarray(out["embeddings"]).shape == (60, 3)
 
 
+def test_lightning_seed_reaches_init_seed():
+    """`seed=` reaches weight init on the lightning path, as it does on the latent one.
+
+    Lightning modules seed their own weight init from `init_seed` in `configure_model`
+    (reconstruction.py:66, mioflow.py:123, cflows.py:172), and they do it AFTER
+    `experiment.py` calls `seed_everything(seed)` — so they OVERRIDE the global seed and
+    `run(seed=7, algorithms={'lightning': ...})` initialised at 42 regardless.
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    assert _resolve_algorithm(algorithms={"lightning": "mioflow"}, datamodule=dm,
+                              seed=7).init_seed == 7
+    # An explicit init_seed beats the run-wide seed.
+    assert _resolve_algorithm(algorithms={"lightning": "mioflow"}, datamodule=dm,
+                              seed=7, init_seed=11).init_seed == 11
+
+
 def test_resolve_algorithm_by_name():
     """String name resolves via algorithm registry."""
     from manylatents.api import _resolve_algorithm

@@ -302,6 +302,20 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                 # `run(algorithms={'lightning': 'mioflow'}, n_global_epochs=3)` trained 100,
                 # and a misspelled parameter raised nothing at all, so a typo and a
                 # deliberate default were the same observable.
+                if seed is not None:
+                    # The latent branches carry `seed` to the module as `random_state`, which
+                    # the base class stores as `init_seed` (latent_module_base.py:46-47).
+                    # Lightning modules seed their own weight init from `init_seed` in
+                    # `configure_model` (reconstruction.py:66, mioflow.py:123, cflows.py:172,
+                    # latent_ode.py:67) and do it AFTER experiment.py:232's
+                    # `seed_everything(seed)`, so they OVERRIDE the global seed:
+                    # `run(seed=7, algorithms={'lightning': ...})` initialised at 42 anyway,
+                    # and `seed` was a no-op over the one thing it most obviously names.
+                    # `setdefault`, so an explicit `init_seed=` still wins. No packaged
+                    # lightning yaml declares `init_seed` and every class defaults it to 42 —
+                    # the same value as `run`'s default — so at the default seed this line
+                    # changes nothing.
+                    kwargs.setdefault("init_seed", seed)
                 return _instantiate_lightning(cfg, datamodule, **kwargs)
 
         raise ValueError(
