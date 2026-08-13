@@ -128,21 +128,39 @@ class MIOFlow(LightningModule):
         logger.info(f"MIOFlow network: {self.network.__class__.__name__}")
 
     def _group_by_time(self, batch: dict) -> list[tuple[Tensor, float]]:
-        """Group batch data by per-sample time labels into a sorted list of (X_t, t).
+        """Group batch data by per-sample timepoint into a sorted list of (X_t, t).
 
-        Accepts both the manyLatents op-contract key ``"label"`` (singular, as
-        emitted by ``InMemoryDataset``/``PrecomputedDataModule``) and the
-        ``"labels"`` (plural) key used by MIOFlow's own prototype datamodules.
-        For MIOFlow the label *is* the per-sample timepoint.
+        Three keys, read in this order:
+
+        - ``"time"`` — the dedicated per-cell timepoint channel that
+          ``api.run(time=...)`` threads through ``PrecomputedDataModule`` into
+          ``InMemoryDataset`` (``data/precomputed_dataset.py:48``), and the key
+          ``Cflows`` reads (``cflows.py:225``). MIOFlow predates it and never
+          learned about it, so ``api.run(algorithms={"lightning": "mioflow"},
+          time=t)`` raised ``KeyError`` on a batch — keys ``['data',
+          'embeddings', 'time']`` — that carried the timepoints all along.
+        - ``"labels"`` (plural) — MIOFlow's own prototype datamodules.
+        - ``"label"`` (singular) — the manyLatents op-contract key; geomancer's
+          ``pipeline/mioflow.py:215`` still emits the timepoint under it.
+
+        ``"time"`` wins because it is the only *unambiguous* one — ``"label"`` is
+        also the colouring/metric channel. Measured before this change: a batch
+        carrying a 2-class cell-type ``label`` beside a 4-timepoint ``time`` grouped
+        into 2 "timepoints" and trained a flow between cell types. A well-formed
+        wrong answer, not a crash.
         """
         if isinstance(batch, dict):
             data = batch["data"]
-            labels = batch.get("labels", batch.get("label"))
+            # Two `is None` checks rather than one `or` chain: these are tensors, and
+            # an all-zero first timepoint makes the whole column falsy under `or`.
+            labels = batch.get("time")
+            if labels is None:
+                labels = batch.get("labels", batch.get("label"))
             if labels is None:
                 raise KeyError(
-                    "MIOFlow requires a per-sample time label in the batch under "
-                    "'label' or 'labels'; got keys "
-                    f"{sorted(batch.keys())}."
+                    "MIOFlow requires a per-sample timepoint in the batch under "
+                    "'time' (pass `time=...` to api.run / the datamodule), "
+                    f"'labels' or 'label'; got keys {sorted(batch.keys())}."
                 )
         else:
             data, labels = batch[0], batch[1]

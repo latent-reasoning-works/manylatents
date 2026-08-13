@@ -365,7 +365,13 @@ def run(
         sampling: Dict of sampler configs or instances.
         seed: Random seed (default 42).
         time: Optional per-cell timepoint labels (in-memory path only), threaded to the
-            datamodule so trajectory algorithms (LatentODE, Cflows) receive ``batch["time"]``.
+            datamodule so trajectory algorithms receive ``batch["time"]`` — read by
+            ``Cflows`` (``algorithms/lightning/cflows.py:225``) and ``MIOFlow``
+            (``algorithms/lightning/mioflow.py:156``). NOT ``LatentODE``, which this line
+            used to name: LatentODE integrates over its ``integration_times``
+            *hyperparameter* (``latent_ode.py:100``) and never reads the batch's time.
+            Measured — its embeddings are byte-identical under ``time=arange(4)``,
+            ``time=arange(4)*100`` and ``time=None``.
             ``None`` (default) leaves every existing result unchanged.
         data_kwargs: Constructor kwargs for the named dataset's DataModule — the generation
             parameters of a synthetic dataset (``n_samples``, ``centers``, ``cluster_std``,
