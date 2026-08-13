@@ -104,7 +104,7 @@ class TestMIOFlowLightningModule:
         assert [t for _, t in groups] == pytest.approx([0.0, 1.0, 2.0, 3.0])
 
     def test_label_and_labels_still_work(self, mioflow_module, time_labeled_batch):
-        """geomancer's `pipeline/mioflow.py:97` emits the timepoint under 'label'."""
+        """geomancer's `pipeline/mioflow.py:215` emits the timepoint under 'label'."""
         d = time_labeled_batch["data"]
         t = time_labeled_batch["labels"]
         for key in ("label", "labels"):
