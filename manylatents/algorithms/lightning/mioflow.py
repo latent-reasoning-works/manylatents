@@ -134,7 +134,7 @@ class MIOFlow(LightningModule):
 
         - ``"time"`` — the dedicated per-cell timepoint channel that
           ``api.run(time=...)`` threads through ``PrecomputedDataModule`` into
-          ``InMemoryDataset`` (``data/precomputed_dataset.py:48``), and the key
+          ``InMemoryDataset`` (``data/precomputed_dataset.py:55``), and the key
           ``Cflows`` reads (``cflows.py:225``). MIOFlow predates it and never
           learned about it, so ``api.run(algorithms={"lightning": "mioflow"},
           time=t)`` raised ``KeyError`` on a batch — keys ``['data',
@@ -151,8 +151,14 @@ class MIOFlow(LightningModule):
         """
         if isinstance(batch, dict):
             data = batch["data"]
-            # Two `is None` checks rather than one `or` chain: these are tensors, and
-            # an all-zero first timepoint makes the whole column falsy under `or`.
+            # Two `is None` checks rather than one `or` chain, and the reason is stronger
+            # than "an all-zero column is falsy": these are TENSORS, and `bool()` on one with
+            # more than one element RAISES — `RuntimeError: Boolean value of Tensor with more
+            # than one value is ambiguous`. So `batch.get("time") or batch.get("labels")` does
+            # not silently fall through to the wrong key, it crashes the step. Measured: the
+            # `or` form fails 9 of 19 tests in this file. Loud rather than silent, but a
+            # timepoint column is exactly the shape that trips it, so it never gets to be
+            # either.
             labels = batch.get("time")
             if labels is None:
                 labels = batch.get("labels", batch.get("label"))
@@ -164,6 +170,15 @@ class MIOFlow(LightningModule):
                 )
         else:
             data, labels = batch[0], batch[1]
+        # A CONTINUOUS TIME CHANNEL DEGENERATES HERE, and reading `"time"` makes that newly
+        # reachable — so it is named rather than left to be found. Grouping is `torch.unique`, so
+        # `time=linspace(0, 1, n)` yields n singleton groups: MEASURED, a 40-cell run produced 40
+        # groups of one, trained to completion and returned finite embeddings with no warning.
+        # The OT loss between one-point distributions is degenerate and the flow it fits is not
+        # the one the caller meant. Not refused here, because a legitimate two-timepoint run is
+        # indistinguishable from a degenerate one by count alone and `_group_by_time` is on the
+        # training hot path; the honest place for that judgement is the caller that knows whether
+        # its clock is categorical. Recorded so the next person does not re-derive it.
         unique_times = torch.unique(labels, sorted=True)
         groups = []
         for t in unique_times:
