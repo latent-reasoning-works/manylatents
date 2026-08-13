@@ -365,6 +365,40 @@ class MIOFlow(LightningModule):
         """Full trajectories (n_bins, n_traj, d) if generated."""
         return self._trajectories
 
+    def extra_outputs(self) -> dict:
+        """Attach the generated trajectories to ``run_experiment()``'s results.
+
+        ``_generate_trajectories()`` runs in ``on_train_end()`` and stores the paths on
+        ``self._trajectories``, but ``run_experiment()``'s return contract is fixed to
+        ``embeddings``/``label``/``metadata``/``scores`` — so until now a fitted MIOFlow's
+        trajectories had no way out of the model. No caller-facing path reaches the fitted
+        instance to read them off: the CLI and ``api.run()`` both return the results dict, and
+        ``EmbeddingCallback`` hooks receive only ``(dataset, embeddings)``.
+
+        This needs no engine change. ``experiment.run_experiment()`` already merges the dict any
+        algorithm returns from ``extra_outputs()`` (step 4g), and ``SaveOutputs`` already
+        persists whatever lands there — so a Hydra CLI run writes trajectories to disk for free
+        once this method exists.
+
+        ``LatentModule`` declares a default that does exactly this, but ``MIOFlow`` is a
+        ``LightningModule`` and does not inherit it; ``Cflows.extra_outputs()`` is the precedent
+        for a Lightning algorithm doing it itself.
+
+        Returns ``{}`` before a fit rather than raising, mirroring ``Cflows``' guard style: this
+        is called unconditionally by the engine, and an algorithm that has not trained yet is an
+        ordinary state rather than an error.
+
+        Detached and moved to numpy for the same reason the base implementation does it — the
+        results dict is serialized by ``SaveOutputs``, and a tensor still attached to the graph
+        would carry the autograd history of the whole run into a file.
+        """
+        traj = self._trajectories
+        if traj is None:
+            return {}
+        if isinstance(traj, Tensor):
+            traj = traj.detach().cpu().numpy()
+        return {"trajectories": traj}
+
     def test_step(self, batch, batch_idx):
         time_groups = self._group_by_time(batch)
         if len(time_groups) < 2:

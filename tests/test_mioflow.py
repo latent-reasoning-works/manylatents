@@ -75,3 +75,61 @@ class TestMIOFlowLosses:
         loss = mioflow_density_loss(source, target)
         assert loss.shape == ()
         assert loss.item() >= 0
+
+
+class TestMIOFlowExtraOutputs:
+    """`extra_outputs()` — the only way a fitted MIOFlow's trajectories reach a caller.
+
+    `_generate_trajectories()` runs in `on_train_end()` and stores the paths on the model, but
+    `run_experiment()`'s return contract is fixed to embeddings/label/metadata/scores and no
+    caller-facing path reaches the fitted instance. `experiment.run_experiment()` already merges
+    whatever `extra_outputs()` returns (step 4g), so this method is the whole fix — see #295.
+    """
+
+    def _model(self, dim=4):
+        from manylatents.algorithms.lightning.mioflow import MIOFlow
+        from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+        return MIOFlow(network=MIOFlowODEFunc(input_dim=dim, hidden_dim=16), optimizer=None,
+                       n_bins=5, n_trajectories=7)
+
+    def test_empty_before_a_fit_rather_than_raising(self):
+        """The engine calls this unconditionally, so an untrained model is an ordinary state.
+        Mirrors `Cflows.extra_outputs()`'s guard, asserted the same way its test does."""
+        assert self._model().extra_outputs() == {}
+
+    def test_returns_the_trajectories_once_generated(self):
+        """The key name matters: `run_experiment()` merges this dict into its results verbatim,
+        and `LatentModule`'s default implementation calls the same thing `trajectories`."""
+        model = self._model()
+        model._trajectories = torch.zeros(5, 7, 4)
+
+        out = model.extra_outputs()
+
+        assert set(out) == {"trajectories"}
+        assert out["trajectories"].shape == (5, 7, 4)
+
+    def test_detached_and_on_the_cpu_as_numpy(self):
+        """`SaveOutputs` serializes whatever lands in the results dict. A tensor still attached
+        to the graph would carry the autograd history of the entire run into a file — which is
+        why the base implementation detaches, and why this must too."""
+        model = self._model()
+        model._trajectories = torch.zeros(5, 7, 4, requires_grad=True) * 1.0
+
+        traj = model.extra_outputs()["trajectories"]
+
+        assert isinstance(traj, np.ndarray), "must survive serialization by SaveOutputs"
+
+    def test_the_axes_are_time_first(self):
+        """`(n_bins, n_trajectories, d)`, and the order is not cosmetic: `_generate_trajectories`
+        integrates `odeint(network, X_0_sample, t_bins)` and torchdiffeq returns
+        `(len(t), *y0.shape)`. Both parameters default to 100, so a default run cannot tell the
+        two axes apart — a consumer reading shape[0] as a population size would be wrong on
+        every non-default run and right on every default one."""
+        model = self._model()
+        model._trajectories = torch.zeros(5, 7, 4)
+
+        traj = model.extra_outputs()["trajectories"]
+
+        assert traj.shape[0] == model.n_bins
+        assert traj.shape[1] == model.n_trajectories
