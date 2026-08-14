@@ -255,8 +255,15 @@ class PCAModule(LatentModule):
     # ------------------------------------------------------------------
 
     def extra_outputs(self) -> dict:
-        """Return extra outputs including robust decomposition artifacts."""
-        extras = super().extra_outputs()
+        """Return PCA's OWN artifacts — the robust decomposition products.
+
+        No `super()`: affinity/kernel are collected generically by
+        `manylatents.outputs` now, and calling super() here would run that pass a
+        second time per merge point (10.0 ms and an NxN allocation at N=3000, measured;
+        `kernel()` is already computed 4x per run_experiment because `affinity()` calls
+        it). The engine merges both halves — see `outputs.collect_outputs`.
+        """
+        extras: dict = {}
 
         if self.method in ('robust_ialm', 'robust_admm') and self._robust_result is not None:
             extras['low_rank_matrix'] = self._robust_result.L

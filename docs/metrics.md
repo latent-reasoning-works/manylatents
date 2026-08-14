@@ -18,9 +18,10 @@ run_experiment()
 ├─ algorithm.transform(test_tensor) → embeddings
 │   outputs["embedding"] = embeddings                     ← embedding available
 │   outputs["module"]    = algorithm                      ← module available
-│   outputs["affinity"]  = algorithm.extra_outputs()      ← extras available
-│   outputs["kernel"]    = ...                              (algorithm-dependent)
-│   outputs["adjacency"] = ...
+│   outputs.update(collect_outputs(algorithm))            ← extras available
+│     ├─ registry (manylatents/outputs.py): trajectories,   (algorithm-dependent)
+│     │    affinity, adjacency, kernel — off ANY algorithm
+│     └─ algorithm.extra_outputs(): its own artifacts only
 │
 ├─ evaluate()   [evaluate.py]
 │   ├─ [sampling.embedding] ── subsample before metrics   ← POSITION 2
@@ -39,11 +40,19 @@ run_experiment()
 | `dataset` | `datamodule.setup()` | `ds.data` | Yes |
 | `embedding` | `algorithm.transform()` | Embedding array | Yes |
 | `module` | `algorithm.fit()` | Fitted LatentModule | Yes (for LatentModules) |
-| `affinity` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
-| `kernel` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
-| `adjacency` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+| `affinity` | `algorithm.fit()` | output registry → `algorithm.affinity()` | No — algorithm-dependent |
+| `kernel` | `algorithm.fit()` | output registry → `algorithm.kernel()` | No — algorithm-dependent |
+| `adjacency` | `algorithm.fit()` | output registry → `algorithm.adjacency()` | No — algorithm-dependent |
+| `trajectories` | `algorithm.fit()` | output registry → `algorithm.trajectories` | No — algorithm-dependent |
 
-New outputs can be added by having a LatentModule return them from `extra_outputs()`. Metrics can immediately target them via `at: "<key>"` — no code changes needed in the evaluation pipeline.
+Two ways to add an output, and the first is the one to reach for:
+
+- **Generic** — register an extractor with `@register_output` in `manylatents/outputs.py`. It then runs against *any* algorithm that has the hook, whatever the algorithm inherits. The four above are registered this way; `list_outputs()` enumerates them without fitting anything.
+- **Algorithm-specific** — return it from that algorithm's `extra_outputs()` (PCA's robust decomposition, Reeb's node coordinates, Cflows' GRN head). Reserved for real per-algorithm computation, not attribute reads.
+
+`collect_outputs()` merges both, and metrics can immediately target either via `at: "<key>"` — no code changes needed in the evaluation pipeline.
+
+The split exists because generic behaviour used to live on `LatentModule.extra_outputs()`, which meant it reached exactly the classes that inherited it: MIOFlow is a LightningModule, computed `.trajectories`, and could never emit them (#295).
 
 ### Sampling positions
 
@@ -52,7 +61,7 @@ Sampling has two categories with different infrastructure:
 - **Pre-fit** (`sampling.dataset`): Fixed integration point in `run_experiment()` BEFORE `fit()`. Reduces what the algorithm sees. This is inherently positional — it changes the algorithm's input, not just what metrics evaluate on.
 - **Post-fit** (any other key): Dynamic loop in `evaluate()` over the `outputs` dict. Any array-valued output can be sampled. If `sampling.embedding` is configured, the dataset is auto-sliced to matching indices for cross-space metrics.
 
-Post-fit sampling uses the same dynamic resolution as metric routing — it iterates the sampling config, matches keys against the `outputs` dict, and applies the sampler to any matching array. New outputs from `extra_outputs()` are automatically sampleable.
+Post-fit sampling uses the same dynamic resolution as metric routing — it iterates the sampling config, matches keys against the `outputs` dict, and applies the sampler to any matching array. New outputs are automatically sampleable, whether they come from the registry or from `extra_outputs()`.
 
 The `get_indices()` method on samplers accepts `**kwargs` for future extensibility — complex samplers (e.g., diffusion condensation) may need access to the kNN cache, outputs dict, or fitted module to build their sampling operator.
 

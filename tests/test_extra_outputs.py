@@ -1,9 +1,16 @@
-"""Tests for LatentModule.extra_outputs() generic method."""
+"""Tests for LatentModule.extra_outputs() — the back-compat shim over the registry.
+
+The generic collect moved to `manylatents.outputs` (see tests/test_output_registry.py).
+The base method still performs it, which is what the first four tests pin; the two
+algorithm tests below now read the merged view the engine actually attaches, because
+their subclasses no longer fold the generics into their own extra_outputs().
+"""
 import numpy as np
 import pytest
 import torch
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
+from manylatents.outputs import collect_outputs
 
 
 class MinimalModule(LatentModule):
@@ -70,12 +77,14 @@ class TestExtraOutputsBase:
 
 class TestExtraOutputsPCA:
     def test_pca_includes_matrices(self):
+        """affinity/kernel are GENERIC outputs, so they come from the registry, not from
+        PCA's own extra_outputs(). `collect_outputs` is the union the engine attaches."""
         from manylatents.algorithms.latent import PCAModule
 
         data = torch.randn(30, 5)
         m = PCAModule(n_components=2)
         m.fit(data)
-        extras = m.extra_outputs()
+        extras = collect_outputs(m)
         assert "affinity" in extras or "kernel" in extras
 
 
@@ -92,7 +101,10 @@ class TestExtraOutputsReebGraph:
 
         m = ReebGraphModule(n_bins=5, random_state=42)
         m.fit(data)
-        extras = m.extra_outputs()
+        # `adjacency` is generic (registry), node_coordinates/structural_summary are
+        # Reeb's own — the shape agreement between the two halves is the assertion worth
+        # keeping, and it is only checkable against the merged dict.
+        extras = collect_outputs(m)
 
         assert "adjacency" in extras
         assert "node_coordinates" in extras

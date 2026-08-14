@@ -16,6 +16,7 @@ from lightning import (
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback
+from manylatents.outputs import collect_outputs
 from manylatents.utils.data import determine_data_source
 
 logger = logging.getLogger(__name__)
@@ -460,14 +461,16 @@ def run_experiment(
                 results.setdefault("scores", {}).update(model_metrics)
 
             # ---- 4g. Attach extra outputs from any algorithm that exposes them ----
-            # LatentModule declares extra_outputs() on the ABC; LightningModule
-            # algorithms (e.g. Cflows' GRN head) may define it too — merge either.
-            if hasattr(algorithm, "extra_outputs"):
-                extras = algorithm.extra_outputs()
-                for key, val in extras.items():
-                    results[key] = val
-                    shape_info = f" shape={val.shape}" if hasattr(val, "shape") else ""
-                    logger.info(f"Extra output attached: {key}{shape_info}")
+            # Two halves, one call. The GENERIC outputs (trajectories/affinity/
+            # adjacency/kernel) come from the registry in `manylatents.outputs`, so they
+            # no longer depend on the algorithm inheriting LatentModule — that inheritance
+            # is why MIOFlow's trajectories were unreachable (#295). ALGORITHM-SPECIFIC
+            # ones still come from the algorithm's own extra_outputs() (Cflows' GRN head).
+            # The `hasattr` gate is gone because collect_outputs() handles absence.
+            for key, val in collect_outputs(algorithm).items():
+                results[key] = val
+                shape_info = f" shape={val.shape}" if hasattr(val, "shape") else ""
+                logger.info(f"Extra output attached: {key}{shape_info}")
 
             # ---- 4h. Evaluate embedding metrics ----
             if metrics is not None:

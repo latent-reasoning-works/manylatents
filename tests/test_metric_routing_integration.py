@@ -122,6 +122,36 @@ def test_on_missing_output_skips_with_warning(caplog):
     assert "spectral_gap" not in result.get("scores", {})
 
 
+def test_on_generic_output_resolves_for_an_algorithm_that_produces_it():
+    """The positive twin of the test above, and the only thing that catches a revert
+    of evaluate.py's merge point.
+
+    `at: kernel` against PCA must RESOLVE. PCA produces a kernel, but it is a GENERIC
+    output — collected by the registry in `manylatents.outputs`, not by PCA's own
+    `extra_outputs()`. If evaluate.py went back to reading `module.extra_outputs()`
+    directly, this key would vanish from the outputs dict and the metric would be
+    silently skipped by the `continue` above, for PCA/Reeb/SelectiveCorrection only,
+    while continuing to work for PHATE/UMAP/tSNE. Nothing else in the suite notices.
+
+    Presence in `scores` is the assertion; the VALUE is SpectralGapRatio's business.
+    """
+    result = run(
+        data="swissroll",
+        algorithms=_PCA_ALGO,
+        metrics={
+            "spectral_gap": {
+                "_target_": "manylatents.metrics.spectral_gap_ratio.SpectralGapRatio",
+                "_partial_": True,
+                "at": "kernel",
+            }
+        },
+    )
+    assert "spectral_gap" in result.get("scores", {}), (
+        "at: kernel did not resolve for PCA — the generic outputs are missing from "
+        "evaluate.py's outputs dict"
+    )
+
+
 # ---------------------------------------------------------------------------
 # 5. Pre-fit sampling reduces data before algorithm fitting
 # ---------------------------------------------------------------------------
