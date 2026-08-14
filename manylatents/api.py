@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import functools
 import importlib
+import inspect
 import logging
 from typing import Any
 
@@ -115,7 +116,28 @@ def _lightning_config(name: str):
     return cfg if "_target_" in cfg else None
 
 
-def _instantiate_lightning(cfg, datamodule):
+def _target_accepts(target: str, key: str) -> bool:
+    """Whether the class named by a ``_target_`` string takes ``key`` as an argument.
+
+    True when it does, when it takes ``**kwargs``, and — deliberately — when we cannot tell:
+    an unimportable target, a `_target_` with no dot in it, or a C-level signature is a
+    failure of *our* introspection, and must not turn into a refusal of the caller's
+    argument. The only thing this is allowed to do is reject a key that the class
+    demonstrably does not have.
+    """
+    try:
+        module_path, class_name = target.rsplit(".", 1)
+        params = inspect.signature(
+            getattr(importlib.import_module(module_path), class_name)
+        ).parameters
+    except (ImportError, AttributeError, ValueError, TypeError):
+        return True
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return True
+    return key in params
+
+
+def _instantiate_lightning(cfg, datamodule, **overrides):
     """Build a LightningModule from a packaged config node.
 
     Nested `network` / `loss` / `optimizer` nodes are passed through AS CONFIGS, not
@@ -123,13 +145,65 @@ def _instantiate_lightning(cfg, datamodule):
     instantiate their own sub-components in ``setup()``, once the input dimension is known
     from the data. Converting them to plain dicts here would break that — `Reconstruction`
     reads ``self.network_config.input_dim`` by attribute.
+
+    ``overrides`` are the caller's ``**kwargs`` off :func:`run`, and used to be dropped on
+    the floor: `run(algorithms={'lightning': 'mioflow'}, n_global_epochs=3)` trained
+    mioflow.yaml's 100, and a misspelled parameter raised nothing at all — the same defect
+    the two latent string forms were each fixed for (api.py:242, api.py:285).
+
+    A nested dict PATCHES its node rather than replacing it, for two reasons: a bare dict
+    would trade the silent drop for an AttributeError in `setup()` (reconstruction.py:45
+    reads `network_config.input_dim` by attribute), and a wholesale replacement would
+    discard every sibling key the packaged config exists to supply — `network={'latent_dim':
+    3}` means "that one, keep the rest", not "here is a whole new network". A dict carrying a
+    DIFFERENT ``_target_`` is a deliberate swap of the component, so that one replaces.
+
+    A key inside a patch is checked against the node target's SIGNATURE, not against the keys
+    the yaml happens to write, because those are not the same set: `cflows.yaml`'s optimizer
+    node lists only `lr`, yet `torch.optim.Adam` takes `weight_decay`, and refusing that
+    would make a routine override unreachable through the only form that patches. Checking
+    here rather than letting `hydra_zen.instantiate` raise buys the error a full dataload
+    earlier, in the caller's vocabulary rather than hydra's.
+
+    TWO SIDE EFFECTS OF FORWARDING AT ALL, both measured and both benign, named here because
+    "the kwargs now arrive" does not imply either:
+
+    * A caller passing hydra's own meta-key ``_recursive_=True`` now raises ``TypeError`` from
+      the constructor. It was silently dropped before, because ``_META_KEYS`` strips meta-keys
+      from the YAML side only, never from an override. A meta-key in ``**kwargs`` was always
+      a mistake; it now says so.
+    * A dict override for a key with no ``DictConfig`` node in the packaged yaml arrives as a
+      ``DictConfig`` rather than a plain dict (``sample_size={'a': 1}``, say). It matters only
+      for a constructor that type-checks its argument, and no current one does.
     """
+    from omegaconf import DictConfig, OmegaConf
+
     target = str(cfg["_target_"])
     # Skip `datamodule` by KEY rather than reading and overriding it: OmegaConf resolves
     # interpolations on value access, so merely iterating `.items()` raises
     # InterpolationKeyError on `${data}`. We supply the real datamodule below regardless.
     kwargs = {k: cfg[k] for k in cfg.keys()
               if k not in _META_KEYS and k != "datamodule"}
+    for key, value in overrides.items():
+        node = kwargs.get(key)
+        if isinstance(value, (dict, DictConfig)) and isinstance(node, DictConfig):
+            node_target = node.get("_target_")
+            if value.get("_target_", node_target) != node_target:
+                kwargs[key] = OmegaConf.create(dict(value))
+                continue
+            for sub in value:
+                if sub not in node and not _target_accepts(str(node_target), str(sub)):
+                    raise TypeError(
+                        f"{node_target} got unexpected keyword argument '{sub}' from the "
+                        f"`{key}=` override. Check the spelling — a key that is in neither "
+                        f"the packaged config nor the target's signature survives the merge "
+                        f"and only fails later, inside setup()."
+                    )
+            kwargs[key] = OmegaConf.merge(node, value)
+        elif isinstance(value, (dict, DictConfig)):
+            kwargs[key] = OmegaConf.create(dict(value))
+        else:
+            kwargs[key] = value
     kwargs["datamodule"] = datamodule
     module_path, class_name = target.rsplit(".", 1)
     cls = getattr(importlib.import_module(module_path), class_name)
@@ -233,7 +307,36 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
         if algo_type == "lightning":
             cfg = _lightning_config(algo_value)
             if cfg is not None:
-                return _instantiate_lightning(cfg, datamodule)
+                # Forwarding `kwargs` is what makes this string form agree with the two
+                # latent string forms above, each of which fixed an earlier round of the same
+                # bug. Without it the packaged yaml won every argument the caller named:
+                # `run(algorithms={'lightning': 'mioflow'}, n_global_epochs=3)` trained 100,
+                # and a misspelled parameter raised nothing at all, so a typo and a
+                # deliberate default were the same observable.
+                if seed is not None:
+                    # The latent branches carry `seed` to the module as `random_state`, which
+                    # the base class stores as `init_seed` (latent_module_base.py:46-47).
+                    # Lightning modules seed their own weight init from `init_seed` in
+                    # `configure_model` (reconstruction.py:66, mioflow.py:123, cflows.py:172,
+                    # latent_ode.py:67) and do it AFTER experiment.py:232's
+                    # `seed_everything(seed)`, so they OVERRIDE the global seed:
+                    # `run(seed=7, algorithms={'lightning': ...})` initialised at 42 anyway,
+                    # and `seed` was a no-op over the one thing it most obviously names.
+                    # `setdefault`, so an explicit `init_seed=` still wins, and at the
+                    # default seed this line changes nothing — but BOTH halves of the original
+                    # claim here were false and are corrected rather than dropped:
+                    #   * `distillation/{base,staged,control_task_only}.yaml` DO declare
+                    #     `init_seed: 42`. Harmless today (42 is also `run`'s default, and all
+                    #     three fail earlier on `MissingMandatoryValue: student`), but a yaml
+                    #     value would now be overridden by `seed` for any caller who fixed that.
+                    #   * `HFTrainerModule.__init__(self, config, datamodule=None)`
+                    #     (lightning/hf_trainer.py:54) accepts neither `init_seed` nor
+                    #     `**kwargs`, and `hf_trainer.yaml` carries a `_target_`, so it IS
+                    #     reachable — it now raises TypeError naming the class instead of
+                    #     ConfigValueError from `save_hyperparameters`. Louder, and still a
+                    #     failure either way.
+                    kwargs.setdefault("init_seed", seed)
+                return _instantiate_lightning(cfg, datamodule, **kwargs)
 
         raise ValueError(
             f"Algorithm '{algo_value}' not found in registry. "
@@ -358,7 +461,8 @@ def run(
         input_data: In-memory array (wraps in PrecomputedDataModule).
         data: Dataset name (e.g. ``"swissroll"``).
         algorithm: String name (``"pca"``), or pre-built instance.
-        algorithms: Dict config, e.g. ``{"latent": "pca"}`` or
+        algorithms: Dict config, e.g. ``{"latent": "pca"}``,
+            ``{"lightning": "mioflow"}``, or
             ``{"latent": {"_target_": "...", "n_components": 2}}``.
         metrics: ``list[str]`` of registry names, ``dict`` of configs
             with ``_target_``, ``str`` bundle name, or ``None``.
@@ -374,13 +478,30 @@ def run(
             make ``n_components`` ambiguous. Unknown keys raise from the DataModule rather
             than being dropped.
         **kwargs: Constructor arguments for the ALGORITHM (``n_components``, ``knn``,
-            ``n_landmark``, ``resolution``, …), on **both** string forms —
-            ``algorithm='pca'`` and ``algorithms={'latent': 'pca'}``. Previously nothing but
-            ``neighborhood_size`` was forwarded on either, so ``run(algorithm='pca',
-            n_components=5)`` quietly returned two columns.
+            ``n_landmark``, ``resolution``, …), on **every** string form —
+            ``algorithm='pca'``, ``algorithms={'latent': 'pca'}`` and
+            ``algorithms={'lightning': 'mioflow'}``. Previously nothing but
+            ``neighborhood_size`` was forwarded on the latent forms, so
+            ``run(algorithm='pca', n_components=5)`` quietly returned two columns; the
+            lightning form forwarded nothing at all.
 
             A ``_target_`` dict is self-contained and does not consume these: put the
             arguments inside the dict instead.
+
+            On the ``lightning`` key the arguments go to the LightningModule constructor
+            (``n_global_epochs``, ``lambda_ot``, ``integration_times``, ``init_seed``, …). A
+            nested node is PATCHED, not replaced: ``network={'latent_dim': 3}`` overrides
+            that one key and keeps the packaged config's ``_target_`` and siblings. Pass a
+            different ``_target_`` inside the node to swap the component wholesale.
+
+            ``neighborhood_size`` is the one argument the lightning path still drops. It is
+            NOT a named parameter of ``run`` — ``run``'s signature is ``(input_data, data,
+            algorithm, algorithms, metrics, sampling, seed, time, data_kwargs, **kwargs)`` — it
+            reaches ``_resolve_algorithm`` as a named parameter of THAT (api.py:213) out of
+            ``**kwargs``. It is dropped because no LightningModule accepts it and forwarding it
+            would break a mixed latent+lightning sweep that sets one value for both. Measured:
+            ``neighborhood_size=5`` on the lightning path is silently ignored and does not
+            raise.
 
             Dataset generation parameters go through ``data_kwargs`` — the two are separate
             channels because ``n_components`` would otherwise be ambiguous between them.
@@ -394,6 +515,8 @@ def run(
         >>> result = run(input_data=array, algorithm=PCAModule(n_components=5))
         >>> result = run(data='gaussian_blob', algorithm='pca',
         ...              data_kwargs={'centers': 5, 'cluster_std': 0.4})
+        >>> result = run(data='swissroll', algorithms={'lightning': 'mioflow'},
+        ...              n_global_epochs=3, network={'hidden_dim': 32})
     """
     from lightning import Trainer
     from manylatents.experiment import run_experiment

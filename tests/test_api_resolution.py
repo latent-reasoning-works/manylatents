@@ -318,6 +318,115 @@ def test_run_lightning_by_name_end_to_end():
     assert np.asarray(out["embeddings"]).shape[0] > 0
 
 
+def test_lightning_string_form_forwards_kwargs():
+    """A declared parameter reaches the module on `algorithms={'lightning': ...}`.
+
+    Regression: the lightning branch called `_instantiate_lightning(cfg, datamodule)` and
+    never passed `**kwargs`, so the packaged yaml won every argument the caller named.
+    Measured on the broken code, `algorithms={'lightning': 'mioflow'}` with
+    `n_global_epochs=3, lambda_energy=0.5, n_bins=7` trained mioflow.yaml's 100 / 0.01 / 100.
+    The two latent string forms above (api.py:242, api.py:285 — the two `algo_kwargs =
+    dict(kwargs)` lines) each already forward, after
+    two earlier rounds of exactly this bug — this key was the one added later and missed.
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    algo = _resolve_algorithm(algorithms={"lightning": "mioflow"}, datamodule=dm,
+                              n_global_epochs=3, lambda_energy=0.5, n_bins=7)
+    assert (algo.n_global_epochs, algo.lambda_energy, algo.n_bins) == (3, 0.5, 7)
+
+
+def test_lightning_unknown_kwarg_raises_rather_than_vanishing():
+    """A misspelling must be distinguishable from a default, as it is for latent modules.
+
+    `{'latent': 'pca'}` with a bogus key raises TypeError from latent_module_base.py:54;
+    `{'lightning': 'mioflow'}` raised nothing at all and returned a default MIOFlow, so a
+    typo and a deliberate default were the same observable.
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    with pytest.raises(TypeError, match="not_a_real_param"):
+        _resolve_algorithm(algorithms={"lightning": "mioflow"}, datamodule=dm,
+                           not_a_real_param=1)
+
+
+def test_lightning_nested_override_patches_the_node():
+    """`network={'latent_dim': 4}` overrides one key and keeps the rest of the node.
+
+    Replacing the node with the caller's bare dict would drop every sibling the packaged
+    config exists to supply, and would break `setup()`, which reads
+    `self.network_config.input_dim` by ATTRIBUTE (reconstruction.py:45).
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    algo = _resolve_algorithm(algorithms={"lightning": "cflows"}, datamodule=dm,
+                              network={"latent_dim": 4})
+    assert algo.network_config.latent_dim == 4
+    assert algo.network_config.hidden_dim == 128      # sibling survived the patch
+    assert "_target_" in algo.network_config          # so did the class it names
+    assert algo.network_config.input_dim is None      # attribute access, not dict indexing
+
+
+def test_lightning_nested_unknown_key_raises():
+    """A typo inside a nested node fails at resolve time, naming the class that refused it.
+
+    Without this the merged node carries `ltent_dim` all the way to `setup()`, where
+    `hydra_zen.instantiate` raises during `trainer.fit` — a full dataload later, and wrapped
+    in an InstantiationException that names hydra rather than the caller's argument.
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    with pytest.raises(TypeError, match="ltent_dim"):
+        _resolve_algorithm(algorithms={"lightning": "cflows"}, datamodule=dm,
+                           network={"ltent_dim": 4})
+
+
+def test_lightning_nested_override_may_add_a_key_the_config_omits():
+    """A key the packaged yaml never wrote is legal if the target class takes it.
+
+    The check is against the `_target_`'s SIGNATURE, not against the keys the yaml happens
+    to list: `cflows.yaml`'s optimizer node writes only `lr`, but `torch.optim.Adam` takes
+    `weight_decay`, and rejecting it would make a routine override unreachable through the
+    only form that patches (the `_target_` dict form replaces the whole node).
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    algo = _resolve_algorithm(algorithms={"lightning": "cflows"}, datamodule=dm,
+                              optimizer={"weight_decay": 1e-4})
+    assert algo.optimizer_config.weight_decay == 1e-4
+    assert algo.optimizer_config.lr == 0.001          # sibling survived
+    assert algo.optimizer_config._partial_ is True    # and so did the meta-key
+
+
+def test_run_lightning_override_changes_the_answer():
+    """End-to-end: a declared parameter changes the result, not just the object.
+
+    Cheapest observable, one training run: ae_reconstruction's embedding width IS
+    `network.latent_dim`, which the packaged config sets to 50.
+    """
+    from manylatents.api import run
+    out = run(data="gaussian_blob", algorithms={"lightning": "ae_reconstruction"},
+              data_kwargs={"n_samples": 60}, network={"latent_dim": 3})
+    assert np.asarray(out["embeddings"]).shape == (60, 3)
+
+
+def test_lightning_seed_reaches_init_seed():
+    """`seed=` reaches weight init on the lightning path, as it does on the latent one.
+
+    Lightning modules seed their own weight init from `init_seed` in `configure_model`
+    (reconstruction.py:66, mioflow.py:123, cflows.py:172), and they do it AFTER
+    `experiment.py` calls `seed_everything(seed)` — so they OVERRIDE the global seed and
+    `run(seed=7, algorithms={'lightning': ...})` initialised at 42 regardless.
+    """
+    from manylatents.api import _resolve_algorithm, _resolve_datamodule
+    dm = _resolve_datamodule(data="gaussian_blob", n_samples=60)
+    assert _resolve_algorithm(algorithms={"lightning": "mioflow"}, datamodule=dm,
+                              seed=7).init_seed == 7
+    # An explicit init_seed beats the run-wide seed.
+    assert _resolve_algorithm(algorithms={"lightning": "mioflow"}, datamodule=dm,
+                              seed=7, init_seed=11).init_seed == 11
+
+
 def test_resolve_algorithm_by_name():
     """String name resolves via algorithm registry."""
     from manylatents.api import _resolve_algorithm
