@@ -149,7 +149,7 @@ def _instantiate_lightning(cfg, datamodule, **overrides):
     ``overrides`` are the caller's ``**kwargs`` off :func:`run`, and used to be dropped on
     the floor: `run(algorithms={'lightning': 'mioflow'}, n_global_epochs=3)` trained
     mioflow.yaml's 100, and a misspelled parameter raised nothing at all — the same defect
-    the two latent string forms were each fixed for (api.py:225, api.py:268).
+    the two latent string forms were each fixed for (api.py:242, api.py:285).
 
     A nested dict PATCHES its node rather than replacing it, for two reasons: a bare dict
     would trade the silent drop for an AttributeError in `setup()` (reconstruction.py:45
@@ -497,7 +497,7 @@ def run(
             ``neighborhood_size`` is the one argument the lightning path still drops. It is
             NOT a named parameter of ``run`` — ``run``'s signature is ``(input_data, data,
             algorithm, algorithms, metrics, sampling, seed, time, data_kwargs, **kwargs)`` — it
-            reaches ``_resolve_algorithm`` as a named parameter of THAT (api.py:202) out of
+            reaches ``_resolve_algorithm`` as a named parameter of THAT (api.py:213) out of
             ``**kwargs``. It is dropped because no LightningModule accepts it and forwarding it
             would break a mixed latent+lightning sweep that sets one value for both. Measured:
             ``neighborhood_size=5`` on the lightning path is silently ignored and does not

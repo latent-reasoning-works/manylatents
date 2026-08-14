@@ -325,7 +325,7 @@ def test_lightning_string_form_forwards_kwargs():
     never passed `**kwargs`, so the packaged yaml won every argument the caller named.
     Measured on the broken code, `algorithms={'lightning': 'mioflow'}` with
     `n_global_epochs=3, lambda_energy=0.5, n_bins=7` trained mioflow.yaml's 100 / 0.01 / 100.
-    The two latent string forms above (api.py:231, api.py:274 — the two `algo_kwargs =
+    The two latent string forms above (api.py:242, api.py:285 — the two `algo_kwargs =
     dict(kwargs)` lines) each already forward, after
     two earlier rounds of exactly this bug — this key was the one added later and missed.
     """
@@ -339,7 +339,7 @@ def test_lightning_string_form_forwards_kwargs():
 def test_lightning_unknown_kwarg_raises_rather_than_vanishing():
     """A misspelling must be distinguishable from a default, as it is for latent modules.
 
-    `{'latent': 'pca'}` with a bogus key raises TypeError from latent_module_base.py:52;
+    `{'latent': 'pca'}` with a bogus key raises TypeError from latent_module_base.py:54;
     `{'lightning': 'mioflow'}` raised nothing at all and returned a default MIOFlow, so a
     typo and a deliberate default were the same observable.
     """
