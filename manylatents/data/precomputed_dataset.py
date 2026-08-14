@@ -37,7 +37,14 @@ class InMemoryDataset(Dataset):
             labels (torch.Tensor, optional): Optional labels tensor
             time (torch.Tensor, optional): Optional per-cell timepoint labels. Registered
                 in ``embedding_outputs`` so each batch dict carries a ``"time"`` key —
-                the seam trajectory algorithms (LatentODE, Cflows) read in ``shared_step``.
+                the seam ``Cflows`` reads in ``shared_step`` and ``MIOFlow`` in
+                ``_group_by_time``. (Not ``LatentODE``: it integrates over its
+                ``integration_times`` hyperparameter and ignores the batch's time.)
+                Kept separate from ``labels``/``"label"`` on purpose — that key is the
+                colouring + metric channel (``experiment.py:286``,
+                ``metrics/silhouette.py:81``, ``metrics/auc.py:59``,
+                ``callbacks/embedding/plot_embeddings.py:319``), so a timepoint written
+                there would silently recolour every plot and feed the metrics a clock.
         """
         self.data = data_tensor
         self.embedding_outputs = {"embeddings": data_tensor}

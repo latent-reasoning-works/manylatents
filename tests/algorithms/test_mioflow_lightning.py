@@ -78,6 +78,50 @@ class TestMIOFlowLightningModule:
         assert groups[2][1] == 1.0
         assert groups[0][0].shape == (20, 5)
 
+    def test_group_by_time_reads_the_time_key(self, mioflow_module, time_labeled_batch):
+        """`api.run(time=...)` batches carry 'time', not 'label'/'labels' (#281).
+
+        Before the fix this raised KeyError on a batch whose keys were
+        ['data', 'embeddings', 'time'] — the timepoints were right there.
+        """
+        batch = {"data": time_labeled_batch["data"], "time": time_labeled_batch["labels"]}
+        groups = mioflow_module._group_by_time(batch)
+        assert len(groups) == 3
+        assert [t for _, t in groups] == pytest.approx([0.0, 0.5, 1.0])
+
+    def test_time_wins_over_a_class_label(self, mioflow_module):
+        """'time' is the unambiguous key, so it must beat a co-present class label.
+
+        Measured before the fix: 2 groups (one per cell type) and a "flow" trained
+        between cell types — a well-formed wrong answer, not a crash.
+        """
+        x = torch.randn(12, 5)
+        celltype = torch.tensor([0.0] * 6 + [1.0] * 6)
+        timepoint = torch.tensor([0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0])
+        groups = mioflow_module._group_by_time(
+            {"data": x, "label": celltype, "time": timepoint}
+        )
+        assert [t for _, t in groups] == pytest.approx([0.0, 1.0, 2.0, 3.0])
+
+    def test_label_and_labels_still_work(self, mioflow_module, time_labeled_batch):
+        """geomancer's `pipeline/mioflow.py:97` emits the timepoint under 'label'.
+
+        Cited against geomancer `main`, deliberately: an earlier revision of this line pointed
+        at a line number read off an UNMERGED geomancer branch, where the same statement sits at
+        223 because that branch grew the file — and got even that wrong by eight. A cross-repo
+        citation has to name the other repo's shipped state or it is unresolvable by anyone but
+        the person who wrote it.
+        """
+        d = time_labeled_batch["data"]
+        t = time_labeled_batch["labels"]
+        for key in ("label", "labels"):
+            groups = mioflow_module._group_by_time({"data": d, key: t})
+            assert [g for _, g in groups] == pytest.approx([0.0, 0.5, 1.0]), key
+
+    def test_missing_timepoint_error_names_time_first(self, mioflow_module):
+        with pytest.raises(KeyError, match="'time'"):
+            mioflow_module._group_by_time({"data": torch.randn(4, 5)})
+
     def test_local_step(self, mioflow_module, time_labeled_batch):
         """Test local training step returns valid loss dict."""
         mioflow_module.setup()
@@ -285,3 +329,43 @@ class TestMIOFlowThroughRunExperiment:
         assert emb.ndim == 2, f"expected 2-D embeddings, got shape {emb.shape}"
         assert emb.shape == (60, 5), f"unexpected embedding shape {emb.shape}"
         assert np.isfinite(emb).all(), "embeddings contain NaN/Inf"
+
+    def test_mioflow_trains_from_the_time_channel(self):
+        """PrecomputedDataModule(time=t) -> MIOFlow, the path that used to KeyError.
+
+        The test above hand-rolls a datamodule that emits 'label'; this one drives the
+        REAL in-memory datamodule, i.e. what `api.run(..., time=t)` builds. That path
+        emits {'data', 'embeddings', 'time'} and nothing else, so before the fix it
+        died in `_group_by_time` before a single optimizer step.
+        """
+        import numpy as np
+        from lightning import Trainer
+
+        from manylatents.api import _instantiate_lightning, _lightning_config
+        from manylatents.callbacks.embedding.base import validate_latent_outputs
+        from manylatents.data.precomputed_datamodule import PrecomputedDataModule
+        from manylatents.experiment import run_experiment
+
+        rng = np.random.default_rng(0)
+        X = np.concatenate([rng.normal(t, 0.3, (10, 6)) for t in range(4)]).astype(np.float32)
+        t = np.repeat(np.arange(4), 10).astype(float)
+
+        dm = PrecomputedDataModule(data=X, time=t, batch_size=len(X))
+        cfg = _lightning_config("mioflow")
+        cfg["n_global_epochs"] = 3
+        model = _instantiate_lightning(cfg, dm)
+        # accelerator="cpu" for the same reason as the test above: "auto" picks MPS on
+        # macOS and torchdiffeq's float64 tolerances crash. This test therefore does NOT
+        # cover `api.run`'s own Trainer(accelerator="auto") — that MPS crash is separate
+        # and pre-existing.
+        trainer = Trainer(
+            accelerator="cpu", devices=1, max_epochs=3, logger=False,
+            enable_checkpointing=False, enable_progress_bar=False,
+            enable_model_summary=False, num_sanity_val_steps=0,
+        )
+        result = run_experiment(datamodule=dm, algorithm=model, trainer=trainer, seed=0)
+
+        validate_latent_outputs(result)
+        emb = np.asarray(result["embeddings"])
+        assert emb.shape == (40, 6)
+        assert np.isfinite(emb).all()
