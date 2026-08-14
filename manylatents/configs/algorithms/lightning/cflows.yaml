@@ -30,3 +30,24 @@ loss:
 integration_times: [0.0, 1.0]
 lambda_density: 1.0
 lambda_energy: 0.0
+
+# --- Granger GRN head ------------------------------------------------------ #
+# Where the time axis came from. NO DEFAULT ON PURPOSE: left null, the head emits
+# no graph at all. A Granger test cannot tell a measured time axis from an
+# ordering derived from the data under test and returns a confident p-value
+# either way (12/12 seeds on pure noise) -- so the run has to say which it has.
+#   measured: the ordering carries information from outside the expression matrix
+#             (collection times, hours post treatment, passage number).
+#   derived:  the ordering was computed from that same matrix (a pseudotime, a
+#             diffusion ordering, an embedding coordinate's rank). Refused unless
+#             grn_allow_derived_time_axis is also set, and then the graph is
+#             marked NOT-CAUSAL in its provenance.
+# See manylatents/algorithms/grn.py and geomancer/docs/granger-verdict.md.
+grn_time_axis: null
+grn_allow_derived_time_axis: false
+# Gene selection and edge thresholding: the maths is not implemented yet, so
+# these must stay null (all genes, all edges -- the estimator's current dense
+# G*(G-1) output). See manylatents.algorithms.grn.select_genes / threshold_edges.
+grn_n_top_genes: null
+grn_alpha: null
+grn_top_k: null

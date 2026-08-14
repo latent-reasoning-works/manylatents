@@ -139,6 +139,11 @@ def _build_model(dm, seed: int = 42) -> Cflows:
         grn_n_bins=64,
         grn_downsample=1,
         grn_direction="forward",
+        # The fixture assigns each cell a collection timepoint k (see _make_data),
+        # standing in for a real experimental clock rather than an ordering read
+        # back out of the expression matrix -- so "measured" is the honest
+        # declaration here. extra_outputs() emits nothing without it.
+        grn_time_axis="measured",
     )
 
 
@@ -190,8 +195,16 @@ def test_cflows_grn_head_end_to_end():
     assert traj.shape == (n_bins, x0.shape[0], N_GENES)
 
     out = model.extra_outputs()
-    assert set(out) == {"grn_edges", "grn_weights", "grn_node_ids"}, out.keys()
+    assert set(out) == {
+        "grn_edges",
+        "grn_weights",
+        "grn_node_ids",
+        "grn_provenance",
+    }, out.keys()
     edges, weights, node_ids = out["grn_edges"], out["grn_weights"], out["grn_node_ids"]
+
+    # The time-axis declaration travels with the graph, leading the provenance.
+    assert out["grn_provenance"][0] == "granger:time_axis=measured"
 
     # Shapes valid for manykinds.SparseGraph.
     assert edges.ndim == 2 and edges.shape[1] == 2

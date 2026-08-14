@@ -121,6 +121,12 @@ class Cflows(LightningModule):
         grn_n_bins: int = 64,
         grn_downsample: int = 1,
         grn_direction: str = "forward",
+        grn_time_axis: str | None = None,
+        grn_allow_derived_time_axis: bool = False,
+        grn_n_top_genes: int | None = None,
+        grn_flavor: str = "variance",
+        grn_alpha: float | None = None,
+        grn_top_k: int | None = None,
     ):
         super().__init__()
         self.datamodule = datamodule
@@ -143,6 +149,18 @@ class Cflows(LightningModule):
         self.grn_n_bins = grn_n_bins          # fine time grid for the decoded trajectory
         self.grn_downsample = grn_downsample  # granger ::downsample (1 for our own grid)
         self.grn_direction = grn_direction    # "forward" (t_min->t_max) or "backward"
+        # Provenance of the fit timepoints: "measured" | "derived". NO DEFAULT --
+        # extra_outputs() emits nothing until it is stated. The integration grid is a
+        # reparametrisation of the fit times (linspace between their min and max), and a
+        # reparametrisation cannot create measurement, so the grid inherits whatever
+        # datamodule.time_tensor was. The model cannot know which; whoever configures the
+        # run does. See manylatents.algorithms.grn.require_time_axis.
+        self.grn_time_axis = grn_time_axis
+        self.grn_allow_derived_time_axis = grn_allow_derived_time_axis
+        self.grn_n_top_genes = grn_n_top_genes  # gene selection (None = every gene)
+        self.grn_flavor = grn_flavor            # gene-selection rule
+        self.grn_alpha = grn_alpha              # edge threshold (None = keep all)
+        self.grn_top_k = grn_top_k              # edge threshold (None = keep all)
 
         self.save_hyperparameters(ignore=["datamodule", "network", "loss"])
         self.network: nn.Module | None = None
@@ -400,15 +418,23 @@ class Cflows(LightningModule):
         :func:`~manylatents.algorithms.cflows_granger.granger_grn`.
 
         Returns:
-            ``{"grn_edges", "grn_weights", "grn_node_ids"}`` — the exact triple
-            that feeds ``manykinds.SparseGraph`` (int ``(E, 2)`` edges into
-            ``node_ids``, one aligned float weight per edge). Returns ``{}`` if no
-            fit has happened yet, or if the estimator / trajectory is unavailable
-            (guarded — never crashes the run).
+            ``{"grn_edges", "grn_weights", "grn_node_ids", "grn_provenance"}`` —
+            the triple that feeds ``manykinds.SparseGraph`` (int ``(E, 2)`` edges
+            into ``node_ids``, one aligned float weight per edge) plus the
+            provenance tuple that graph must carry. Returns ``{}`` if no fit has
+            happened yet, if the estimator / trajectory is unavailable, or if
+            ``grn_time_axis`` was not stated (guarded — never crashes the run).
 
         ``gene_names`` default to ``range(n_genes)`` unless ``grn_gene_names`` is
         set; ``grn_regulators`` / ``grn_targets`` default (``None``) to *all genes
         are both regulators and targets*.
+
+        **``grn_time_axis`` has no default and this method emits nothing without
+        it.** A Granger test cannot tell a measured time axis from an ordering
+        derived from the data under test, and returns a confident p-value either
+        way — on pure noise, 12/12 seeds. The model cannot know which kind
+        ``datamodule.time_tensor`` holds, so the run's configuration must say. See
+        :func:`manylatents.algorithms.grn.require_time_axis`.
         """
         if self.network is None:
             return {}
@@ -418,9 +444,23 @@ class Cflows(LightningModule):
             return {}  # no fit yet -> nothing to integrate
 
         try:
-            from manylatents.algorithms.cflows_granger import granger_grn
+            from manylatents.algorithms.grn import (
+                granger_grn_from_expression,
+                require_time_axis,
+            )
         except Exception as exc:  # estimator deps (statsmodels) missing, etc.
-            logger.warning("granger_grn unavailable (%s); extra_outputs() -> {}", exc)
+            logger.warning("GRN operation unavailable (%s); extra_outputs() -> {}", exc)
+            return {}
+
+        # Refused BEFORE any work, and reported separately from a degenerate
+        # trajectory: "nobody said where the time axis came from" is a
+        # configuration gap, not a numerical failure.
+        try:
+            require_time_axis(
+                self.grn_time_axis, allow_derived=self.grn_allow_derived_time_axis
+            )
+        except ValueError as exc:
+            logger.warning("GRN head refused: %s; extra_outputs() -> {}", exc)
             return {}
 
         try:
@@ -443,18 +483,28 @@ class Cflows(LightningModule):
             gene_names = (
                 self.grn_gene_names if self.grn_gene_names is not None else list(range(n_genes))
             )
-            edges, node_ids, weights = granger_grn(
+            edges, node_ids, weights, provenance = granger_grn_from_expression(
                 gene_traj_np,
                 gene_names,
-                regulators=self.grn_regulators,
-                targets=self.grn_targets,
+                time_axis=self.grn_time_axis,
+                allow_derived=self.grn_allow_derived_time_axis,
+                n_top_genes=self.grn_n_top_genes,
+                flavor=self.grn_flavor,
                 downsample=max(int(self.grn_downsample), 1),
+                alpha=self.grn_alpha,
+                top_k=self.grn_top_k,
+                with_provenance=True,
             )
         except Exception as exc:  # degenerate trajectory / solver / estimator failure
             logger.warning("GRN head failed (%s); extra_outputs() -> {}", exc)
             return {}
 
-        return {"grn_edges": edges, "grn_weights": weights, "grn_node_ids": node_ids}
+        return {
+            "grn_edges": edges,
+            "grn_weights": weights,
+            "grn_node_ids": node_ids,
+            "grn_provenance": provenance,
+        }
 
     # ------------------------------------------------------------------ #
     # Optimizer (mirrors LatentODE)
