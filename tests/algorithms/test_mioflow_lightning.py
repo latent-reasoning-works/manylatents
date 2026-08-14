@@ -104,7 +104,14 @@ class TestMIOFlowLightningModule:
         assert [t for _, t in groups] == pytest.approx([0.0, 1.0, 2.0, 3.0])
 
     def test_label_and_labels_still_work(self, mioflow_module, time_labeled_batch):
-        """geomancer's `pipeline/mioflow.py:215` emits the timepoint under 'label'."""
+        """geomancer's `pipeline/mioflow.py:97` emits the timepoint under 'label'.
+
+        Cited against geomancer `main`, deliberately: an earlier revision of this line pointed
+        at a line number read off an UNMERGED geomancer branch, where the same statement sits at
+        223 because that branch grew the file — and got even that wrong by eight. A cross-repo
+        citation has to name the other repo's shipped state or it is unresolvable by anyone but
+        the person who wrote it.
+        """
         d = time_labeled_batch["data"]
         t = time_labeled_batch["labels"]
         for key in ("label", "labels"):

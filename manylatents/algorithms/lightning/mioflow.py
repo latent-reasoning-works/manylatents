@@ -141,7 +141,7 @@ class MIOFlow(LightningModule):
           'embeddings', 'time']`` — that carried the timepoints all along.
         - ``"labels"`` (plural) — MIOFlow's own prototype datamodules.
         - ``"label"`` (singular) — the manyLatents op-contract key; geomancer's
-          ``pipeline/mioflow.py:215`` still emits the timepoint under it.
+          ``pipeline/mioflow.py:97`` (on geomancer ``main``) still emits it under that key.
 
         ``"time"`` wins because it is the only *unambiguous* one — ``"label"`` is
         also the colouring/metric channel. Measured before this change: a batch
