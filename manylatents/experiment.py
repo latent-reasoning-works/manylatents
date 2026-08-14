@@ -417,6 +417,29 @@ def run_experiment(
             else:
                 logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method — skipping")
 
+        else:
+            # NEITHER BRANCH MATCHED, and until now that was SILENT. `latents` stayed None, the
+            # `if latents is not None` guard below skipped packaging, and `run_experiment`
+            # returned a results dict with no embeddings, no error and no log line saying why —
+            # indistinguishable from an algorithm that ran and produced nothing.
+            #
+            # It is reachable: the two branches above are the only ones, so any algorithm that
+            # is not a `LatentModule` or a `LightningModule` lands here. A second GPU substrate
+            # (a JAX module, say) hits it on its first run.
+            #
+            # Refusing by NAME rather than logging: a caller who passed the wrong object gets a
+            # sentence naming what it was and what the engine accepts, at the point of failure.
+            # The capability hooks (`encode`, `extra_outputs`, `test_step`, `fit_fraction`) are
+            # all `hasattr` and so already framework-free — it is only this dispatch that is
+            # bound to two base classes. Whether that should become a protocol is a design
+            # question, deliberately not answered here.
+            raise TypeError(
+                f"run_experiment() cannot fit {type(algorithm).__name__}: it is neither a "
+                f"LatentModule (fit/transform) nor a LightningModule (trainer.fit + encode). "
+                f"Those are the two shapes the fit dispatch knows; an algorithm outside both "
+                f"produces no embeddings and cannot be packaged into a result."
+            )
+
         step_time = time.perf_counter() - t_step_start
 
         # ---- 4f. Package results ----
