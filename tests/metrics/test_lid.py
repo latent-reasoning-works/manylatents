@@ -102,15 +102,22 @@ def test_a_duplicate_heavy_cloud_no_longer_reports_a_sub_unit_dimension():
     assert 3.0 < lid(x, k=20) < 8.0
 
 
-def test_duplicate_distances_are_decided_by_round_off_not_by_geometry():
+def test_a_duplicate_neighbour_is_never_geometry_whichever_way_it_lands():
     """Why no choice of epsilon could have fixed this.
 
     ``compute_knn`` expands ``||a||^2 + ||b||^2 - 2a.b``, so the true zero
-    distance between two duplicate rows comes back as exactly 0 for some pairs
-    and as a cancellation residue (~1e-7 here) for others — decided by
-    floating-point luck, not by the data. The old estimator's epsilon governed
-    only the first group; the second got a LID computed off round-off. Both
-    read as a sub-unit "dimension" in a 64-dimensional space.
+    distance between two duplicate rows comes back either as exactly 0 or as a
+    cancellation residue — and which one is decided by the BLAS and backend, not
+    by the data. On this fixture CI sees 100% exact zeros while a local
+    sklearn/OpenBLAS build sees 37% zeros and 63% residues at ~1.7e-07.
+
+    That environment dependence is the argument. An epsilon governs only the
+    exact-zero half: rows landing on a residue ignore it and get a LID computed
+    off float32 round-off instead. Neither half is dropped, and both report a
+    sub-unit "dimension" in a 64-dimensional space. So the split ratio is
+    deliberately observed here rather than asserted — what must hold everywhere
+    is that the duplicate neighbour is never at a geometric distance, and that
+    the old estimator's answer is not a dimension.
     """
     from manylatents.utils.metrics import compute_knn
 
@@ -118,15 +125,17 @@ def test_duplicate_distances_are_decided_by_round_off_not_by_geometry():
     x = np.concatenate([base, base])  # every row has exactly one exact duplicate
 
     d, _ = compute_knn(np.ascontiguousarray(x, dtype=np.float32), k=20, include_self=False)
-    exact_zero = d[:, 0] == 0.0
-    assert 0.0 < exact_zero.mean() < 1.0, (
-        "the split is the point: a true zero distance surfaces as 0 for some "
-        "duplicate pairs and as round-off for others"
+    assert d[:, 0].max() < 1e-4, (
+        "every duplicate neighbour is an exact zero or round-off, never geometry"
     )
-    assert d[~exact_zero, 0].max() < 1e-4, "the non-zero ones are round-off, not geometry"
+    assert d[:, -1].min() > 1.0, "while the k-th neighbour is at a real distance"
 
-    assert np.median(_clamped_lid(x)) < 1.0, "both paths produced a sub-unit dimension"
-    assert 3.0 < lid(x, k=20) < 8.0, "dedup recovers the dimension the points actually sit on"
+    assert np.median(_clamped_lid(x)) < 1.0, (
+        "so the old estimator reports a sub-unit dimension either way"
+    )
+    assert 3.0 < lid(x, k=20) < 8.0, (
+        "dedup recovers the dimension the points actually sit on"
+    )
 
 
 # ---- refuse rather than return a number ----
