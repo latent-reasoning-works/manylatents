@@ -34,7 +34,17 @@ Reference algorithm (reproduced exactly):
 The reference pipeline does **not** z-score / standardize the input; the only
 notebook preprocessing beyond ``do_granger`` is dropping genes whose
 mean-over-cells trajectory is constant in time (``var == 0``). No scaling is
-applied here either.
+applied here either. That gene drop is available (generalised to top-k
+variable-gene ranking) via ``granger_grn(..., n_top_genes=..., flavor=...)``
+and is **on by default** at ``n_top_genes=2000`` -- enough to keep every gene
+of a typical HVG-sized input, while bounding the O(n_genes^2) pair grid on a
+whole-transcriptome one. Pass ``n_top_genes=None`` to turn it off, in which
+case constant genes fall out as ``NaN`` when their bivariate fit fails.
+
+``flavor`` picks the ranking statistic and defaults to ``"seurat"``, which
+assumes **log1p expression** -- the scale a trajectory arrives on. Raw-count
+input wants ``flavor="seurat_v3"`` instead; the two scanpy HVG flavors assume
+different input scales, so the default is a convenience, not a safe guess.
 
 Dependencies are kept light: numpy, pandas, statsmodels.
 """
@@ -48,8 +58,14 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.stattools import grangercausalitytests
 
+from manylatents.algorithms.temporally_variable_genes import (
+    TVG_FLAVORS,
+    temporally_variable_genes,
+)
+
 __all__ = [
     "granger_grn",
+    "select_variable_genes",
     "granger_signed_score_matrix",
     "signed_score",
     "SIGNED_SCORE_CAP",
@@ -79,6 +95,7 @@ def _to_gene_time_frame(
     gene_traj: np.ndarray,
     gene_names: Sequence,
     downsample: int,
+    difference: bool = True,
 ) -> pd.DataFrame:
     """Return the preprocessed ``[T', genes]`` frame used by the Granger tests.
 
@@ -107,8 +124,9 @@ def _to_gene_time_frame(
     frame = pd.DataFrame(arr, columns=list(gene_names))
     # Reference: trajs.T[::10] -> downsample every `downsample`-th timepoint.
     frame = frame.iloc[::downsample]
-    # Reference: trajs - trajs.shift(1); dropna() -> first difference for stationarity.
-    frame = frame.diff().dropna()
+    if difference:
+        # Reference: trajs - trajs.shift(1); dropna() -> first difference for stationarity.
+        frame = frame.diff().dropna()
     return frame
 
 
@@ -128,6 +146,38 @@ def _pair_p_and_coef(frame: pd.DataFrame, cause: str, effect: str) -> tuple:
     p_value = res[1][0]["ssr_chi2test"][1]
     coef = res[1][1][1].params[1]
     return float(p_value), float(coef)
+
+
+def select_variable_genes(
+    gene_traj: np.ndarray,
+    gene_names: Sequence,
+    n_top_genes: int = 2000,
+    flavor: str = "seurat",
+    downsample: int = 10,
+) -> np.ndarray:
+    """Names of the ``n_top_genes`` most temporally variable genes.
+
+    Ranking is done on the downsampled but **not** yet differenced trajectory:
+    "temporally variable" means the gene moves over time, which is a property of
+    the series itself. (First-differencing it would measure volatility -- a
+    different quantity, and not what the reference's ``var == 0`` gene drop
+    looked at.)
+
+    ``flavor`` defaults to ``"seurat"`` and is forwarded to
+    :func:`~manylatents.algorithms.temporally_variable_genes.temporally_variable_genes`;
+    see there for what each flavor assumes about the input scale. The default
+    therefore assumes **log1p expression** -- pass ``flavor="seurat_v3"`` for
+    raw counts.
+    """
+    frame = _to_gene_time_frame(gene_traj, gene_names, downsample, difference=False)
+    # TVG wants (n_genes, n_obs); the frame is (n_timepoints, n_genes).
+    _, names = temporally_variable_genes(
+        frame.to_numpy().T,
+        list(frame.columns),
+        n_top_genes=n_top_genes,
+        flavor=flavor,
+    )
+    return names
 
 
 def granger_signed_score_matrix(
@@ -187,6 +237,8 @@ def granger_grn(
     regulators: Optional[Sequence] = None,
     targets: Optional[Sequence] = None,
     downsample: int = 10,
+    n_top_genes: Optional[int] = 2000,
+    flavor: Optional[str] = "seurat",
 ):
     """Estimate a directed, signed, weighted Granger-causality GRN.
 
@@ -203,6 +255,19 @@ def granger_grn(
         Time downsampling factor (reference uses 10). For short unit-test
         series pass ``downsample=1`` so the differenced series is long enough
         for statsmodels to fit.
+    n_top_genes : int, optional
+        Restrict the GRN to the ``n_top_genes`` most temporally variable genes
+        (see :func:`select_variable_genes`), intersected with ``regulators`` /
+        ``targets``. Default ``2000`` -- large enough to keep every gene of a
+        typical HVG-sized input, and a bound on the O(n_genes^2) pair grid for
+        a whole-transcriptome one. This generalises the reference pipeline's
+        ``var == 0`` gene drop. Pass ``None`` to keep every gene.
+    flavor : {"seurat", "seurat_v3"}, optional
+        Ranking statistic for the variable-gene selection, matching the scanpy
+        HVG flavor of the same name. Default ``"seurat"``, which expects
+        log1p-scaled expression; ``"seurat_v3"`` expects raw counts, so pass it
+        explicitly for count input. Read only when ``n_top_genes`` is given,
+        and ignored otherwise.
 
     Returns
     -------
@@ -226,6 +291,25 @@ def granger_grn(
         regulators = list(gene_names)
     if targets is None:
         targets = list(gene_names)
+
+    # `flavor` is only read when selection runs; with `n_top_genes=None` it is
+    # ignored rather than an error, since it carries a default of its own.
+    if n_top_genes is not None:
+        if flavor is None:
+            raise ValueError(
+                "flavor=None is not a ranking statistic; pick one of "
+                f"{TVG_FLAVORS} (`seurat` for log1p expression, `seurat_v3` for "
+                "counts), or pass n_top_genes=None to turn selection off."
+            )
+        # Generalises the reference's `var == 0` drop: keep the top-k most
+        # temporally variable genes instead of only discarding the dead ones.
+        # Intersects with any caller-supplied regulators/targets rather than
+        # replacing them.
+        keep = {str(g) for g in select_variable_genes(
+            gene_traj, gene_names, n_top_genes, flavor, downsample=downsample
+        )}
+        regulators = [r for r in regulators if str(r) in keep]
+        targets = [c for c in targets if str(c) in keep]
 
     scores = granger_signed_score_matrix(
         gene_traj, gene_names, regulators=regulators, targets=targets, downsample=downsample
