@@ -90,7 +90,11 @@ omics = ["manylatents-omics"]
 # Cflows: neural-ODE trajectory + Granger GRN estimator. statsmodels (Granger,
 # tests/test_cflows_granger.py) and manykinds (GRN head, tests/test_cflows_grn_head.py)
 # are both imported by cflows tests but were absent from [all].
-cflows = ["statsmodels>=0.14", "manykinds>=0.1.1"]
+# scikit-misc supplies the loess fit behind temporally_variable_genes'
+# `seurat_v3` flavor -- the same dependency scanpy takes for its `seurat_v3` HVG,
+# and reachable from here via `granger_grn(..., n_top_genes=..., flavor=...)`.
+# The import stays lazy, so `seurat` works without it.
+cflows = ["statsmodels>=0.14", "manykinds>=0.1.1", "scikit-misc>=0.5"]
 # All optional extras (excluding docs/dev)
 all = [
     "manylatents[hf,torchdr,jax,omics,cflows]",
