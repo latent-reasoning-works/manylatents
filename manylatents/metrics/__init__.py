@@ -109,6 +109,8 @@ from manylatents.metrics.effective_neighborhood_size import EffectiveNeighborhoo
 from manylatents.metrics.mismatch_ratio import MismatchRatio
 from manylatents.metrics.preservation_diagnostics import Fold, PreservationScale
 from manylatents.metrics.shepard_residual import ShepardResidual
+from manylatents.metrics.covariance_floor import CovarianceFloor
+from manylatents.metrics.strain import LocalStrain
 
 # Post-hoc analysis
 from manylatents.metrics.metric_agreement import MetricAgreement
@@ -185,6 +187,8 @@ __all__ = [
     "Fold",
     "PreservationScale",
     "ShepardResidual",
+    "LocalStrain",
+    "CovarianceFloor",
     # Post-hoc analysis
     "MetricAgreement",
 ]

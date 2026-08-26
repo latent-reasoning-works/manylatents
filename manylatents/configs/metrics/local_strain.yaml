@@ -1,0 +1,6 @@
+local_strain:
+  _target_: manylatents.metrics.strain.LocalStrain
+  _partial_: True
+  n_neighbors: 25
+  include_self: True
+  at: embedding

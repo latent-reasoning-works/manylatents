@@ -1,0 +1,7 @@
+covariance_floor:
+  _target_: manylatents.metrics.covariance_floor.CovarianceFloor
+  _partial_: True
+  n_neighbors: 25
+  target_dim: 2
+  include_self: False
+  at: dataset
