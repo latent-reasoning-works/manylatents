@@ -27,10 +27,12 @@ class MIOFlow(LightningModule):
     global, and local finetune.
 
     Args:
-        network: Hydra config or instantiated MIOFlowODEFunc.
+        network: Hydra config or instantiated MIOFlowODEFunc. Existing modules
+            keep their identity and weights; seed them at construction with
+            MIOFlowODEFunc(..., init_seed=42).
         optimizer: Hydra config for optimizer (partial instantiation).
         datamodule: Data module for loading time-labeled data.
-        init_seed: Random seed for weight initialization.
+        init_seed: Seed before config construction; never resets supplied weights.
         n_local_epochs: Epochs of local (per-interval) pre-training.
         n_global_epochs: Epochs of global (full-trajectory) training.
         n_post_local_epochs: Epochs of local fine-tuning after global.
@@ -120,6 +122,9 @@ class MIOFlow(LightningModule):
 
     def configure_model(self):
         """Instantiate network from Hydra config."""
+        # Lightning calls this hook for every stage, even when setup() returns early.
+        if self.network is not None:
+            return
         torch.manual_seed(self.init_seed)
         if isinstance(self.network_config, (dict, DictConfig)):
             self.network = hydra_zen.instantiate(self.network_config)

@@ -852,7 +852,8 @@ def robust_local_pca(
 
 
 def ltsa_align(X: np.ndarray, indices: np.ndarray,
-               local_bases: np.ndarray, n_components: int) -> np.ndarray:
+               local_bases: np.ndarray, n_components: int,
+               random_state: int = 42) -> np.ndarray:
     """Local Tangent Space Alignment (Zhang & Zha 2004).
 
     Args:
@@ -860,6 +861,7 @@ def ltsa_align(X: np.ndarray, indices: np.ndarray,
         indices: (n, k) neighbor index array.
         local_bases: (n, n_components, d) local PC bases per point.
         n_components: Embedding dimensionality.
+        random_state: Seed for ARPACK's starting vector.
 
     Returns:
         (n, n_components) embedding.
@@ -893,6 +895,7 @@ def ltsa_align(X: np.ndarray, indices: np.ndarray,
     try:
         eigenvalues, eigenvectors = eigsh(
             B_csr, k=n_components + 1, which='SM', maxiter=n * 20,
+            v0=np.random.default_rng(random_state).standard_normal(n),
         )
     except Exception:
         # ARPACK may fail to converge on small/ill-conditioned matrices;

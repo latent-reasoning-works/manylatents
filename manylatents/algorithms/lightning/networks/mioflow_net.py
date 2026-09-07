@@ -20,10 +20,14 @@ class MIOFlowODEFunc(nn.Module):
     Args:
         input_dim: Spatial dimensionality of the data.
         hidden_dim: Width of hidden layers in the MLP.
+        init_seed: Seed before creating weights. None uses the caller's RNG,
+            including the seed set by a config-building Lightning wrapper.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int = 64):
+    def __init__(self, input_dim: int, hidden_dim: int = 64, init_seed: int | None = None):
         super().__init__()
+        if init_seed is not None:
+            torch.manual_seed(init_seed)
         self.net = nn.Sequential(
             nn.Linear(input_dim + 1, hidden_dim),
             nn.SiLU(),
