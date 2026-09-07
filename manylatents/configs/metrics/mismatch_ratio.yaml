@@ -1,3 +1,8 @@
+# Requires a nonnegative neighborhood affinity (e.g. PHATE's transition matrix).
+# PCA.affinity() is centered Gram / (n-1), with signed entries and near-zero row
+# sums, so MismatchRatio correctly raises MeasurementUnavailable for that pairing.
+# k_eff = (sum w)^2 / sum(w^2) is invariant to positive row scaling: weights need
+# not sum to one, particularly after removing the diagonal, but must be nonnegative.
 mismatch_ratio:
   _target_: manylatents.metrics.mismatch_ratio.MismatchRatio
   _partial_: True

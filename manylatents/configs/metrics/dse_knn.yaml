@@ -1,5 +1,6 @@
 # DSE with kNN adaptive-bandwidth kernel.
 # k tracks neighborhood_size so the diagnostic matches the DR algorithm's kNN.
+# When neighborhood_size is null, DSE uses its own default k=15.
 # t_high is a list — flatten_and_unroll_metrics expands it into separate evaluations,
 # each returning a scalar eigenvalue count.
 

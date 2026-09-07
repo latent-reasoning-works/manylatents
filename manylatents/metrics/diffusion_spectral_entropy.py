@@ -7,6 +7,9 @@ from manylatents.metrics.registry import register_metric
 from manylatents.utils.kernel_utils import symmetric_diffusion_operator
 
 
+DEFAULT_K = 15
+
+
 def exact_eigvals(K: np.ndarray) -> np.ndarray:
     """Compute exact eigenvalues with symmetry safety check.
 
@@ -112,7 +115,7 @@ def compute_diffusion_matrix_knn(
 
 @register_metric(
     aliases=["diffusion_spectral_entropy", "dse"],
-    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0, "kernel": "knn", "k": 15, "alpha": 1.0},
+    default_params={"t": 3, "gaussian_kernel_sigma": 10, "output_mode": "entropy", "t_high": 100, "numerical_floor": 1e-6, "max_N": 10000, "random_seed": 0, "kernel": "knn", "k": DEFAULT_K, "alpha": 1.0},
     description="Diffusion spectral entropy (eigenvalue count at diffusion time t)",
 )
 def DiffusionSpectralEntropy(
@@ -128,7 +131,7 @@ def DiffusionSpectralEntropy(
     random_seed: int = 0,
     cache: Optional[dict] = None,
     kernel: str = "knn",
-    k: int = 15,
+    k: Optional[int] = DEFAULT_K,
     alpha: float = 1.0,
 ) -> float:
     """
@@ -150,7 +153,7 @@ def DiffusionSpectralEntropy(
         random_seed: Seed for reproducible subsampling
         cache: Shared cache dict for kNN reuse
         kernel: "knn" (adaptive bandwidth, default) or "dense" (global Gaussian)
-        k: Neighborhood size for knn kernel (default 15)
+        k: Neighborhood size for knn kernel (default 15; None uses this default)
         alpha: Density normalization (0=graph Laplacian, 0.5=Fokker-Planck, 1.0=Laplace-Beltrami)
     """
     X = embeddings
@@ -164,6 +167,10 @@ def DiffusionSpectralEntropy(
     # Dispatch kernel construction
     if kernel == "knn":
         from manylatents.utils.metrics import compute_knn
+        # The config inherits nullable neighborhood_size. None means no request;
+        # explicit values still go unchanged through compute_knn's validation.
+        if k is None:
+            k = DEFAULT_K
         distances, indices = compute_knn(X, k=k, cache=cache)
         K = compute_diffusion_matrix_knn(distances, indices, alpha=alpha)
     else:
