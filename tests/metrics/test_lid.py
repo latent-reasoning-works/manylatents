@@ -28,6 +28,32 @@ def test_recovers_the_dimension_of_a_linear_subspace():
     assert 3.0 < lid(_subspace_cloud(), k=20) < 8.0
 
 
+@pytest.mark.parametrize("intrinsic, ambient", [(2, 8), (3, 12)])
+def test_uniform_subspace_recovers_known_dimension(intrinsic, ambient):
+    from manylatents.api import run
+
+    rng = np.random.default_rng(42)
+    basis, _ = np.linalg.qr(rng.normal(size=(ambient, intrinsic)))
+    # Uniform on a unit cube in the intrinsic coordinates; an orthonormal
+    # embedding preserves its Euclidean geometry in the higher-dimensional space.
+    x = rng.uniform(size=(5000, intrinsic)) @ basis.T
+    result = run(
+        input_data=x,
+        algorithm="pca",
+        n_components=intrinsic,
+        metrics={"lid": {
+            "_target_": "manylatents.metrics.lid.LocalIntrinsicDimensionality",
+            "_partial_": True,
+            "at": "dataset",  # measure the original ambient-dimensional cloud
+            "k": 40,
+        }},
+    )
+    estimate, = result["scores"].values()
+    # Finite neighborhoods have sampling variation and cube boundary bias.
+    # A 5% allowance tests dimension recovery without assuming exact unbiasedness.
+    assert estimate == pytest.approx(intrinsic, rel=0.05)
+
+
 def test_per_sample_returns_one_value_per_input_row():
     x = np.repeat(_subspace_cloud(n=200), 3, axis=0)
     out = lid(x, k=20, return_per_sample=True)

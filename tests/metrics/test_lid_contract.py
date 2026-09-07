@@ -42,6 +42,23 @@ def test_numpy_integer_k_is_supported():
     assert lid(x, k=np.int64(2)) == lid(x, k=2)
 
 
+@pytest.mark.parametrize("k, coordinates, expected", [
+    (2, [0.0, 1.0, 3.0], 1 / np.log([3.0, 2.0, 1.5])),
+    (4, [0.0, 1.0, 2.0, 3.0, 4.0],
+     3 / np.log([32 / 3, 27 / 2, 4, 27 / 2, 32 / 3])),
+])
+def test_published_estimates_and_arithmetic_mean(backend, k, coordinates, expected):
+    # Hand-computed Euclidean neighbor ratios, excluding the query itself.
+    # At the origin with k=4, sum = log(4*2*4/3) = log(32/3),
+    # so Eq. (8) gives 3/log(32/3), not the old 4/log(32/3).
+    # k=2 pins the smallest defined neighborhood: (k-1)=1 log term.
+    x = np.array(coordinates)[:, None]
+    actual = lid(x, k=k, return_per_sample=True)
+    np.testing.assert_allclose(actual, expected, rtol=2e-6)
+    assert lid(x, k=k) == pytest.approx(np.mean(expected), rel=2e-6)
+    assert not np.isclose(np.mean(actual), 1 / np.mean(1 / actual))
+
+
 @pytest.mark.parametrize("per_sample", [False, True])
 def test_equal_neighbor_radii_are_unavailable(backend, per_sample):
     with pytest.raises(MeasurementUnavailable, match="log.*sum"):
@@ -140,6 +157,8 @@ def test_reported_distance_fixture_across_units(backend, dtype):
     # metric, including conditioning and neighbor search, not a copied formula.
     x = np.arange(5, dtype=dtype)[:, None]
     expected = lid(x, k=4, return_per_sample=True)
+    # Published k-1 normalization, checked independently of unit invariance.
+    assert expected[0] == pytest.approx(3 / np.log(32 / 3), rel=2e-6)
     eps = np.finfo(np.float32).eps  # kNN's working dtype, even for float64 input
     operations = x.shape[1] * 4
     rtol = operations * eps / (1 - operations * eps)

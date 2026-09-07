@@ -55,7 +55,16 @@ def LocalIntrinsicDimensionality(
     cache: Optional[dict] = None,
     dedup: bool = True,
 ) -> Union[float, np.ndarray]:
-    """Estimate LID using ``-k / sum_j log(d_j / r_k)`` over k-NN distances.
+    """Estimate LID with the Levina--Bickel (NIPS 2004) maximum likelihood estimator.
+
+    At a fixed neighborhood size k, Eq. (8) gives each point's estimate as
+    ``m_k(x) = [(1/(k-1)) * sum_{j=1}^{k-1} log(T_k(x)/T_j(x))]**-1``.
+    T_j is the Euclidean distance to the j-th OTHER point: the query itself
+    is excluded. Only the first k-1 distances enter the sum; T_k sets its radius.
+    The result is the arithmetic mean of these per-point estimates, as in the
+    2004 paper. The later MacKay--Ghahramani alternative averages inverses
+    before inverting; this function does not compute that aggregation or apply
+    the k-2 bias correction. It evaluates one k, without averaging over k.
 
     Neighbors are selected from exact distinct input points, RMS-normalised
     before float32 kNN (FAISS when available, sklearn otherwise). Each duplicate
@@ -80,6 +89,13 @@ def LocalIntrinsicDimensionality(
             salvage a mean.
 
     Notes:
+        Levina and Bickel, "Maximum Likelihood Estimation of Intrinsic
+        Dimension", NIPS 2004, Eq. (8):
+        https://papers.nips.cc/paper_files/paper/2004/file/74934548253bcab8490ebd74afed7031-Paper.pdf
+
+        The k-1 normalizer and sum require k >= 2. Zero neighbor distances
+        make the logarithm undefined; equal positive radii can give a zero sum
+        and an infinite estimate. These cases raise MeasurementUnavailable.
         The previous absolute radius clamp and log epsilon measured numerical
         constants at tiny scales or duplicate distances. Neither belongs in a
         scale-free distance ratio. Float32 conditioning can still leave geometry
@@ -89,8 +105,8 @@ def LocalIntrinsicDimensionality(
     """
     if k is None:
         k = 20
-    # The k-th neighbor contributes log(r_k / r_k) = 0. A negative denominator
-    # needs at least one other term, hence k >= 2 (necessary, not sufficient).
+    # Eq. (8) normalizes k-1 log terms by k-1. This requires k-1 > 0,
+    # hence k >= 2 (necessary, not sufficient for a finite estimate).
     if isinstance(k, (bool, np.bool_)) or not isinstance(k, (int, np.integer)) or k < 2:
         raise MeasurementUnavailable("k must be a nonboolean integer >= 2")
     k = int(k)
@@ -133,14 +149,14 @@ def LocalIntrinsicDimensionality(
 
     # Float64 division prevents ratios of positive float32 distances underflowing
     # to zero before the log. For sorted positive distances d_j <= r_k, each log
-    # is <= 0; a finite positive -k/sum requires a finite strictly negative sum.
+    # is <= 0; -(k-1)/sum requires a finite strictly negative sum.
     r_k = distances[:, -1]
     with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
-        log_sum = np.sum(np.log(distances / r_k[:, None]), axis=1)
+        log_sum = np.sum(np.log(distances[:, :k-1] / r_k[:, None]), axis=1)
     if not np.all(np.isfinite(log_sum) & (log_sum < 0)):
         raise MeasurementUnavailable("LID requires a finite strictly negative log-distance sum")
     with np.errstate(over="ignore", divide="ignore"):
-        lid_values = -k / log_sum
+        lid_values = -(k - 1) / log_sum
     if not np.all(np.isfinite(lid_values) & (lid_values > 0)):
         raise MeasurementUnavailable("LID estimates are not finite and positive at working precision")
     lid_values = lid_values[inverse]
