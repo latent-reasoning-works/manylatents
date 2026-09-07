@@ -4,6 +4,7 @@ from typing import Any, Optional
 import numpy as np
 
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.exceptions import MeasurementUnavailable
 from manylatents.utils.metrics import compute_knn
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ def LogLogConsistency(
         embeddings: (n_samples, n_features) array.
         dataset: Unused, kept for protocol compatibility.
         module: Unused, kept for protocol compatibility.
-        k: Maximum number of neighbors (drives kNN pre-computation).
+        k: Sweep ceiling, bounded by available neighbors.
         k_min: Minimum k for the sweep.
         k_steps: Number of log-spaced k values between k_min and k.
         cache: Optional shared cache dict for kNN reuse.
@@ -46,15 +47,25 @@ def LogLogConsistency(
     Returns:
         Dict with summary scalars and per-point arrays.
     """
-    distances, _ = compute_knn(embeddings, k=k, include_self=True, cache=cache)
+    if any(not isinstance(value, (int, np.integer)) or isinstance(value, bool)
+           or value <= 0 for value in (k, k_min, k_steps)):
+        raise MeasurementUnavailable("LogLogConsistency k sweep requires positive integer bounds and steps")
 
-    # Clamp k to actual columns returned (compute_knn may reduce k for small datasets)
-    k = distances.shape[1] - 1  # last valid index (column 0 = self)
+    # k is a search ceiling: clipping a range to available data is not
+    # substituting a requested measurement's neighborhood size.
+    k = min(k, embeddings.shape[0] - 1)
+    if k < k_min:
+        raise MeasurementUnavailable("LogLogConsistency has no usable k sweep: ceiling is below k_min")
 
     # Build log-spaced k grid
     k_values = np.unique(
         np.logspace(np.log10(k_min), np.log10(k), k_steps).astype(int)
     )
+    k_values = k_values[(k_values >= k_min) & (k_values <= k)]
+    if len(k_values) < 2:
+        raise MeasurementUnavailable("LogLogConsistency has no usable k sweep: requires at least 2 distinct k values")
+
+    distances, _ = compute_knn(embeddings, k=k, include_self=True, cache=cache)
 
     # Slice distance columns: with include_self=True, column j = j-th neighbor
     T = distances[:, k_values]  # (n_points, len(k_values))

@@ -32,7 +32,7 @@ def _compute_kstar(
 
     Args:
         data: (n, d) input-space coordinates (e.g. PCA-50).
-        k_max: Maximum k for the log-log sweep.
+        k_max: Ceiling for the log-log sweep, bounded by available neighbors.
         k_min: Minimum k.
         k_steps: Number of log-spaced k values.
         r2_threshold: R² threshold for valid geometric regime.
@@ -45,13 +45,24 @@ def _compute_kstar(
     if cache is None:
         cache = {}
 
-    distances, _ = compute_knn(data, k=k_max, include_self=True, cache=cache)
+    if any(not isinstance(value, (int, np.integer)) or isinstance(value, bool)
+           or value <= 0 for value in (k_max, k_min, k_steps)):
+        raise MeasurementUnavailable("Mismatch k sweep requires positive integer bounds and steps")
+
+    # k_max is a search ceiling: clipping a range to available data is not
+    # substituting a requested measurement's neighborhood size.
+    k_max = min(k_max, data.shape[0] - 1)
+    if k_max < k_min:
+        raise MeasurementUnavailable("Mismatch has no usable k sweep: ceiling is below k_min")
 
     k_values = np.unique(
         np.logspace(np.log10(k_min), np.log10(k_max), k_steps).astype(int)
     )
-    max_col = distances.shape[1] - 1
-    k_values = k_values[k_values <= max_col]
+    k_values = k_values[(k_values >= k_min) & (k_values <= k_max)]
+    if len(k_values) < 3:
+        raise MeasurementUnavailable("Mismatch has no usable k sweep: requires at least 3 distinct k values")
+
+    distances, _ = compute_knn(data, k=k_max, include_self=True, cache=cache)
 
     n_points = data.shape[0]
     k_star = np.full(n_points, float(k_values[0]))
