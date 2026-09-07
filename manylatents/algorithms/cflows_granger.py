@@ -14,7 +14,7 @@ Reference algorithm (reproduced exactly):
   first difference (``x - x.shift(1)``) for stationarity and drops NaNs.
 * ``grangers_causation_matrix`` runs, per ordered pair, ::
 
-      res = grangercausalitytests(data[[c, r]], maxlag=(1,), verbose=False)
+      res = grangercausalitytests(data[[c, r]], maxlag=(1,))
       p    = res[1][0]["ssr_chi2test"][1]     # chi2 p-value
       coef = res[1][1][1].params[1]           # coef on lagged CAUSE r_{t-1}
 
@@ -41,7 +41,6 @@ Dependencies are kept light: numpy, pandas, statsmodels.
 
 from __future__ import annotations
 
-import warnings
 from typing import Optional, Sequence
 
 import numpy as np
@@ -120,11 +119,7 @@ def _pair_p_and_coef(frame: pd.DataFrame, cause: str, effect: str) -> tuple:
     ``p`` the ssr chi2 p-value and ``coef`` the lagged-cause coefficient.
     """
     two_col = frame[[effect, cause]]
-    with warnings.catch_warnings():
-        # statsmodels emits Future/Value warnings around `verbose`; the
-        # reference suppresses them. We mirror `verbose=False` exactly.
-        warnings.simplefilter("ignore")
-        res = grangercausalitytests(two_col, maxlag=(1,), verbose=False)
+    res = grangercausalitytests(two_col, maxlag=(1,))
     p_value = res[1][0]["ssr_chi2test"][1]
     coef = res[1][1][1].params[1]
     return float(p_value), float(coef)

@@ -72,7 +72,7 @@ def test_estimator_index_path_matches_independent_ols():
 
     # data[[c, r]] => statsmodels tests column 2 (r) Granger-causes column 1 (c).
     frame = pd.DataFrame({"c": c, "r": r})[["c", "r"]]
-    res = grangercausalitytests(frame, maxlag=(1,), verbose=False)
+    res = grangercausalitytests(frame, maxlag=(1,))
 
     sm_p = res[1][0]["ssr_chi2test"][1]
     sm_coef = res[1][1][1].params[1]
