@@ -1,4 +1,7 @@
 """Tests for cache-aware compute_knn."""
+import sys
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from manylatents.utils.metrics import _content_key, compute_knn
@@ -16,6 +19,59 @@ def test_compute_knn_no_cache(sample_data):
     dists, idxs = compute_knn(sample_data, k=5)
     assert dists.shape == (50, 6)  # k+1 with self
     assert idxs.shape == (50, 6)
+
+
+@pytest.mark.parametrize("integer_type", [np.int32, np.int64, np.uint64])
+@pytest.mark.parametrize("include_self", [False, True])
+def test_numpy_integer_uses_same_typed_backend(
+    sample_data, monkeypatch, integer_type, include_self
+):
+    """Exercise FAISS's Python-int boundary even when FAISS is unavailable."""
+    import sklearn.neighbors
+
+    counts = []
+
+    class TypedIndex:
+        def __init__(self, dimension):
+            pass
+
+        def add(self, data):
+            pass
+
+        def search(self, data, count):
+            if type(count) is not int:
+                raise TypeError("search requires a Python int")
+            counts.append(count)
+            indices = np.tile(np.arange(count), (len(data), 1))
+            return indices.astype(np.float32) ** 2, indices
+
+    def unexpected_fallback(*args, **kwargs):
+        pytest.fail("integer spelling must not trigger a backend swap")
+
+    monkeypatch.setitem(sys.modules, "faiss", SimpleNamespace(IndexFlatL2=TypedIndex))
+    monkeypatch.setattr(sklearn.neighbors, "NearestNeighbors", unexpected_fallback)
+    # Separate empty caches ensure both spellings actually reach the backend.
+    results = []
+    for k in (integer_type(2), 2):
+        cache = {}
+        results.append(compute_knn(sample_data, k, include_self=include_self, cache=cache))
+        assert type(cache[_content_key(sample_data)][0]) is int
+    assert counts == [3, 3]
+    for numpy_result, python_result in zip(*results):
+        np.testing.assert_array_equal(numpy_result, python_result)
+
+
+def test_backend_failure_warns_about_numerical_changes(sample_data, monkeypatch, caplog):
+    def broken_index(dimension):
+        raise RuntimeError("backend unavailable")
+
+    monkeypatch.setitem(sys.modules, "faiss", SimpleNamespace(IndexFlatL2=broken_index))
+    with caplog.at_level("WARNING", logger="manylatents.utils.knn"):
+        distances, indices = compute_knn(sample_data, k=2)
+    assert distances.shape == indices.shape == (len(sample_data), 3)
+    assert "falling back to sklearn" in caplog.text
+    assert "neighbors and distances may differ between backends" in caplog.text
+    assert "changing derived measurements" in caplog.text
 
 
 def test_compute_knn_cache_populates(sample_data):

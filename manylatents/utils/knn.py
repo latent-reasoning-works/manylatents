@@ -39,6 +39,9 @@ def compute_knn(
     2. FAISS-CPU if faiss is installed (~10-50x faster than sklearn)
     3. sklearn NearestNeighbors as fallback
 
+    Backends can differ in floating-point distances and neighbor tie-breaking,
+    so switching backends can change derived measurements.
+
     Args:
         data: (n_samples, n_features) float32 array.
         k: Number of neighbors (excluding self).
@@ -63,6 +66,9 @@ def compute_knn(
         raise MeasurementUnavailable(
             f"kNN requires 0 < k < n_samples; got k={k}, n_samples={n_samples}"
         )
+    # Typed backends such as FAISS require a Python int. Normalize before
+    # arithmetic/cache lookup so numpy integer counts use the same backend.
+    k = int(k)
 
     # Check cache for a usable superset
     if cache is not None:
@@ -104,7 +110,11 @@ def compute_knn(
         # Catches ImportError (no faiss), AttributeError (faiss-gpu without CUDA
         # runtime — module loads but symbols like IndexFlatL2 are missing), etc.
         if not isinstance(e, ImportError):
-            logger.warning(f"FAISS failed ({type(e).__name__}: {e}), falling back to sklearn")
+            logger.warning(
+                f"FAISS failed ({type(e).__name__}: {e}), falling back to sklearn; "
+                "neighbors and distances may differ between backends, changing "
+                "derived measurements"
+            )
         from sklearn.neighbors import NearestNeighbors
 
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)

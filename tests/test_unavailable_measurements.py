@@ -303,6 +303,13 @@ def test_small_cohort_can_override_speculative_prewarm_neighborhood():
 
 @pytest.mark.parametrize('cv', [None, 5])
 def test_signal_axis_cannot_be_invented_for_collapsed_vectors(cv):
+    from manylatents.metrics.signal_geometry import _separation_auroc
+
     data = np.ones((40, 4))
+    labels = np.repeat([0, 1], 20)
+    # Pin the axis refusal directly: the full readout now refuses the undefined
+    # LID first, so it never reaches class separation on this collapsed cloud.
     with pytest.raises(MeasurementUnavailable, match='axis'):
-        layer_geometry(data, np.repeat([0, 1], 20), cv=cv)
+        _separation_auroc(data, labels, cv=cv)
+    with pytest.raises(MeasurementUnavailable, match='distinct points'):
+        layer_geometry(data, labels, cv=cv)
