@@ -1,0 +1,17 @@
+score_jacobian_id:
+  _target_: manylatents.metrics.score_jacobian_id.ScoreJacobianID
+  _partial_: True
+  at: module
+  # Smoke fixture only: two small positive scales in standardized coordinates
+  # exercise multi-scale FLIPD within the score model's training noise range.
+  # Report the finite-scale statistic at 0.05 explicitly; this is a "does it run"
+  # check, with no plateau/limit inference or accuracy claim for the trained net.
+  # These scales and this interpretation are NOT recommendations for real data:
+  # a method owner must choose both. The metric itself has no default policy.
+  estimator_policy:
+    _target_: manylatents.metrics.score_jacobian_id.FLIPD
+    scales: [0.1, 0.05]
+    scale_policy:
+      _target_: manylatents.metrics.score_jacobian_id.read_finite_scale
+      _partial_: True
+      sigma: 0.05

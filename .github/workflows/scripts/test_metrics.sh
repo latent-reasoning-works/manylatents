@@ -43,6 +43,13 @@ for config in "${CONFIGS[@]}"; do
         callbacks/embedding=minimal \
         logger=none"
 
+    if [ "$config" = "score_jacobian_id" ]; then
+        # PCA has no score interface. ScoreDiffusionModule is not a CLI latent
+        # algorithm; this fixture fits it and runs the shipped Hydra metric
+        # through evaluate(), including its explicit FLIPD/scale policy.
+        CMD="python -m pytest tests/test_score_jacobian_id.py::test_shipped_score_config_fitted_model_smoke -q"
+    fi
+
     if $CMD > /tmp/test_metric_${config}.log 2>&1; then
         echo "  ✅ $config"
     else

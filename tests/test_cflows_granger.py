@@ -20,8 +20,10 @@ import numpy as np
 import pandas as pd
 import pytest
 from scipy import stats
-from statsmodels.regression.linear_model import OLS
-from statsmodels.tsa.stattools import grangercausalitytests
+
+pytest.importorskip("statsmodels")  # optional dep — skip module if unavailable (manylatents convention)
+from statsmodels.regression.linear_model import OLS  # noqa: E402
+from statsmodels.tsa.stattools import grangercausalitytests  # noqa: E402
 
 from manylatents.algorithms.cflows_granger import (
     SIGNED_SCORE_CAP,
