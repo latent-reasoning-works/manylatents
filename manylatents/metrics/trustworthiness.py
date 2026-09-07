@@ -47,9 +47,13 @@ def Trustworthiness(embeddings: np.ndarray,
     X_low = embeddings
     n = X_high.shape[0]
     k = n_neighbors
-    if not isinstance(k, (int, np.integer)) or isinstance(k, bool) or not 0 < k < n / 2:
+    # For n, k > 0, n*k*(2*n - 3*k - 1) > 0 iff 3*k < 2*n - 1.
+    # Thus integer k <= (2*n - 2)//3: floor((2*n - 1)/3), except
+    # when that limit is integral, where equality gives zero and we subtract 1.
+    if (not isinstance(k, (int, np.integer)) or isinstance(k, bool)
+            or k <= 0 or 3 * k >= 2 * n - 1):
         raise MeasurementUnavailable(
-            f"Trustworthiness requires 0 < n_neighbors < n_samples / 2; got k={k}, n={n}"
+            f"Trustworthiness requires integer 0 < n_neighbors < (2 * n_samples - 1) / 3; got k={k}, n={n}"
         )
     if X_low.shape[0] != n:
         raise MeasurementUnavailable("Trustworthiness requires matching sample counts")

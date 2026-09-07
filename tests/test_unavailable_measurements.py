@@ -19,12 +19,63 @@ from manylatents.utils.stats import bootstrap_ci
 from manylatents.utils.exceptions import MeasurementUnavailable
 
 
-@pytest.mark.parametrize('k', [25, 19, 0, -1, 38])
+@pytest.mark.parametrize('k', [25, 1.5, 0, -1, 38, True])
 def test_trustworthiness_refuses_invalid_neighborhood(k):
     rng = np.random.default_rng(0)
     high, low = rng.normal(size=(38, 8)), rng.normal(size=(38, 2))
     with pytest.raises(MeasurementUnavailable, match='Trustworthiness'):
         Trustworthiness(low, dataset=SimpleNamespace(data=high), n_neighbors=k)
+
+
+@pytest.mark.parametrize('n', [38, 99, 100, 101])
+@pytest.mark.parametrize('neighborhood', ['half', 'largest_valid'])
+def test_trustworthiness_accepts_positive_normalizer(n, neighborhood):
+    # Strict inequality: ceil((2*n - 1)/3) - 1 is the largest valid integer.
+    k = n // 2 if neighborhood == 'half' else (2 * n - 2) // 3
+    assert n * k * (2 * n - 3 * k - 1) > 0
+    rng = np.random.default_rng(0)
+    high, low = rng.normal(size=(n, 8)), rng.normal(size=(n, 2))
+    actual = Trustworthiness(low, dataset=SimpleNamespace(data=high), n_neighbors=k)
+    assert np.isfinite(actual)
+    assert actual < 1.0
+    assert Trustworthiness(high, dataset=SimpleNamespace(data=high), n_neighbors=k) == 1.0
+
+
+@pytest.mark.parametrize('n', [38, 99, 100, 101])
+@pytest.mark.parametrize('offset', [0, 1])
+def test_trustworthiness_refuses_nonpositive_normalizer(n, offset):
+    # First invalid integer is ceil((2*n - 1)/3), including exact equality.
+    k = (2 * n + 1) // 3 + offset
+    assert n * k * (2 * n - 3 * k - 1) <= 0
+    # The original n=38, k=25 failure has 2*38 - 3*25 - 1 = 0.
+    data = np.random.default_rng(0).normal(size=(n, 4))
+    with pytest.raises(MeasurementUnavailable, match='Trustworthiness'):
+        Trustworthiness(data, dataset=SimpleNamespace(data=data), n_neighbors=k)
+
+
+def test_trustworthiness_k_config_evaluates_previously_refused_neighborhood():
+    from pathlib import Path
+
+    from manylatents.evaluate import evaluate
+    from manylatents.utils.metrics import flatten_and_unroll_metrics
+    from omegaconf import OmegaConf
+
+    config = OmegaConf.load(
+        Path(__file__).parents[1] / 'manylatents/configs/metrics/trustworthiness_k.yaml'
+    )
+    n = 100
+    k = n // 2
+    assert k in config.trustworthiness.n_neighbors
+    assert 0 < 3 * k < 2 * n - 1
+    # Exercise this sweep entry; larger entries still exceed this cohort's domain.
+    config.trustworthiness.n_neighbors = [k]
+    data = np.random.default_rng(0).normal(size=(n, 4))
+    scores = evaluate(data[:, :2], dataset=SimpleNamespace(data=data),
+                      metrics=flatten_and_unroll_metrics(config))
+    assert len(scores) == 1
+    score = next(iter(scores.values()))
+    assert np.isfinite(score)
+    assert score < 1.0
 
 
 @pytest.mark.parametrize('cached', [False, True])
