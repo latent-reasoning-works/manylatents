@@ -87,6 +87,7 @@ except ImportError:
 
 # Embedding quality metrics
 from manylatents.metrics.silhouette import SilhouetteScore
+from manylatents.metrics.subspace_commitment import SubspaceCommitment
 
 # Dataset metrics
 from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
@@ -165,6 +166,7 @@ __all__ = [
     "MagnitudeDimension",
     # Embedding quality metrics
     "SilhouetteScore",
+    "SubspaceCommitment",
     # Dataset metrics
     "GeodesicDistanceCorrelation",
     "DatasetTopologyDescriptor",
