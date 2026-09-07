@@ -3,6 +3,8 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+from manylatents.utils.exceptions import MeasurementUnavailable
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,7 @@ def _content_key(data) -> str:
         data = data.detach().cpu().numpy()
     data = np.ascontiguousarray(data, dtype=np.float32)
     h = hashlib.sha256()
-    h.update(f"{data.shape}{data.dtype}".encode())
+    h.update(f"knn-self-v2{data.shape}{data.dtype}".encode())
     h.update(data[0].tobytes())
     h.update(data[-1].tobytes())
     return h.hexdigest()[:16]
@@ -55,9 +57,12 @@ def compute_knn(
     if isinstance(data, torch.Tensor):
         data = data.numpy()
 
-    # Default k when None (e.g. from ${neighborhood_size} resolving to null)
-    if k is None:
-        k = 15
+    n_samples = data.shape[0]
+    if (not isinstance(k, (int, np.integer)) or isinstance(k, bool)
+            or not 0 < k < n_samples):
+        raise MeasurementUnavailable(
+            f"kNN requires 0 < k < n_samples; got k={k}, n_samples={n_samples}"
+        )
 
     # Check cache for a usable superset
     if cache is not None:
@@ -70,17 +75,6 @@ def compute_knn(
                 if not include_self:
                     dists, idxs = dists[:, 1:], idxs[:, 1:]
                 return dists, idxs
-
-    n_samples = data.shape[0]
-    if k >= n_samples:
-        import warnings
-        warnings.warn(
-            f"Clamping k from {k} to {n_samples - 1} (n_samples={n_samples})",
-            UserWarning,
-        )
-        k = n_samples - 1
-    if k <= 0:
-        return np.zeros((n_samples, 0)), np.zeros((n_samples, 0), dtype=np.int64)
 
     data = np.ascontiguousarray(data, dtype=np.float32)
     n_neighbors = k + 1  # always query k+1 to include self, then trim
@@ -116,6 +110,13 @@ def compute_knn(
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(data)
         distances, indices = nbrs.kneighbors(data)
         logger.info(f"compute_knn: sklearn, n={data.shape[0]}, d={data.shape[1]}, k={k}")
+
+    # Ties may put self anywhere, or outside the returned k+1 candidates.
+    # Canonicalize before caching: self first, then k actual other indices.
+    other = indices != np.arange(n_samples)[:, None]
+    order = np.argsort(~other, axis=1, kind="stable")[:, :k]
+    indices = np.column_stack((np.arange(n_samples), np.take_along_axis(indices, order, axis=1)))
+    distances = np.column_stack((np.zeros(n_samples), np.take_along_axis(distances, order, axis=1)))
 
     # Store in cache (always with self included)
     if cache is not None:

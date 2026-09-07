@@ -80,71 +80,17 @@ def _compute_mismatch_labels(
         mismatched: (n,) boolean mask.
         mismatch_ratio: (n,) v_i values.
     """
-    from manylatents.utils.metrics import compute_knn
+    from manylatents.metrics.mismatch_ratio import _compute_keff, _compute_kstar
 
-    # Step 1: log-log diagnostic on input space → k* per point
-    cache = {}
-    distances, _ = compute_knn(input_data, k=k_max, include_self=True, cache=cache)
-
-    k_values = np.unique(
-        np.logspace(np.log10(k_min), np.log10(k_max), k_steps).astype(int)
-    )
-    # Clamp to available columns (compute_knn clamps k when n_samples is small)
-    max_col = distances.shape[1] - 1
-    k_values = k_values[k_values <= max_col]
-
-    T = distances[:, k_values]
-    eps = 1e-30
-    log_T = np.log(np.maximum(T, eps))
-    log_k = np.log(k_values.astype(float))
-
-    # Find k* per point: largest k where cumulative R² > threshold
     n_points = input_data.shape[0]
-    k_star = np.full(n_points, k_values[-1], dtype=float)
-
-    for i in range(n_points):
-        for j in range(len(k_values), 2, -1):
-            sub_log_T = log_T[i, :j]
-            sub_log_k = log_k[:j]
-            n_k = j
-            sx = sub_log_k.sum()
-            sx2 = (sub_log_k ** 2).sum()
-            sy = sub_log_T.sum()
-            sxy = (sub_log_T * sub_log_k).sum()
-            d = n_k * sx2 - sx ** 2
-            sl = (n_k * sxy - sx * sy) / d
-            ic = (sy - sl * sx) / n_k
-            yp = sl * sub_log_k + ic
-            ss_res = ((sub_log_T - yp) ** 2).sum()
-            ym = sub_log_T.mean()
-            ss_tot = ((sub_log_T - ym) ** 2).sum()
-            r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
-            if r2 >= r2_threshold:
-                k_star[i] = k_values[j - 1]
-                break
-        else:
-            k_star[i] = k_values[0]
-
-    # Step 2: effective-k from affinity matrix
-    try:
-        W = module.affinity(ignore_diagonal=True, use_symmetric=False)
-    except NotImplementedError:
-        logger.warning(
-            f"{module.__class__.__name__} has no affinity_matrix. "
-            "Using uniform k_eff = neighborhood_size."
-        )
-        ns = getattr(module, 'neighborhood_size', None) or 15
-        k_eff = np.full(n_points, float(ns))
-    else:
-        if hasattr(W, 'toarray'):
-            W = W.toarray()
-        W = np.asarray(W)
-        row_sum = W.sum(axis=1)
-        row_sum_sq = (W ** 2).sum(axis=1)
-        k_eff = np.where(row_sum_sq > 0, row_sum ** 2 / row_sum_sq, 0.0)
+    k_eff = _compute_keff(module, n_points)
+    k_star, _ = _compute_kstar(
+        input_data, k_max=k_max, k_min=k_min, k_steps=k_steps,
+        r2_threshold=r2_threshold,
+    )
 
     # Step 3: mismatch ratio
-    mismatch_ratio = np.where(k_star > 0, k_eff / k_star, 0.0)
+    mismatch_ratio = k_eff / k_star
     mismatched = (mismatch_ratio > v_max) | (mismatch_ratio < v_min)
 
     logger.info(

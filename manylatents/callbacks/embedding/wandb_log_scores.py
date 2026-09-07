@@ -11,6 +11,7 @@ try:
 except (ImportError, AttributeError):
     wandb = None
 from manylatents.callbacks.embedding.base import EmbeddingCallback
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,16 @@ class WandbLogScores(EmbeddingCallback):
                 scores[name] = vals
 
         tag = embeddings.get("metadata", {}).get("source", "embedding")
+
+        unavailable = {
+            f"{tag}/{name}": value.to_dict()
+            for name, value in scores.items()
+            if isinstance(value, MeasurementUnavailable)
+        }
+        if unavailable:
+            wandb.log(unavailable, commit=False)
+        scores = {name: value for name, value in scores.items()
+                  if not isinstance(value, MeasurementUnavailable)}
 
         # 1) summary scalars (0-D only)
         scalar_summary = {

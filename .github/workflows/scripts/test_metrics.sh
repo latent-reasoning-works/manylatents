@@ -25,8 +25,16 @@ for config in "${CONFIGS[@]}"; do
     echo "→ Testing: metrics=$config"
     TESTED=$((TESTED + 1))
 
+    ALGORITHM=pca
+    if [ "$config" = "mismatch_ratio" ]; then
+        # PCA.affinity() is a signed centered Gram matrix / (n-1), not
+        # neighborhood probabilities. Mismatch correctly refuses it; PHATE
+        # supplies a nonnegative transition matrix. See tests/test_metric_smoke.py.
+        ALGORITHM=phate
+    fi
+
     CMD="python -m manylatents.main \
-        algorithms/latent=pca \
+        algorithms/latent=$ALGORITHM \
         data=swissroll \
         data.n_distributions=5 \
         data.n_points_per_distribution=20 \

@@ -2,6 +2,7 @@
 import numpy as np
 import pytest
 from manylatents.utils.metrics import _content_key, compute_knn
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 
 @pytest.fixture
@@ -68,20 +69,17 @@ def test_compute_knn_cache_different_arrays():
 
 
 def test_compute_knn_k_exceeds_n_samples():
-    """k >= n_samples should clamp and warn."""
+    """An impossible neighborhood must not be silently replaced."""
     small_data = np.random.RandomState(42).randn(10, 3).astype(np.float32)
-    with pytest.warns(UserWarning, match="Clamping k"):
-        dists, idxs = compute_knn(small_data, k=15)
-    assert dists.shape[1] <= 10
-    assert idxs.shape[1] <= 10
+    with pytest.raises(MeasurementUnavailable, match="0 < k < n_samples"):
+        compute_knn(small_data, k=15)
 
 
 def test_compute_knn_k_equals_n_samples():
-    """k == n_samples should also clamp."""
+    """Self is not one of the requested neighbors."""
     data = np.random.RandomState(42).randn(5, 2).astype(np.float32)
-    with pytest.warns(UserWarning, match="Clamping k"):
-        dists, idxs = compute_knn(data, k=5)
-    assert dists.shape[0] == 5
+    with pytest.raises(MeasurementUnavailable, match="0 < k < n_samples"):
+        compute_knn(data, k=5)
 
 
 def test_compute_knn_content_key_matches(sample_data):

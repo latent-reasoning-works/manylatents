@@ -39,6 +39,16 @@ class Metric(Protocol):
     exactly 1.0 for any single array — true as self-similarity, useless in a declared suite,
     where nothing downstream can tell a constant from a measurement. Raise instead.
 
+    When a requested measurement cannot be computed, raise
+    ``manylatents.utils.exceptions.MeasurementUnavailable`` (a ``ValueError``)
+    with the reason. Scalar evaluation propagates the exception. For list-valued
+    config sweeps, the shared evaluator retains that exception as the unavailable
+    entry's value alongside successful results; if no entry in that metric's
+    sweep is measurable, it raises. Saved/logged unavailables are represented as
+    ``{"status": "unavailable", "reason": "..."}``. There is no numeric sentinel
+    to aggregate and no silently substituted measurement. This applies to
+    unavailable evidence and unmet mathematical preconditions alike.
+
     Standard parameters:
         embeddings: Low-dimensional embedding array (n_samples, n_dims)
         dataset: Dataset object with .data attribute for high-dimensional data

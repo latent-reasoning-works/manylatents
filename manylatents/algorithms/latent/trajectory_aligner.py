@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from manylatents.utils.exceptions import MeasurementUnavailable
+
 from manylatents.algorithms.latent.latent_module_base import (
     ArrayLike,
     LatentModule,
@@ -95,8 +97,8 @@ class TrajectoryAligner(LatentModule):
 
         Cosine distance (``1 - cosine similarity``) per aligned step; shape ``(T,)``,
         non-negative, and exactly ``0`` where aligned steps coincide — so
-        ``residual(A, A)`` is all zeros (the identity bound). Zero-norm steps are
-        treated as aligned (distance 0). Pass ``y`` to score without fitting; else
+        ``residual(A, A)`` is all zeros for nonzero steps (the identity bound).
+        Zero-norm comparisons are unavailable. Pass ``y`` to score without fitting; else
         the reference stored by ``fit`` is used.
         """
         if y is None and not self._is_fitted:
@@ -105,7 +107,9 @@ class TrajectoryAligner(LatentModule):
         src, ref = self._align(_to_numpy(x), reference)
         dot = np.sum(src * ref, axis=1)
         denom = np.linalg.norm(src, axis=1) * np.linalg.norm(ref, axis=1)
-        cos = np.divide(dot, denom, out=np.ones_like(dot), where=denom > 0)
+        if denom.size == 0 or np.any(denom == 0) or not np.all(np.isfinite(denom)):
+            raise MeasurementUnavailable("Alignment residual requires finite nonzero vector norms")
+        cos = np.clip(dot / denom, -1.0, 1.0)
         return 1.0 - cos
 
     # -- matcher: (source, reference) -> (source_aligned, reference_aligned), both (T, d) --
