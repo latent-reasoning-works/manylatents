@@ -8,8 +8,9 @@ Parameterisation (noise-prediction / EDM-lite, VE forward x_t = x0 + sigma*eps):
   denoise (Tweedie) E[x0 | x_t] = x_t + sigma^2 * score = x_t - sigma * eps_hat.
 Training minimises E || eps_hat(x0 + sigma*eps, sigma) - eps ||^2 over log-uniform sigma.
 
-Everything is computed in a standardised space (per-dim mean/std stored at fit) — dimension counts
-from the score spectrum are scale-invariant, and standardisation stabilises training.
+Everything is computed in a standardised space (per-dim mean/std stored at fit).
+Standardisation stabilises training; selecting dimension from scores requires an
+explicit estimator policy (see metrics.score_jacobian_id).
 """
 from __future__ import annotations
 
@@ -117,6 +118,29 @@ class ScoreDiffusionModule:
         return self
 
     # ---- inference (standardised space) ----
+    def score_tensor(self, z, sigma):
+        """Differentiable score in standardized coordinates for standardized z.
+
+        Accepts a torch Tensor (N, D) and a scalar positive noise scale. Device
+        and dtype conversion preserve the input graph; no NumPy conversion or
+        no_grad context is used. Call under torch.enable_grad() for divergence.
+        The returned derivative is with respect to standardized coordinates,
+        without raw-space rescaling. Network parameter gradients are not filled
+        by callers using torch.autograd.grad with respect to z.
+        """
+        import torch
+
+        if not self._is_fitted or self.net is None:
+            raise ValueError("score_tensor requires a fitted ScoreDiffusionModule.")
+        if not isinstance(z, torch.Tensor) or z.ndim != 2:
+            raise ValueError("score_tensor requires a torch Tensor of shape (N, D).")
+        sigma = float(sigma)
+        if not np.isfinite(sigma) or sigma <= 0:
+            raise ValueError("score_tensor requires a finite positive sigma.")
+        z = z.to(device=self.device, dtype=torch.float32)
+        log_sigma = z.new_full((len(z),), np.log(sigma))
+        return -self.net(z, log_sigma) / sigma
+
     def _eps_hat(self, Z, sigma):
         import torch
         Z = np.asarray(Z, np.float32)
@@ -127,7 +151,12 @@ class ScoreDiffusionModule:
             return self.net(zt, ls).cpu().numpy()
 
     def score(self, x, sigma, standardized=True):
-        """grad_x log p_sigma. If standardized=False, x is in raw space (standardised internally)."""
+        """NumPy score in standardized coordinates (no input gradients).
+
+        If standardized=False, raw inputs are standardized internally; the
+        output still uses standardized coordinates. Use score_tensor for
+        differentiable standardized scores, including FLIPD divergence.
+        """
         Z = np.asarray(x, np.float32) if standardized else self._standardize(np.asarray(x, np.float32))
         return -self._eps_hat(Z, sigma) / float(sigma)
 

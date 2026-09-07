@@ -2,3 +2,6 @@ score_jacobian_id:
   _target_: manylatents.metrics.score_jacobian_id.ScoreJacobianID
   _partial_: True
   at: module
+  # Required: caller's callable policy, or configured FLIPD(scales, scale_policy).
+  # null deliberately refuses; largest_log_gap is unsound and also refuses.
+  estimator_policy: null
