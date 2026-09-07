@@ -109,3 +109,21 @@ def test_mismatch_smoke_phate_measures_real_neighborhoods(smoke_data_kwargs):
     keff = scores["mismatch_ratio.k_eff"]
     assert np.all((keff > 1) & (keff < len(W) - 1))
     assert np.ptp(keff) > 0
+
+
+def test_trustworthiness_k_smoke_config_executes(smoke_data_kwargs):
+    result = run(
+        data="swissroll", data_kwargs=smoke_data_kwargs, seed=42,
+        algorithm="pca", metrics="trustworthiness_k",
+    )
+    assert result["embeddings"].shape == (100, 2)
+    scores = result["scores"]
+    assert set(scores) == {f"trustworthiness__n_neighbors_{k}" for k in (15, 25, 50, 100, 250)}
+    for k in (15, 25, 50):
+        score = scores[f"trustworthiness__n_neighbors_{k}"]
+        assert isinstance(score, float) and np.isfinite(score)
+    for k in (100, 250):
+        unavailable = scores[f"trustworthiness__n_neighbors_{k}"]
+        assert isinstance(unavailable, MeasurementUnavailable)
+        assert f"k={k}" in str(unavailable)
+        assert "n=100" in str(unavailable)
