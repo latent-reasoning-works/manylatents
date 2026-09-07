@@ -10,8 +10,9 @@ training is supported here; the older affinity/PHATE-operator mode had no
 counterpart in mioflow 2.0 and was dropped (recoverable from git history at
 commit ``76740b8`` if ever needed again).
 
-Composed internally by :class:`~manylatents.algorithms.lightning.mioflow.MIOFlow`
-when ``use_gaga=True`` -- this module has no LightningModule of its own.
+One encoder choice for :class:`~manylatents.algorithms.lightning.mioflow.MIOFlow`.
+Pass its Hydra config as ``encoder`` with ``encoder_pretraining="gaga"`` for
+staged fitting, or use the legacy ``use_gaga=True`` shortcut.
 """
 
 from __future__ import annotations

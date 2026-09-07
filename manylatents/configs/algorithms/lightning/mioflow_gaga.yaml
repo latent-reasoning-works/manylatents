@@ -3,7 +3,7 @@ _recursive_: false
 datamodule: ${data}
 network:
   _target_: manylatents.algorithms.lightning.networks.mioflow_net.MIOFlowODEFunc
-  input_dim: null # inferred from GAGA latent dim in setup()
+  input_dim: null # inferred from encoder.latent_dim in configure_model()
   hidden_dim: 64
 optimizer:
   _target_: torch.optim.Adam
@@ -27,12 +27,17 @@ density_top_k: 5
 density_hinge_value: 0.01
 # Optimization
 grad_clip: null
-# GAGA -- demo variant with GAGA enabled. Override gaga_latent_dim and
-# gaga_*_epochs per dataset. See mioflow.yaml for the full parameter list.
-use_gaga: true
-gaga_latent_dim: 8
-gaga_hidden_dims: 128
-gaga_activation: relu
+# Swappable encoder config, instantiated alongside the flow in configure_model().
+# To use an existing fixed encoder, change _target_ and set encoder_pretraining: none.
+encoder:
+  _target_: manylatents.algorithms.lightning.networks.gaga_net.GAGANetwork
+  input_dim: null # inferred from data, then persisted for restoration
+  latent_dim: 8
+  hidden_dims: 128
+  activation: relu
+encoder_pretraining: gaga
+# GAGA pretraining runs in on_fit_start(), and is skipped after restoring a
+# completed stage. Override encoder.latent_dim and gaga_*_epochs per dataset.
 gaga_encoder_epochs: 50
 gaga_decoder_epochs: 50
 gaga_dist_weight_phase1: 1.0

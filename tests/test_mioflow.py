@@ -204,3 +204,31 @@ class TestGAGALosses:
         x = torch.randn(10, 5)
         y = torch.randn(10, 5)
         assert gaga_reconstruction_loss(x, y).item() > 0
+
+
+def test_momentum_keyword_only_preserves_positional_init_seed():
+    import inspect
+    from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+    signature = inspect.signature(MIOFlowODEFunc)
+    assert signature.parameters["momentum_beta"].kind is inspect.Parameter.KEYWORD_ONLY
+    first = MIOFlowODEFunc(3, 8, 123, momentum_beta=0.9)
+    torch.manual_seed(999)
+    second = MIOFlowODEFunc(3, 8, 123)
+    for key, value in first.state_dict().items():
+        torch.testing.assert_close(value, second.state_dict()[key], rtol=0, atol=0)
+
+
+def test_momentum_matches_reference_after_reset_and_batch_resize():
+    from manylatents.algorithms.lightning.networks.mioflow_net import MIOFlowODEFunc
+
+    func = MIOFlowODEFunc(3, 8, momentum_beta=0.9)
+    x = torch.randn(5, 3)
+    t = torch.tensor(0.5)
+    raw = func.net(torch.cat([t.expand(len(x), 1), x], dim=-1))
+    first = func(t, x)
+    torch.testing.assert_close(first, 0.1 * raw)
+    torch.testing.assert_close(func(t, x), 0.9 * first + 0.1 * raw)
+    func.reset_momentum()
+    torch.testing.assert_close(func(t, x), first)
+    torch.testing.assert_close(func(t, x[:2]), 0.1 * raw[:2])

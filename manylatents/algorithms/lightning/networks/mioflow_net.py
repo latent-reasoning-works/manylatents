@@ -28,7 +28,9 @@ class MIOFlowODEFunc(nn.Module):
             velocity field exactly, matching upstream mioflow 2.0's
             ``ODEFunc.momentum_beta`` default. Call :meth:`reset_momentum`
             before each fresh integration (``odeint`` call) since the
-            smoothing state is carried across ``forward`` calls.
+            smoothing state is carried across ``forward`` calls. After reset,
+            the previous velocity is zero, so the first result is
+            ``(1 - beta) * raw_velocity``, as in the reference.
     """
 
     def __init__(
@@ -38,6 +40,7 @@ class MIOFlowODEFunc(nn.Module):
         super().__init__()
         if init_seed is not None:
             torch.manual_seed(init_seed)
+        self.input_dim = input_dim
         self.net = nn.Sequential(
             nn.Linear(input_dim + 1, hidden_dim),
             nn.SiLU(),
@@ -56,8 +59,9 @@ class MIOFlowODEFunc(nn.Module):
         t_expanded = t.expand(x.size(0), 1)
         dxdt = self.net(torch.cat([t_expanded, x], dim=-1))
         if self.momentum_beta > 0:
-            if self._previous_v is not None and self._previous_v.shape == dxdt.shape:
-                dxdt = self.momentum_beta * self._previous_v + (1 - self.momentum_beta) * dxdt
+            if self._previous_v is None or self._previous_v.shape != dxdt.shape:
+                self._previous_v = torch.zeros_like(dxdt)
+            dxdt = self.momentum_beta * self._previous_v + (1 - self.momentum_beta) * dxdt
             self._previous_v = dxdt.detach()
         return dxdt
 

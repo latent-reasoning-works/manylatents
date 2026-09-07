@@ -3,7 +3,7 @@ _recursive_: false
 datamodule: ${data}
 network:
   _target_: manylatents.algorithms.lightning.networks.mioflow_net.MIOFlowODEFunc
-  input_dim: null # inferred from data in setup()
+  input_dim: null # inferred from data in configure_model()
   hidden_dim: 64
 optimizer:
   _target_: torch.optim.Adam
@@ -28,7 +28,10 @@ density_hinge_value: 0.01
 # Optimization (upstream mioflow 2.0 defaults grad_clip to 1.0; kept off here
 # so existing callers' training dynamics don't silently change)
 grad_clip: null
-# GAGA (optional composed geometric autoencoder; off by default)
+# Optional fixed-coordinate encoder config (encode + latent_dim contract).
+encoder: null
+encoder_pretraining: null # none by default; gaga for legacy use_gaga=true
+# Backward-compatible GAGA shortcut; prefer the encoder config in mioflow_gaga.
 use_gaga: false
 gaga_latent_dim: null # required when use_gaga=true
 gaga_hidden_dims: 128

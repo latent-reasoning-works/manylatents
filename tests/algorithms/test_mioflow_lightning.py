@@ -353,16 +353,18 @@ class TestMIOFlowGAGA:
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
 
         assert module.gaga_network is not None
         assert module.gaga_network.latent_dim == 3
         assert module._gaga_preprocessor is not None
 
     def test_gaga_pretraining_produces_finite_losses(self, gaga_time_labeled_batch):
-        """setup()'s internal GAGA pretraining must not blow up."""
+        """The training hook's GAGA pretraining must not blow up."""
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
 
         x_norm = module._gaga_preprocessor.normalize(gaga_time_labeled_batch["data"])
         x_hat, z = module.gaga_network(x_norm)
@@ -370,10 +372,11 @@ class TestMIOFlowGAGA:
         assert torch.isfinite(z).all()
 
     def test_gaga_frozen_after_pretraining(self, gaga_time_labeled_batch):
-        """GAGA must not be jointly fine-tuned with the ODE flow after setup()."""
+        """GAGA must not be jointly fine-tuned with the ODE flow after pretraining."""
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
 
         assert all(not p.requires_grad for p in module.gaga_network.parameters())
         assert not module.gaga_network.training
@@ -396,7 +399,7 @@ class TestMIOFlowGAGA:
         )
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
 
-        # Compute target distances the same way _setup_gaga does, but before
+        # Compute target distances the same way _fit_gaga does, but before
         # any GAGA training, to get a losses-at-init baseline.
         data = gaga_time_labeled_batch["data"]
         gt_distances = module._compute_gaga_target_distances(data.numpy())
@@ -420,10 +423,11 @@ class TestMIOFlowGAGA:
         dist_loss_before = gaga_distance_loss(z_before, gt_upper).item()
         recon_loss_before = gaga_reconstruction_loss(x_hat_before, x_norm).item()
 
-        # Now actually pretrain via setup() with real epoch counts.
+        # Now actually pretrain via on_fit_start() with real epoch counts.
         module.gaga_encoder_epochs = 40
         module.gaga_decoder_epochs = 40
         module.setup()
+        module.on_fit_start()
 
         with torch.no_grad():
             z_after = module.gaga_network.encode(x_norm)
@@ -444,6 +448,7 @@ class TestMIOFlowGAGA:
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
 
         z = module.encode(gaga_time_labeled_batch["data"][:10])
         assert z.shape == (10, 3)
@@ -452,6 +457,7 @@ class TestMIOFlowGAGA:
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
 
         x = gaga_time_labeled_batch["data"][:10]
         z_default = module.encode(x)
@@ -462,6 +468,7 @@ class TestMIOFlowGAGA:
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
 
         module._generate_trajectories()
         assert module.trajectories is not None
@@ -472,6 +479,7 @@ class TestMIOFlowGAGA:
         module = self._make_module(gaga_latent_dim=3)
         module.datamodule = self._make_datamodule(gaga_time_labeled_batch)
         module.setup()
+        module.on_fit_start()
         groups = module._group_by_time(gaga_time_labeled_batch)
 
         local_result = module._local_step(groups)

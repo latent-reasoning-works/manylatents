@@ -61,9 +61,9 @@ manylatents/
 │       ├── distillation.py         # Activation-distillation aux-loss (task_loss + α·align_loss)
 │       ├── phase1_align.py         # Staged alignment training
 │       ├── mioflow.py              # Neural-ODE trajectory inference over time-labeled
-│       │                           #   populations; optional composed GAGA geometric
-│       │                           #   autoencoder (use_gaga=True) pretrained internally
-│       │                           #   in setup() and frozen before ODE training
+│       │                           #   populations; swappable fixed encoder config,
+│       │                           #   optional GAGA pretraining in on_fit_start();
+│       │                           #   checkpoint construction in configure_model()
 │       ├── losses/                 # MSELoss, geometric losses
 │       └── networks/               # Autoencoder, AANet, LatentODE, MIOFlowODEFunc,
 │                                    #   GAGANetwork architectures
