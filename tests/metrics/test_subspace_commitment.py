@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+from manylatents.utils.exceptions import MeasurementUnavailable
+
 
 class _LabeledDataset:
     def __init__(self, labels):
@@ -25,20 +27,20 @@ def test_planted_groups_are_committed():
 
     rng = np.random.default_rng(0)
     X, labels = _planted(rng)
-    res = SubspaceCommitment(X, dataset=_LabeledDataset(labels))
+    res = SubspaceCommitment(X, dataset=_LabeledDataset(labels), null_policy="random_bases")
     assert res["n_groups"] == 4
     assert res["mean"] > 0.4
     assert res["excess"] > 0.2
 
 
 def test_shuffled_labels_reduce_commitment():
-    """Label structure is what's measured: shuffling labels must drop the excess."""
+    """For planted distinct subspaces, shuffling reduces the random-basis contrast."""
     from manylatents.metrics import SubspaceCommitment
 
     rng = np.random.default_rng(1)
     X, labels = _planted(rng)
-    true = SubspaceCommitment(X, dataset=_LabeledDataset(labels))
-    shuf = SubspaceCommitment(X, dataset=_LabeledDataset(rng.permutation(labels)))
+    true = SubspaceCommitment(X, dataset=_LabeledDataset(labels), null_policy="random_bases")
+    shuf = SubspaceCommitment(X, dataset=_LabeledDataset(rng.permutation(labels)), null_policy="random_bases")
     assert true["excess"] > shuf["excess"] + 0.1
 
 
@@ -49,28 +51,27 @@ def test_isotropic_data_has_no_excess():
     rng = np.random.default_rng(2)
     X = rng.standard_normal((160, 64))
     labels = np.repeat(np.arange(4), 40)
-    res = SubspaceCommitment(X, dataset=_LabeledDataset(labels))
+    res = SubspaceCommitment(X, dataset=_LabeledDataset(labels), null_policy="random_bases")
     assert abs(res["excess"]) < 0.05
 
 
-def test_no_labels_returns_nan():
+def test_no_labels_refuses():
     from manylatents.metrics import SubspaceCommitment
 
     rng = np.random.default_rng(3)
-    with pytest.warns(RuntimeWarning):
-        res = SubspaceCommitment(rng.standard_normal((20, 8)), dataset=None)
-    assert np.isnan(res["mean"]) and res["n_groups"] == 0
+    with pytest.raises(MeasurementUnavailable, match="no labels"):
+        SubspaceCommitment(rng.standard_normal((20, 8)), null_policy="random_bases")
 
 
-def test_single_group_returns_nan():
+def test_single_group_refuses():
     from manylatents.metrics import SubspaceCommitment
 
     rng = np.random.default_rng(4)
-    with pytest.warns(RuntimeWarning):
-        res = SubspaceCommitment(
-            rng.standard_normal((20, 8)), dataset=_LabeledDataset([0] * 20)
+    with pytest.raises(MeasurementUnavailable, match="2 usable label groups"):
+        SubspaceCommitment(
+            rng.standard_normal((20, 8)), dataset=_LabeledDataset([0] * 20),
+            null_policy="random_bases",
         )
-    assert np.isnan(res["mean"])
 
 
 def test_registry_aliases():
@@ -86,3 +87,158 @@ def test_registry_aliases():
         "n_null": 3,
         "random_seed": 0,
     }
+
+
+def _identical_groups(d=2):
+    X = np.zeros((8, d))
+    X[:, 0] = np.tile([-2., -1., 1., 2.], 2)
+    return X, _LabeledDataset(np.repeat([0, 1], 4))
+
+
+@pytest.mark.parametrize("name", ["SubspaceCommitment", "subspace_commitment", "commitment"])
+def test_registry_never_supplies_a_null(name):
+    from manylatents.metrics import get_metric
+
+    X, ds = _identical_groups()
+    with pytest.raises(MeasurementUnavailable, match="caller must choose"):
+        get_metric(name)(X, dataset=ds, rank=1)
+    assert get_metric(name)(X, dataset=ds, rank=1,
+                            null_policy="label_permutation")["excess"] == 0
+
+
+@pytest.mark.parametrize("kwargs", [{}, {"null_policy": None}, {"null_policy": "automatic"}])
+def test_direct_call_refuses_without_named_policy(kwargs):
+    from manylatents.metrics import SubspaceCommitment
+
+    X, ds = _identical_groups()
+    with pytest.raises(MeasurementUnavailable, match="null_policy"):
+        SubspaceCommitment(X, dataset=ds, rank=1, **kwargs)
+
+
+@pytest.mark.parametrize("d, baseline", [
+    (2, 0.10335686140609159),
+    (4, 0.4131682499157813),
+    (8, 0.6334527190431952),
+])
+def test_explicit_random_bases_preserves_documented_counterexample(d, baseline):
+    """This is an orientation contrast, never a label-independence correction."""
+    from manylatents.metrics import SubspaceCommitment
+
+    X, ds = _identical_groups(d)
+    result = SubspaceCommitment(X, dataset=ds, rank=1, n_null=3,
+                               random_seed=0, null_policy="random_bases")
+    assert result["mean"] == 0
+    assert result["null_mean"] == pytest.approx(baseline, abs=1e-14)
+    assert result["excess"] == pytest.approx(-baseline, abs=1e-14)
+    assert result["null_policy"] == "random_bases"
+    assert "p_value" not in result
+
+
+@pytest.mark.parametrize("d", [2, 4, 8])
+def test_permutation_identical_groups_is_exactly_zero(d):
+    from manylatents.metrics import SubspaceCommitment
+
+    X, ds = _identical_groups(d)
+    result = SubspaceCommitment(X, dataset=ds, rank=1, n_null=19,
+                               null_policy="label_permutation")
+    assert result["mean"] == result["null_mean"] == result["excess"] == 0
+    assert result["p_value"] == 1  # Every tied permutation counts in the upper tail.
+    assert result["null_policy"] == "label_permutation"
+
+
+def test_permutation_refits_with_fixed_auxiliary_randomness(monkeypatch):
+    import manylatents.metrics.subspace_commitment as metric
+
+    X, labels = _planted(np.random.default_rng(17), n_per=12, K=3, d=8, rank=1)
+    # Unequal groups, including a small excluded group: all sizes are preserved.
+    X, labels = X[:29], labels[:29]
+    labels[-2:] = 3
+    original = metric.group_half_bases
+    calls = []
+
+    def record(embeddings, perm_labels, rank, rng):
+        assert embeddings is X
+        calls.append((perm_labels.copy(), rng.bit_generator.state))
+        return original(embeddings, perm_labels, rank, rng)
+
+    monkeypatch.setattr(metric, "group_half_bases", record)
+    result = metric.SubspaceCommitment(
+        X, dataset=_LabeledDataset(labels), rank=1, n_null=9,
+        random_seed=8, null_policy="label_permutation",
+    )
+    assert len(calls) == 10  # Observed plus B complete split/fit/score evaluations.
+    assert result["n_groups"] == 2
+    for perm_labels, rng_state in calls:
+        np.testing.assert_array_equal(np.sort(perm_labels), np.sort(labels))
+        assert rng_state == calls[0][1]
+    assert any(not np.array_equal(perm, labels) for perm, _ in calls[1:])
+
+    # Each null value equals a fresh public evaluation of that labeling.
+    perm_means = [metric.SubspaceCommitment(
+        X, dataset=_LabeledDataset(perm), rank=1, n_null=1, random_seed=8,
+        null_policy="random_bases",
+    )["mean"] for perm, _ in calls[1:].copy()]
+    assert result["null_mean"] == np.mean(perm_means)
+    assert result["excess"] == result["mean"] - np.mean(perm_means)
+    assert result["p_value"] == (1 + sum(t >= result["mean"] for t in perm_means)) / 10
+
+
+def test_planted_permutation_upper_tail_and_determinism():
+    from manylatents.metrics import SubspaceCommitment
+
+    X, labels = _planted(np.random.default_rng(0), n_per=20, K=3, d=16, rank=1)
+    kwargs = dict(dataset=_LabeledDataset(labels), rank=1, n_null=19,
+                  random_seed=0, null_policy="label_permutation")
+    result = SubspaceCommitment(X, **kwargs)
+    assert result == SubspaceCommitment(X, **kwargs)
+    assert result["excess"] > 0.2
+    assert result["p_value"] == 1 / 20  # Plus-one correction even with no exceedances.
+
+
+@pytest.mark.parametrize("kwargs, reason", [
+    ({"rank": 0}, "rank"), ({"rank": -1}, "rank"),
+    ({"rank": 1.5}, "rank"), ({"n_null": 0}, "n_null"),
+    ({"n_null": True}, "n_null"), ({"random_seed": -1}, "random_seed"),
+])
+def test_invalid_parameters_refuse(kwargs, reason):
+    from manylatents.metrics import SubspaceCommitment
+
+    X, ds = _identical_groups()
+    with pytest.raises(MeasurementUnavailable, match=reason):
+        SubspaceCommitment(X, dataset=ds, null_policy="label_permutation", **kwargs)
+
+
+@pytest.mark.parametrize("policy", ["random_bases", "label_permutation"])
+@pytest.mark.parametrize("invalid", ["nonfinite", "zero_energy", "misaligned_labels"])
+def test_unavailable_evidence_refuses(policy, invalid):
+    from manylatents.metrics import SubspaceCommitment
+
+    X, ds = _identical_groups()
+    if invalid == "nonfinite":
+        X[0, 0] = np.nan
+    elif invalid == "zero_energy":
+        X[0] = 0  # One undefined sample must not disappear from the average.
+    else:
+        ds.metadata = ds.metadata[:-1]
+    with pytest.raises(MeasurementUnavailable):
+        SubspaceCommitment(X, dataset=ds, rank=1, null_policy=policy)
+
+
+def test_undefined_permutation_is_not_discarded(monkeypatch):
+    import manylatents.metrics.subspace_commitment as metric
+
+    X, ds = _identical_groups()
+    original = metric.commitment_profile
+    count = 0
+
+    def undefined_null(embeddings, bases):
+        nonlocal count
+        count += 1
+        if count > 2:  # Both observed halves succeeded; first permutation fails.
+            return np.full(len(embeddings), np.nan)
+        return original(embeddings, bases)
+
+    monkeypatch.setattr(metric, "commitment_profile", undefined_null)
+    with pytest.raises(MeasurementUnavailable, match="undefined projection energy"):
+        metric.SubspaceCommitment(X, dataset=ds, rank=1,
+                                  null_policy="label_permutation")

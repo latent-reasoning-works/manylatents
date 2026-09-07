@@ -1,32 +1,61 @@
-"""Subspace-commitment order parameter.
+"""Cross-fitted projection-energy concentration with a caller-chosen null.
 
-Given labeled embeddings, fit a low-rank subspace per label group and measure,
-per sample, how concentrated the sample's projection energy is across the
-group subspaces: ``commitment = 1 - H(w)/log K`` where ``w`` is the normalized
-energy distribution over the K group subspaces. 1 = the sample lies in one
-group's subspace (committed); 0 = spread evenly (uncommitted / wandering).
+Fit a low-rank subspace per label group and score each sample against bases
+fit on the opposite split half: ``T = mean(1 - H(w)/log K)``, where ``w`` is
+its normalized projection energy across the K subspaces. This measures
+concentration, not agreement with the sample's own label. Bases are fitted
+on centered rows; projection energies use the supplied origin (raw rows).
 
-Reported with a rank/count-matched RANDOM-bases null computed identically
-(``excess = mean - null_mean``), so generic geometry (anisotropy, norm
-structure) cancels in the excess and only label-structured concentration
-remains.
+There is NO default null. The method owner must supply ``null_policy``:
 
-Scoring is SPLIT-HALF CROSS-FIT: each group's samples are split in two, bases
-are fit per half, and every sample is scored against the bases fit on the
-halves it did NOT contribute to. This removes in-sample fitting bias — on
-isotropic data the excess is ~0 by construction, not by luck. Groups need at
-least 4 samples to participate.
+* ``"random_bases"`` asks how concentrated energies are relative to
+  independently oriented subspaces with matching dimensions, ranks and group
+  counts. It is NOT centred under label independence. It does not preserve
+  covariance or overlap between fitted bases, so generic anisotropy does NOT
+  cancel. Cross-fitting addresses fitting bias, not this null mismatch.
+* ``"label_permutation"`` asks whether concentration exceeds that under
+  exchangeable labels conditional on the fixed embeddings and group sizes.
+  Each permutation reruns the WHOLE split/fit/score procedure, with the same
+  auxiliary split randomness as the observed evaluation. Any rank selection
+  must also run inside every evaluation (currently rank is caller-specified,
+  with the existing SVD shape cap applied during each fit). The caller owns
+  whether unrestricted label exchangeability is appropriate for their data.
+  Upper-tail ``p_value = (1 + #{T_perm >= T_observed}) / (B + 1)``.
+  Runtime is roughly B+1 complete basis-fitting evaluations, versus one fit
+  evaluation plus cheap random draws for ``random_bases``.
+
+Known failure of the random-basis label-independence interpretation: give
+both groups the SAME four collinear points, ``[-2, -1, 1, 2]`` on the first
+axis of R^2, rank=1, n_null=3, random_seed=0. Every fitted basis spans the same
+line, so energies are equal and mean commitment is exactly 0. The reproduced
+null mean is 0.10335686140609159 and excess -0.10335686140609159 (up to floating
+roundoff), despite NO label-specific structure. Zero-padding to four and
+eight dimensions gives excess about -0.413 and -0.634, respectively. The
+permutation null on the minimal fixture gives baseline=excess=0 and p_value=1.
+The previously reported -0.45007 did not reproduce; its original dimensions
+were not supplied and it is not evidence for this fixture.
+
+These are different scientific questions wearing one name. In the sibling
+reasoning-geometry repository, experiments/analysis/74_class_commitment_dynamics.py
+around lines 190-193 and notes/nizar-task-commitment-block.md lines 18-25 read
+nonpositive random-basis excess as a shared-collapse signature. Under label
+permutation that number means something different. This module does not
+choose between those interpretations or silently rewrite the downstream
+findings: the method owner must name the null.
+
+The existing cohort rule is retained: groups with fewer than four samples
+are excluded from fitting and scoring. Permutations preserve all group sizes
+and rerun that rule; the identities of included samples can therefore change.
+Missing policy, unavailable labels/cohorts, or undefined scores raise
+MeasurementUnavailable instead of producing a plausible numeric sentinel.
 """
-import logging
-import warnings
 from typing import Optional
 
 import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
-
-logger = logging.getLogger(__name__)
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 
 def _extract_labels(dataset: Optional[object]) -> Optional[np.ndarray]:
@@ -43,7 +72,7 @@ def _extract_labels(dataset: Optional[object]) -> Optional[np.ndarray]:
 
 def _fit_basis(X: np.ndarray, rank: int) -> np.ndarray:
     """Top-``rank`` right singular vectors of the mean-centered rows -> (d, r)."""
-    Xc = np.nan_to_num(X - X.mean(0))
+    Xc = X - X.mean(0)
     try:
         _, _, Vt = np.linalg.svd(Xc, full_matrices=False)
     except np.linalg.LinAlgError:
@@ -91,12 +120,37 @@ def commitment_profile(embeddings: np.ndarray, bases_list: list) -> np.ndarray:
     return np.where(tot > 1e-12, c, np.nan)
 
 
+def _finite_mean(values: np.ndarray, context: str) -> float:
+    """Refuse undefined observations rather than silently dropping them."""
+    if not np.all(np.isfinite(values)):
+        raise MeasurementUnavailable(
+            f"SubspaceCommitment: {context} has undefined projection energy scores."
+        )
+    return float(np.mean(values))
+
+
+def _cross_fit(embeddings, labels, rank, rng):
+    """One complete split/fit/score evaluation, shared by observed and permuted data."""
+    bases_by_half, half_of_sample = group_half_bases(embeddings, labels, rank, rng)
+    if len(bases_by_half[0]) < 2:
+        raise MeasurementUnavailable(
+            "SubspaceCommitment: requires at least 2 usable label groups "
+            "with >= 4 samples each."
+        )
+    c = np.full(len(labels), np.nan)
+    for h in (0, 1):
+        mask = half_of_sample == h
+        other = list(bases_by_half[1 - h].values())
+        c[mask] = commitment_profile(embeddings[mask], other)
+    mean = _finite_mean(c[half_of_sample >= 0], "cross-fit")
+    return mean, bases_by_half, half_of_sample
+
+
 @register_metric(
     aliases=["subspace_commitment", "commitment"],
     default_params={"rank": 4, "n_null": 3, "random_seed": 0},
-    description="Concentration of per-sample projection energy across per-label "
-    "subspaces (1 = committed to one group, 0 = wandering), with a "
-    "rank-matched random-bases null (excess).",
+    description="Cross-fitted projection-energy concentration; caller must name "
+    "null_policy='random_bases' or 'label_permutation'. See module for hypotheses.",
 )
 def SubspaceCommitment(
     embeddings: np.ndarray,
@@ -106,67 +160,104 @@ def SubspaceCommitment(
     n_null: int = 3,
     random_seed: int = 0,
     cache: Optional[dict] = None,
+    null_policy: Optional[str] = None,
 ) -> dict:
-    """Compute the subspace-commitment order parameter.
+    """Compute concentration relative to an explicitly named null.
 
     Args:
-        embeddings: (n_samples, n_features) embedding array.
-        dataset: Dataset with .metadata (or .get_labels()) giving group labels.
+        embeddings: Finite (n_samples, n_features) embedding array. The supplied
+            origin is used for scoring; fitting centers each group's half.
+        dataset: Dataset with .metadata (or .get_labels()) giving aligned labels.
+            Groups with fewer than four samples are excluded.
         module: LatentModule (unused).
-        rank: Rank of each group subspace.
-        n_null: Random-bases draws for the null.
-        random_seed: Seed for the null bases.
+        rank: Positive requested subspace rank; capped by each fit's SVD shape.
+        n_null: Positive number B of null draws. For label_permutation this
+            costs roughly B+1 COMPLETE basis-fitting evaluations.
+        random_seed: Nonnegative seed; split randomness is reset identically
+            for observed and every permuted evaluation.
+        cache: Unused; fitted bases must not be reused across permutations.
+        null_policy: REQUIRED caller choice (None raises MeasurementUnavailable).
+            'random_bases' measures concentration relative to independently
+            oriented subspaces, NOT excess centred under label independence.
+            'label_permutation' tests exchangeable labels with fixed embeddings
+            and group sizes, rerunning split/fit/score per draw. The module
+            docstring gives the counterexample and downstream interpretation
+            that the method owner must decide between. Example:
+            SubspaceCommitment(X, dataset=ds, null_policy='label_permutation',
+                               rank=1, n_null=99).
 
     Returns:
-        dict: ``mean`` (mean per-sample commitment), ``null_mean`` (matched
-        random-bases null), ``excess`` (mean - null_mean), ``n_groups``.
-        All-nan dict if labels are unavailable or fewer than 2 usable groups.
+        dict: mean, null_mean, excess (mean - null_mean), n_groups, null_policy.
+        Only label_permutation also reports the upper-tail p_value, counting
+        ties with >= and using the (1 + count)/(B + 1) correction.
+
+    Raises:
+        MeasurementUnavailable: Missing/unknown null policy, missing labels,
+            invalid inputs, fewer than two usable groups, undefined observed
+            or null scores, or a failed basis decomposition. No null draw or
+            scored observation is silently discarded.
     """
-    nan_result = {
-        "mean": float("nan"),
-        "null_mean": float("nan"),
-        "excess": float("nan"),
-        "n_groups": 0,
-    }
+    if null_policy not in ("random_bases", "label_permutation"):
+        raise MeasurementUnavailable(
+            "SubspaceCommitment: missing or unknown null_policy; caller must "
+            "choose 'random_bases' or 'label_permutation' (see module docstring)."
+        )
+    for name, value, minimum in (
+        ("rank", rank, 1), ("n_null", n_null, 1), ("random_seed", random_seed, 0)
+    ):
+        if (isinstance(value, (bool, np.bool_))
+                or not isinstance(value, (int, np.integer)) or value < minimum):
+            raise MeasurementUnavailable(
+                f"SubspaceCommitment: {name} must be an integer >= {minimum}."
+            )
+    embeddings = np.asarray(embeddings)
+    if (embeddings.ndim != 2 or 0 in embeddings.shape
+            or not np.issubdtype(embeddings.dtype, np.number)
+            or np.iscomplexobj(embeddings) or not np.all(np.isfinite(embeddings))):
+        raise MeasurementUnavailable("SubspaceCommitment: requires finite real 2-D embeddings.")
     labels = _extract_labels(dataset)
     if labels is None:
-        warnings.warn(
-            "SubspaceCommitment: no labels available, returning nan.", RuntimeWarning
-        )
-        return nan_result
+        raise MeasurementUnavailable("SubspaceCommitment: no labels available.")
+    if labels.ndim != 1 or len(labels) != len(embeddings):
+        raise MeasurementUnavailable("SubspaceCommitment: requires one aligned label per sample.")
+    if any(lab is None or lab != lab for lab in labels):
+        raise MeasurementUnavailable("SubspaceCommitment: missing label values.")
 
     rng = np.random.default_rng(random_seed)
-    bases_by_half, half_of_sample = group_half_bases(embeddings, labels, rank, rng)
-    n_groups = len(bases_by_half[0])
-    if n_groups < 2:
-        warnings.warn(
-            "SubspaceCommitment: fewer than 2 usable groups (>= 4 samples each), "
-            "returning nan.",
-            RuntimeWarning,
-        )
-        return nan_result
+    try:
+        mean, bases_by_half, half_of_sample = _cross_fit(embeddings, labels, rank, rng)
+        null_means = []
+        if null_policy == "random_bases":
+            # Keep the original contrast and RNG sequence when explicitly chosen.
+            d = embeddings.shape[1]
+            ranks = [B.shape[1] for B in bases_by_half[0].values()]
+            scored = embeddings[half_of_sample >= 0]
+            for _ in range(n_null):
+                null_bases = [np.linalg.qr(rng.standard_normal((d, r)))[0] for r in ranks]
+                null_means.append(_finite_mean(
+                    commitment_profile(scored, null_bases), "random-bases null"
+                ))
+        else:
+            # Separate label draws from the identically reset auxiliary fit RNG.
+            permutation_rng = np.random.default_rng(random_seed)
+            for _ in range(n_null):
+                permuted_labels = permutation_rng.permutation(labels)
+                perm_mean, _, _ = _cross_fit(
+                    embeddings, permuted_labels, rank, np.random.default_rng(random_seed)
+                )
+                null_means.append(perm_mean)
+    except np.linalg.LinAlgError as exc:
+        raise MeasurementUnavailable("SubspaceCommitment: basis decomposition failed.") from exc
 
-    # cross-fit: samples in half h are scored against bases fit on the OTHER half
-    c = np.full(len(labels), np.nan)
-    for h in (0, 1):
-        mask = half_of_sample == h
-        if mask.any():
-            other = list(bases_by_half[1 - h].values())
-            c[mask] = commitment_profile(embeddings[mask], other)
-    mean = float(np.nanmean(c))
-
-    d = embeddings.shape[1]
-    ranks = [B.shape[1] for B in bases_by_half[0].values()]
-    null_means = []
-    for _ in range(n_null):
-        null_bases = [np.linalg.qr(rng.standard_normal((d, r)))[0] for r in ranks]
-        scored = embeddings[half_of_sample >= 0]
-        null_means.append(float(np.nanmean(commitment_profile(scored, null_bases))))
-    null_mean = float(np.nanmean(null_means)) if null_means else float("nan")
-
-    return {
+    null_mean = _finite_mean(np.asarray(null_means), "null")
+    result = {
         "mean": mean,
         "null_mean": null_mean,
         "excess": mean - null_mean,
-        "n_groups": n_groups,
+        "n_groups": len(bases_by_half[0]),
+        "null_policy": null_policy,
     }
+    if null_policy == "label_permutation":
+        exceedances = np.count_nonzero(np.asarray(null_means) >= mean)
+        result["p_value"] = float((1 + exceedances) / (n_null + 1))
+    return result
