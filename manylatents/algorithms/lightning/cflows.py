@@ -82,7 +82,9 @@ class Cflows(LightningModule):
 
     Args:
         network: Hydra config or instantiated ``LatentODENetwork`` (encode ->
-            integrate in latent -> decode).
+            integrate in latent -> decode). Existing modules keep their identity
+            and weights; seed them at construction with
+            ``LatentODENetwork(..., init_seed=42)``.
         optimizer: Hydra config for optimizer (partial instantiation) or a
             ``functools.partial``.
         loss: Hydra config or instantiated OT loss (``OTLoss``). This is the
@@ -91,7 +93,7 @@ class Cflows(LightningModule):
             ``energy`` helper. The config ``loss`` node therefore carries the
             OT loss specifically.
         datamodule: Data module yielding batches with ``"data"`` and ``"time"``.
-        init_seed: Random seed for weight initialization.
+        init_seed: Seed before config construction; never resets supplied weights.
         integration_times: Time span used by ``encode()`` for the embedding
             (mirrors ``LatentODE``). The *training* time spans come from the
             data's timepoints, not this value.
@@ -169,6 +171,9 @@ class Cflows(LightningModule):
 
     def configure_model(self):
         """Instantiate network + losses from Hydra configs (or pass instances)."""
+        # Lightning calls this hook for every stage, even when setup() returns early.
+        if self.network is not None:
+            return
         torch.manual_seed(self.init_seed)
 
         if isinstance(self.network_config, (dict, DictConfig)):

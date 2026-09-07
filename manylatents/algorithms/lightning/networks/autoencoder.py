@@ -1,5 +1,6 @@
 from typing import List, Union
 
+import torch
 import torch.nn as nn
 from torch import Tensor
 
@@ -17,6 +18,7 @@ class Autoencoder(nn.Module):
         activation: str = "relu",
         batchnorm: bool = False,
         dropout: float = 0.0,
+        init_seed: int | None = None,
     ):
         """
         Parameters:
@@ -26,8 +28,12 @@ class Autoencoder(nn.Module):
             activation (str): "relu", "tanh", or "sigmoid".
             batchnorm (bool): If True, insert BatchNorm1d after each Linear.
             dropout (float): Dropout probability after each activation (0=no dropout).
+            init_seed: Seed before creating weights. None uses the caller's RNG,
+                including the seed set by a config-building Lightning wrapper.
         """
         super().__init__()
+        if init_seed is not None:
+            torch.manual_seed(init_seed)
         if isinstance(hidden_dims, int):
             hidden_dims = [hidden_dims]
 

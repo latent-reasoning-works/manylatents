@@ -23,11 +23,13 @@ class LatentODE(LightningModule):
     architecture with reconstruction loss.
 
     Args:
-        network: Hydra config or instantiated LatentODENetwork.
+        network: Hydra config or instantiated LatentODENetwork. Existing modules
+            keep their identity and weights; seed them at construction with
+            LatentODENetwork(..., init_seed=42).
         optimizer: Hydra config for optimizer (partial instantiation).
         loss: Hydra config or instantiated loss module.
         datamodule: Data module for loading train/val/test data.
-        init_seed: Random seed for weight initialization.
+        init_seed: Seed before config construction; never resets supplied weights.
         integration_times: ODE integration time span [t_0, t_T].
     """
 
@@ -64,6 +66,9 @@ class LatentODE(LightningModule):
 
     def configure_model(self):
         """Instantiate network and loss from Hydra configs."""
+        # Lightning calls this hook for every stage, even when setup() returns early.
+        if self.network is not None:
+            return
         torch.manual_seed(self.init_seed)
 
         cfg_map = {

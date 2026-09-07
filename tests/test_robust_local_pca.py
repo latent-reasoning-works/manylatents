@@ -3,6 +3,53 @@ import numpy as np
 import pytest
 
 
+def test_ltsa_seed_controls_arpack_start_and_embedding(monkeypatch):
+    from scipy.sparse import linalg
+    from manylatents.utils.robust_pca_solvers import ltsa_align, robust_local_pca
+    from manylatents.utils.knn import compute_knn
+
+    X = np.random.default_rng(7).normal(size=(40, 3))
+    distances, indices = compute_knn(X.astype(np.float32), k=10, include_self=False)
+    local = robust_local_pca(X, n_components=2, robust_method="none",
+                             precomputed_neighbors=indices,
+                             precomputed_distances=distances)
+    starts = []
+    eigsh = linalg.eigsh
+
+    def capture_start(*args, **kwargs):
+        starts.append(kwargs.get("v0"))
+        return eigsh(*args, **kwargs)
+
+    monkeypatch.setattr(linalg, "eigsh", capture_start)
+    embeddings = []
+    for prior_seed in (0, 99):
+        np.random.seed(prior_seed)
+        embeddings.append(ltsa_align(X, indices, local.local_bases, 2))
+    assert all(start is not None for start in starts)
+    np.testing.assert_array_equal(starts[0], starts[1])
+    np.testing.assert_allclose(embeddings[0], embeddings[1], atol=1e-8, rtol=1e-8)
+    ltsa_align(X, indices, local.local_bases, 2, random_state=43)
+    assert not np.array_equal(starts[0], starts[-1])
+
+
+def test_robust_local_pca_passes_seed_to_ltsa(monkeypatch):
+    from manylatents.algorithms.latent.pca import PCAModule
+    from manylatents.utils import robust_pca_solvers
+
+    seeds = []
+    align = robust_pca_solvers.ltsa_align
+
+    def capture_seed(*args, **kwargs):
+        seeds.append(kwargs.get("random_state"))
+        return align(*args, **kwargs)
+
+    monkeypatch.setattr(robust_pca_solvers, "ltsa_align", capture_seed)
+    X = np.random.default_rng(7).normal(size=(40, 3)).astype(np.float32)
+    PCAModule(n_components=2, method="robust_local", robust_method="none",
+              neighborhood_size=10, random_state=123).fit_transform(X)
+    assert seeds == [123]
+
+
 def make_robust_local_pca_test_data(n=500, noise_std=0.0,
                                       contamination_frac=0.05, seed=42):
     from sklearn.datasets import make_swiss_roll
