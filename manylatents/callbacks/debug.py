@@ -5,13 +5,34 @@ Both surfaces are imported by callers that gate them on env vars (e.g.
 """
 from __future__ import annotations
 
+import math
 import os
+from numbers import Integral
 from typing import Any, List
 
 import torch
 from lightning.pytorch.callbacks import Callback
 from torch import nn
 from torch.utils.hooks import RemovableHandle
+
+from manylatents.utils.exceptions import MeasurementUnavailable
+
+
+def _validate_count(name: str, value: int, *, minimum: int = 0) -> None:
+    if isinstance(value, bool) or not isinstance(value, Integral) or value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}, got {value!r}")
+
+
+def _loss_summary(loss: Any) -> str:
+    if isinstance(loss, torch.Tensor) and loss.numel() != 1:
+        return str(MeasurementUnavailable("loss must contain one scalar").to_dict())
+    try:
+        value = float(loss)
+    except (TypeError, ValueError, OverflowError) as exc:
+        return str(MeasurementUnavailable(f"loss cannot be read as a scalar: {exc}").to_dict())
+    if not math.isfinite(value):
+        return str(MeasurementUnavailable("loss is non-finite").to_dict())
+    return f"{value:.6e}"
 
 
 def attach_nan_detector(model: nn.Module, max_reports: int = 10) -> List[RemovableHandle]:
@@ -20,8 +41,9 @@ def attach_nan_detector(model: nn.Module, max_reports: int = 10) -> List[Removab
 
     Returns the list of handles so callers can remove them later.
     """
+    _validate_count("max_reports", max_reports)
     rank = os.environ.get("LOCAL_RANK", "0")
-    state = {"reports": 0, "max": int(max_reports)}
+    state = {"reports": 0, "max": max_reports}
     handles: List[RemovableHandle] = []
 
     def make_hook(name: str):
@@ -45,17 +67,19 @@ def attach_nan_detector(model: nn.Module, max_reports: int = 10) -> List[Removab
                 if not (has_nan or has_inf):
                     continue
                 finite_mask = ~nan_mask & ~inf_mask
-                if t.numel() > 0 and bool(finite_mask.any().item()):
-                    amax = float(t[finite_mask].abs().max().item())
+                n_finite = int(finite_mask.sum().item())
+                if n_finite:
+                    amax = f"{t[finite_mask].abs().max().item():.4e}"
                 else:
-                    amax = float("nan")
+                    amax = str(MeasurementUnavailable("no finite activations").to_dict())
                 n_nan = int(nan_mask.sum().item())
                 n_inf = int(inf_mask.sum().item())
                 print(
                     f"[NaN-trap][rank{rank}] FIRST_BAD module={tname!r} "
                     f"shape={tuple(t.shape)} dtype={t.dtype} "
                     f"NaN={n_nan} Inf={n_inf} "
-                    f"finite_abs_max={amax:.4e}",
+                    f"finite_count={n_finite} total_count={t.numel()} "
+                    f"finite_abs_max={amax}",
                     flush=True,
                 )
                 state["reports"] += 1
@@ -81,12 +105,16 @@ def attach_nan_detector(model: nn.Module, max_reports: int = 10) -> List[Removab
 class FirstBatchLoggerCallback(Callback):
     """Log the first training batch's ``input_ids`` stats (and optional
     vocab-OOB check), plus the per-step loss for the first ``n_steps``
-    optimizer steps. Then unplugs.
+    batches. Logging stops after that many batch-end calls.
     """
 
     def __init__(self, n_steps: int = 12, vocab_size: int | None = None):
         super().__init__()
-        self.n_steps = int(n_steps)
+        _validate_count("n_steps", n_steps)
+        # Token IDs range over [0, vocab_size), so a vocabulary must be nonempty.
+        if vocab_size is not None:
+            _validate_count("vocab_size", vocab_size, minimum=1)
+        self.n_steps = n_steps
         self.vocab_size = vocab_size
         self._logged_batch = False
         self._step_count = 0
@@ -96,26 +124,28 @@ class FirstBatchLoggerCallback(Callback):
         if not self._logged_batch:
             ids = batch.get("input_ids") if isinstance(batch, dict) else None
             if isinstance(ids, torch.Tensor):
-                vmin = int(ids.min().item())
-                vmax = int(ids.max().item())
                 msg = (
                     f"[first-batch][rank{rank}] input_ids shape={tuple(ids.shape)} "
-                    f"dtype={ids.dtype} min={vmin} max={vmax}"
+                    f"dtype={ids.dtype}"
                 )
-                if self.vocab_size is not None:
-                    msg += f" vocab={self.vocab_size} oob={vmax >= self.vocab_size}"
+                if ids.numel() == 0:
+                    msg += f" bounds={MeasurementUnavailable('input_ids is empty').to_dict()}"
+                elif ids.dtype not in (torch.uint8, torch.int8, torch.int16, torch.int32, torch.int64):
+                    msg += f" bounds={MeasurementUnavailable('input_ids must have integer dtype').to_dict()}"
+                else:
+                    vmin = ids.min().item()
+                    vmax = ids.max().item()
+                    msg += f" min={vmin} max={vmax}"
+                    if self.vocab_size is not None:
+                        msg += f" vocab={self.vocab_size} oob={vmin < 0 or vmax >= self.vocab_size}"
                 print(msg, flush=True)
             self._logged_batch = True
 
         if self._step_count < self.n_steps:
             loss_t = outputs.get("loss") if isinstance(outputs, dict) else outputs
-            try:
-                loss_v = float(loss_t)
-            except Exception:
-                loss_v = float("nan")
             print(
                 f"[step-trace][rank{rank}] step={trainer.global_step} "
-                f"batch_idx={batch_idx} loss={loss_v:.6e}",
+                f"batch_idx={batch_idx} loss={_loss_summary(loss_t)}",
                 flush=True,
             )
             self._step_count += 1
