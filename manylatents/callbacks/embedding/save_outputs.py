@@ -191,8 +191,8 @@ class SaveOutputs(EmbeddingCallback):
             arr = np.asarray(value)
 
             if arr.ndim == 0:
-                # Scalar
-                flattened[name] = float(value)
+                # Preserve categorical provenance alongside numeric scores.
+                flattened[name] = value if isinstance(value, str) else float(value)
             elif arr.shape[0] != n_samples:
                 # Not per-sample: flatten array with suffixes
                 if arr.ndim == 1:

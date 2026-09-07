@@ -1,4 +1,4 @@
-"""Cross-fitted projection-energy concentration with a caller-chosen null.
+"""Cross-fitted projection-energy concentration with a label-permutation default.
 
 Fit a low-rank subspace per label group and score each sample against bases
 fit on the opposite split half: ``T = mean(1 - H(w)/log K)``, where ``w`` is
@@ -6,14 +6,15 @@ its normalized projection energy across the K subspaces. This measures
 concentration, not agreement with the sample's own label. Bases are fitted
 on centered rows; projection energies use the supplied origin (raw rows).
 
-There is NO default null. The method owner must supply ``null_policy``:
+The default ``null_policy="label_permutation"`` is centred under label
+independence. The two available nulls answer different questions:
 
 * ``"random_bases"`` asks how concentrated energies are relative to
   independently oriented subspaces with matching dimensions, ranks and group
   counts. It is NOT centred under label independence. It does not preserve
   covariance or overlap between fitted bases, so generic anisotropy does NOT
   cancel. Cross-fitting addresses fitting bias, not this null mismatch.
-* ``"label_permutation"`` asks whether concentration exceeds that under
+* ``"label_permutation"`` (default) asks whether concentration exceeds that under
   exchangeable labels conditional on the fixed embeddings and group sizes.
   Each permutation reruns the WHOLE split/fit/score procedure, with the same
   auxiliary split randomness as the observed evaluation. Any rank selection
@@ -21,8 +22,10 @@ There is NO default null. The method owner must supply ``null_policy``:
   with the existing SVD shape cap applied during each fit). The caller owns
   whether unrestricted label exchangeability is appropriate for their data.
   Upper-tail ``p_value = (1 + #{T_perm >= T_observed}) / (B + 1)``.
-  Runtime is roughly B+1 complete basis-fitting evaluations, versus one fit
-  evaluation plus cheap random draws for ``random_bases``.
+  Default runtime is roughly B+1 complete basis-fitting evaluations, versus
+  one fit evaluation plus cheap random draws for ``random_bases``. Control B
+  with the public ``n_null`` parameter (default 3, hence four evaluations and
+  a minimum attainable p-value of 1/4); increase it for finer p-value resolution.
 
 Known failure of the random-basis label-independence interpretation: give
 both groups the SAME four collinear points, ``[-2, -1, 1, 2]`` on the first
@@ -35,18 +38,29 @@ permutation null on the minimal fixture gives baseline=excess=0 and p_value=1.
 The previously reported -0.45007 did not reproduce; its original dimensions
 were not supplied and it is not evidence for this fixture.
 
-These are different scientific questions wearing one name. In the sibling
+Migration: the default changed to ``label_permutation`` from the original
+``random_bases`` contrast, following an interim version that required an
+explicit policy. Prior numbers under the old contrast must be recomputed
+or reinterpreted as concentration relative to independently oriented subspaces,
+rather than compared with results under the new default. Every result carries
+``null_policy``, retained as ``<metric>.null_policy`` in evaluated scores and
+their saved/logged forms. Legacy results without this field have unknown
+provenance unless their producing version/configuration establishes the null;
+do not infer the new default from a missing field.
+
+In the sibling
 reasoning-geometry repository, experiments/analysis/74_class_commitment_dynamics.py
 around lines 190-193 and notes/nizar-task-commitment-block.md lines 18-25 read
 nonpositive random-basis excess as a shared-collapse signature. Under label
-permutation that number means something different. This module does not
-choose between those interpretations or silently rewrite the downstream
-findings: the method owner must name the null.
+permutation that number means something different: nonpositive excess means
+no observed concentration above the permutation baseline, not evidence of
+shared collapse by itself. The downstream author must decide whether to
+recompute or retain the old contrast explicitly as ``random_bases``.
 
 The existing cohort rule is retained: groups with fewer than four samples
 are excluded from fitting and scoring. Permutations preserve all group sizes
 and rerun that rule; the identities of included samples can therefore change.
-Missing policy, unavailable labels/cohorts, or undefined scores raise
+Invalid policy, unavailable labels/cohorts, or undefined scores raise
 MeasurementUnavailable instead of producing a plausible numeric sentinel.
 """
 from typing import Optional
@@ -148,9 +162,11 @@ def _cross_fit(embeddings, labels, rank, rng):
 
 @register_metric(
     aliases=["subspace_commitment", "commitment"],
-    default_params={"rank": 4, "n_null": 3, "random_seed": 0},
-    description="Cross-fitted projection-energy concentration; caller must name "
-    "null_policy='random_bases' or 'label_permutation'. See module for hypotheses.",
+    default_params={"rank": 4, "n_null": 3, "random_seed": 0,
+                    "null_policy": "label_permutation"},
+    description="Cross-fitted projection-energy concentration; default "
+    "null_policy='label_permutation' costs n_null+1 complete fitting evaluations "
+    "(n_null=3). Named 'random_bases' is NOT centred under label independence.",
 )
 def SubspaceCommitment(
     embeddings: np.ndarray,
@@ -160,9 +176,12 @@ def SubspaceCommitment(
     n_null: int = 3,
     random_seed: int = 0,
     cache: Optional[dict] = None,
-    null_policy: Optional[str] = None,
+    null_policy: str = "label_permutation",
 ) -> dict:
-    """Compute concentration relative to an explicitly named null.
+    """Compute concentration with a label-permutation null by default.
+
+    Default cost: n_null+1 complete split/fit/score evaluations (four with
+    n_null=3), versus one fit plus cheap draws for named 'random_bases'.
 
     Args:
         embeddings: Finite (n_samples, n_features) embedding array. The supplied
@@ -171,20 +190,19 @@ def SubspaceCommitment(
             Groups with fewer than four samples are excluded.
         module: LatentModule (unused).
         rank: Positive requested subspace rank; capped by each fit's SVD shape.
-        n_null: Positive number B of null draws. For label_permutation this
-            costs roughly B+1 COMPLETE basis-fitting evaluations.
+        n_null: Positive number B of null draws/permutations (default 3).
+            The default label_permutation costs roughly B+1 COMPLETE
+            basis-fitting evaluations; p-value resolution is 1/(B+1).
         random_seed: Nonnegative seed; split randomness is reset identically
             for observed and every permuted evaluation.
         cache: Unused; fitted bases must not be reused across permutations.
-        null_policy: REQUIRED caller choice (None raises MeasurementUnavailable).
+        null_policy: Defaults to 'label_permutation'.
             'random_bases' measures concentration relative to independently
             oriented subspaces, NOT excess centred under label independence.
             'label_permutation' tests exchangeable labels with fixed embeddings
             and group sizes, rerunning split/fit/score per draw. The module
-            docstring gives the counterexample and downstream interpretation
-            that the method owner must decide between. Example:
-            SubspaceCommitment(X, dataset=ds, null_policy='label_permutation',
-                               rank=1, n_null=99).
+            docstring gives the counterexample and migration requirements.
+            Example: SubspaceCommitment(X, dataset=ds, rank=1, n_null=99).
 
     Returns:
         dict: mean, null_mean, excess (mean - null_mean), n_groups, null_policy.
@@ -192,14 +210,14 @@ def SubspaceCommitment(
         ties with >= and using the (1 + count)/(B + 1) correction.
 
     Raises:
-        MeasurementUnavailable: Missing/unknown null policy, missing labels,
+        MeasurementUnavailable: Invalid null policy (including None), missing labels,
             invalid inputs, fewer than two usable groups, undefined observed
             or null scores, or a failed basis decomposition. No null draw or
             scored observation is silently discarded.
     """
     if null_policy not in ("random_bases", "label_permutation"):
         raise MeasurementUnavailable(
-            "SubspaceCommitment: missing or unknown null_policy; caller must "
+            "SubspaceCommitment: invalid null_policy; "
             "choose 'random_bases' or 'label_permutation' (see module docstring)."
         )
     for name, value, minimum in (

@@ -86,6 +86,7 @@ def test_registry_aliases():
         "rank": 4,
         "n_null": 3,
         "random_seed": 0,
+        "null_policy": "label_permutation",
     }
 
 
@@ -96,18 +97,21 @@ def _identical_groups(d=2):
 
 
 @pytest.mark.parametrize("name", ["SubspaceCommitment", "subspace_commitment", "commitment"])
-def test_registry_never_supplies_a_null(name):
+def test_registry_defaults_to_label_permutation(name):
     from manylatents.metrics import get_metric
 
     X, ds = _identical_groups()
-    with pytest.raises(MeasurementUnavailable, match="caller must choose"):
-        get_metric(name)(X, dataset=ds, rank=1)
-    assert get_metric(name)(X, dataset=ds, rank=1,
-                            null_policy="label_permutation")["excess"] == 0
+    result = get_metric(name)(X, dataset=ds, rank=1)
+    assert result["excess"] == 0
+    assert result["p_value"] == 1
+    assert result["null_policy"] == "label_permutation"
+    old_contrast = get_metric(name)(X, dataset=ds, rank=1, null_policy="random_bases")
+    assert old_contrast["excess"] < 0
+    assert old_contrast["null_policy"] == "random_bases"
 
 
-@pytest.mark.parametrize("kwargs", [{}, {"null_policy": None}, {"null_policy": "automatic"}])
-def test_direct_call_refuses_without_named_policy(kwargs):
+@pytest.mark.parametrize("kwargs", [{"null_policy": None}, {"null_policy": "automatic"}])
+def test_direct_call_refuses_invalid_policy(kwargs):
     from manylatents.metrics import SubspaceCommitment
 
     X, ds = _identical_groups()
@@ -135,12 +139,12 @@ def test_explicit_random_bases_preserves_documented_counterexample(d, baseline):
 
 
 @pytest.mark.parametrize("d", [2, 4, 8])
-def test_permutation_identical_groups_is_exactly_zero(d):
+@pytest.mark.parametrize("kwargs", [{}, {"n_null": 19}, {"null_policy": "label_permutation"}])
+def test_default_permutation_identical_groups_is_exactly_zero(d, kwargs):
     from manylatents.metrics import SubspaceCommitment
 
     X, ds = _identical_groups(d)
-    result = SubspaceCommitment(X, dataset=ds, rank=1, n_null=19,
-                               null_policy="label_permutation")
+    result = SubspaceCommitment(X, dataset=ds, rank=1, **kwargs)
     assert result["mean"] == result["null_mean"] == result["excess"] == 0
     assert result["p_value"] == 1  # Every tied permutation counts in the upper tail.
     assert result["null_policy"] == "label_permutation"
@@ -164,7 +168,7 @@ def test_permutation_refits_with_fixed_auxiliary_randomness(monkeypatch):
     monkeypatch.setattr(metric, "group_half_bases", record)
     result = metric.SubspaceCommitment(
         X, dataset=_LabeledDataset(labels), rank=1, n_null=9,
-        random_seed=8, null_policy="label_permutation",
+        random_seed=8,
     )
     assert len(calls) == 10  # Observed plus B complete split/fit/score evaluations.
     assert result["n_groups"] == 2
@@ -183,16 +187,85 @@ def test_permutation_refits_with_fixed_auxiliary_randomness(monkeypatch):
     assert result["p_value"] == (1 + sum(t >= result["mean"] for t in perm_means)) / 10
 
 
-def test_planted_permutation_upper_tail_and_determinism():
+def test_planted_default_permutation_upper_tail_and_determinism():
     from manylatents.metrics import SubspaceCommitment
 
     X, labels = _planted(np.random.default_rng(0), n_per=20, K=3, d=16, rank=1)
     kwargs = dict(dataset=_LabeledDataset(labels), rank=1, n_null=19,
-                  random_seed=0, null_policy="label_permutation")
+                  random_seed=0)
     result = SubspaceCommitment(X, **kwargs)
     assert result == SubspaceCommitment(X, **kwargs)
     assert result["excess"] > 0.2
+    assert result["null_policy"] == "label_permutation"
     assert result["p_value"] == 1 / 20  # Plus-one correction even with no exceedances.
+
+
+@pytest.mark.parametrize("route", ["registry", "hydra"])
+@pytest.mark.parametrize("policy_kwargs, policy", [
+    ({}, "label_permutation"),
+    ({"null_policy": "random_bases"}, "random_bases"),
+])
+def test_null_provenance_survives_evaluation_saving_and_logging(
+    route, policy_kwargs, policy, tmp_path, monkeypatch,
+):
+    import json
+    from unittest.mock import MagicMock
+
+    import pandas as pd
+    from omegaconf import OmegaConf
+
+    from manylatents.evaluate import evaluate
+    from manylatents.callbacks.embedding.atomic_writer import write_embedding_outputs_atomic
+    from manylatents.callbacks.embedding.save_outputs import SaveOutputs
+    import manylatents.callbacks.embedding.save_outputs as save_module
+    import manylatents.callbacks.embedding.wandb_log_scores as log_module
+
+    X, ds = _identical_groups()
+    name = "subspace_commitment"
+    if route == "registry":
+        scores = evaluate(X, dataset=ds, metrics=[name], rank=1, **policy_kwargs)
+    else:
+        config = OmegaConf.create({
+            "_target_": "manylatents.metrics.subspace_commitment.SubspaceCommitment",
+            "_partial_": True, "at": "embedding", "rank": 1, **policy_kwargs,
+        })
+        scores = evaluate(X, dataset=ds, metrics={name: config})
+    assert scores[f"{name}.null_policy"] == policy
+    outputs = {"embeddings": X, "scores": scores}
+
+    # Exercise the real CSV and JSON writers, without an external W&B session.
+    monkeypatch.setattr(save_module, "wandb", None)
+    saver = SaveOutputs(save_dir=str(tmp_path), use_timestamp=False,
+                        save_additional_outputs=True, save_metric_tables=True)
+    saver.on_latent_end(ds, outputs)
+    saved_json = json.loads((tmp_path / "embeddings_experiment_scores.json").read_text())
+    assert saved_json == scores
+    saved_csv = pd.read_csv(next(tmp_path.glob("metrics_summary_*.csv")))
+    assert saved_csv.loc[0, f"{name}.null_policy"] == policy
+    assert saved_csv.loc[0, f"{name}.excess"] == pytest.approx(scores[f"{name}.excess"])
+    write_embedding_outputs_atomic(outputs, tmp_path / "outputs.json")
+    assert json.loads((tmp_path / "outputs.json").read_text())["scores"] == scores
+
+    mock_wandb = MagicMock()
+    monkeypatch.setattr(log_module, "wandb", mock_wandb)
+    log_module.WandbLogScores().on_latent_end(ds, outputs)
+    logged = {key: value for call in mock_wandb.log.call_args_list
+              for key, value in call.args[0].items()}
+    assert logged == {f"embedding/{key}": value for key, value in scores.items()}
+
+    # The engine also logs scores directly, without WandbLogScores installed.
+    from manylatents.data.precomputed_datamodule import PrecomputedDataModule
+    import manylatents.experiment as engine
+
+    monkeypatch.setattr(engine, "_load_precomputed_from_datamodule", lambda dm: outputs)
+    mock_run = MagicMock()
+    result = engine.run_experiment(
+        datamodule=PrecomputedDataModule(data=X, batch_size=len(X)),
+        algorithm=None, trainer=None, eval_only=True, wandb_run=mock_run,
+    )
+    assert result["scores"] == scores
+    mock_run.log.assert_called_once_with({f"metrics/{key}": value for key, value in scores.items()})
+    mock_run.finish.assert_called_once()
 
 
 @pytest.mark.parametrize("kwargs, reason", [
