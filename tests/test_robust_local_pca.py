@@ -27,7 +27,9 @@ def test_ltsa_seed_controls_arpack_start_and_embedding(monkeypatch):
         embeddings.append(ltsa_align(X, indices, local.local_bases, 2))
     assert all(start is not None for start in starts)
     np.testing.assert_array_equal(starts[0], starts[1])
-    np.testing.assert_allclose(embeddings[0], embeddings[1], atol=1e-8, rtol=1e-8)
+    # Identical seeded calls on the same platform must be repeatable; there is
+    # no reference embedding from another BLAS implementation to approximate.
+    np.testing.assert_array_equal(embeddings[0], embeddings[1])
     ltsa_align(X, indices, local.local_bases, 2, random_state=43)
     assert not np.array_equal(starts[0], starts[-1])
 

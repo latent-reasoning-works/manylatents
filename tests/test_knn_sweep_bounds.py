@@ -44,6 +44,12 @@ def test_selective_correction_mismatch_diagnostic_at_default_ceiling(data):
     assert labels.shape == ratios.shape == (200,)
     assert labels.dtype == np.bool_
     assert np.all(np.isfinite(ratios))
+    # Equal weights on every other point mean exactly n-1 effective neighbors.
+    # This analytic case checks the meaning without repeating the formula.
+    keff = result["k_eff"]
+    np.testing.assert_allclose(
+        keff, len(data) - 1, rtol=len(data) * np.finfo(keff.dtype).eps, atol=0,
+    )
     np.testing.assert_allclose(ratios, result["v"])
     np.testing.assert_array_equal(labels, (ratios > 1.0) | (ratios < 0.5))
 
