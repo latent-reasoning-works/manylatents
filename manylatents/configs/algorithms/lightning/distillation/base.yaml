@@ -35,6 +35,7 @@ optimizer:
   eps: 1e-8
 
 alignment_weight: 0.0
-alignment_batch_size: 16
+# Absent means up to 16 available probes; explicit counts are exact requests.
+alignment_batch_size: null
 init_seed: 42
 lr_scheduler: null
