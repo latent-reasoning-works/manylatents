@@ -93,6 +93,7 @@ def LocalIntrinsicDimensionality(
     # needs at least one other term, hence k >= 2 (necessary, not sufficient).
     if isinstance(k, (bool, np.bool_)) or not isinstance(k, (int, np.integer)) or k < 2:
         raise MeasurementUnavailable("k must be a nonboolean integer >= 2")
+    k = int(k)
 
     if hasattr(embeddings, "detach"):
         embeddings = embeddings.detach().cpu().numpy()
