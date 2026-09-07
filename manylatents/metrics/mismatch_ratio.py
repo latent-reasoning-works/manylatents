@@ -12,6 +12,7 @@ from typing import Any, Optional
 import numpy as np
 
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.exceptions import MeasurementUnavailable
 from manylatents.utils.knn import compute_knn
 
 logger = logging.getLogger(__name__)
@@ -82,15 +83,28 @@ def _compute_kstar(
     return k_star, k_values
 
 
-def _compute_keff(module) -> np.ndarray:
-    """Extract per-point k_eff from a fitted module's affinity matrix."""
-    W = module.affinity(ignore_diagonal=True, use_symmetric=False)
+def _compute_keff(module, n_points: int) -> np.ndarray:
+    """Extract effective neighborhoods only from a graph aligned to the data."""
+    if module is None:
+        raise MeasurementUnavailable("Mismatch requires a fitted module's affinity")
+    try:
+        W = module.affinity(ignore_diagonal=True, use_symmetric=False)
+    except (NotImplementedError, AttributeError) as exc:
+        raise MeasurementUnavailable("Mismatch affinity is unavailable") from exc
     if hasattr(W, 'toarray'):
         W = W.toarray()
-    W = np.asarray(W)
+    W = np.asarray(W, dtype=float)
+    if W.shape != (n_points, n_points):
+        raise MeasurementUnavailable(
+            f"Mismatch affinity must have shape {(n_points, n_points)}, got {W.shape}"
+        )
+    if not np.all(np.isfinite(W)) or np.any(W < 0):
+        raise MeasurementUnavailable("Mismatch affinity must have finite nonnegative weights")
     row_sum = W.sum(axis=1)
     row_sum_sq = (W ** 2).sum(axis=1)
-    return np.where(row_sum_sq > 0, row_sum ** 2 / row_sum_sq, 0.0)
+    if np.any(row_sum_sq == 0):
+        raise MeasurementUnavailable("Mismatch affinity has rows without neighborhood evidence")
+    return row_sum ** 2 / row_sum_sq
 
 
 @register_metric(
@@ -136,14 +150,14 @@ def MismatchRatio(
     if dataset is not None and hasattr(dataset, 'data'):
         input_data = dataset.data
     if input_data is None:
-        logger.warning(
-            "MismatchRatio: no dataset.data available for k_star computation. "
-            "Falling back to computing k_star on the embedding itself."
-        )
-        input_data = embeddings
+        raise MeasurementUnavailable("MismatchRatio requires dataset.data for input-space geometry")
 
     input_data = np.asarray(input_data, dtype=np.float32)
+    if input_data.ndim != 2 or len(embeddings) != len(input_data):
+        raise MeasurementUnavailable("MismatchRatio requires row-aligned input data and embeddings")
     n_points = input_data.shape[0]
+
+    k_eff = _compute_keff(module, n_points)
 
     # k_star from input space
     k_star, k_values = _compute_kstar(
@@ -151,26 +165,8 @@ def MismatchRatio(
         r2_threshold=r2_threshold, cache=cache,
     )
 
-    # k_eff from module's affinity matrix
-    if module is not None:
-        try:
-            k_eff = _compute_keff(module)
-            if len(k_eff) != n_points:
-                logger.warning(
-                    f"MismatchRatio: k_eff length {len(k_eff)} != n_points {n_points} "
-                    f"(likely landmarks). Using mean k_eff={k_eff.mean():.1f}."
-                )
-                k_eff = np.full(n_points, k_eff.mean())
-        except (NotImplementedError, AttributeError) as e:
-            ns = getattr(module, 'neighborhood_size', None) or 15
-            logger.warning(f"MismatchRatio: affinity unavailable ({e}). Using uniform k_eff={ns}.")
-            k_eff = np.full(n_points, float(ns))
-    else:
-        logger.warning("MismatchRatio: no module provided. Cannot compute k_eff.")
-        k_eff = np.full(n_points, np.nan)
-
     # v = k_eff / k_star
-    v = np.where(k_star > 0, k_eff / k_star, 0.0)
+    v = k_eff / k_star
 
     logger.info(
         f"MismatchRatio: median v={np.median(v):.3f}, "

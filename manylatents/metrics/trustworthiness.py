@@ -12,6 +12,7 @@ from scipy.spatial.distance import cdist
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.exceptions import MeasurementUnavailable
 from manylatents.utils.metrics import compute_knn
 
 
@@ -40,10 +41,18 @@ def Trustworthiness(embeddings: np.ndarray,
     Returns:
       - A float representing the trustworthiness score.
     """
+    if dataset is None or getattr(dataset, "data", None) is None:
+        raise MeasurementUnavailable("Trustworthiness requires dataset.data")
     X_high = dataset.data
     X_low = embeddings
     n = X_high.shape[0]
     k = n_neighbors
+    if not isinstance(k, (int, np.integer)) or isinstance(k, bool) or not 0 < k < n / 2:
+        raise MeasurementUnavailable(
+            f"Trustworthiness requires 0 < n_neighbors < n_samples / 2; got k={k}, n={n}"
+        )
+    if X_low.shape[0] != n:
+        raise MeasurementUnavailable("Trustworthiness requires matching sample counts")
 
     _, knn_high = compute_knn(X_high, k=k, include_self=False, cache=cache)
     _, knn_low = compute_knn(X_low, k=k, include_self=False, cache=cache)
@@ -52,6 +61,7 @@ def Trustworthiness(embeddings: np.ndarray,
 
     # Rank matrix from original-space distances
     dist_high = cdist(X_high, X_high, metric='euclidean')
+    np.fill_diagonal(dist_high, -np.inf)
     rank_matrix = np.argsort(np.argsort(dist_high, axis=1), axis=1)
 
     penalty = 0.0
@@ -61,7 +71,4 @@ def Trustworthiness(embeddings: np.ndarray,
                 penalty += rank_matrix[i, j] - k
 
     normalizer = n * k * (2 * n - 3 * k - 1)
-    if normalizer == 0:
-        return 1.0
-
     return float(1.0 - (2.0 / normalizer) * penalty)

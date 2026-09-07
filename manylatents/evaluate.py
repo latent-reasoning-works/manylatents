@@ -146,6 +146,10 @@ def prewarm_cache(
 
         if data is not None and k_set:
             max_k = max(k_set)
+            # Prewarming is speculative (registry kwargs can override defaults).
+            # Let the metric validate its actual request against the sample count.
+            if max_k >= len(data):
+                continue
 
             # Disk cache for dataset kNN
             if at_value == "dataset" and knn_cache_dir is not None:

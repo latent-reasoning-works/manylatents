@@ -5,6 +5,9 @@ Run with: pytest tests/metrics/test_signal_geometry.py
 """
 
 import numpy as np
+import pytest
+
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 from manylatents.metrics.signal_geometry import (
     SIGNAL_LAYERS,
@@ -28,8 +31,10 @@ def test_signal_manifold_geometry_smoke():
         assert g.n == 160 and g.dim == 16
         # LID is a finite positive intrinsic-dimension estimate.
         assert np.isfinite(g.lid) and 0.0 < g.lid <= g.dim + 1e-6
-        # Axis-aligned AUROC is always in [0.5, 1.0].
-        assert 0.5 - 1e-9 <= g.auroc <= 1.0 + 1e-9
+        # Held-out AUROC can fall below chance.
+        assert 0.0 <= g.auroc <= 1.0
+        assert g.evaluation_mode == "stratified_cv"
+        assert g.cv_folds == 5
 
     # Layers with an injected class shift separate; pure-noise layers do not.
     sep_auroc = min(results[l].auroc for l in separable)
@@ -69,16 +74,13 @@ def test_auroc_requires_two_classes():
         signal_manifold_geometry({"rna": vectors}, single_class, k=20)
 
 
-def test_cv_clamps_folds_to_smallest_class():
-    """cv larger than a class size clamps instead of raising sklearn's error."""
+def test_cv_refuses_more_folds_than_smallest_class():
+    """Do not replace the requested evaluation with fewer folds."""
     layer_vectors, labels = make_synthetic_cohort(
         n_per_class=3, dim=8, separable_layers=("rna",), shift=4.0, seed=0
     )
-    # cv=5 > 3 per class must NOT raise; folds clamp to 3.
-    results = signal_manifold_geometry(layer_vectors, labels, k=2, cv=5)
-    assert set(results) == set(SIGNAL_LAYERS)
-    for g in results.values():
-        assert 0.0 <= g.auroc <= 1.0
+    with pytest.raises(MeasurementUnavailable, match="smallest class size"):
+        signal_manifold_geometry(layer_vectors, labels, k=2, cv=5)
 
 
 def test_cv_raises_on_singleton_class():
