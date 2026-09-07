@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from manylatents.algorithms.lightning.mioflow import MIOFlow
 from manylatents.algorithms.lightning.networks.autoencoder import Autoencoder
-from manylatents.algorithms.lightning.networks.network import HasEncode
+from manylatents.algorithms.lightning.networks.network import HasDecode, HasEncode
 
 pytest.importorskip("torchdiffeq")
 pytest.importorskip("ot")
@@ -186,11 +186,49 @@ def test_encode_only_contract_and_latent_trajectories():
     module.encoder_config = EncodeOnly()
     module.configure_model()
     assert isinstance(module.encoder, HasEncode)
+    assert not isinstance(module.encoder, HasDecode)
+    assert not module.supports_ambient_trajectories
     module._global_step(module._group_by_time(data.batch))["loss"].backward()
     assert any(p.grad is not None for p in module.network.parameters())
     assert all(p.grad is None for p in module.encoder.parameters())
     module._generate_trajectories()
     assert module.trajectories.shape == (3, 4, 2)
+
+
+@pytest.mark.parametrize("kind", ["gaga", "autoencoder", None])
+def test_ambient_trajectory_capability_before_running(kind):
+    module = make_module(kind, PopulationData())
+    if kind == "autoencoder":
+        module.encoder_config["decoder_hidden_dims"] = [9, 7, 5]
+    module.configure_model()
+    assert module.trajectories is None
+    # The query must not integrate, encode, decode, or fit anything.
+    with patch.object(module.network, "forward", side_effect=AssertionError("ran flow")):
+        if module.encoder is not None:
+            assert isinstance(module.encoder, HasDecode)
+            with patch.object(module.encoder, "decode", side_effect=AssertionError("decoded")):
+                assert module.supports_ambient_trajectories
+        else:
+            assert module.supports_ambient_trajectories
+    module._generate_trajectories()
+    assert module.trajectories.shape == (3, 4, 4)
+
+
+@pytest.mark.parametrize("decode", [None, 42])
+def test_noncallable_decode_does_not_advertise_ambient_trajectories(decode):
+    module = make_module(None, PopulationData())
+    module.encoder_config = EncodeOnly()
+    module.encoder_config.decode = decode
+    module.configure_model()
+    assert not module.supports_ambient_trajectories
+    module._generate_trajectories()
+    assert module.trajectories.shape == (3, 4, 2)
+
+
+def test_trajectory_capability_requires_configuration():
+    module = make_module("autoencoder", PopulationData())
+    with pytest.raises(RuntimeError, match="Call configure_model"):
+        _ = module.supports_ambient_trajectories
 
 
 def test_explicit_time_wins_over_both_label_channels():
@@ -225,6 +263,7 @@ def test_hydra_configs_resolve_and_restore_without_their_parent(tmp_path):
             "_target_": "manylatents.algorithms.lightning.networks.autoencoder.Autoencoder",
             "input_dim": None,
             "hidden_dims": ["${width}"],
+            "decoder_hidden_dims": [9, "${width}", 5],
             "latent_dim": 2,
         },
     })
@@ -244,6 +283,7 @@ def test_hydra_configs_resolve_and_restore_without_their_parent(tmp_path):
     assert cfg.encoder.input_dim is None
     assert module.hparams["network"]["hidden_dim"] == 7
     assert module.hparams["encoder"]["hidden_dims"] == [7]
+    assert module.hparams["encoder"]["decoder_hidden_dims"] == [9, 7, 5]
     path = tmp_path / "hydra.ckpt"
     fit_trainer.save_checkpoint(path)
     restored = MIOFlow.load_from_checkpoint(path, strict=True)

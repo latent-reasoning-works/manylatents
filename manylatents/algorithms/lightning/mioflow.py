@@ -28,7 +28,7 @@ from lightning.pytorch import LightningModule
 from omegaconf import DictConfig, OmegaConf
 from torch import Tensor
 
-from .networks.network import HasEncode
+from .networks.network import HasDecode, HasEncode
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,9 @@ class MIOFlow(LightningModule):
             satisfying HasEncode: encode(x) and a positive integer latent_dim.
             decode is optional: flow training and endpoint embeddings only need
             encoding. Generated trajectories are decoded when decode is available,
-            otherwise they remain in latent space. An instantiated encoder is
+            otherwise they remain in latent space. After configure_model(),
+            supports_ambient_trajectories reports this without running the flow.
+            An instantiated encoder is
             also accepted (supply it again when restoring).
         encoder_pretraining: "none" uses fixed encoder weights and identity
             preprocessing; "gaga" fits PHATE distances and reconstruction, requiring
@@ -215,6 +217,19 @@ class MIOFlow(LightningModule):
         self.register_buffer("_time_span", torch.tensor([0.0, 1.0]))
         self.register_buffer("_time_span_fitted", torch.tensor(False))
         self._trajectories: Tensor | None = None
+
+    @property
+    def supports_ambient_trajectories(self) -> bool:
+        """Whether trajectories use ambient coordinates, after configure_model().
+
+        Without an encoder the flow already operates in ambient space. With
+        one, only a callable decode is required; no training or inference runs.
+        """
+        if self.network is None:
+            raise RuntimeError("Call configure_model() before checking trajectory capabilities.")
+        return self.encoder is None or (
+            isinstance(self.encoder, HasDecode) and callable(self.encoder.decode)
+        )
 
     @property
     def total_epochs(self) -> int:
@@ -725,7 +740,7 @@ class MIOFlow(LightningModule):
             if hasattr(self.network, "reset_momentum"):
                 self.network.reset_momentum()
             trajectory = odeint(self.network, X_0_latent, t_bins)
-            if self.encoder is not None and callable(getattr(self.encoder, "decode", None)):
+            if self.encoder is not None and self.supports_ambient_trajectories:
                 n_bins_, n_traj_, d_latent = trajectory.shape
                 flat_ambient = self._decode_coordinates(trajectory.reshape(-1, d_latent))
                 trajectory = flat_ambient.reshape(n_bins_, n_traj_, -1)
