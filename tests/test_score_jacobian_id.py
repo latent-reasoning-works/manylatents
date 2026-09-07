@@ -4,6 +4,7 @@ import pytest
 
 from manylatents.metrics.score_jacobian_id import (
     FLIPD, ScoreDimensionEvidence, ScoreJacobianID, _largest_gap_cut,
+    read_finite_scale,
 )
 from manylatents.utils.exceptions import MeasurementUnavailable
 
@@ -173,18 +174,70 @@ def test_fitted_score_diffusion_flipd_end_to_end():
     assert all(p.grad is None for p in model.net.parameters())
 
 
-def test_config_and_registry_refuse_without_policy():
-    from hydra.utils import instantiate
-    from omegaconf import OmegaConf
-    from pathlib import Path
+def test_registry_refuses_without_policy():
     from manylatents.metrics.registry import get_metric
 
-    path = Path(__file__).parents[1] / "manylatents/configs/metrics/score_jacobian_id.yaml"
-    config = OmegaConf.load(path).score_jacobian_id
-    del config["at"]
-    for metric in (instantiate(config), get_metric("score_id")):
-        with pytest.raises(MeasurementUnavailable, match="estimator_policy"):
-            metric(np.zeros((1, 4)), module=_AnalyticPancake())
+    with pytest.raises(MeasurementUnavailable, match="estimator_policy"):
+        get_metric("score_id")(np.zeros((1, 4)), module=_AnalyticPancake())
+
+
+def test_finite_scale_readout_selects_named_scale_not_position():
+    values = np.array([[1., 2.], [3., 4.]])
+    np.testing.assert_array_equal(
+        read_finite_scale(values, [0.05, 0.1], sigma=0.05), [1., 3.],
+    )
+
+
+@pytest.mark.parametrize("scales", [[0.1], [0.05, 0.05]])
+def test_finite_scale_readout_refuses_missing_or_ambiguous_scale(scales):
+    with pytest.raises(MeasurementUnavailable, match="exactly once"):
+        read_finite_scale(np.zeros((2, len(scales))), scales, sigma=0.05)
+
+
+@pytest.fixture
+def shipped_score_metrics():
+    from pathlib import Path
+    from hydra import compose, initialize_config_dir
+    import manylatents.configs  # noqa: F401 — register Hydra schema
+    from manylatents.utils.metrics import flatten_and_unroll_metrics
+
+    with initialize_config_dir(
+        config_dir=str(Path(__file__).resolve().parents[1] / "manylatents/configs"),
+        version_base="1.3",
+    ):
+        config = compose(config_name="config", overrides=["metrics=score_jacobian_id"])
+    metrics = flatten_and_unroll_metrics(config.metrics)
+    # The nested scale list is evidence for one policy, not a metric sweep.
+    assert set(metrics) == {"score_jacobian_id"}
+    return metrics
+
+
+@pytest.mark.parametrize("rank", [0, 4])
+def test_shipped_score_config_recovers_analytic_endpoints(shipped_score_metrics, rank):
+    from manylatents.evaluate import evaluate
+
+    scores = evaluate(
+        np.zeros((2, 4), np.float32), module=_AnalyticPancake(m=rank),
+        metrics=shipped_score_metrics,
+    )
+    assert scores["score_jacobian_id"] == pytest.approx(
+        rank * 25 / (25 + 0.05**2), abs=1e-6,
+    )
+
+
+def test_shipped_score_config_fitted_model_smoke(shipped_score_metrics):
+    """CI entry point: instantiate the shipped policy and measure a real score net."""
+    from manylatents.algorithms.generative.score_diffusion import ScoreDiffusionModule
+    from manylatents.evaluate import evaluate
+
+    X = np.random.default_rng(4).normal(size=(12, 4)).astype(np.float32)
+    model = ScoreDiffusionModule(
+        hidden=8, depth=1, n_fourier=2, epochs=1, device="cpu",
+    ).fit(X)
+    scores = evaluate(X, module=model, metrics=shipped_score_metrics)
+    assert set(scores) == {"score_jacobian_id"}
+    assert isinstance(scores["score_jacobian_id"], float)
+    assert np.isfinite(scores["score_jacobian_id"])
 
 
 def test_flipd_stochastic_trace_off_diagonal_is_seeded_and_converges():

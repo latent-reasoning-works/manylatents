@@ -90,6 +90,19 @@ def largest_log_gap(evidence):
     )
 
 
+def read_finite_scale(values, scales, *, sigma):
+    """Read a caller-named finite-scale statistic, without dimension/limit inference.
+
+    ``sigma`` is required and must occur exactly once in the supplied scales.
+    This explicit column readout is useful for smoke fixtures; it does not test
+    scale stability or choose scientifically appropriate noise scales.
+    """
+    indices = np.flatnonzero(np.asarray(scales) == sigma)
+    if len(indices) != 1:
+        raise MeasurementUnavailable("read_finite_scale requires sigma exactly once in scales.")
+    return values[:, indices[0]]
+
+
 @dataclass
 class FLIPD:
     """FLIPD with caller-selected scales and interpretation, neither defaulted.
