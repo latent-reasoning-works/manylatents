@@ -132,3 +132,53 @@ def test_scale_invariance_on_each_backend(backend):
     eps = np.finfo(x.dtype).eps
     rtol = operations * eps / (1 - operations * eps)
     np.testing.assert_allclose(lid(x * 7.6e-16, k=k), lid(x, k=k), rtol=rtol, atol=0)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_reported_distance_fixture_across_units(backend, dtype):
+    # The origin has real neighbor distances [1, 2, 3, 4]. Exercise the shipped
+    # metric, including conditioning and neighbor search, not a copied formula.
+    x = np.arange(5, dtype=dtype)[:, None]
+    expected = lid(x, k=4, return_per_sample=True)
+    eps = np.finfo(np.float32).eps  # kNN's working dtype, even for float64 input
+    operations = x.shape[1] * 4
+    rtol = operations * eps / (1 - operations * eps)
+    for scale in (1e-6, 1e-12, 1e-18, 1e6):
+        actual = lid(x * scale, k=4, return_per_sample=True)
+        if dtype is np.float64:
+            # For this fixture, decimal rescaling rounds to the same conditioned
+            # float32 coordinates. All per-point estimates are exactly equal.
+            np.testing.assert_array_equal(actual, expected)
+        else:
+            np.testing.assert_allclose(actual, expected, rtol=rtol, atol=0)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_binary_rescaling_is_exact_across_orders_of_magnitude(backend, dtype):
+    x = np.arange(5, dtype=dtype)[:, None]
+    expected = lid(x, k=4, return_per_sample=True)
+    # Powers of two preserve the significands. Stay within the input exponent
+    # range and the float64 squared-RMS range used by conditioning.
+    limit = min(np.finfo(dtype).maxexp // 2, np.finfo(np.float64).maxexp // 4)
+    for exponent in (-limit, -limit // 2, limit // 2, limit):
+        np.testing.assert_array_equal(
+            lid(np.ldexp(x, exponent), k=4, return_per_sample=True), expected,
+        )
+
+
+def test_float32_input_underflow_has_a_dtype_derived_boundary(backend):
+    x = np.arange(5, dtype=np.float32)[:, None]
+    finfo = np.finfo(x.dtype)
+    smallest_exponent = finfo.minexp - finfo.nmant
+    # Conditioning in float64 even rescues float32 subnormal coordinates when
+    # the caller can still represent all five distinct points exactly.
+    np.testing.assert_array_equal(
+        lid(np.ldexp(x, smallest_exponent), k=4, return_per_sample=True),
+        lid(x, k=4, return_per_sample=True),
+    )
+    # Half a subnormal step merges input rows before LID sees them. The requested
+    # neighborhood no longer exists; no numeric sentinel can represent it.
+    with pytest.raises(MeasurementUnavailable, match="distinct points"):
+        lid(np.ldexp(x, smallest_exponent - 1), k=4)
+    with pytest.raises(MeasurementUnavailable, match="no geometry"):
+        lid(np.ldexp(x, smallest_exponent - 3), k=4)
