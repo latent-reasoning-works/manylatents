@@ -19,6 +19,8 @@ class Autoencoder(nn.Module):
         batchnorm: bool = False,
         dropout: float = 0.0,
         init_seed: int | None = None,
+        *,
+        decoder_hidden_dims: Union[List[int], int, None] = None,
     ):
         """
         Parameters:
@@ -30,6 +32,10 @@ class Autoencoder(nn.Module):
             dropout (float): Dropout probability after each activation (0=no dropout).
             init_seed: Seed before creating weights. None uses the caller's RNG,
                 including the seed set by a config-building Lightning wrapper.
+            decoder_hidden_dims (list[int], int, or None): Hidden widths in
+                latent-to-ambient order; defaults to reversed hidden_dims.
+                The latent input and ambient output layers are automatic.
+                An empty list gives a direct latent-to-ambient linear map.
         """
         super().__init__()
         if init_seed is not None:
@@ -40,6 +46,26 @@ class Autoencoder(nn.Module):
         self.input_dim   = input_dim
         self.hidden_dims = list(hidden_dims)
         self.latent_dim  = latent_dim
+
+        if decoder_hidden_dims is None:
+            self.decoder_hidden_dims = list(reversed(self.hidden_dims))
+        else:
+            if isinstance(decoder_hidden_dims, int):
+                decoder_hidden_dims = [decoder_hidden_dims]
+            try:
+                self.decoder_hidden_dims = list(decoder_hidden_dims)
+            except TypeError as exc:
+                raise ValueError("decoder_hidden_dims must be an int or a list of positive integers.") from exc
+            for name, dims in (
+                ("decoder_hidden_dims", self.decoder_hidden_dims),
+                ("latent_dim", [latent_dim]),
+                ("input_dim", [input_dim]),
+            ):
+                if any(isinstance(d, bool) or not isinstance(d, int) or d <= 0 for d in dims):
+                    raise ValueError(
+                        f"{name} must contain positive integer dimensions for a "
+                        "latent-to-ambient decoder."
+                    )
 
         # pick activation
         act = {
@@ -65,7 +91,7 @@ class Autoencoder(nn.Module):
         # build decoder
         decoder_layers = []
         prev = latent_dim
-        for h in reversed(self.hidden_dims):
+        for h in self.decoder_hidden_dims:
             decoder_layers.append(nn.Linear(prev, h))
             if batchnorm:
                 decoder_layers.append(nn.BatchNorm1d(h))
@@ -83,3 +109,7 @@ class Autoencoder(nn.Module):
 
     def encode(self, x: Tensor) -> Tensor:
         return self.encoder(x)
+
+    def decode(self, z: Tensor) -> Tensor:
+        """Map latent code back to input space."""
+        return self.decoder(z)

@@ -22,12 +22,25 @@ class MIOFlowODEFunc(nn.Module):
         hidden_dim: Width of hidden layers in the MLP.
         init_seed: Seed before creating weights. None uses the caller's RNG,
             including the seed set by a config-building Lightning wrapper.
+        momentum_beta: Exponential-smoothing factor applied to the predicted
+            velocity, ``v_t = beta * v_{t-1} + (1 - beta) * f(t, x)``. ``0.0``
+            (default) disables smoothing and reproduces the un-smoothed
+            velocity field exactly, matching upstream mioflow 2.0's
+            ``ODEFunc.momentum_beta`` default. Call :meth:`reset_momentum`
+            before each fresh integration (``odeint`` call) since the
+            smoothing state is carried across ``forward`` calls. After reset,
+            the previous velocity is zero, so the first result is
+            ``(1 - beta) * raw_velocity``, as in the reference.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int = 64, init_seed: int | None = None):
+    def __init__(
+        self, input_dim: int, hidden_dim: int = 64, init_seed: int | None = None,
+        *, momentum_beta: float = 0.0,
+    ):
         super().__init__()
         if init_seed is not None:
             torch.manual_seed(init_seed)
+        self.input_dim = input_dim
         self.net = nn.Sequential(
             nn.Linear(input_dim + 1, hidden_dim),
             nn.SiLU(),
@@ -35,10 +48,22 @@ class MIOFlowODEFunc(nn.Module):
             nn.SiLU(),
             nn.Linear(hidden_dim, input_dim),
         )
+        self.momentum_beta = momentum_beta
+        self._previous_v: Tensor | None = None
+
+    def reset_momentum(self) -> None:
+        """Clear the carried velocity state before a fresh integration."""
+        self._previous_v = None
 
     def forward(self, t: Tensor, x: Tensor) -> Tensor:
         t_expanded = t.expand(x.size(0), 1)
-        return self.net(torch.cat([t_expanded, x], dim=-1))
+        dxdt = self.net(torch.cat([t_expanded, x], dim=-1))
+        if self.momentum_beta > 0:
+            if self._previous_v is None or self._previous_v.shape != dxdt.shape:
+                self._previous_v = torch.zeros_like(dxdt)
+            dxdt = self.momentum_beta * self._previous_v + (1 - self.momentum_beta) * dxdt
+            self._previous_v = dxdt.detach()
+        return dxdt
 
 
 def mioflow_ot_loss(source: Tensor, target: Tensor) -> Tensor:
@@ -58,6 +83,8 @@ def mioflow_energy_loss(model: MIOFlowODEFunc, x0: Tensor, t_seq: Tensor) -> Ten
     """Penalizes large velocity magnitudes along the ODE trajectory."""
     from torchdiffeq import odeint
 
+    if hasattr(model, "reset_momentum"):
+        model.reset_momentum()
     trajectory = odeint(model, x0, t_seq)
     total_energy = 0.0
     num_evaluations = 0
