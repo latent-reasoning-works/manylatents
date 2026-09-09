@@ -23,6 +23,8 @@ def _array(value):
     if hasattr(value, 'toarray'):
         value = value.toarray()
     result = np.array(value, copy=True)
+    if np.iscomplexobj(result):
+        raise ValueError('Captured coordinates and neighborhood objects must be real-valued')
     if not np.issubdtype(result.dtype, np.number) or not np.isfinite(result).all():
         raise ValueError('A required captured array is nonnumeric or nonfinite')
     return result

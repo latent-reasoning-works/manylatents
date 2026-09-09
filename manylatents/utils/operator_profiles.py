@@ -12,6 +12,8 @@ from .neighborhood_profiles import transported_patch_radii
 
 
 def _matrix(value, name):
+    if np.iscomplexobj(value):
+        raise ValueError(f'{name} must be real-valued; complex coordinates or weights are unsupported')
     value = np.asarray(value, dtype=np.float64)
     if value.ndim != 2 or not np.isfinite(value).all():
         raise ValueError(f'{name} must be a finite numeric matrix')

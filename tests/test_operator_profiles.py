@@ -106,3 +106,12 @@ def test_signed_or_nonfinite_quantile_weights_rejected(weights):
 def test_invalid_propagation_arguments(kwargs):
     with pytest.raises(ValueError):
         finite_patch_propagation(np.eye(2),[0],[[1]],**kwargs)
+
+
+def test_complex_arrays_rejected_without_discarding_imaginary_parts():
+    with pytest.raises(ValueError,match='real-valued'):
+        weighted_radius_quantiles(np.array([[1+1j,1]]),np.array([[0.,1]]))
+    with pytest.raises(ValueError,match='real-valued'):
+        finite_patch_propagation(np.eye(2,dtype=complex),[0],[[1]])
+    with pytest.raises(ValueError,match='real-valued'):
+        transported_patch_summary(np.array([[0+0j,0],[1,1]]),[0],[[1]])

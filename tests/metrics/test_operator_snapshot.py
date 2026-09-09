@@ -138,3 +138,8 @@ def test_snapshot_zero_row_is_preserved_for_downstream_unavailability():
     result=OperatorSnapshot(Y,dataset=SimpleNamespace(data=X),module=module)
     assert_array_equal(result['kernel'][0],np.zeros(3))
     assert_array_equal(result['affinity'][0],np.zeros(3))
+
+
+def test_complex_snapshot_input_rejected():
+    with pytest.raises(ValueError,match='real-valued'):
+        OperatorSnapshot(Y.astype(complex),dataset=SimpleNamespace(data=X),module=umap_stub())
