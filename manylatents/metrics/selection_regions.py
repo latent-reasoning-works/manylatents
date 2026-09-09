@@ -130,8 +130,9 @@ def _curve(q, slab_eligible, slab_boundary, target, counted, threshold_lists, ex
                   selection_full=total == int(counted.sum()), exhaustive=bool(exhaustive))
     result['best_full_recovery'] = _summary(result, target_count, True)
     result['max_recovery'] = _summary(result, target_count, False)
-    result['frontier_indices'] = _frontier(tp, fp, np.arange(len(tp)))
-    result['per_form_frontier_indices'] = [_frontier(tp, fp, np.arange(offsets[f], offsets[f+1])) for f in range(nforms)]
+    result['frontier_space'] = 'TP_MAX_FP_MIN'
+    result['count_frontier_indices'] = _frontier(tp, fp, np.arange(len(tp)))
+    result['per_form_count_frontier_indices'] = [_frontier(tp, fp, np.arange(offsets[f], offsets[f+1])) for f in range(nforms)]
     return result
 
 
@@ -156,6 +157,8 @@ def SelectionRegionProfile(embeddings, target_mask, probe_index, forms, slabs=No
     Boundary count refers to the intersected region; tie_count counts q equality
     over all counted particles, including those outside the slab. All frontier
     indices retain tied candidates and pool precisely the supplied forms.
+    These count frontiers maximize TP and minimize FP (TP_MAX_FP_MIN); they are
+    not recovery/contamination frontiers. Complete attainable curves are retained.
     """
     Y = _cloud(embeddings)
     n, d = Y.shape
@@ -206,7 +209,7 @@ def SelectionRegionProfile(embeddings, target_mask, probe_index, forms, slabs=No
     result = _curve(q, eligible, slab_boundary, target, counted, primary_thresholds, True)
     ball_forms = [f for f,M in enumerate(matrices) if slabs[f] is None and np.array_equal(M,np.eye(d))]
     ball_ids = np.concatenate([np.arange(result['offsets'][f],result['offsets'][f+1]) for f in ball_forms]) if ball_forms else np.empty(0,dtype=np.int64)
-    result['ball_frontier_indices'] = _frontier(result['tp'],result['fp'],ball_ids)
+    result['ball_count_frontier_indices'] = _frontier(result['tp'],result['fp'],ball_ids)
     result.update(q=q, counted_mask=counted, target_mask=target, slab_eligible=eligible,
                   anchor=Y[probe].copy(), forms=matrices.copy(), eigenvalues=eigenvalues,
                   collision=_collision(Y,target,counted), additional=None,

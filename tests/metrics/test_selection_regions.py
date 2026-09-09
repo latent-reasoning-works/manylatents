@@ -23,7 +23,7 @@ def test_exact_thresholds_closed_counts_and_registry():
     assert_array_equal(p['boundary_count'],p['tie_count'])
     assert p['best_full_recovery']['candidate_index'] == [1]
     assert p['collision']['floor'] == 0
-    assert_array_equal(p['frontier_indices'],[1])
+    assert_array_equal(p['count_frontier_indices'],[1])
     assert p['contamination'][0] == 0 and not p['contamination_defined'][0]
     assert p['selection_empty'][0] and p['selection_full'][-1]
 
@@ -102,9 +102,9 @@ def test_ellipse_recovers_stretched_object_and_tied_frontier_retained():
     M = np.array([np.eye(2),np.diag([1.,4.]),np.diag([1.,4.])])
     p = SelectionRegionProfile(Y,S,0,M)
     assert_array_equal(p['best_full_recovery']['fp'],[1,0,0])
-    assert len(p['frontier_indices']) == 2
-    assert_array_equal(p['form_index'][p['frontier_indices']],[1,2])
-    assert len(p['ball_frontier_indices']) == 2  # empty and full-recovery tradeoff
+    assert len(p['count_frontier_indices']) == 2
+    assert_array_equal(p['form_index'][p['count_frontier_indices']],[1,2])
+    assert len(p['ball_count_frontier_indices']) == 2  # empty and full-recovery tradeoff
 
 
 def test_ball_eligibility_and_edge_identity_validation():
