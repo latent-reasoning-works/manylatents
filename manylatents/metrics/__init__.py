@@ -192,3 +192,14 @@ __all__ = [
     # Post-hoc analysis
     "MetricAgreement",
 ]
+
+# Finite task selection and structured downstream summaries.
+from manylatents.metrics.task_selection import (CenteredSelectionBall, StratifiedSeedCentroid,
+    WeightedCoverageRadius, DistinctGroupBudgetBall, DonorEligibilityByAnswerToken)
+from manylatents.metrics.task_summaries import (SelectedPseudobulkLogCPM, PairedEffectError,
+    CloneVoteFateDistribution, SquaredProbabilityError, weighted_total_variation)
+from manylatents.metrics.paired_logit import PairedLogitContrast
+__all__ += ['CenteredSelectionBall', 'StratifiedSeedCentroid', 'WeightedCoverageRadius',
+    'DistinctGroupBudgetBall', 'DonorEligibilityByAnswerToken', 'SelectedPseudobulkLogCPM',
+    'PairedEffectError', 'CloneVoteFateDistribution', 'SquaredProbabilityError',
+    'weighted_total_variation', 'PairedLogitContrast']

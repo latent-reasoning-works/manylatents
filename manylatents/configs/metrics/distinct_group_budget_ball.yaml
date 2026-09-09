@@ -1,0 +1,4 @@
+distinct_group_budget_ball:
+  _target_: manylatents.metrics.task_selection.DistinctGroupBudgetBall
+  _partial_: true
+  at: embedding

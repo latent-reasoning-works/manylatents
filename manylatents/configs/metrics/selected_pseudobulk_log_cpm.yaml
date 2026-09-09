@@ -1,0 +1,4 @@
+selected_pseudobulk_log_cpm:
+  _target_: manylatents.metrics.task_summaries.SelectedPseudobulkLogCPM
+  _partial_: True
+  at: embedding

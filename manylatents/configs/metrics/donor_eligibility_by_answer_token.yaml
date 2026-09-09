@@ -1,0 +1,4 @@
+donor_eligibility_by_answer_token:
+  _target_: manylatents.metrics.task_selection.DonorEligibilityByAnswerToken
+  _partial_: true
+  at: embedding

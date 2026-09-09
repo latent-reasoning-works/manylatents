@@ -1,0 +1,4 @@
+clone_vote_fate_distribution:
+  _target_: manylatents.metrics.task_summaries.CloneVoteFateDistribution
+  _partial_: True
+  at: embedding

@@ -1,0 +1,4 @@
+paired_effect_error:
+  _target_: manylatents.metrics.task_summaries.PairedEffectError
+  _partial_: True
+  at: embedding

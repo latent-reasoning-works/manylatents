@@ -1,0 +1,4 @@
+weighted_coverage_radius:
+  _target_: manylatents.metrics.task_selection.WeightedCoverageRadius
+  _partial_: true
+  at: embedding

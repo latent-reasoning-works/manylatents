@@ -1,0 +1,4 @@
+squared_probability_error:
+  _target_: manylatents.metrics.task_summaries.SquaredProbabilityError
+  _partial_: True
+  at: embedding

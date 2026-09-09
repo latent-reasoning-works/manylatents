@@ -1,0 +1,4 @@
+weighted_total_variation:
+  _target_: manylatents.metrics.task_summaries.weighted_total_variation
+  _partial_: True
+  at: embedding

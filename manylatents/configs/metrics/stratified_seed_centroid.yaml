@@ -1,0 +1,4 @@
+stratified_seed_centroid:
+  _target_: manylatents.metrics.task_selection.StratifiedSeedCentroid
+  _partial_: true
+  at: embedding

@@ -1,0 +1,5 @@
+paired_logit:
+  _target_: manylatents.metrics.paired_logit.PairedLogitContrast
+  _partial_: true
+  at: embedding
+  baseline_logits: null

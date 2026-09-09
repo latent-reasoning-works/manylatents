@@ -1,0 +1,4 @@
+centered_selection_ball:
+  _target_: manylatents.metrics.task_selection.CenteredSelectionBall
+  _partial_: true
+  at: embedding
