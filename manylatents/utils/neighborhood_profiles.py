@@ -138,7 +138,8 @@ def patch_moments(X, neighborhood_ids, frame=None):
                 q_status[a] = "DEGENERATE_TANGENT_SPREAD"
             else:
                 q[a] = named[a, 2, 2] / denominator
-                q_status[a] = "LOW_SUPPORT" if m < 10 else "OK"
+                q_status[a] = ("NUMERICAL_ERROR" if status[a] == "NUMERICAL_ERROR"
+                               else "LOW_SUPPORT" if m < 10 else "OK")
     return dict(count=count, mean=mean, centered_moment=centered,
                 unbiased_covariance=unbiased, covariance_status=status,
                 unbiased_status=unbiased_status, frame_moment=named,
@@ -146,16 +147,27 @@ def patch_moments(X, neighborhood_ids, frame=None):
                 named_q=q, named_q_status=q_status)
 
 
+def _positive_log_ratio(numerator, denominator):
+    """Compute log(numerator/denominator) without near-one cancellation."""
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        relative_step = (numerator - denominator) / denominator
+        result = np.log1p(relative_step)
+        fallback = np.log(numerator) - np.log(denominator)
+    return np.where(np.isfinite(result), result, fallback)
+
+
 def _secants(values, radii, zero_status):
     result = np.full((values.shape[0], len(radii) - 1), np.nan)
     valid = (values[:, :-1] > 0) & (values[:, 1:] > 0)
-    statuses = np.where(valid, "OK", zero_status)
+    statuses = np.full(valid.shape, zero_status, dtype="U32")
+    statuses[valid] = "OK"
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-        relative_step = np.diff(radii) / radii[:-1]
-        log_step = np.log1p(relative_step)
-        log_step = np.where(np.isfinite(log_step), log_step, np.diff(np.log(radii)))
-        raw = np.diff(np.log(values), axis=1) / log_step
-    result[valid] = raw[valid]
+        log_step = _positive_log_ratio(radii[1:], radii[:-1])
+        raw = _positive_log_ratio(values[:, 1:].astype(np.float64),
+                                  values[:, :-1].astype(np.float64)) / log_step
+    finite = np.isfinite(raw)
+    result[valid & finite] = raw[valid & finite]
+    statuses[valid & ~finite] = "NONFINITE_SECANT"
     return result, statuses
 
 
@@ -258,6 +270,9 @@ def transported_patch_radii(Y, query_ids, neighborhood_ids):
     Strict inner_radius < outer_radius means some closed ball selects exactly
     the patch. Exact equality is a boundary tie and cannot separate the patch.
     Empty patch or complement has missing radii and an explicit status.
+    ``strictly_selectable`` is an object array: True for a nonempty full patch
+    (no complement exists to exclude), None for an empty patch (not evaluated),
+    and otherwise the strict gap test. A censored outer radius is not a failure.
     """
     Y = _matrix(Y, "Y")
     identities = _ids(query_ids, len(Y))
@@ -266,7 +281,7 @@ def transported_patch_radii(Y, query_ids, neighborhood_ids):
         raise ValueError("one patch is required per query identity")
     inside, outside = np.full(len(patches), np.nan), np.full(len(patches), np.nan)
     status = np.full(len(patches), "OK", dtype="U32")
-    selectable = np.zeros(len(patches), dtype=bool)
+    selectable = np.full(len(patches), None, dtype=object)
     gap = np.full(len(patches), np.nan)
     all_ids = np.arange(len(Y))
     for a, (identity, ids) in enumerate(zip(identities, patches)):
@@ -281,9 +296,10 @@ def transported_patch_radii(Y, query_ids, neighborhood_ids):
             status[a] = "EMPTY_PATCH"
         elif not len(complement):
             status[a] = "EMPTY_COMPLEMENT"
+            selectable[a] = True
         else:
             gap[a] = outside[a] - inside[a]
-            selectable[a] = gap[a] > 0
+            selectable[a] = bool(gap[a] > 0)
             status[a] = "BOUNDARY_TIE" if gap[a] == 0 else ("OK" if gap[a] > 0 else "INTERLEAVED")
     return dict(inner_radius=inside, outer_radius=outside, gap=gap,
                 strictly_selectable=selectable, status=status)
@@ -295,6 +311,12 @@ def influence_profiles(weights, distances, radii, *, patch_mask=None, self_indic
     No symmetry or PSD assumption is made. Self mass is retained, not removed.
     A zero row has undefined distribution, CDF, participation and leakage.
     Row maxima stabilize normalization; overflowing total mass is rejected.
+
+    ``patch_mask`` is used literally. To measure escape from a physical patch,
+    include the focal particle together with its nonself neighborhood IDs in
+    the mask. A mask containing only nonself IDs instead measures mass outside
+    that target set and counts self-weight as outside; label that readout
+    accordingly. This function never silently changes the supplied mask.
     """
     weights, distances, radii = _matrix(weights, "weights"), _matrix(distances, "distances"), _radii(radii)
     if weights.shape != distances.shape or np.any(weights < 0) or np.any(distances < 0):

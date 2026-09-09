@@ -123,7 +123,7 @@ def test_full_input_hash_detects_interior_mutation():
 def test_transport_ties_intruders_empty_and_strict_gap():
     result = transported_patch_radii(X, [0, 0, 0, 0, 0], [[1], [1, 2], [4], [], [1, 2, 3, 4]])
     assert_array_equal(result['status'], ['OK', 'BOUNDARY_TIE', 'INTERLEAVED', 'EMPTY_PATCH', 'EMPTY_COMPLEMENT'])
-    assert_array_equal(result['strictly_selectable'], [True, False, False, False, False])
+    assert_array_equal(result['strictly_selectable'], [True, False, False, None, True])
     assert_allclose(result['gap'][:3], [1, 0, -2], **TOL)
     assert np.isnan(result['inner_radius'][3])
     assert np.isnan(result['outer_radius'][4])
@@ -216,3 +216,38 @@ def test_adjacent_radii_with_equal_rounded_logs_have_finite_secants():
     secants, status = _secants(np.array([[1., 2.]]), radii, 'ZERO')
     assert status[0, 0] == 'OK'
     assert np.isfinite(secants).all()
+
+
+def test_end_to_end_equal_rounded_log_radii_secants():
+    radii = np.array([1e100, np.nextafter(1e100, np.inf)])
+    points = np.array([[0., 0., 0.], [radii[1], 0., 0.]])
+    result = neighborhood_profiles(points, points[[0]], [None], radii)
+    assert_array_equal(result['hard_count'], [[1, 2]])
+    assert_array_equal(result['count_secant_status'], [['OK']])
+    assert_array_equal(result['mass_secant_status'], [['OK']])
+    assert np.isfinite(result['count_secants']).all()
+    assert np.isfinite(result['mass_secants']).all()
+    expected = np.log(2.) / np.log1p((radii[1] - radii[0]) / radii[0])
+    assert_allclose(result['count_secants'][0, 0], expected, **TOL)
+
+
+def test_nonfinite_secant_is_not_reported_ok():
+    from manylatents.utils.neighborhood_profiles import _secants
+    result, status = _secants(np.array([[1., np.inf]]), RADII[:2], 'ZERO_COUNT')
+    assert status[0, 0] == 'NONFINITE_SECANT'
+    assert np.isnan(result[0, 0])
+
+
+def test_self_only_influence_stays_in_physical_patch():
+    weights = np.array([[3., 0., 0.]])
+    distances = np.array([[0., 1., 2.]])
+    physical_patch = np.array([[True, True, False]])  # focal union neighbor 1
+    result = influence_profiles(weights, distances, RADII,
+                                patch_mask=physical_patch, self_indices=[0])
+    assert result['patch_leakage'][0] == 0
+    assert result['self_mass'][0] == 3
+    assert result['self_fraction'][0] == 1
+    nonself_targets = physical_patch.copy()
+    nonself_targets[0, 0] = False
+    target_result = influence_profiles(weights, distances, RADII, patch_mask=nonself_targets)
+    assert target_result['patch_leakage'][0] == 1  # Different target-set estimand.
