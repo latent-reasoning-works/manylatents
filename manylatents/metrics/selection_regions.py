@@ -68,14 +68,28 @@ def _collision(Y, target, counted):
 
 
 def _frontier(tp, fp, indices):
-    # Preserve all candidates tied at any nondominated count pair.
+    """Count Pareto candidates in O(C log C), preserving input order and ties.
+
+    Within an equal-FP group only maximal TP can survive. That maximum survives
+    exactly when it exceeds every maximum at smaller FP. All occurrences of
+    tied candidate IDs are retained, including repeated indices in the input.
+    Counts and candidate memberships are never modified by this search.
+    """
     indices = np.asarray(indices, dtype=np.int64)
-    keep = []
-    for i in indices:
-        dominated = (tp[indices] >= tp[i]) & (fp[indices] <= fp[i]) & ((tp[indices] > tp[i]) | (fp[indices] < fp[i]))
-        if not dominated.any():
-            keep.append(int(i))
-    return np.asarray(keep, dtype=np.int64)
+    if not indices.size:
+        return indices.copy()
+    order = np.argsort(fp[indices], kind='stable')
+    ordered_fp = fp[indices[order]]
+    ordered_tp = tp[indices[order]]
+    starts = np.r_[0, np.flatnonzero(ordered_fp[1:] != ordered_fp[:-1]) + 1]
+    sizes = np.diff(np.r_[starts, len(indices)])
+    maxima = np.maximum.reduceat(ordered_tp, starts)
+    surviving_group = np.r_[True, maxima[1:] > np.maximum.accumulate(maxima)[:-1]]
+    keep_sorted = ((ordered_tp == np.repeat(maxima, sizes)) &
+                   np.repeat(surviving_group, sizes))
+    keep_original = np.empty(len(indices), dtype=bool)
+    keep_original[order] = keep_sorted
+    return indices[keep_original]
 
 
 def _summary(curve, target_count, full):

@@ -1,10 +1,11 @@
 """Deterministic unit objects; these are not the twelve downstream result scenes."""
 import json
+from itertools import product
 import numpy as np
 import pytest
 from numpy.testing import assert_array_equal, assert_allclose
 from manylatents.metrics.selection_regions import (
-    SelectionRegionProfile, BallMembership, DeclaredEdgeProfile, SelectionGaugeProfile,
+    SelectionRegionProfile, BallMembership, DeclaredEdgeProfile, SelectionGaugeProfile, _frontier,
 )
 from manylatents.metrics.registry import get_metric
 
@@ -210,3 +211,63 @@ def test_gauge_excludes_focal_and_unsafe_gaps():
     assert 1. < g['gap_thresholds'][0][0] < 3.
     for bad in (np.array([[np.nan,1,2,3]]), np.array([[0j,1j,2j,3j]])):
         with pytest.raises(ValueError): SelectionGaugeProfile(reference,bad,counted_mask=np.ones(4,dtype=bool))
+
+
+
+def _previous_brute_frontier(tp, fp, indices):
+    # Verbatim search body from native 65513cbb9c3b78f6c7b21542f73cecb167034366.
+    indices = np.asarray(indices, dtype=np.int64)
+    keep = []
+    for i in indices:
+        dominated = (tp[indices] >= tp[i]) & (fp[indices] <= fp[i]) & ((tp[indices] > tp[i]) | (fp[indices] < fp[i]))
+        if not dominated.any():
+            keep.append(int(i))
+    return np.asarray(keep, dtype=np.int64)
+
+
+def test_frontier_exhaustive_small_ordered_count_fixtures():
+    # Every ordered sequence of 0..4 pairs in {0,1,2}^2, with no RNG.
+    pairs = list(product(range(3), repeat=2))
+    for length in range(5):
+        for candidate_pairs in product(pairs, repeat=length):
+            a = np.asarray(candidate_pairs, dtype=np.int64).reshape(length,2)
+            ids = np.arange(length,dtype=np.int64)
+            assert_array_equal(_frontier(a[:,0],a[:,1],ids),
+                               _previous_brute_frontier(a[:,0],a[:,1],ids))
+
+
+def test_frontier_subsets_repeated_indices_and_duplicate_count_pairs():
+    tp = np.array([2,0,2,1,3,3,1],dtype=np.int64)
+    fp = np.array([2,0,2,1,3,2,0],dtype=np.int64)
+    # Exhaustive ordered index selections through length four exercise repeated
+    # IDs, subsets and nonmonotone candidate order, including the empty input.
+    for length in range(5):
+        for indices in product(range(len(tp)),repeat=length):
+            assert_array_equal(_frontier(tp,fp,indices),
+                               _previous_brute_frontier(tp,fp,indices))
+    ties = np.array([5,5,2,0,6,6,5])
+    assert_array_equal(_frontier(tp,fp,ties),[5,5,6,6,5])
+
+
+def test_frontier_duplicate_forms_full_native_output_matches_previous(monkeypatch):
+    import manylatents.metrics.selection_regions as native
+    Y = np.array([[0.,0.],[0.,0.],[1.,0.],[0.,1.],[2.,1.]])
+    target = np.array([False,False,True,False,True])
+    forms = np.array([np.eye(2),np.diag([1.,4.]),np.eye(2),np.diag([1.,4.])])
+    kwargs = dict(thresholds=[[0.,.5,1.,4.]]*len(forms))
+    optimized = native.SelectionRegionProfile(Y,target,0,forms,**kwargs)
+    monkeypatch.setattr(native,'_frontier',_previous_brute_frontier)
+    previous = native.SelectionRegionProfile(Y,target,0,forms,**kwargs)
+    def identical(lhs,rhs):
+        if isinstance(lhs,np.ndarray):
+            assert lhs.dtype == rhs.dtype
+            assert_array_equal(lhs,rhs)
+        elif isinstance(lhs,dict):
+            assert lhs.keys() == rhs.keys()
+            for key in lhs: identical(lhs[key],rhs[key])
+        elif isinstance(lhs,list):
+            assert len(lhs) == len(rhs)
+            for a,b in zip(lhs,rhs): identical(a,b)
+        else:
+            assert lhs == rhs
+    identical(optimized,previous)
