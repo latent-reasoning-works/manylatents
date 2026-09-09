@@ -46,7 +46,7 @@ def _mask(ids, subset, name):
 def _labels(value,n,name):
     a=np.asarray(value)
     _require(a.shape==(n,) and a.dtype.kind in 'iuUS',name+' must be aligned integer/string group labels')
-    _require(a.dtype.kind!='u' or not a.size or a.max()<=np.iinfo(np.int64).max(),name+' out of int64 range')
+    _require(a.dtype.kind!='u' or not a.size or a.max()<=np.iinfo(np.int64).max,name+' out of int64 range')
     return a.copy()
 
 

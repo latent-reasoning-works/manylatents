@@ -124,3 +124,23 @@ def test_donor_token_keys_unsorted_ids():
     assert out['eligible_ids'].tolist()==[10,30];assert out['rejected_ids'].tolist()==[20,40]
     assert out['rejection_reasons'][20]=='ANSWER_TOKEN_MISMATCH'
     assert out['rejection_reasons'][40]=='NAME_PAIR_MISMATCH'
+
+
+@pytest.mark.parametrize("dtype", [np.uint32, np.uint64])
+def test_unsigned_group_labels_are_supported(dtype):
+    from manylatents.metrics.task_selection import CenteredSelectionBall, SelectionView
+    coordinates=np.array([[0.],[1.]],dtype=np.float64)
+    ids=np.array([0,1],dtype=np.int64)
+    labels=np.array([3,4],dtype=dtype)
+    view=SelectionView(ids=ids,coordinates=coordinates,candidate_mask=np.array([True,True]),group_labels=labels)
+    assert np.array_equal(view.group_labels,labels)
+    record=CenteredSelectionBall(coordinates,center=np.array([0.]),ids=ids,candidate_ids=ids,
+        threshold_squared=1.,candidate_groups=labels)
+    assert record['group_counts']=={3:1,4:1}
+
+
+def test_unsigned_group_labels_above_int64_fail_with_contract_error():
+    from manylatents.metrics.task_selection import SelectionView
+    with pytest.raises(ContractViolation):
+        SelectionView(ids=np.array([0],dtype=np.int64),coordinates=np.array([[0.]]),
+            candidate_mask=np.array([True]),group_labels=np.array([2**63],dtype=np.uint64))
