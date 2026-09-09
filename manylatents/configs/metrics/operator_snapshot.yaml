@@ -1,0 +1,3 @@
+_target_: manylatents.metrics.operator_snapshot.OperatorSnapshot
+_partial_: true
+at: embedding
