@@ -197,9 +197,9 @@ __all__ = [
 from manylatents.metrics.task_selection import (CenteredSelectionBall, StratifiedSeedCentroid,
     WeightedCoverageRadius, DistinctGroupBudgetBall, DonorEligibilityByAnswerToken)
 from manylatents.metrics.task_summaries import (SelectedPseudobulkLogCPM, PairedEffectError,
-    CloneVoteFateDistribution, SquaredProbabilityError, weighted_total_variation)
+    CloneVoteFateDistribution, SquaredProbabilityError, weighted_total_variation, SignedWeightedAttributeAccount)
 from manylatents.metrics.paired_logit import PairedLogitContrast
 __all__ += ['CenteredSelectionBall', 'StratifiedSeedCentroid', 'WeightedCoverageRadius',
     'DistinctGroupBudgetBall', 'DonorEligibilityByAnswerToken', 'SelectedPseudobulkLogCPM',
     'PairedEffectError', 'CloneVoteFateDistribution', 'SquaredProbabilityError',
-    'weighted_total_variation', 'PairedLogitContrast']
+    'weighted_total_variation', 'SignedWeightedAttributeAccount', 'PairedLogitContrast']

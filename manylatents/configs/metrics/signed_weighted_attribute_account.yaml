@@ -1,0 +1,4 @@
+signed_weighted_attribute_account:
+  _target_: manylatents.metrics.task_summaries.SignedWeightedAttributeAccount
+  _partial_: True
+  at: embedding

@@ -198,3 +198,100 @@ def weighted_total_variation(embeddings=None, *, ids,mass_p,mass_q,attribute_ran
         raise NumericalFailure('Weighted summary arithmetic overflow')
     return dict(base,status='OK',TV=tv,bounded_attribute_product=product,normalized_p=p,
                 normalized_q=q,observed_weighted_attribute_error=observed)
+
+
+@register_metric(aliases=['signed_weighted_attribute_account'])
+def SignedWeightedAttributeAccount(embeddings=None, *, ids, reference_mask, selected_mask,
+                                    weights, attribute, attribute_range,
+                                    dataset=None, module=None, cache=None):
+    """Finite signed account, p=selected and q=reference, on an ordered ID universe.
+
+    Literal membership contributions differ from normalized residual mass on
+    retained identities. All input arrays are copied and validated before sums.
+    """
+    import hashlib
+    import json
+    raw_ids = np.asarray(ids)
+    if raw_ids.ndim != 1 or raw_ids.dtype != np.dtype('int64'):
+        raise ContractViolation('ids must be a unique int64 vector')
+    universe = _ids(raw_ids, 'ids')
+    n = len(universe)
+    masks = []
+    for name, value in [('reference_mask', reference_mask), ('selected_mask', selected_mask)]:
+        a = np.asarray(value)
+        if a.shape != (n,) or a.dtype != np.dtype('bool'):
+            raise ContractViolation(name + ' must be an aligned boolean vector')
+        masks.append(a.copy())
+    ref, sel = masks
+    w = _real(weights, 'weights', 1).copy()
+    f = _real(attribute, 'attribute', 1).copy()
+    bounds = _real(attribute_range, 'attribute_range', 1).copy()
+    if w.shape != (n,) or (w < 0).any() or f.shape != (n,):
+        raise ContractViolation('weights and attribute must align; weights nonnegative')
+    if bounds.shape != (2,) or bounds[0] > bounds[1] or (f < bounds[0]).any() or (f > bounds[1]).any():
+        raise ContractViolation('Invalid attribute range or out-of-range attribute')
+    added = sel & ~ref
+    removed = ref & ~sel
+    arrays = dict(ids=universe, reference_mask=ref, selected_mask=sel, weights=w,
+                  attribute=f, attribute_range=bounds)
+    h = hashlib.sha256()
+    for name, a in arrays.items():
+        header = json.dumps([name, a.dtype.str, list(a.shape)], separators=(',', ':')).encode()
+        h.update(len(header).to_bytes(8, 'little')); h.update(header); h.update(a.tobytes(order='C'))
+    out = dict(arrays, input_hash=h.hexdigest(), added_mask=added, removed_mask=removed,
+               added_ids=universe[added], removed_ids=universe[removed])
+    undefined = ['normalized_p', 'normalized_q', 'mean_reference', 'mean_selected',
+                 'signed_error', 'absolute_error', 'TV', 'bound', 'excess', 'deficit',
+                 'residual_contrast', 'residual_reconstruction', 'residual_reconstruction_residual',
+                 'residual_reconstruction_absolute_residual', 'added_contributions',
+                 'removed_contributions', 'membership_reconstruction',
+                 'membership_reconstruction_residual', 'membership_reconstruction_absolute_residual',
+                 'centered_difference_integral', 'direct_centered_residual']
+    try:
+        with np.errstate(over='raise', invalid='raise', divide='raise', under='ignore'):
+            mq = w * ref; mp = w * sel
+            tq = float(mq.sum(dtype=np.float64)); tp = float(mp.sum(dtype=np.float64))
+            width = float(bounds[1] - bounds[0])
+            out.update(reference_mass=tq, selected_mass=tp, raw_mass_p=mp, raw_mass_q=mq)
+            if tq == 0 or tp == 0:
+                return dict(out, status='NOT_EVALUABLE_ZERO_MASS', residual_status='NOT_EVALUABLE_ZERO_MASS',
+                            **dict.fromkeys(undefined))
+            p = mp / tp; q = mq / tq
+            # Center means first to avoid overflowing products with large offsets.
+            fc = f - bounds[0]
+            muq_c = float(np.dot(q, fc)); mup_c = float(np.dot(p, fc))
+            muq = float(bounds[0] + muq_c); mup = float(bounds[0] + mup_c)
+            signed = float(mup - muq)
+            diff = p - q; tv = float(.5 * np.abs(diff).sum(dtype=np.float64))
+            centered = float(np.dot(diff, fc))
+            if tv > 0:
+                excess = np.maximum(diff, 0) / tv; deficit = np.maximum(-diff, 0) / tv
+                contrast = float(np.dot(excess, fc) - np.dot(deficit, fc))
+                residual = float(tv * contrast); rs = 'OK'
+            else:
+                excess = deficit = contrast = None
+                residual = 0.; rs = 'NOT_APPLICABLE_ZERO_TV'
+            # Evaluate only contributing entries: unrelated large weights must
+            # not create spurious overflows in quantities that are exactly zero.
+            ac = np.zeros(n); rc = np.zeros(n)
+            ac[added] = (w[added] / tp) * (f[added] - muq)
+            rc[removed] = -(w[removed] / tp) * (f[removed] - muq)
+            membership = float(ac.sum(dtype=np.float64) + rc.sum(dtype=np.float64))
+            out.update(status='OK', residual_status=rs, normalized_p=p, normalized_q=q,
+                       mean_reference=muq, mean_selected=mup, signed_error=signed,
+                       absolute_error=abs(signed), TV=tv, bound=tv*width,
+                       excess=excess, deficit=deficit, residual_contrast=contrast,
+                       residual_reconstruction=residual,
+                       residual_reconstruction_residual=residual-signed,
+                       residual_reconstruction_absolute_residual=abs(residual-signed),
+                       added_contributions=ac, removed_contributions=rc,
+                       membership_reconstruction=membership,
+                       membership_reconstruction_residual=membership-signed,
+                       membership_reconstruction_absolute_residual=abs(membership-signed),
+                       centered_difference_integral=centered, direct_centered_residual=signed-centered)
+    except FloatingPointError as error:
+        raise NumericalFailure('Signed attribute account arithmetic overflow or invalid operation') from error
+    for key, value in out.items():
+        if isinstance(value, (float, np.ndarray)) and not np.isfinite(value).all():
+            raise NumericalFailure('Nonfinite signed account output: '+key)
+    return out
