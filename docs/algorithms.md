@@ -215,3 +215,54 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     ```
 
     `_recursive_: false` prevents Hydra from eagerly instantiating nested configs — the `Reconstruction` module handles deferred instantiation in `setup()` once `input_dim` is known from the datamodule.
+
+
+## MIOFlow encoders and checkpoints
+
+MIOFlow accepts an optional `encoder` Hydra config, like Reconstruction's
+`network` config. `configure_model()` instantiates the encoder, preprocessing
+buffers, and flow once. Repeated calls retain trained weights. The encoder must
+be an `nn.Module` satisfying `HasEncode` (`networks/network.py`): `encode(x)` maps
+`(batch, ambient_dim)` to `(batch, latent_dim)`, and `latent_dim` is a positive
+integer. Configs use `input_dim` for the ambient dimension; it can be inferred
+from data, or supplied with `ambient_dim`.
+
+Decoding is optional because the flow integrates fixed latent coordinates under
+`no_grad()`. The flow optimizer includes only flow parameters. Encoder dropout
+and BatchNorm remain in evaluation mode. `encode()` returns latent endpoints;
+generated trajectories are decoded to ambient space if the encoder offers
+`decode(z)`, otherwise they remain latent.
+
+The `mioflow_gaga` catalog config selects `GAGANetwork` and
+`encoder_pretraining: gaga`. Its PHATE statistics and two-phase fitting run in
+`on_fit_start()`, after Lightning restores checkpoint state. The legacy
+`use_gaga=True` shortcut remains available. For a fixed plain autoencoder, use:
+
+```yaml
+encoder:
+  _target_: manylatents.algorithms.lightning.networks.autoencoder.Autoencoder
+  input_dim: 15
+  hidden_dims: [32, 16]
+  latent_dim: 3
+encoder_pretraining: none
+```
+
+`none` uses the supplied encoder weights with identity preprocessing; it does
+not pretrain an autoencoder. An already-trained encoder instance may also be
+passed. GAGA's pretraining routine specifically requires `GAGANetwork`; the
+minimal encoder contract does not require its reconstruction training structure.
+
+Config-based checkpoints persist resolved architecture configs, ambient/latent
+dimensions, normalization statistics, training time bounds, and encoder-stage
+completion. `MIOFlow.load_from_checkpoint(path, strict=True)` restores without a
+datamodule or fitting. A completed stage is also skipped when resuming with
+`Trainer.fit(ckpt_path=...)`; an unfinished stage is fitted when training resumes.
+For live network/encoder objects, construction metadata cannot be inferred in
+general: supply the corresponding `network=` or `encoder=` object again to
+`load_from_checkpoint`. Old PR checkpoints lack the required construction
+metadata and are not automatically migrated.
+
+Explicit batch `time` takes precedence over `labels`, then `label`; populations
+are ordered by time. `MIOFlowODEFunc` retains positional `init_seed` and makes
+`momentum_beta` keyword-only. Momentum starts from zero after reset, so its first
+velocity is `(1 - beta) * raw_velocity`, matching the reference.

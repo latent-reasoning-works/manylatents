@@ -9,9 +9,11 @@ Provides a generic bootstrap CI function that wraps any statistic:
 
 from __future__ import annotations
 
-from typing import Callable, Sequence
+from typing import Callable
 
 import numpy as np
+
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 
 def bootstrap_ci(
@@ -28,10 +30,10 @@ def bootstrap_ci(
 
     Args:
         stat_fn: Callable that takes the same number of arrays as ``*arrays``
-            and returns a scalar float.  Resamples that raise or return NaN
-            are silently skipped.
+            and returns a scalar float. Every requested resample must succeed
+            and return a finite value; otherwise the interval is unavailable.
         *arrays: One or more arrays of the same length (first axis).
-        n_bootstrap: Number of bootstrap resamples.
+        n_bootstrap: Number of bootstrap resamples (at least 10).
         ci: Confidence level (default 0.95 → 95% CI).
         seed: Random seed for reproducibility.
 
@@ -49,24 +51,33 @@ def bootstrap_ci(
     if any(len(a) != n for a in arrays):
         raise ValueError("All arrays must have the same length")
 
+    if n == 0 or not isinstance(n_bootstrap, int) or isinstance(n_bootstrap, bool) or n_bootstrap < 10:
+        raise MeasurementUnavailable("Bootstrap requires nonempty arrays and at least 10 resamples")
+    if not 0 < ci < 1:
+        raise MeasurementUnavailable("Bootstrap confidence level must lie strictly between 0 and 1")
+
     rng = np.random.RandomState(seed)
     stats: list[float] = []
 
+    first_failure = None
     for _ in range(n_bootstrap):
         idx = rng.randint(0, n, size=n)
         resampled = tuple(a[idx] for a in arrays)
         try:
-            val = stat_fn(*resampled)
-        except Exception:
+            val = np.asarray(stat_fn(*resampled))
+            if val.ndim != 0 or not np.isfinite(val):
+                raise ValueError("stat_fn did not return a finite scalar")
+            stats.append(float(val))
+        except Exception as exc:
+            if first_failure is None:
+                first_failure = exc
             continue
-        if np.isfinite(val):
-            stats.append(val)
 
-    if len(stats) < 10:
-        raise RuntimeError(
+    if len(stats) != n_bootstrap:
+        raise MeasurementUnavailable(
             f"Only {len(stats)}/{n_bootstrap} bootstrap resamples produced "
-            f"finite values — stat_fn may be failing on resampled data."
-        )
+            f"finite values; all requested resamples must succeed."
+        ) from first_failure
 
     alpha = (1 - ci) / 2
     return (

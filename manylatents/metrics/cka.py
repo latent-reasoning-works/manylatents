@@ -12,6 +12,7 @@ from typing import Dict, Optional, Union
 import numpy as np
 
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 _SINGLE_ARRAY_NOTE = (
     "These are CROSS-MODAL metrics: they compare two or more embeddings of the same"
@@ -77,6 +78,11 @@ def cka_pairwise(
     X = _ensure_2d(X)
     Y = _ensure_2d(Y)
 
+    for data in (X, Y):
+        if (data.ndim != 2 or data.shape[0] < 2 or data.shape[1] == 0
+                or not np.all(np.isfinite(data)) or np.all(data == data[0])):
+            raise MeasurementUnavailable("CKA requires finite, noncollapsed representations with at least two samples")
+
     if X.shape[0] != Y.shape[0]:
         raise ValueError(f"Sample count mismatch: {X.shape[0]} vs {Y.shape[0]}")
 
@@ -96,8 +102,8 @@ def cka_pairwise(
     hsic_kk = _hsic(K_c, K_c)
     hsic_ll = _hsic(L_c, L_c)
 
-    if hsic_kk == 0 or hsic_ll == 0:
-        return 0.0
+    if not np.all(np.isfinite([hsic_kl, hsic_kk, hsic_ll])) or hsic_kk <= 0 or hsic_ll <= 0:
+        raise MeasurementUnavailable("CKA requires nonzero centered kernel norms")
 
     return hsic_kl / np.sqrt(hsic_kk * hsic_ll)
 
@@ -132,7 +138,7 @@ def CKA(
         return_matrix: If True and embeddings is dict, return full CKA matrix.
 
     Returns:
-        If embeddings is single array: 1.0 (self-similarity).
+        A single array or collapsed representation raises: no comparison is available.
         If embeddings is dict: Dict mapping pair names to CKA values,
             e.g., {"esm3_evo2": 0.87}, or matrix if return_matrix=True.
     """

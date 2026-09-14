@@ -4,11 +4,12 @@ from itertools import product
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from omegaconf import DictConfig, ListConfig
+from omegaconf import DictConfig, ListConfig, open_dict
 from scipy.sparse.csgraph import connected_components, shortest_path
 from sklearn.neighbors import kneighbors_graph
 
 from manylatents.utils.knn import compute_knn, _content_key  # noqa: F401
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +173,10 @@ def flatten_and_unroll_metrics(
     are present).  The ``at`` field participates in sweep expansion just like
     any other parameter.
 
+    Expanded configs carry ``_sweep_group_`` so evaluation can retain individual
+    MeasurementUnavailable results and refuse if the entire group is unavailable.
+    This metadata is removed before metric instantiation.
+
     Returns:
       name -> single-value DictConfig, where name is
         "{metric}" or
@@ -197,8 +202,12 @@ def flatten_and_unroll_metrics(
             continue
 
         # 3) cartesian-product over all sweep values
+        if any(not values for values in sweep_vals):
+            raise MeasurementUnavailable(f"Metric sweep '{metric_name}' has no requested values")
         for combo in product(*sweep_vals):
             cfg_copy = copy.deepcopy(metric_cfg)
+            with open_dict(cfg_copy):
+                cfg_copy._sweep_group_ = metric_name
             suffix_parts = []
             for k, val in zip(sweep_keys, combo):
                 # coerce to native types

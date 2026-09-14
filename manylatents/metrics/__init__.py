@@ -45,6 +45,7 @@ except ImportError:
     pass
 from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis, ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
+from manylatents.metrics.score_jacobian_id import ScoreJacobianID
 from manylatents.metrics.loglog_consistency import LogLogConsistency
 from manylatents.metrics.trustworthiness import Trustworthiness
 
@@ -87,6 +88,7 @@ except ImportError:
 
 # Embedding quality metrics
 from manylatents.metrics.silhouette import SilhouetteScore
+from manylatents.metrics.subspace_commitment import SubspaceCommitment
 
 # Dataset metrics
 from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
@@ -128,6 +130,7 @@ __all__ = [
     "LocalSpectralAnalysis",
     "ParticipationRatio",
     "LocalIntrinsicDimensionality",
+    "ScoreJacobianID",
     "LogLogConsistency",
     "Trustworthiness",
     # Additional metrics
@@ -165,6 +168,7 @@ __all__ = [
     "MagnitudeDimension",
     # Embedding quality metrics
     "SilhouetteScore",
+    "SubspaceCommitment",
     # Dataset metrics
     "GeodesicDistanceCorrelation",
     "DatasetTopologyDescriptor",

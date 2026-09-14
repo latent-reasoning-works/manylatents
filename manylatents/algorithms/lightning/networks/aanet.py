@@ -102,6 +102,8 @@ class Vanilla(Base):
     without the variational (KL divergence) components.
     
     built to mimic https://github.com/KrishnaswamyLab/AAnet/blob/master/AAnet_torch/models/AAnet_vanilla.py
+
+    init_seed seeds weight construction; None uses the caller's RNG.
     """
     def __init__(
         self,
@@ -114,9 +116,12 @@ class Vanilla(Base):
         device: torch.device = None,
         diffusion_extrema=None,
         archetypal_weight: float = 1.0,
+        init_seed: int | None = None,
         **kwargs
     ):
         super().__init__()
+        if init_seed is not None:
+            torch.manual_seed(init_seed)
         self.input_dim = input_dim
         self.n_archetypes = n_archetypes
         self.noise = noise
@@ -200,6 +205,8 @@ class VAE(Base):
     adding noise in the latent space via reparameterization.
     
     https://github.com/KrishnaswamyLab/AAnet/blob/master/AAnet_torch/models/AAnet_VAE.py
+
+    init_seed seeds weight construction; None uses the caller's RNG.
     """
     def __init__(
         self,
@@ -212,9 +219,12 @@ class VAE(Base):
         kl_loss: str = "partial",
         device: torch.device = None,
         diffusion_extrema=None,
+        init_seed: int | None = None,
         **kwargs
     ) -> None:
         super(VAE, self).__init__()
+        if init_seed is not None:
+            torch.manual_seed(init_seed)
         self.input_dim = input_dim
         self.n_archetypes = n_archetypes
         self.layer_widths = layer_widths

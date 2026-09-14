@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.exceptions import MeasurementUnavailable
 from manylatents.metrics.cross_modal_jaccard import CrossModalJaccard
 from manylatents.metrics.rank_agreement import RankAgreement
 
@@ -53,8 +54,16 @@ def stratify_by_percentile(
     Returns:
         StratificationResult with scores, strata assignments, and counts.
     """
+    scores = np.asarray(scores)
+    if scores.ndim != 1 or scores.size == 0 or not np.all(np.isfinite(scores)):
+        raise MeasurementUnavailable("Alignment thresholds require nonempty finite scores")
+    if not 0 <= low_percentile < high_percentile <= 100:
+        raise MeasurementUnavailable("Alignment percentile thresholds must satisfy 0 <= low < high <= 100")
     low_thresh = np.percentile(scores, low_percentile)
     high_thresh = np.percentile(scores, high_percentile)
+
+    if low_thresh >= high_thresh:
+        raise MeasurementUnavailable("Alignment percentile thresholds coincide; strata are unavailable")
 
     strata = np.ones(len(scores), dtype=int)  # Default to middle (1)
     strata[scores <= low_thresh] = 0  # Divergent

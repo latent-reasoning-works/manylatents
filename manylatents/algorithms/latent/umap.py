@@ -8,6 +8,7 @@ from torch import Tensor
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
 from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
+from ...utils.kwargs import route_kwargs
 
 
 class UMAPModule(LatentModule):
@@ -31,10 +32,12 @@ class UMAPModule(LatentModule):
         neighborhood_size: Optional[int] = None,
         **kwargs
     ):
+        datamodule = kwargs.pop("datamodule", None)
+        self._extra_kwargs = kwargs   # forwarded to the umap backend in _create_model (routed, not blindly)
         super().__init__(
             n_components=n_components, init_seed=random_state,
             backend=backend, device=device,
-            neighborhood_size=neighborhood_size, **kwargs,
+            neighborhood_size=neighborhood_size, datamodule=datamodule,
         )
         self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors
         self.min_dist = min_dist
@@ -67,6 +70,7 @@ class UMAPModule(LatentModule):
                 min_dist=self.min_dist,
                 device=resolve_device(self.device),
                 random_state=self.random_state,
+                **route_kwargs(UMAP, self._extra_kwargs, context="UMAPModule[torchdr]"),
             )
         else:
             from umap import UMAP
@@ -81,6 +85,7 @@ class UMAPModule(LatentModule):
                     dens_frac=self.dens_frac,
                     dens_var_shift=self.dens_var_shift,
                 )
+            kwargs.update(route_kwargs(UMAP, self._extra_kwargs, context="UMAPModule[umap-learn]"))
             return UMAP(
                 n_components=self.n_components,
                 random_state=self.random_state,

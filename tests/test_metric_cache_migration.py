@@ -77,9 +77,15 @@ def test_cache_sharing_across_metrics(embedding_data):
     # Pre-warm with k=10
     compute_knn(emb, k=10, cache=cache)
 
-    # Both use k<=10, should reuse
+    # k<=10, so this reuses the pre-warmed entry
     KNNPreservation(emb, ds, n_neighbors=5, cache=cache)
-    LocalIntrinsicDimensionality(emb, k=5, cache=cache)
+    assert len(cache) <= 2  # emb + dataset.data from KNNPres
 
-    # Cache should still have only 2 entries max (emb + dataset.data from KNNPres)
-    assert len(cache) <= 2
+    # LID deliberately does NOT reuse it. Since #304 it RMS-normalises and
+    # deduplicates before any distance work, and the cache is keyed by content,
+    # so its conditioned view takes its own entry. Reusing the raw entry would
+    # reintroduce the bug through the cache: a kNN computed on a badly scaled
+    # array is precisely what LID must not trust, and a deduplicated cloud is a
+    # different point set. One extra entry is the cost of that.
+    LocalIntrinsicDimensionality(emb, k=5, cache=cache)
+    assert len(cache) == 3

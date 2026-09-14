@@ -16,6 +16,7 @@ except (ImportError, AttributeError):
 
 
 from manylatents.utils.utils import NumpyEncoder as _NumpyEncoder
+from manylatents.utils.exceptions import MeasurementUnavailable
 from manylatents.callbacks.embedding.base import EmbeddingCallback, validate_latent_outputs
 from manylatents.utils.utils import save_embeddings
 
@@ -191,11 +192,14 @@ class SaveOutputs(EmbeddingCallback):
         """
         flattened = {}
         for name, value in scores.items():
+            if isinstance(value, MeasurementUnavailable):
+                flattened[name] = json.dumps(value.to_dict())
+                continue
             arr = np.asarray(value)
 
             if arr.ndim == 0:
-                # Scalar
-                flattened[name] = float(value)
+                # Preserve categorical provenance alongside numeric scores.
+                flattened[name] = value if isinstance(value, str) else float(value)
             elif arr.shape[0] != n_samples:
                 # Not per-sample: flatten array with suffixes
                 if arr.ndim == 1:

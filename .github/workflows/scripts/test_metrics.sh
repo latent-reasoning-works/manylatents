@@ -25,8 +25,16 @@ for config in "${CONFIGS[@]}"; do
     echo "→ Testing: metrics=$config"
     TESTED=$((TESTED + 1))
 
+    ALGORITHM=pca
+    if [ "$config" = "mismatch_ratio" ]; then
+        # PCA.affinity() is a signed centered Gram matrix / (n-1), not
+        # neighborhood probabilities. Mismatch correctly refuses it; PHATE
+        # supplies a nonnegative transition matrix. See tests/test_metric_smoke.py.
+        ALGORITHM=phate
+    fi
+
     CMD="python -m manylatents.main \
-        algorithms/latent=pca \
+        algorithms/latent=$ALGORITHM \
         data=swissroll \
         data.n_distributions=5 \
         data.n_points_per_distribution=20 \
@@ -34,6 +42,13 @@ for config in "${CONFIGS[@]}"; do
         metrics=$config \
         callbacks/embedding=minimal \
         logger=none"
+
+    if [ "$config" = "score_jacobian_id" ]; then
+        # PCA has no score interface. ScoreDiffusionModule is not a CLI latent
+        # algorithm; this fixture fits it and runs the shipped Hydra metric
+        # through evaluate(), including its explicit FLIPD/scale policy.
+        CMD="python -m pytest tests/test_score_jacobian_id.py::test_shipped_score_config_fitted_model_smoke -q"
+    fi
 
     if $CMD > /tmp/test_metric_${config}.log 2>&1; then
         echo "  ✅ $config"

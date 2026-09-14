@@ -19,6 +19,7 @@ import numpy as np
 
 from manylatents.metrics.registry import get_metric
 from manylatents.outputs import collect_outputs
+from manylatents.utils.exceptions import MeasurementUnavailable
 from manylatents.utils.metrics import _content_key, compute_eigenvalues, compute_knn
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,10 @@ def prewarm_cache(
 
         if data is not None and k_set:
             max_k = max(k_set)
+            # Prewarming is speculative (registry kwargs can override defaults).
+            # Let the metric validate its actual request against the sample count.
+            if max_k >= len(data):
+                continue
 
             # Disk cache for dataset kNN
             if at_value == "dataset" and knn_cache_dir is not None:
@@ -240,15 +245,25 @@ def _evaluate_hydra(
 
     Returns:
         Flat dict of metric results (with ColormapInfo viz metadata).
+        Swept entries that raise MeasurementUnavailable retain that exception
+        as their value. Each sweep must have at least one measurable entry;
+        successes from other metrics do not make an unavailable sweep valid.
     """
     import hydra as _hydra
+    from omegaconf import open_dict
     from manylatents.callbacks.embedding.base import ColormapInfo
 
     results: dict[str, Any] = {}
+    sweep_entries: dict[str, list[str]] = {}
+    measured_sweeps: set[str] = set()
     for metric_name, metric_cfg in metrics.items():
         # Read and pop 'at' before instantiation so it is not passed to the
         # metric function as a keyword argument.
         cfg_copy = _copy.deepcopy(metric_cfg)
+        with open_dict(cfg_copy):
+            sweep_group = cfg_copy.pop("_sweep_group_", None)
+        if sweep_group is not None:
+            sweep_entries.setdefault(sweep_group, []).append(metric_name)
         at_value = getattr(cfg_copy, "at", "embedding")  # default for safety
         if hasattr(cfg_copy, "at"):
             try:
@@ -264,6 +279,11 @@ def _evaluate_hydra(
             primary_data = outputs.get(at_value)
             if primary_data is None:
                 algo_name = type(module).__name__ if module else "unknown"
+                if sweep_group is not None:
+                    results[metric_name] = MeasurementUnavailable(
+                        f"Metric '{metric_name}': output '{at_value}' not available from {algo_name}"
+                    )
+                    continue
                 logger.warning(
                     f"Skipping metric '{metric_name}': output '{at_value}' "
                     f"not available from {algo_name}. "
@@ -274,12 +294,21 @@ def _evaluate_hydra(
         metric_fn = _hydra.utils.instantiate(cfg_copy)
 
         # Call with standard signature -- route primary data to embeddings kwarg
-        raw_result = metric_fn(
-            embeddings=primary_data if primary_data is not None else embeddings,
-            dataset=dataset,
-            module=module,
-            cache=cache,
-        )
+        try:
+            raw_result = metric_fn(
+                embeddings=primary_data if primary_data is not None else embeddings,
+                dataset=dataset,
+                module=module,
+                cache=cache,
+            )
+        except MeasurementUnavailable as exc:
+            if sweep_group is None:
+                raise
+            results[metric_name] = exc.with_traceback(None)
+            continue
+
+        if sweep_group is not None:
+            measured_sweeps.add(sweep_group)
 
         # Unpack (value, ColormapInfo) tuples from metrics that provide viz metadata
         if (
@@ -293,6 +322,10 @@ def _evaluate_hydra(
         else:
             results.update(_flatten_metric_result(metric_name, raw_result))
 
+    for group, entries in sweep_entries.items():
+        if group not in measured_sweeps:
+            reasons = "; ".join(f"{name}: {results[name]}" for name in entries)
+            raise MeasurementUnavailable(f"Metric sweep '{group}' has no measurable values: {reasons}")
     return results
 
 

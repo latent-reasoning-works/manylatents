@@ -209,7 +209,7 @@ class PCAModule(LatentModule):
         # LTSA alignment
         self._embedding = ltsa_align(
             x_np.astype(np.float64), indices,
-            local_result.local_bases, self.n_components
+            local_result.local_bases, self.n_components, random_state=self.init_seed,
         ).astype(x_np.dtype)
 
     # ------------------------------------------------------------------

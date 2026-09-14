@@ -2,6 +2,40 @@
 
 The evaluation system for manyLatents: metrics for measuring embedding quality, dataset properties, and algorithm internals. All metric configs live in a flat `configs/metrics/` directory. Each config declares its evaluation target via the `at` field.
 
+## Metric smoke failures: absent parameters and incompatible affinities
+
+`metrics=dse_knn` inherits `k` from the nullable `neighborhood_size` setting.
+An absent size (`null` / `None`) resolves to DSE's existing default, **15**, in
+the metric itself. Explicit values still reach `compute_knn` unchanged: zero,
+negative, noninteger, or `k >= n_samples` requests raise `MeasurementUnavailable`.
+The default is not clipped to fit smaller datasets either.
+
+`metrics=mismatch_ratio` with `algorithms/latent=pca` correctly refuses the
+pairing. `PCAModule.affinity()` returns
+`X_centered @ X_centered.T / (n_samples - 1)`: a scaled sample Gram matrix,
+documented by PCA as a covariance, **not a transition matrix**. On the smoke
+dataset (5 distributions × 20 points, rotated to 50 dimensions), direct
+execution reproduced the negative-weight refusal. Inspection of the fitted
+module confirmed exact equality with that formula, negative entries, and row
+sums approximately zero. Removing the diagonal, as mismatch does, retains the
+negative entries; it cannot turn this matrix into neighborhood probabilities.
+
+Mismatch measures `k_eff = (sum w)^2 / sum(w^2)` for each row. This equals
+`1 / sum(p^2)` after normalizing nonnegative weights into probabilities, so
+positive row scaling is harmless and rows need not already sum to one (the
+diagonal is removed). Signed covariance entries cannot supply that probability
+interpretation. The finite, nonnegative, nonempty-row checks remain intact;
+substituting a neighborhood size when they fail would invent a result.
+
+The CI metric sweep therefore pairs **only mismatch_ratio with PHATE**, whose
+affinity is nonnegative and row-stochastic, instead of PCA. The metric config
+still runs; it is not skipped or given a fabricated affinity. Regression tests
+in `tests/test_metric_smoke.py` execute both actual pairings through `run()` and
+the shared experiment/evaluation engine, assert PCA's refusal and matrix
+properties, and compare PHATE's measured `k_eff` against its row probabilities.
+They also execute the DSE config's five diffusion times with an absent and an
+explicit neighborhood size. Config composition alone did not catch either bug.
+
 ## Pipeline Execution Model
 
 Metrics and sampling operate on **named pipeline outputs** — a dict built as `run_experiment()` progresses. Understanding when each output becomes available is key to understanding what `at` and `sampling` can target.

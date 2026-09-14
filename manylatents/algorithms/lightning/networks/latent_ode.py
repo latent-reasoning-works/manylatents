@@ -49,6 +49,8 @@ class LatentODENetwork(nn.Module):
         rtol: Relative tolerance for adaptive solvers.
         atol: Absolute tolerance for adaptive solvers.
         use_adjoint: If True, use odeint_adjoint for O(1) memory backprop.
+        init_seed: Seed before creating weights. None uses the caller's RNG,
+            including the seed set by a config-building Lightning wrapper.
     """
 
     def __init__(
@@ -63,8 +65,11 @@ class LatentODENetwork(nn.Module):
         rtol: float = 1e-4,
         atol: float = 1e-4,
         use_adjoint: bool = True,
+        init_seed: int | None = None,
     ):
         super().__init__()
+        if init_seed is not None:
+            torch.manual_seed(init_seed)
         if encoder_hidden_dims is None:
             encoder_hidden_dims = [256, 128]
         if decoder_hidden_dims is None:

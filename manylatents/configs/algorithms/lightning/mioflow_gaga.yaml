@@ -1,0 +1,48 @@
+_target_: manylatents.algorithms.lightning.mioflow.MIOFlow
+_recursive_: false
+datamodule: ${data}
+network:
+  _target_: manylatents.algorithms.lightning.networks.mioflow_net.MIOFlowODEFunc
+  input_dim: null # inferred from encoder.latent_dim in configure_model()
+  hidden_dim: 64
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+# Training phases
+n_local_epochs: 0
+n_global_epochs: 100
+n_post_local_epochs: 0
+# Loss weights
+lambda_ot: 1.0
+lambda_energy: 0.01
+lambda_density: 0.0
+energy_time_steps: 10
+# Output
+sample_size: null
+n_trajectories: 100
+n_bins: 100
+# Density loss
+density_top_k: 5
+density_hinge_value: 0.01
+# Optimization
+grad_clip: null
+# Swappable encoder config, instantiated alongside the flow in configure_model().
+# To use an existing fixed encoder, change _target_ and set encoder_pretraining: none.
+encoder:
+  _target_: manylatents.algorithms.lightning.networks.gaga_net.GAGANetwork
+  input_dim: null # inferred from data, then persisted for restoration
+  latent_dim: 8
+  hidden_dims: 128
+  activation: relu
+encoder_pretraining: gaga
+# GAGA pretraining runs in on_fit_start(), and is skipped after restoring a
+# completed stage. Override encoder.latent_dim and gaga_*_epochs per dataset.
+gaga_encoder_epochs: 50
+gaga_decoder_epochs: 50
+gaga_dist_weight_phase1: 1.0
+gaga_recon_weight_phase2: 1.0
+gaga_lr: 0.001
+gaga_phate_knn: 5
+gaga_phate_t: auto
+gaga_phate_n_components: 2

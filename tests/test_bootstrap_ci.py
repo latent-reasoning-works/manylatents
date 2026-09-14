@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from manylatents.utils.stats import bootstrap_ci
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 
 def test_basic_mean_ci():
@@ -90,9 +91,9 @@ def test_mismatched_lengths_raises():
 
 
 def test_failing_stat_fn_raises():
-    """If stat_fn fails on most resamples, raise RuntimeError."""
+    """Unavailable bootstrap statistics use the shared measurement failure."""
     def always_fail(x):
         raise ValueError("nope")
 
-    with pytest.raises(RuntimeError, match="bootstrap resamples"):
+    with pytest.raises(MeasurementUnavailable, match="bootstrap resamples"):
         bootstrap_ci(always_fail, np.arange(10, dtype=float), n_bootstrap=50)

@@ -10,6 +10,7 @@ import tempfile
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any
+from manylatents.utils.utils import NumpyEncoder
 
 
 def serialize_embedding_outputs(outputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,7 +79,7 @@ def write_embedding_outputs_atomic(
         suffix='.tmp',
         prefix='.tmp_'
     ) as tmp:
-        json.dump(serialized, tmp, indent=2)
+        json.dump(serialized, tmp, indent=2, cls=NumpyEncoder)
         tmp.flush()
         os.fsync(tmp.fileno())      # the rename is atomic; the CONTENT must be on disk first
         tmp_path = Path(tmp.name)

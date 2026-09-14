@@ -207,6 +207,9 @@ def temporally_variable_genes(
 
     # Descending by score, NaN last (scanpy: `nan_to_num(..., nan=-inf)`).
     # Stable so ties keep gene order, matching scanpy's tie handling.
+    # np.argsort returns the indices that would sort the array without modifying
+    # the contextual value of the indices themselves, so we can use it to
+    # get the top indices into the original gene_names array.
     ranked = np.argsort(-np.nan_to_num(score, nan=-np.inf), kind="stable")
 
     top_k = min(n_top_genes, expr.shape[0])

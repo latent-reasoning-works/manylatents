@@ -18,6 +18,7 @@ See ``/network/scratch/c/cesar.valdez/distillation-algo-module-plan.md``.
 """
 from __future__ import annotations
 
+from numbers import Integral
 from typing import Any, Dict, List, Mapping, Optional
 
 import torch
@@ -27,6 +28,7 @@ from torch import Tensor
 
 from manylatents.lightning.activation_snapshot import ActivationSnapshot
 from manylatents.lightning.hooks import ActivationExtractor, LayerSpec, resolve_layer
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 __all__ = ["Distillation"]
 
@@ -103,7 +105,9 @@ class Distillation(LightningModule):
         alignment_weight: coefficient on the alignment MSE term. ``0.0`` means
             pure task training; the module never runs the probe forward pass.
         alignment_batch_size: number of probe samples drawn per
-            ``training_step`` when computing the alignment term.
+            ``training_step`` when computing the alignment term. Must be a
+            positive integer no larger than the probe set. If absent (None),
+            use up to 16 available probes.
         init_seed: seed used before optimizer construction. Student weights are
             the caller's responsibility - init the module deterministically
             upstream if you need reproducible runs.
@@ -120,11 +124,20 @@ class Distillation(LightningModule):
         optimizer: Mapping[str, Any],
         *,
         alignment_weight: float = 0.0,
-        alignment_batch_size: int = 16,
+        alignment_batch_size: Optional[int] = None,
         init_seed: int = 42,
         lr_scheduler: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__()
+
+        if alignment_batch_size is not None and (
+            isinstance(alignment_batch_size, bool)
+            or not isinstance(alignment_batch_size, Integral)
+            or alignment_batch_size <= 0
+        ):
+            raise MeasurementUnavailable("alignment_batch_size must be a positive integer")
+        if isinstance(init_seed, bool) or not isinstance(init_seed, Integral):
+            raise ValueError("init_seed must be an integer")
 
         if alignment_weight > 0 and len(layer_pairs) == 0:
             raise ValueError(
@@ -152,7 +165,7 @@ class Distillation(LightningModule):
         self.optimizer_cfg = dict(optimizer)
         self.lr_scheduler_cfg = dict(lr_scheduler) if lr_scheduler is not None else None
         self.alignment_weight = float(alignment_weight)
-        self.alignment_batch_size = int(alignment_batch_size)
+        self.alignment_batch_size = alignment_batch_size
         self.init_seed = int(init_seed)
 
         # Register snapshot tensors as buffers so .to(device) moves them and
@@ -232,14 +245,23 @@ class Distillation(LightningModule):
         return total
 
     def _sample_probe_indices(self) -> Tensor:
-        """Draw ``alignment_batch_size`` unique indices (or fewer if the probe
-        set is smaller) uniformly at random on each call. Uses
+        """Draw exactly the requested number of unique probe indices.
+
+        An absent batch size defaults to up to 16 available probes. Uses
         :func:`torch.randperm`, seeded by PyTorch's global RNG - callers who
         need reproducibility should ``torch.manual_seed`` upstream or inside
         a subclass override.
         """
         n_probe = int(self._probe_input_ids.shape[0])
-        k = min(self.alignment_batch_size, n_probe)
+        if n_probe == 0:
+            raise MeasurementUnavailable("alignment requires a nonempty probe set")
+        k = min(16, n_probe) if self.alignment_batch_size is None else self.alignment_batch_size
+        # Sampling without replacement needs k distinct members of n_probe;
+        # therefore k <= n_probe. Only the unspecified default may adapt.
+        if k > n_probe:
+            raise MeasurementUnavailable(
+                f"alignment_batch_size={k} exceeds the {n_probe} available probes"
+            )
         # randperm lives on the same device as the probe buffer (CUDA when
         # moved), so we don't induce a host-device sync per step.
         perm = torch.randperm(n_probe, device=self._probe_input_ids.device)
@@ -311,10 +333,18 @@ class Distillation(LightningModule):
         if self.lr_scheduler_cfg is None:
             return optimizer
 
+        warmup_steps = self.lr_scheduler_cfg.get("warmup_steps", 0)
+        total_steps = self.lr_scheduler_cfg.get("total_steps")
+        for name, value, minimum in (
+            ("warmup_steps", warmup_steps, 0),
+            ("total_steps", total_steps, 1),
+        ):
+            # Warmup counts may be zero (no warmup); a training schedule
+            # needs at least one step to describe a nonempty training run.
+            if isinstance(value, bool) or not isinstance(value, Integral) or value < minimum:
+                raise ValueError(f"{name} must be an integer >= {minimum}")
         from transformers import get_linear_schedule_with_warmup
 
-        warmup_steps = int(self.lr_scheduler_cfg.get("warmup_steps", 0))
-        total_steps = int(self.lr_scheduler_cfg.get("total_steps", 0))
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
         )

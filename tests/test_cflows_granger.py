@@ -20,8 +20,10 @@ import numpy as np
 import pandas as pd
 import pytest
 from scipy import stats
-from statsmodels.regression.linear_model import OLS
-from statsmodels.tsa.stattools import grangercausalitytests
+
+pytest.importorskip("statsmodels")  # optional dep — skip module if unavailable (manylatents convention)
+from statsmodels.regression.linear_model import OLS  # noqa: E402
+from statsmodels.tsa.stattools import grangercausalitytests  # noqa: E402
 
 from manylatents.algorithms.cflows_granger import (
     SIGNED_SCORE_CAP,
@@ -72,7 +74,7 @@ def test_estimator_index_path_matches_independent_ols():
 
     # data[[c, r]] => statsmodels tests column 2 (r) Granger-causes column 1 (c).
     frame = pd.DataFrame({"c": c, "r": r})[["c", "r"]]
-    res = grangercausalitytests(frame, maxlag=(1,), verbose=False)
+    res = grangercausalitytests(frame, maxlag=(1,))
 
     sm_p = res[1][0]["ssr_chi2test"][1]
     sm_coef = res[1][1][1].params[1]

@@ -1,6 +1,6 @@
 [project]
 name = "manylatents"
-version = "0.1.6"
+version = "0.1.7"
 description = "Unified dimensionality reduction and neural network analysis framework"
 license = "MIT"
 authors = [
@@ -94,7 +94,8 @@ omics = ["manylatents-omics"]
 # `seurat_v3` flavor -- the same dependency scanpy takes for its `seurat_v3` HVG,
 # and reachable from here via `granger_grn(..., n_top_genes=..., flavor=...)`.
 # The import stays lazy, so `seurat` works without it.
-cflows = ["statsmodels>=0.14", "manykinds>=0.1.1", "scikit-misc>=0.5"]
+cflows = ["statsmodels>=0.14,<0.16", "manykinds>=0.1.1", "scikit-misc>=0.5"]
+# Support 0.14/0.15 without the removed verbose argument; review the next minor API.
 # All optional extras (excluding docs/dev)
 all = [
     "manylatents[hf,torchdr,jax,omics,cflows]",

@@ -27,6 +27,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 # Canonical dogma track layers (shared schema, owned by the #26 SignalRecord agent).
 SIGNAL_LAYERS = ("accessibility", "tf", "histone", "cage", "rna", "splice")
@@ -38,66 +39,79 @@ class LayerGeometry:
 
     layer: str
     lid: float  # mean LID@k across the cohort's layer vectors
-    auroc: float  # class separation along the class-mean-difference axis (>= 0.5)
+    auroc: float  # held-out AUROC may be below 0.5
     n: int  # number of variants
     dim: int  # per-variant layer vector dimensionality
+    evaluation_mode: str  # "stratified_cv" or explicitly requested "in_cohort"
+    cv_folds: int | None
+
+
+def _separation_axis(vectors: np.ndarray, y: np.ndarray) -> np.ndarray:
+    axis = vectors[y == 1].mean(axis=0) - vectors[y == 0].mean(axis=0)
+    norm = np.linalg.norm(axis)
+    if norm == 0 or not np.isfinite(norm):
+        raise MeasurementUnavailable("AUROC separation axis requires a finite nonzero norm")
+    return axis / norm
 
 
 def _axis_projection(vectors: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Project onto the class-mean-difference axis (positive class = higher)."""
-    axis = vectors[y == 1].mean(axis=0) - vectors[y == 0].mean(axis=0)
+    axis = _separation_axis(vectors, y)
     # Elementwise-then-sum rather than ``vectors @ axis``: the BLAS matmul loop
     # emits spurious FP RuntimeWarnings once torch has touched the FP control word.
     return (vectors * axis).sum(axis=1)
 
 
 def _separation_auroc(
-    vectors: np.ndarray, labels: np.ndarray, cv: int | None = None
+    vectors: np.ndarray, labels: np.ndarray, cv: int | None = 5
 ) -> float:
     """AUROC of the two classes along their class-mean-difference axis.
 
     A cheap, modality-agnostic linear-separability score: project each variant
     onto ``mean(positive) - mean(negative)``, then score with ``roc_auc_score``.
 
-    ``cv=None`` (default): in-cohort read — the axis is fit on the same variants
-    it scores, so it is always ``>= 0.5`` and optimistic on small N.
-    ``cv=k``: honest read — stratified k-fold; the axis is fit on each train
+    ``cv=None`` (explicit opt-in): in-cohort read — the axis is fit on the same variants
+    it scores, which is optimistic on small N.
+    ``cv=k`` (default 5): held-out read — stratified k-fold; the axis is fit on each train
     split and scores the held-out fold, projections pooled for one AUROC. A layer
     with no class signal then sits at ~0.5 (and may dip below), which is the
     point: it stops the within-cohort optimism from masking a null layer.
     """
+    vectors = np.asarray(vectors, dtype=float)
     labels = np.asarray(labels)
+    if (vectors.ndim != 2 or labels.ndim != 1 or len(vectors) != len(labels)
+            or not np.all(np.isfinite(vectors))):
+        raise MeasurementUnavailable("AUROC requires finite vectors and one label per sample")
     classes = np.unique(labels)
     if classes.size != 2:
-        raise ValueError(f"AUROC needs exactly 2 classes, got {classes.tolist()}")
+        raise MeasurementUnavailable(f"AUROC needs exactly 2 classes, got {classes.tolist()}")
     neg, pos = classes
     y = (labels == pos).astype(int)
 
-    if not cv:
+    if cv is None:
         return float(roc_auc_score(y, _axis_projection(vectors, y)))
 
     from sklearn.model_selection import StratifiedKFold
 
-    # Clamp folds to the smallest class so StratifiedKFold can't raise on a
-    # small (e.g. rare-pathogenic) class; need >= 2 per class to CV at all.
+    # A requested fold count is part of the evaluation, never silently replaced.
     smallest_class = int(np.bincount(y).min())
     if smallest_class < 2:
-        raise ValueError(
+        raise MeasurementUnavailable(
             f"cv AUROC needs >= 2 samples per class; smallest class has {smallest_class}"
         )
-    n_splits = min(cv, smallest_class)
+    if not isinstance(cv, (int, np.integer)) or isinstance(cv, bool) or not 2 <= cv <= smallest_class:
+        raise MeasurementUnavailable(
+            f"cv AUROC requires 2 <= cv <= smallest class size ({smallest_class}); got {cv}"
+        )
+    n_splits = cv
 
     proj = np.empty(y.shape[0], dtype=float)
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=0)
     for train_idx, test_idx in skf.split(vectors, y):
-        axis = (
-            vectors[train_idx][y[train_idx] == 1].mean(axis=0)
-            - vectors[train_idx][y[train_idx] == 0].mean(axis=0)
-        )
+        axis = _separation_axis(vectors[train_idx], y[train_idx])
         # Unit-normalize per fold so out-of-fold projections pool on ONE scale:
         # un-normalized per-fold axes have different norms, which distorts the
         # ranks when projections from all folds are scored by one roc_auc_score.
-        axis /= np.linalg.norm(axis) + 1e-12
         proj[test_idx] = (vectors[test_idx] * axis).sum(axis=1)
     return float(roc_auc_score(y, proj))
 
@@ -107,16 +121,16 @@ def layer_geometry(
     labels: np.ndarray,
     layer: str = "",
     k: int = 20,
-    cv: int | None = None,
+    cv: int | None = 5,
 ) -> LayerGeometry:
     """LID@k + class-separation AUROC for a single layer's per-variant vectors.
 
     ``cv`` forwards to :func:`_separation_auroc` (``None`` = in-cohort read;
-    ``k``-fold = honest held-out AUROC).
+    ``k``-fold = held-out AUROC, default 5).
     """
     vectors = np.asarray(vectors, dtype=float)
     if vectors.ndim != 2:
-        raise ValueError(f"layer '{layer}': expected (N, D) vectors, got {vectors.shape}")
+        raise MeasurementUnavailable(f"layer '{layer}': expected (N, D) vectors, got {vectors.shape}")
     lid = float(LocalIntrinsicDimensionality(vectors, k=k))
     auroc = _separation_auroc(vectors, labels, cv=cv)
     return LayerGeometry(
@@ -125,6 +139,8 @@ def layer_geometry(
         auroc=auroc,
         n=vectors.shape[0],
         dim=vectors.shape[1],
+        evaluation_mode="in_cohort" if cv is None else "stratified_cv",
+        cv_folds=cv,
     )
 
 
@@ -132,7 +148,7 @@ def signal_manifold_geometry(
     layer_vectors: dict[str, np.ndarray],
     labels: np.ndarray,
     k: int = 20,
-    cv: int | None = None,
+    cv: int | None = 5,
 ) -> dict[str, LayerGeometry]:
     """Per-layer LID@k + AUROC over a variant cohort's per-layer signal vectors.
 
@@ -142,9 +158,10 @@ def signal_manifold_geometry(
             any keys are accepted (protein-side layers work identically).
         labels: ``(N,)`` binary class labels (e.g. pathogenic vs benign).
         k: neighbors for LID (default 20; matches ``metrics/lid.py``).
-        cv: if set, per-layer AUROC is a stratified ``cv``-fold held-out read
-            (axis fit out-of-fold, unit-normalized, projections pooled); folds
-            are clamped to the smallest class. ``None`` = in-cohort read.
+        cv: Per-layer AUROC uses stratified held-out folds (default 5),
+            with axes fit out-of-fold and unit-normalized. Each class must
+            have at least ``cv`` samples. ``None`` explicitly opts into an
+            in-cohort read. The result records the mode and fold count.
 
     Returns:
         ``{layer_name -> LayerGeometry}`` — the per-layer geometry baseline. The

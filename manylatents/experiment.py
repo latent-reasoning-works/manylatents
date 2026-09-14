@@ -18,6 +18,7 @@ from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback
 from manylatents.outputs import collect_outputs
 from manylatents.utils.data import determine_data_source
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -524,10 +525,13 @@ def run_experiment(
         scores = results["scores"]
         scalar_metrics = {}
         for name, val in scores.items():
-            if isinstance(val, tuple) and len(val) == 2:
+            if isinstance(val, MeasurementUnavailable):
+                wandb_run.log({f"metrics/{name}": val.to_dict()})
+            elif isinstance(val, tuple) and len(val) == 2:
                 scalar_metrics[f"metrics/{name}"] = float(val[0])
             elif np.ndim(val) == 0:
-                scalar_metrics[f"metrics/{name}"] = float(val)
+                # Keep the null policy (and other string provenance) with scores.
+                scalar_metrics[f"metrics/{name}"] = val if isinstance(val, str) else float(val)
         if scalar_metrics:
             wandb_run.log(scalar_metrics)
             logger.info(f"Auto-logged {len(scalar_metrics)} metrics to wandb: {list(scalar_metrics.keys())}")
