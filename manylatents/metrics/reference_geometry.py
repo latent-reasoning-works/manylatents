@@ -119,6 +119,51 @@ def pca_reference_scores(
     return scores
 
 
+def mahalanobis_score(
+    query: np.ndarray, reference: np.ndarray, ridge: float = 1e-3
+) -> np.ndarray:
+    """Distance of each query row from the reference mean, measured in units of
+    the reference's own spread along every direction.
+
+    ``sqrt((x - mean)^T (C + ridge * v * I)^-1 (x - mean))`` with ``C`` the
+    reference sample covariance and ``v`` its mean variance per feature. A
+    displacement along a direction in which the reference barely varies counts
+    for much more than the same displacement along a direction of large spread.
+
+    The ridge keeps directions with no reference spread finite, and makes the
+    score well defined with more features than reference points. Because it is
+    relative to the mean variance, rescaling both arrays by a common factor
+    leaves the score unchanged. Computed from a thin SVD of the centred
+    reference; no feature-by-feature covariance is formed.
+
+    Args:
+        ridge: strictly positive fraction of the mean per-feature variance
+            added to every direction.
+    """
+    if (isinstance(ridge, (bool, np.bool_)) or not isinstance(ridge, (int, float, np.floating))
+            or not np.isfinite(ridge) or ridge <= 0):
+        raise MeasurementUnavailable("ridge must be a finite number > 0")
+    q, r = _pair(query, reference)
+    n = r.shape[0]
+    if n < 2:
+        raise MeasurementUnavailable("a covariance needs at least two reference rows")
+    mean = r.mean(axis=0)
+    _, singular, vt = np.linalg.svd(r - mean, full_matrices=False)
+    variances = singular ** 2 / (n - 1)
+    floor = float(ridge) * variances.sum() / r.shape[1]
+    if not np.isfinite(floor) or floor <= 0:
+        raise MeasurementUnavailable("the reference has no spread to measure distances in")
+    centred = q - mean
+    coordinates = centred @ vt.T
+    inside = (coordinates ** 2 / (variances + floor)).sum(axis=1)
+    outside = np.maximum((centred ** 2).sum(axis=1) - (coordinates ** 2).sum(axis=1), 0.0) / floor
+    scores = np.sqrt(inside + outside)
+    bad = ~np.isfinite(scores)
+    if bad.any():
+        raise unavailable_for_points("Mahalanobis distance is not finite", bad)
+    return scores
+
+
 def local_participation_ratio(
     query: np.ndarray, reference: np.ndarray, k: int = 20, chunk_size: int = 256
 ) -> np.ndarray:

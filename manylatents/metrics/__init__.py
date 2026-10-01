@@ -64,6 +64,7 @@ from manylatents.metrics.reference_geometry import (
     knn_distance_score,
     local_participation_ratio,
     lof_novelty_score,
+    mahalanobis_score,
     pca_reference_scores,
     standardize_against,
 )
@@ -156,6 +157,7 @@ __all__ = [
     "knn_distance_score",
     "local_participation_ratio",
     "lof_novelty_score",
+    "mahalanobis_score",
     "pca_reference_scores",
     "standardize_against",
     # Cross-modal alignment metrics

@@ -153,3 +153,76 @@ def test_decimal_constant_cloud_has_no_pca_rank_or_local_spread():
     with pytest.raises(MeasurementUnavailable) as err:
         local_participation_ratio(reference[:2], reference, k=20)
     assert err.value.indices.tolist() == [0, 1]
+
+
+# --- Mahalanobis distance to the reference cloud ---------------------------------
+
+
+def _mahalanobis_direct(query, reference, ridge):
+    mean = reference.mean(axis=0)
+    covariance = np.cov(reference - mean, rowvar=False)
+    covariance = covariance + ridge * np.trace(covariance) / covariance.shape[0] * np.eye(covariance.shape[0])
+    centred = query - mean
+    return np.sqrt(np.einsum("ij,jk,ik->i", centred, np.linalg.inv(covariance), centred))
+
+
+def test_mahalanobis_matches_the_direct_formula():
+    from manylatents.metrics.reference_geometry import mahalanobis_score
+
+    rng = np.random.default_rng(20)
+    reference = rng.normal(size=(400, 6)) @ rng.normal(size=(6, 6))
+    query = rng.normal(size=(25, 6)) * 3.0
+    for ridge in (1e-3, 0.1):
+        np.testing.assert_allclose(
+            mahalanobis_score(query, reference, ridge=ridge),
+            _mahalanobis_direct(query, reference, ridge), rtol=1e-8,
+        )
+
+
+def test_mahalanobis_weights_directions_by_reference_spread():
+    from manylatents.metrics.reference_geometry import mahalanobis_score
+
+    rng = np.random.default_rng(21)
+    reference = rng.normal(size=(2000, 2)) * np.array([10.0, 0.1])
+    along_wide, along_narrow = np.array([[5.0, 0.0]]), np.array([[0.0, 5.0]])
+    # the same Euclidean length is ordinary along the wide axis, extreme along the narrow one
+    assert mahalanobis_score(along_narrow, reference)[0] > 20 * mahalanobis_score(along_wide, reference)[0]
+
+
+def test_mahalanobis_is_invariant_to_a_common_rescaling():
+    from manylatents.metrics.reference_geometry import mahalanobis_score
+
+    rng = np.random.default_rng(22)
+    reference = rng.normal(size=(300, 5))
+    query = rng.normal(size=(10, 5))
+    np.testing.assert_allclose(
+        mahalanobis_score(query, reference),
+        mahalanobis_score(1000.0 * query, 1000.0 * reference), rtol=1e-8,
+    )
+
+
+def test_mahalanobis_with_more_features_than_reference_points():
+    from manylatents.metrics.reference_geometry import mahalanobis_score
+
+    rng = np.random.default_rng(23)
+    reference = rng.normal(size=(40, 300))
+    query = rng.normal(size=(6, 300))
+    scores = mahalanobis_score(query, reference, ridge=1e-2)
+    assert scores.shape == (6,) and np.all(np.isfinite(scores)) and np.all(scores > 0)
+    np.testing.assert_allclose(scores, _mahalanobis_direct(query, reference, 1e-2), rtol=1e-6)
+
+
+@pytest.mark.parametrize("ridge", [0.0, -1.0, float("nan"), True])
+def test_mahalanobis_rejects_a_non_positive_ridge(ridge):
+    from manylatents.metrics.reference_geometry import mahalanobis_score
+
+    rng = np.random.default_rng(24)
+    with pytest.raises(MeasurementUnavailable):
+        mahalanobis_score(rng.normal(size=(3, 4)), rng.normal(size=(50, 4)), ridge=ridge)
+
+
+def test_mahalanobis_refuses_a_reference_without_spread():
+    from manylatents.metrics.reference_geometry import mahalanobis_score
+
+    with pytest.raises(MeasurementUnavailable):
+        mahalanobis_score(np.ones((2, 3)), np.ones((10, 3)))

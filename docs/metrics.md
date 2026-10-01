@@ -138,6 +138,7 @@ far = knn_distance_score(query, reference, k=20)
 | `knn_distance_score` | mean distance to its k nearest reference points |
 | `lof_novelty_score` | local outlier factor relative to the reference |
 | `pca_reference_scores` | norm inside and outside the reference's leading principal subspace |
+| `mahalanobis_score` | distance from the reference mean in units of the reference's spread along every direction |
 | `local_participation_ratio` | number of directions its reference neighbourhood spans |
 | `standardize_against` | z-scores using the reference's column moments |
 
