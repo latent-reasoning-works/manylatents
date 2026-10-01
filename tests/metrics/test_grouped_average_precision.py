@@ -87,3 +87,47 @@ def test_nonfinite_scores_identify_rows():
     with pytest.raises(MeasurementUnavailable) as err:
         grouped_average_precision(scores, LABELS, GROUPS)
     assert err.value.indices.tolist() == [2]
+
+
+def test_group_resampling_matches_a_direct_computation():
+    # Resampling whole groups: each replicate is a weighted mean of the fixed
+    # per-group values over a multiset of groups.
+    result = grouped_average_precision(
+        SCORES, LABELS, GROUPS, n_bootstrap=500, rng=np.random.default_rng(3),
+        resample="groups",
+    )
+    rng = np.random.default_rng(3)
+    ap = np.array([5 / 6, 1.0])
+    weight = np.array([4.0, 2.0])
+    replicates = []
+    for _ in range(500):
+        draw = rng.integers(0, 2, size=2)
+        replicates.append((ap[draw] * weight[draw]).sum() / weight[draw].sum())
+    assert result["se"] == pytest.approx(np.std(replicates, ddof=1))
+    assert result["auprc"] == pytest.approx((4 * 5 / 6 + 2 * 1.0) / 6)
+
+
+def test_group_resampling_differs_from_row_resampling():
+    rng = np.random.default_rng(0)
+    n = 3000
+    groups = rng.integers(0, 6, size=n)
+    labels = (rng.random(n) < 0.2).astype(int)
+    # signal strength differs a lot between groups, so between-group spread
+    # exceeds within-group sampling noise
+    scores = labels * (groups / 2.0) + rng.normal(size=n)
+    rows = grouped_average_precision(scores, labels, groups, n_bootstrap=300,
+                                     rng=np.random.default_rng(1))
+    whole = grouped_average_precision(scores, labels, groups, n_bootstrap=300,
+                                      rng=np.random.default_rng(1), resample="groups")
+    assert whole["auprc"] == rows["auprc"]
+    assert whole["se"] > 2 * rows["se"]
+
+
+def test_group_resampling_needs_two_groups_and_a_known_mode():
+    scores, labels = np.array([0.9, 0.1, 0.8, 0.2]), np.array([1, 0, 1, 0])
+    with pytest.raises(MeasurementUnavailable, match="two groups"):
+        grouped_average_precision(scores, labels, np.zeros(4, dtype=int), n_bootstrap=10,
+                                  rng=np.random.default_rng(0), resample="groups")
+    with pytest.raises(ValueError, match="resample"):
+        grouped_average_precision(SCORES, LABELS, GROUPS, n_bootstrap=10,
+                                  rng=np.random.default_rng(0), resample="blocks")

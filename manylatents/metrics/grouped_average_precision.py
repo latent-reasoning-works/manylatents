@@ -31,6 +31,7 @@ def grouped_average_precision(
     groups: np.ndarray,
     n_bootstrap: int = 0,
     rng: Optional[np.random.Generator] = None,
+    resample: str = "rows",
 ) -> dict[str, Any]:
     """Group-size-weighted mean of per-group average precision.
 
@@ -40,11 +41,18 @@ def grouped_average_precision(
         groups: (n,) group key per row.
         n_bootstrap: integer bootstrap replicates, at least 2; 0 skips it.
         rng: generator for the bootstrap; required when ``n_bootstrap > 0``.
+        resample: what a bootstrap replicate redraws. The two answer different
+            questions and can differ severalfold.
+            ``"rows"`` (default) resamples rows with replacement inside every
+            (group, label) cell, so both classes stay present in every group:
+            the uncertainty from having finitely many rows per group.
+            ``"groups"`` resamples whole groups with replacement and keeps each
+            group's value fixed: the uncertainty from having finitely many
+            groups that differ from one another. Needs at least two groups.
 
     Returns:
         ``{"auprc", "se", "per_group", "weights"}``. ``se`` is None without a
-        bootstrap. Each replicate resamples rows with replacement inside every
-        (group, label) cell, so both classes stay present in every group.
+        bootstrap.
 
     Raises:
         MeasurementUnavailable: non-finite scores, non-binary labels, or a
@@ -73,6 +81,8 @@ def grouped_average_precision(
         raise MeasurementUnavailable("n_bootstrap must be 0 or an integer >= 2")
     if n_bootstrap and not isinstance(rng, np.random.Generator):
         raise ValueError("a bootstrap needs an explicit numpy Generator in rng")
+    if resample not in ("rows", "groups"):
+        raise ValueError(f"resample must be 'rows' or 'groups', got {resample!r}")
     if np.any(groups != groups):
         raise unavailable_for_points("groups contain missing keys", groups != groups)
 
@@ -88,7 +98,20 @@ def grouped_average_precision(
     value, per_group, weights = _statistic(scores, labels, group_rows)
 
     se = None
-    if n_bootstrap:
+    if n_bootstrap and resample == "groups":
+        keys = list(per_group)
+        if len(keys) < 2:
+            raise MeasurementUnavailable(
+                "resampling groups needs at least two groups; got one"
+            )
+        values = np.array([per_group[g] for g in keys])
+        sizes = np.array([weights[g] for g in keys], dtype=np.float64)
+        replicates = np.empty(int(n_bootstrap), dtype=np.float64)
+        for b in range(int(n_bootstrap)):
+            draw = rng.integers(0, len(keys), size=len(keys))
+            replicates[b] = (values[draw] * sizes[draw]).sum() / sizes[draw].sum()
+        se = float(np.std(replicates, ddof=1))
+    elif n_bootstrap:
         cells = [
             rows[labels[rows] == cls]
             for rows in group_rows.values()
