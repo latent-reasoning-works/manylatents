@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-from manylatents.utils.exceptions import MeasurementUnavailable
+from manylatents.utils.exceptions import MeasurementUnavailable, unavailable_for_points
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,12 @@ def _as_float32_matrix(x, name: str) -> np.ndarray:
         raise MeasurementUnavailable(f"{name} must be a nonempty real numeric matrix")
     if not np.isfinite(x).all():
         raise MeasurementUnavailable(f"{name} contains non-finite values")
-    return np.ascontiguousarray(x, dtype=np.float32)
+    with np.errstate(over="ignore", invalid="ignore"):
+        converted = np.ascontiguousarray(x, dtype=np.float32)
+    bad = ~np.isfinite(converted).all(axis=1)
+    if bad.any():
+        raise unavailable_for_points(f"{name} is not finite at float32 precision", bad)
+    return converted
 
 
 def compute_knn_query(
@@ -225,4 +230,10 @@ def compute_knn_query(
             f"n_query={query.shape[0]}, k={k}"
         )
 
-    return np.asarray(distances, dtype=np.float64), np.asarray(indices, dtype=np.int64)
+    distances = np.asarray(distances, dtype=np.float64)
+    indices = np.asarray(indices, dtype=np.int64)
+    bad = ~np.all(np.isfinite(distances) & (distances >= 0)
+                  & (indices >= 0) & (indices < n_reference), axis=1)
+    if bad.any():
+        raise unavailable_for_points("query neighbours are unresolved at float32 precision", bad)
+    return distances, indices

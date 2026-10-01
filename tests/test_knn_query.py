@@ -55,3 +55,10 @@ def test_rejects_dimension_mismatch_and_non_finite():
     bad[0, 0] = np.nan
     with pytest.raises(MeasurementUnavailable):
         compute_knn_query(reference, bad, k=2)
+
+
+@pytest.mark.parametrize("value", [1e30, 1e40])
+def test_unresolvable_query_distances_raise_with_rows(value):
+    with pytest.raises(MeasurementUnavailable) as err:
+        compute_knn_query(np.array([[0.], [1.]]), np.array([[0.5], [value]]), k=1)
+    assert err.value.indices.tolist() == [1]
