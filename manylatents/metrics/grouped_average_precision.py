@@ -130,3 +130,118 @@ def grouped_average_precision(
         se = float(np.std(replicates, ddof=1))
 
     return {"auprc": value, "se": se, "per_group": per_group, "weights": weights}
+
+
+def grouped_average_precision_difference(
+    scores_a: np.ndarray,
+    scores_b: np.ndarray,
+    labels: np.ndarray,
+    groups: np.ndarray,
+    clusters: Optional[np.ndarray] = None,
+    n_bootstrap: int = 1000,
+    rng: Optional[np.random.Generator] = None,
+) -> dict[str, Any]:
+    """Paired difference of group-size-weighted average precisions (a minus b).
+
+    Scores, binary labels and group keys are aligned 1D arrays, as in
+    :func:`grouped_average_precision`. Higher scores mean more likely positive.
+    ``n_bootstrap`` must be an integer >= 2 and ``rng`` a numpy Generator.
+
+    Rows are drawn with replacement within every (group, label) cell. When
+    ``clusters`` is supplied, a second bootstrap draws each group's clusters
+    with replacement, retaining all rows of each drawn cluster. Cluster keys
+    must be aligned with the rows, belong to exactly one group and contain
+    both classes. Each replicate uses the same draw for both scores and
+    weights group average precisions by their resampled row counts.
+
+    Returns:
+        ``auprc_a``, ``auprc_b``, ``difference``, ``ci95_rows``,
+        ``ci95_clusters``, ``n_clusters``, ``groups_ahead`` and ``n_groups``.
+        Intervals are lists of the 2.5% and 97.5% quantiles of replicate
+        differences. Cluster outputs are None when clusters are absent.
+        ``groups_ahead`` counts groups with strictly higher AP for a.
+
+    Raises:
+        MeasurementUnavailable: invalid bootstrap settings, unavailable input
+            measurements, or invalid clusters (offending keys are named).
+        ValueError: input arrays are not 1D and aligned.
+    """
+    if (isinstance(n_bootstrap, (bool, np.bool_))
+            or not isinstance(n_bootstrap, (int, np.integer))
+            or n_bootstrap < 2):
+        raise MeasurementUnavailable("n_bootstrap must be an integer >= 2")
+    if not isinstance(rng, np.random.Generator):
+        raise MeasurementUnavailable("a bootstrap needs an explicit numpy Generator in rng")
+
+    observed_a = grouped_average_precision(scores_a, labels, groups)
+    observed_b = grouped_average_precision(scores_b, labels, groups)
+    scores_a = np.asarray(scores_a, dtype=np.float64)
+    scores_b = np.asarray(scores_b, dtype=np.float64)
+    labels = np.asarray(labels).astype(int)
+    groups = np.asarray(groups)
+    group_rows = {g: np.flatnonzero(groups == g) for g in observed_a["per_group"]}
+
+    cluster_members = None
+    n_clusters = None
+    if clusters is not None:
+        clusters = np.asarray(clusters)
+        if clusters.shape != labels.shape:
+            raise ValueError("clusters must be 1D and the same length as labels")
+        missing = (clusters != clusters) | (clusters == None)  # noqa: E711
+        if np.any(missing):
+            raise unavailable_for_points(
+                f"clusters contain missing keys: {clusters[missing].tolist()}", missing
+            )
+        cluster_rows = {c: np.flatnonzero(clusters == c) for c in np.unique(clusters).tolist()}
+        spanning = [c for c, rows in cluster_rows.items() if np.unique(groups[rows]).size != 1]
+        one_class = [c for c, rows in cluster_rows.items() if np.unique(labels[rows]).size != 2]
+        if spanning or one_class:
+            raise MeasurementUnavailable(
+                f"clusters spanning groups: {spanning}; clusters without both classes: {one_class}"
+            )
+        cluster_members = {
+            g: [cluster_rows[c] for c in np.unique(clusters[rows]).tolist()]
+            for g, rows in group_rows.items()
+        }
+        n_clusters = len(cluster_rows)
+
+    cells = {
+        g: [rows[labels[rows] == cls] for cls in (0, 1)]
+        for g, rows in group_rows.items()
+    }
+    intervals = {}
+    for mode in ("rows", "clusters"):
+        if mode == "clusters" and cluster_members is None:
+            intervals[mode] = None
+            continue
+        replicates = np.empty(n_bootstrap, dtype=np.float64)
+        for b in range(n_bootstrap):
+            if mode == "rows":
+                sampled_rows = {
+                    g: np.concatenate([rng.choice(cell, size=cell.size, replace=True) for cell in pair])
+                    for g, pair in cells.items()
+                }
+            else:
+                sampled_rows = {
+                    g: np.concatenate([
+                        members[j] for j in rng.integers(0, len(members), size=len(members))
+                    ])
+                    for g, members in cluster_members.items()
+                }
+            a, _, _ = _statistic(scores_a, labels, sampled_rows)
+            b_value, _, _ = _statistic(scores_b, labels, sampled_rows)
+            replicates[b] = a - b_value
+        intervals[mode] = np.quantile(replicates, [0.025, 0.975]).tolist()
+
+    return {
+        "auprc_a": observed_a["auprc"],
+        "auprc_b": observed_b["auprc"],
+        "difference": observed_a["auprc"] - observed_b["auprc"],
+        "ci95_rows": intervals["rows"],
+        "ci95_clusters": intervals["clusters"],
+        "n_clusters": n_clusters,
+        "groups_ahead": sum(
+            observed_a["per_group"][g] > observed_b["per_group"][g] for g in group_rows
+        ),
+        "n_groups": len(group_rows),
+    }

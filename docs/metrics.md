@@ -131,6 +131,7 @@ far = knn_distance_score(query, reference, k=20)
 
 | Function | What it returns per query point |
 |---|---|
+| `grouped_average_precision_difference` | paired difference of group-weighted AP, with 95% row and optional cluster bootstrap intervals (aggregate across rows) |
 | `gpd_lid.tail_distances` | ascending distances to its k nearest reference points |
 | `gpd_lid.hill_tail_index` | tail index xi > 0; `1/xi` is the LID |
 | `gpd_lid.pickands_tail_index` | signed tail index: positive power-law, near zero exponential, negative bounded |

@@ -58,7 +58,10 @@ from manylatents.metrics.correlation import PearsonCorrelation
 from manylatents.metrics.knn_preservation import KNNPreservation
 from manylatents.metrics.tangent_space import TangentSpaceApproximation
 from manylatents.metrics.auc import AUC
-from manylatents.metrics.grouped_average_precision import grouped_average_precision
+from manylatents.metrics.grouped_average_precision import (
+    grouped_average_precision,
+    grouped_average_precision_difference,
+)
 from manylatents.metrics.outlier_score import OutlierScore
 from manylatents.metrics.reference_geometry import (
     knn_distance_score,
@@ -153,6 +156,7 @@ __all__ = [
     "TangentSpaceApproximation",
     "AUC",
     "grouped_average_precision",
+    "grouped_average_precision_difference",
     "OutlierScore",
     "knn_distance_score",
     "local_participation_ratio",

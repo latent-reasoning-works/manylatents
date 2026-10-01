@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from manylatents.metrics.grouped_average_precision import grouped_average_precision
+from manylatents.metrics import grouped_average_precision_difference
 from manylatents.utils.exceptions import MeasurementUnavailable
 
 SCORES = np.array([0.9, 0.8, 0.7, 0.1, 0.2, 0.6])
@@ -131,3 +132,144 @@ def test_group_resampling_needs_two_groups_and_a_known_mode():
     with pytest.raises(ValueError, match="resample"):
         grouped_average_precision(SCORES, LABELS, GROUPS, n_bootstrap=10,
                                   rng=np.random.default_rng(0), resample="blocks")
+
+
+CLUSTERS = np.array(["x", "x", "y", "y", "z", "z"])
+
+
+def test_difference_observed_values_and_optional_clusters():
+    result = grouped_average_precision_difference(
+        SCORES, -SCORES, LABELS, GROUPS, n_bootstrap=20, rng=np.random.default_rng(0)
+    )
+    a = grouped_average_precision(SCORES, LABELS, GROUPS)
+    b = grouped_average_precision(-SCORES, LABELS, GROUPS)
+    assert result["auprc_a"] == a["auprc"]
+    assert result["auprc_b"] == b["auprc"]
+    assert result["difference"] == a["auprc"] - b["auprc"]
+    assert result["groups_ahead"] == 2
+    assert result["n_groups"] == 2
+    assert result["ci95_clusters"] is None
+    assert result["n_clusters"] is None
+
+
+def test_difference_identical_scores_are_exactly_zero():
+    result = grouped_average_precision_difference(
+        SCORES, SCORES, LABELS, GROUPS, CLUSTERS, 30, np.random.default_rng(0)
+    )
+    assert result["difference"] == 0
+    assert result["ci95_rows"] == [0, 0]
+    assert result["ci95_clusters"] == [0, 0]
+    assert result["groups_ahead"] == 0
+    assert result["n_clusters"] == 3
+
+
+def test_difference_better_score_and_seed_determinism():
+    def compute():
+        return grouped_average_precision_difference(
+            LABELS, -LABELS, LABELS, GROUPS, CLUSTERS, 50, np.random.default_rng(9)
+        )
+
+    result = compute()
+    assert result == compute()
+    assert result["ci95_rows"][0] > 0
+    assert result["ci95_clusters"][0] > 0
+
+
+def test_difference_cluster_interval_wider_for_near_duplicate_rows():
+    rng = np.random.default_rng(7)
+    clusters = np.repeat(np.arange(12), 40)
+    labels = np.tile(np.repeat([0, 1], 20), 12)
+    # Each cluster repeats one pair of scores with tiny perturbations.
+    strength = np.repeat(np.linspace(-2, 2, 12), 40)
+    a = labels * strength + rng.normal(scale=0.001, size=labels.size)
+    b = np.zeros(labels.size)
+    result = grouped_average_precision_difference(
+        a, b, labels, np.zeros(labels.size), clusters, 250, np.random.default_rng(3)
+    )
+    assert np.diff(result["ci95_clusters"])[0] > 2 * np.diff(result["ci95_rows"])[0]
+
+
+def test_difference_tied_bootstraps_match_sklearn_with_variable_cluster_sizes():
+    from sklearn.metrics import average_precision_score
+
+    labels = np.array([0, 1, 0, 0, 1, 1, 0, 1, 0, 1])
+    groups = np.array([0] * 6 + [1] * 4)
+    clusters = np.array([0, 0, 1, 1, 1, 1, 2, 2, 3, 3])
+    a = np.array([1, 1, 0, 1, 1, 0, 2, 2, 0, 1])
+    b = np.array([0, 1, 1, 1, 0, 0, 1, 0, 1, 1])
+    n = 40
+    result = grouped_average_precision_difference(
+        a, b, labels, groups, clusters, n, np.random.default_rng(5)
+    )
+    rng = np.random.default_rng(5)
+    for mode in ("rows", "clusters"):
+        differences = []
+        for _ in range(n):
+            samples = []
+            for group in np.unique(groups):
+                rows = np.flatnonzero(groups == group)
+                if mode == "rows":
+                    samples.append(np.concatenate([
+                        rng.choice(rows[labels[rows] == cls], size=np.sum(labels[rows] == cls))
+                        for cls in (0, 1)
+                    ]))
+                else:
+                    keys = np.unique(clusters[rows])
+                    drawn = rng.choice(keys, size=len(keys))
+                    samples.append(np.concatenate([rows[clusters[rows] == key] for key in drawn]))
+            values = [
+                sum(len(rows) * average_precision_score(labels[rows], score[rows])
+                    for rows in samples) / sum(map(len, samples))
+                for score in (a, b)
+            ]
+            differences.append(values[0] - values[1])
+        assert result[f"ci95_{mode}"] == pytest.approx(np.quantile(differences, [0.025, 0.975]))
+
+
+@pytest.mark.parametrize("n_bootstrap", [0, 1, -1, 2.5, True, np.bool_(False)])
+def test_difference_refuses_invalid_bootstrap_count(n_bootstrap):
+    with pytest.raises(MeasurementUnavailable, match="n_bootstrap"):
+        grouped_average_precision_difference(
+            SCORES, SCORES, LABELS, GROUPS, n_bootstrap=n_bootstrap, rng=np.random.default_rng(0)
+        )
+
+
+@pytest.mark.parametrize("rng", [None, 42, np.random.RandomState(0)])
+def test_difference_requires_generator(rng):
+    with pytest.raises(MeasurementUnavailable, match="Generator"):
+        grouped_average_precision_difference(SCORES, SCORES, LABELS, GROUPS, rng=rng)
+
+
+@pytest.mark.parametrize("which", ["a", "b"])
+def test_difference_refuses_nonfinite_scores(which):
+    bad = SCORES.copy()
+    bad[2] = np.nan
+    a, b = (bad, SCORES) if which == "a" else (SCORES, bad)
+    with pytest.raises(MeasurementUnavailable) as err:
+        grouped_average_precision_difference(a, b, LABELS, GROUPS, rng=np.random.default_rng(0))
+    assert err.value.indices.tolist() == [2]
+
+
+@pytest.mark.parametrize("clusters, message", [
+    (["x", "x", "y", "y", "x", "x"], "spanning groups:.*x"),
+    (["positive", "negative", "positive", "negative", "z", "z"], "without both classes:.*negative.*positive"),
+    ([0, 0, 1, 1, np.nan, np.nan], "missing keys"),
+])
+def test_difference_refuses_and_names_invalid_clusters(clusters, message):
+    with pytest.raises(MeasurementUnavailable, match=message):
+        grouped_average_precision_difference(
+            SCORES, SCORES, LABELS, GROUPS, clusters, rng=np.random.default_rng(0)
+        )
+
+
+@pytest.mark.parametrize("labels", [[1, 0, 1, 0, 0, 0], [2, 0, 1, 0, 0, 1]])
+def test_difference_reuses_label_and_group_validation(labels):
+    with pytest.raises(MeasurementUnavailable):
+        grouped_average_precision_difference(SCORES, SCORES, labels, GROUPS, rng=np.random.default_rng(0))
+
+
+def test_difference_refuses_misaligned_clusters():
+    with pytest.raises(ValueError, match="clusters"):
+        grouped_average_precision_difference(
+            SCORES, SCORES, LABELS, GROUPS, CLUSTERS[:-1], rng=np.random.default_rng(0)
+        )
