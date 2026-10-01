@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LRW Ecosystem — Visual Identity</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
+
+  :root {
+    --bg-void: #0A0E14;
+    --bg-surface: #0D1117;
+    --bg-elevated: #161B22;
+    --border: #21262D;
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-tertiary: #484F58;
+
+    /* LRW Palette */
+    --lrw-manylatents: #8B949E;
+    --lrw-manylatents-bright: #A3B1BF;
+    --lrw-manylatents-dim: #484F58;
+    --lrw-manyagents: #3FB950;
+    --lrw-manyagents-bright: #56D364;
+    --lrw-manyagents-dim: #1B4332;
+    --lrw-geomancer: #D29922;
+    --lrw-geomancer-bright: #E3B341;
+    --lrw-geomancer-dim: #5C3D0E;
+    --lrw-shop: #58A6FF;
+    --lrw-shop-bright: #79C0FF;
+    --lrw-shop-dim: #1B3A5C;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .page-header {
+    text-align: center;
+    padding: 80px 40px 40px;
+    position: relative;
+  }
+
+  .page-header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 16px;
+  }
+
+  .page-header .title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -1px;
+  }
+
+  .page-header .subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: var(--border);
+    margin: 48px auto;
+  }
+
+  .showcase {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 40px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
+  }
+
+  .repo-card {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    opacity: 0;
+    transform: translateY(24px);
+    animation: cardReveal 0.6s ease-out forwards;
+  }
+
+  .repo-card:nth-child(1) { animation-delay: 0.2s; }
+  .repo-card:nth-child(2) { animation-delay: 0.4s; }
+  .repo-card:nth-child(3) { animation-delay: 0.6s; }
+  .repo-card:nth-child(4) { animation-delay: 0.8s; }
+
+  @keyframes cardReveal {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .banner-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .banner-container svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .repo-meta {
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+
+  .repo-meta .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .repo-meta .name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .repo-meta .desc {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: auto;
+  }
+
+  /* Palette strip at bottom */
+  .palette-strip {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 40px 80px;
+    display: flex;
+    gap: 2px;
+    border-radius: 4px;
+    overflow: hidden;
+    opacity: 0;
+    animation: cardReveal 0.6s ease-out 1.2s forwards;
+  }
+
+  .palette-swatch {
+    flex: 1;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: flex 0.3s ease;
+  }
+
+  .palette-swatch:hover {
+    flex: 2;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 40px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    letter-spacing: 2px;
+    opacity: 0;
+    animation: cardReveal 0.6s ease-out 1.4s forwards;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Visual Identity System</h1>
+  <div class="title">Latent Reasoning Works</div>
+  <div class="subtitle">four repos &middot; one palette &middot; distinct personalities</div>
+</div>
+
+<div class="divider"></div>
+
+<div class="showcase">
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- manyLatents — Slate / Eigenvalue Spectrum              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="repo-card">
+    <div class="banner-container">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="ml-fade" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#8B949E" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="#8B949E" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <rect width="880" height="220" fill="#0D1117"/>
+        <!-- Eigenvalue spectrum bars -->
+        <g opacity="0.12">
+          <rect x="40" y="40" width="8" height="140" rx="2" fill="#8B949E"/>
+          <rect x="56" y="52" width="8" height="128" rx="2" fill="#8B949E"/>
+          <rect x="72" y="66" width="8" height="114" rx="2" fill="#8B949E"/>
+          <rect x="88" y="78" width="8" height="102" rx="2" fill="#8B949E"/>
+          <rect x="104" y="90" width="8" height="90" rx="2" fill="#8B949E"/>
+          <rect x="120" y="100" width="8" height="80" rx="2" fill="#8B949E"/>
+          <rect x="136" y="108" width="8" height="72" rx="2" fill="#8B949E"/>
+          <rect x="152" y="116" width="8" height="64" rx="2" fill="#8B949E"/>
+          <rect x="168" y="122" width="8" height="58" rx="2" fill="#8B949E"/>
+          <rect x="184" y="128" width="8" height="52" rx="2" fill="#8B949E"/>
+          <rect x="200" y="133" width="8" height="47" rx="2" fill="#8B949E"/>
+          <rect x="216" y="137" width="8" height="43" rx="2" fill="#8B949E"/>
+          <rect x="232" y="140" width="8" height="40" rx="2" fill="#8B949E"/>
+          <rect x="248" y="143" width="8" height="37" rx="2" fill="#8B949E"/>
+          <rect x="264" y="146" width="8" height="34" rx="2" fill="#8B949E"/>
+          <rect x="280" y="148" width="8" height="32" rx="2" fill="#8B949E"/>
+          <rect x="296" y="150" width="8" height="30" rx="2" fill="#8B949E"/>
+          <rect x="312" y="152" width="8" height="28" rx="2" fill="#8B949E"/>
+          <rect x="328" y="154" width="8" height="26" rx="2" fill="#8B949E"/>
+          <rect x="344" y="155" width="8" height="25" rx="2" fill="#8B949E"/>
+          <rect x="360" y="157" width="8" height="23" rx="2" fill="#8B949E"/>
+          <rect x="376" y="158" width="8" height="22" rx="2" fill="#8B949E"/>
+          <rect x="392" y="159" width="8" height="21" rx="2" fill="#8B949E"/>
+          <rect x="408" y="160" width="8" height="20" rx="2" fill="#8B949E"/>
+        </g>
+        <!-- Eigenvalue labels -->
+        <text x="44" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8321;</text>
+        <text x="108" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8325;</text>
+        <text x="200" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8321;&#8320;</text>
+        <text x="344" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8345;</text>
+        <!-- Title -->
+        <text x="500" y="100" font-family="monospace" font-size="36" font-weight="700" fill="#E6EDF3" letter-spacing="-1">manyLatents</text>
+        <text x="502" y="128" font-family="monospace" font-size="13" fill="#8B949E">dimensionality reduction &amp; spectral analysis</text>
+        <!-- Accent line -->
+        <rect x="500" y="142" width="60" height="2" rx="1" fill="#8B949E" opacity="0.4"/>
+        <!-- Version badge -->
+        <rect x="500" y="156" width="42" height="18" rx="9" fill="#8B949E" opacity="0.15"/>
+        <text x="521" y="168" font-family="monospace" font-size="10" fill="#8B949E" text-anchor="middle">v0.1</text>
+      </svg>
+    </div>
+    <div class="repo-meta">
+      <div class="dot" style="background:#8B949E"></div>
+      <span class="name">latent-reasoning-works/manylatents</span>
+      <span class="desc">PyTorch Lightning + Hydra</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- manyAgents — Green / Network Graph                     -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="repo-card">
+    <div class="banner-container">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg">
+        <rect width="880" height="220" fill="#0D1117"/>
+        <!-- Matrix rain columns -->
+        <g font-family="monospace" font-size="11" fill="#3FB950">
+          <g opacity="0.06">
+            <text x="42" y="20">1</text><text x="42" y="36">0</text><text x="42" y="52">1</text><text x="42" y="68">1</text><text x="42" y="84">0</text><text x="42" y="100">0</text><text x="42" y="116">1</text><text x="42" y="132">0</text><text x="42" y="148">1</text><text x="42" y="164">0</text><text x="42" y="180">1</text><text x="42" y="196">1</text>
+          </g>
+          <g opacity="0.09">
+            <text x="66" y="28">0</text><text x="66" y="44">1</text><text x="66" y="60">0</text><text x="66" y="76">1</text><text x="66" y="92">1</text><text x="66" y="108">0</text><text x="66" y="124">1</text><text x="66" y="140">1</text><text x="66" y="156">0</text><text x="66" y="172">1</text><text x="66" y="188">0</text><text x="66" y="204">1</text>
+          </g>
+          <g opacity="0.14">
+            <text x="90" y="12">1</text><text x="90" y="28">1</text><text x="90" y="44">0</text><text x="90" y="60">0</text><text x="90" y="76">1</text><text x="90" y="92">0</text><text x="90" y="108">1</text><text x="90" y="124">0</text><text x="90" y="140">0</text><text x="90" y="156">1</text><text x="90" y="172">1</text><text x="90" y="188">0</text>
+          </g>
+          <g opacity="0.07">
+            <text x="114" y="24">0</text><text x="114" y="40">0</text><text x="114" y="56">1</text><text x="114" y="72">1</text><text x="114" y="88">0</text><text x="114" y="104">1</text><text x="114" y="120">0</text><text x="114" y="136">1</text><text x="114" y="152">1</text><text x="114" y="168">0</text><text x="114" y="184">0</text><text x="114" y="200">1</text>
+          </g>
+          <g opacity="0.11">
+            <text x="138" y="16">1</text><text x="138" y="32">0</text><text x="138" y="48">1</text><text x="138" y="64">0</text><text x="138" y="80">0</text><text x="138" y="96">1</text><text x="138" y="112">1</text><text x="138" y="128">0</text><text x="138" y="144">1</text><text x="138" y="160">0</text><text x="138" y="176">1</text><text x="138" y="192">1</text>
+          </g>
+          <g opacity="0.05">
+            <text x="162" y="32">0</text><text x="162" y="48">1</text><text x="162" y="64">1</text><text x="162" y="80">0</text><text x="162" y="96">1</text><text x="162" y="112">0</text><text x="162" y="128">0</text><text x="162" y="144">1</text><text x="162" y="160">0</text><text x="162" y="176">1</text><text x="162" y="192">1</text><text x="162" y="208">0</text>
+          </g>
+          <g opacity="0.08">
+            <text x="186" y="20">1</text><text x="186" y="36">1</text><text x="186" y="52">0</text><text x="186" y="68">1</text><text x="186" y="84">0</text><text x="186" y="100">0</text><text x="186" y="116">1</text><text x="186" y="132">1</text><text x="186" y="148">0</text><text x="186" y="164">0</text><text x="186" y="180">1</text><text x="186" y="196">0</text>
+          </g>
+          <g opacity="0.12">
+            <text x="210" y="8">0</text><text x="210" y="24">1</text><text x="210" y="40">0</text><text x="210" y="56">1</text><text x="210" y="72">1</text><text x="210" y="88">0</text><text x="210" y="104">1</text><text x="210" y="120">0</text><text x="210" y="136">1</text><text x="210" y="152">0</text><text x="210" y="168">0</text><text x="210" y="184">1</text>
+          </g>
+          <g opacity="0.06">
+            <text x="234" y="28">1</text><text x="234" y="44">0</text><text x="234" y="60">0</text><text x="234" y="76">1</text><text x="234" y="92">1</text><text x="234" y="108">0</text><text x="234" y="124">0</text><text x="234" y="140">1</text><text x="234" y="156">1</text><text x="234" y="172">0</text><text x="234" y="188">1</text><text x="234" y="204">0</text>
+          </g>
+          <g opacity="0.10">
+            <text x="258" y="16">0</text><text x="258" y="32">1</text><text x="258" y="48">1</text><text x="258" y="64">0</text><text x="258" y="80">0</text><text x="258" y="96">1</text><text x="258" y="112">0</text><text x="258" y="128">1</text><text x="258" y="144">0</text><text x="258" y="160">1</text><text x="258" y="176">1</text><text x="258" y="192">0</text>
+          </g>
+        </g>
+        <!-- Agent network nodes -->
+        <g opacity="0.2">
+          <circle cx="120" cy="80" r="4" fill="#3FB950"/>
+          <circle cx="200" cy="120" r="4" fill="#3FB950"/>
+          <circle cx="80" cy="150" r="4" fill="#3FB950"/>
+          <circle cx="170" cy="60" r="3" fill="#3FB950"/>
+          <circle cx="250" cy="90" r="3" fill="#3FB950"/>
+          <circle cx="140" cy="170" r="3" fill="#3FB950"/>
+          <circle cx="300" cy="140" r="3" fill="#3FB950"/>
+          <circle cx="60" cy="90" r="2.5" fill="#3FB950"/>
+          <circle cx="220" cy="170" r="2.5" fill="#3FB950"/>
+          <circle cx="320" cy="70" r="2.5" fill="#3FB950"/>
+          <!-- Edges -->
+          <line x1="120" y1="80" x2="200" y2="120" stroke="#3FB950" stroke-width="0.5" opacity="0.5"/>
+          <line x1="120" y1="80" x2="170" y2="60" stroke="#3FB950" stroke-width="0.5" opacity="0.5"/>
+          <line x1="120" y1="80" x2="80" y2="150" stroke="#3FB950" stroke-width="0.5" opacity="0.4"/>
+          <line x1="200" y1="120" x2="250" y2="90" stroke="#3FB950" stroke-width="0.5" opacity="0.5"/>
+          <line x1="200" y1="120" x2="140" y2="170" stroke="#3FB950" stroke-width="0.5" opacity="0.4"/>
+          <line x1="200" y1="120" x2="300" y2="140" stroke="#3FB950" stroke-width="0.5" opacity="0.3"/>
+          <line x1="170" y1="60" x2="250" y2="90" stroke="#3FB950" stroke-width="0.5" opacity="0.4"/>
+          <line x1="80" y1="150" x2="140" y2="170" stroke="#3FB950" stroke-width="0.5" opacity="0.4"/>
+          <line x1="60" y1="90" x2="120" y2="80" stroke="#3FB950" stroke-width="0.5" opacity="0.3"/>
+          <line x1="220" y1="170" x2="200" y2="120" stroke="#3FB950" stroke-width="0.5" opacity="0.3"/>
+          <line x1="320" y1="70" x2="250" y2="90" stroke="#3FB950" stroke-width="0.5" opacity="0.3"/>
+          <line x1="300" y1="140" x2="320" y2="70" stroke="#3FB950" stroke-width="0.5" opacity="0.2"/>
+        </g>
+        <!-- Agent pulse rings -->
+        <circle cx="200" cy="120" r="12" fill="none" stroke="#3FB950" stroke-width="0.5" opacity="0.1"/>
+        <circle cx="200" cy="120" r="24" fill="none" stroke="#3FB950" stroke-width="0.3" opacity="0.06"/>
+        <circle cx="120" cy="80" r="10" fill="none" stroke="#3FB950" stroke-width="0.5" opacity="0.08"/>
+        <!-- Title -->
+        <text x="500" y="100" font-family="monospace" font-size="36" font-weight="700" fill="#E6EDF3" letter-spacing="-1">manyAgents</text>
+        <text x="502" y="128" font-family="monospace" font-size="13" fill="#3FB950">multi-step orchestration via API</text>
+        <rect x="500" y="142" width="60" height="2" rx="1" fill="#3FB950" opacity="0.4"/>
+        <rect x="500" y="156" width="56" height="18" rx="9" fill="#3FB950" opacity="0.15"/>
+        <text x="528" y="168" font-family="monospace" font-size="10" fill="#3FB950" text-anchor="middle">future</text>
+      </svg>
+    </div>
+    <div class="repo-meta">
+      <div class="dot" style="background:#3FB950"></div>
+      <span class="name">latent-reasoning-works/manyagents</span>
+      <span class="desc">agent-driven workflow composition</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Geomancer — Amber / Sacred Geometry                    -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="repo-card">
+    <div class="banner-container">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg">
+        <rect width="880" height="220" fill="#0D1117"/>
+        <!-- Hexagonal tessellation -->
+        <g stroke="#D29922" fill="none" stroke-width="0.5">
+          <!-- Row 1 -->
+          <polygon points="80,50 105,35 130,50 130,80 105,95 80,80" opacity="0.08"/>
+          <polygon points="130,50 155,35 180,50 180,80 155,95 130,80" opacity="0.12"/>
+          <polygon points="180,50 205,35 230,50 230,80 205,95 180,80" opacity="0.06"/>
+          <polygon points="230,50 255,35 280,50 280,80 255,95 230,80" opacity="0.10"/>
+          <polygon points="280,50 305,35 330,50 330,80 305,95 280,80" opacity="0.05"/>
+          <!-- Row 2 -->
+          <polygon points="55,95 80,80 105,95 105,125 80,140 55,125" opacity="0.10"/>
+          <polygon points="105,95 130,80 155,95 155,125 130,140 105,125" opacity="0.15"/>
+          <polygon points="155,95 180,80 205,95 205,125 180,140 155,125" opacity="0.08"/>
+          <polygon points="205,95 230,80 255,95 255,125 230,140 205,125" opacity="0.13"/>
+          <polygon points="255,95 280,80 305,95 305,125 280,140 255,125" opacity="0.07"/>
+          <polygon points="305,95 330,80 355,95 355,125 330,140 305,125" opacity="0.04"/>
+          <!-- Row 3 -->
+          <polygon points="80,140 105,125 130,140 130,170 105,185 80,170" opacity="0.06"/>
+          <polygon points="130,140 155,125 180,140 180,170 155,185 130,170" opacity="0.11"/>
+          <polygon points="180,140 205,125 230,140 230,170 205,185 180,170" opacity="0.14"/>
+          <polygon points="230,140 255,125 280,140 280,170 255,185 230,170" opacity="0.09"/>
+          <polygon points="280,140 305,125 330,140 330,170 305,185 280,170" opacity="0.06"/>
+        </g>
+        <!-- Central glyph -->
+        <g transform="translate(180, 110)" opacity="0.18">
+          <circle r="30" fill="none" stroke="#D29922" stroke-width="0.8"/>
+          <circle r="18" fill="none" stroke="#D29922" stroke-width="0.5"/>
+          <circle r="6" fill="none" stroke="#D29922" stroke-width="0.5"/>
+          <line x1="-30" y1="0" x2="30" y2="0" stroke="#D29922" stroke-width="0.3"/>
+          <line x1="0" y1="-30" x2="0" y2="30" stroke="#D29922" stroke-width="0.3"/>
+          <line x1="-21" y1="-21" x2="21" y2="21" stroke="#D29922" stroke-width="0.3"/>
+          <line x1="21" y1="-21" x2="-21" y2="21" stroke="#D29922" stroke-width="0.3"/>
+        </g>
+        <!-- Corner accents -->
+        <g stroke="#D29922" stroke-width="0.5" opacity="0.1">
+          <polyline points="40,20 40,40 60,40" fill="none"/>
+          <polyline points="400,20 400,40 380,40" fill="none"/>
+          <polyline points="40,200 40,180 60,180" fill="none"/>
+          <polyline points="400,200 400,180 380,180" fill="none"/>
+        </g>
+        <!-- Title -->
+        <text x="500" y="100" font-family="monospace" font-size="36" font-weight="700" fill="#E6EDF3" letter-spacing="-1">Geomancer</text>
+        <text x="502" y="128" font-family="monospace" font-size="13" fill="#D29922">geometric deep learning &amp; reward training</text>
+        <rect x="500" y="142" width="60" height="2" rx="1" fill="#D29922" opacity="0.4"/>
+        <rect x="500" y="156" width="56" height="18" rx="9" fill="#D29922" opacity="0.15"/>
+        <text x="528" y="168" font-family="monospace" font-size="10" fill="#D29922" text-anchor="middle">future</text>
+      </svg>
+    </div>
+    <div class="repo-meta">
+      <div class="dot" style="background:#D29922"></div>
+      <span class="name">latent-reasoning-works/geomancer</span>
+      <span class="desc">geometric deep learning</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Shop — Steel Blue / Terminal                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="repo-card">
+    <div class="banner-container">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg">
+        <rect width="880" height="220" fill="#0D1117"/>
+        <!-- Terminal commands -->
+        <g font-family="monospace" font-size="11" fill="#58A6FF">
+          <text x="40" y="44" opacity="0.06">$ salloc --gres=gpu:1 --mem=32G</text>
+          <text x="40" y="62" opacity="0.09">$ sbatch --partition=main job.sh</text>
+          <text x="40" y="80" opacity="0.05">  Submitted batch job 4821937</text>
+          <text x="40" y="98" opacity="0.12">$ squeue -u $USER</text>
+          <text x="40" y="116" opacity="0.07">  4821937  main  train  RUNNING  0:42</text>
+          <text x="40" y="134" opacity="0.10">$ sacct -j 4821937 --format=Elapsed</text>
+          <text x="40" y="152" opacity="0.04">  02:15:33</text>
+          <text x="40" y="170" opacity="0.08">$ srun python -m manylatents.main</text>
+          <text x="40" y="188" opacity="0.06">  [GPU 0] Training epoch 1/100...</text>
+        </g>
+        <!-- Queue visualization -->
+        <g opacity="0.12">
+          <!-- Pipeline bars -->
+          <rect x="360" y="50" width="60" height="8" rx="2" fill="#58A6FF"/>
+          <rect x="360" y="66" width="45" height="8" rx="2" fill="#58A6FF" opacity="0.7"/>
+          <rect x="360" y="82" width="80" height="8" rx="2" fill="#58A6FF" opacity="0.5"/>
+          <rect x="360" y="98" width="30" height="8" rx="2" fill="#58A6FF" opacity="0.8"/>
+          <rect x="360" y="114" width="55" height="8" rx="2" fill="#58A6FF" opacity="0.4"/>
+          <rect x="360" y="130" width="70" height="8" rx="2" fill="#58A6FF" opacity="0.6"/>
+          <rect x="360" y="146" width="25" height="8" rx="2" fill="#58A6FF" opacity="0.9"/>
+          <rect x="360" y="162" width="50" height="8" rx="2" fill="#58A6FF" opacity="0.3"/>
+        </g>
+        <!-- Prompt cursor -->
+        <rect x="40" y="198" width="7" height="12" fill="#58A6FF" opacity="0.15"/>
+        <!-- Title -->
+        <text x="500" y="100" font-family="monospace" font-size="36" font-weight="700" fill="#E6EDF3" letter-spacing="-1">Shop</text>
+        <text x="502" y="128" font-family="monospace" font-size="13" fill="#58A6FF">SLURM job submission &amp; cluster management</text>
+        <rect x="500" y="142" width="60" height="2" rx="1" fill="#58A6FF" opacity="0.4"/>
+        <rect x="500" y="156" width="42" height="18" rx="9" fill="#58A6FF" opacity="0.15"/>
+        <text x="521" y="168" font-family="monospace" font-size="10" fill="#58A6FF" text-anchor="middle">v0.1</text>
+      </svg>
+    </div>
+    <div class="repo-meta">
+      <div class="dot" style="background:#58A6FF"></div>
+      <span class="name">latent-reasoning-works/shop</span>
+      <span class="desc">Hydra SLURM launchers</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Palette Strip -->
+<div class="palette-strip">
+  <div class="palette-swatch" style="background:#8B949E; color:#0D1117">Slate</div>
+  <div class="palette-swatch" style="background:#3FB950; color:#0D1117">Green</div>
+  <div class="palette-swatch" style="background:#D29922; color:#0D1117">Amber</div>
+  <div class="palette-swatch" style="background:#58A6FF; color:#0D1117">Blue</div>
+</div>
+
+<div class="footer">
+  LATENT REASONING WORKS &middot; 2025
+</div>
+
+</body>
+</html>
