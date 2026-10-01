@@ -59,6 +59,13 @@ from manylatents.metrics.knn_preservation import KNNPreservation
 from manylatents.metrics.tangent_space import TangentSpaceApproximation
 from manylatents.metrics.auc import AUC
 from manylatents.metrics.outlier_score import OutlierScore
+from manylatents.metrics.reference_geometry import (
+    knn_distance_score,
+    local_participation_ratio,
+    lof_novelty_score,
+    pca_reference_scores,
+    standardize_against,
+)
 
 # Cross-modal alignment metrics
 from manylatents.metrics.cka import CKA, cka_pairwise
@@ -144,6 +151,11 @@ __all__ = [
     "TangentSpaceApproximation",
     "AUC",
     "OutlierScore",
+    "knn_distance_score",
+    "local_participation_ratio",
+    "lof_novelty_score",
+    "pca_reference_scores",
+    "standardize_against",
     # Cross-modal alignment metrics
     "CKA",
     "cka_pairwise",
