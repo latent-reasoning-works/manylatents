@@ -84,3 +84,68 @@ def bootstrap_ci(
         float(np.percentile(stats, 100 * alpha)),
         float(np.percentile(stats, 100 * (1 - alpha))),
     )
+
+
+def partial_spearman(x, y, covariates) -> dict:
+    """Spearman correlation of ``x`` and ``y`` after removing covariates.
+
+    All variables are rank-transformed (average ranks for ties). The ranks of
+    ``x`` and ``y`` are each regressed on an intercept and the covariate ranks;
+    ``rho`` is the Pearson correlation of the residuals. With no covariates
+    this is the ordinary Spearman correlation.
+
+    Args:
+        x, y: (n,) arrays.
+        covariates: (n,) or (n, q) array; q may be 0.
+
+    Returns:
+        ``{"rho", "p_value", "n", "dof"}`` with ``dof = n - 2 - q`` and a
+        two-sided p-value from the t distribution.
+
+    Raises:
+        MeasurementUnavailable: non-finite input, fewer than one residual
+            degree of freedom, or a variable fully explained by the covariates.
+    """
+    from scipy.stats import rankdata, t as t_distribution
+
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    z = np.asarray(covariates, dtype=np.float64)
+    if z.ndim == 1:
+        z = z[:, None]
+    if x.ndim != 1 or y.shape != x.shape or z.ndim != 2 or z.shape[0] != x.shape[0]:
+        raise ValueError(
+            f"x and y must be (n,), covariates (n,) or (n, q); got {x.shape}, {y.shape}, {z.shape}"
+        )
+    if not (np.isfinite(x).all() and np.isfinite(y).all() and np.isfinite(z).all()):
+        raise MeasurementUnavailable("partial Spearman needs finite inputs")
+    n, q = z.shape
+    dof = n - 2 - q
+    if dof < 1:
+        raise MeasurementUnavailable(
+            f"n={n} leaves {dof} residual degrees of freedom with {q} covariates"
+        )
+
+    design = np.column_stack([np.ones(n)] + [rankdata(z[:, j]) for j in range(q)])
+
+    def residual(values):
+        ranks = rankdata(values)
+        coefficients, *_ = np.linalg.lstsq(design, ranks, rcond=None)
+        return ranks - design @ coefficients, ranks
+
+    rx, ranks_x = residual(x)
+    ry, ranks_y = residual(y)
+    # A residual that is zero up to rounding means the covariates explain the variable.
+    for name, res, ranks in (("x", rx, ranks_x), ("y", ry, ranks_y)):
+        spread = np.linalg.norm(ranks - ranks.mean())
+        if spread == 0 or np.linalg.norm(res) <= 1e-9 * spread:
+            raise MeasurementUnavailable(
+                f"{name} has no variation left after removing the covariates"
+            )
+    rho = float(np.clip(rx @ ry / (np.linalg.norm(rx) * np.linalg.norm(ry)), -1.0, 1.0))
+    if abs(rho) == 1.0:
+        p_value = 0.0
+    else:
+        statistic = rho * np.sqrt(dof / (1.0 - rho * rho))
+        p_value = float(2.0 * t_distribution.sf(abs(statistic), dof))
+    return {"rho": rho, "p_value": p_value, "n": int(n), "dof": int(dof)}
