@@ -16,3 +16,22 @@ class MeasurementUnavailable(ValueError):
     def to_dict(self) -> dict[str, str]:
         """Preserve the unavailable state and reason in saved/logged results."""
         return {"status": "unavailable", "reason": str(self)}
+
+
+def unavailable_for_points(reason: str, bad) -> MeasurementUnavailable:
+    """Build the failure for a per-point measurement undefined at some points.
+
+    ``bad`` is a boolean mask over points. The returned exception carries the
+    offending row numbers as ``.indices`` so a caller can drop those points
+    explicitly and report how many were dropped. Nothing is dropped here.
+    """
+    import numpy as np
+
+    bad = np.asarray(bad, dtype=bool)
+    indices = np.flatnonzero(bad)
+    err = MeasurementUnavailable(
+        f"{reason} for {indices.size} of {bad.size} points "
+        f"(first indices: {indices[:10].tolist()})"
+    )
+    err.indices = indices
+    return err

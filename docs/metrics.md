@@ -111,6 +111,45 @@ manylatents algorithms/latent=pca data=swissroll metrics=trustworthiness
 manylatents algorithms/latent=pca data=swissroll metrics=standard
 ```
 
+## Scoring against a reference cloud
+
+Most metrics measure one cloud. These score *query* points against a separate
+*reference* cloud, so the query points never act as each other's neighbours.
+They are plain functions, because they take a second array the metric protocol
+has no slot for.
+
+```python
+import numpy as np
+from manylatents.metrics.gpd_lid import tail_distances, hill_tail_index, pickands_tail_index
+from manylatents.metrics import knn_distance_score, lof_novelty_score, pca_reference_scores
+
+distances = tail_distances(query, k=20, reference=reference)   # (n_query, 20)
+lid = 1.0 / hill_tail_index(distances)                          # local intrinsic dimension
+xi = pickands_tail_index(tail_distances(query, k=100, reference=reference))  # signed tail shape
+far = knn_distance_score(query, reference, k=20)
+```
+
+| Function | What it returns per query point |
+|---|---|
+| `gpd_lid.tail_distances` | ascending distances to its k nearest reference points |
+| `gpd_lid.hill_tail_index` | tail index xi > 0; `1/xi` is the LID |
+| `gpd_lid.pickands_tail_index` | signed tail index: positive power-law, near zero exponential, negative bounded |
+| `gpd_lid.exponentiality` | 0 to 1, how well the power-law assumption fits |
+| `knn_distance_score` | mean distance to its k nearest reference points |
+| `lof_novelty_score` | local outlier factor relative to the reference |
+| `pca_reference_scores` | norm inside and outside the reference's leading principal subspace |
+| `mahalanobis_score` | distance from the reference mean in units of the reference's spread along every direction |
+| `local_participation_ratio` | number of directions its reference neighbourhood spans |
+| `standardize_against` | z-scores using the reference's column moments |
+
+A measurement that is undefined at some points raises `MeasurementUnavailable`
+with the offending row numbers in `.indices`; nothing is filled in or dropped.
+
+Controls live in `manylatents.utils.surrogates` (`shuffle_within_rows`,
+`random_feature_subset`, `gaussian_surrogate`, `permute_within_groups`), and
+`manylatents.metrics.grouped_average_precision` and
+`manylatents.utils.stats.partial_spearman` cover evaluation.
+
 ## Embedding Metrics
 
 Evaluate the **quality of low-dimensional embeddings**. Compare high-dimensional input to low-dimensional output. Config: `at: embedding`.

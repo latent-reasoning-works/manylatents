@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
-from manylatents.utils.exceptions import MeasurementUnavailable
+from manylatents.utils.exceptions import MeasurementUnavailable, unavailable_for_points
 
 logger = logging.getLogger(__name__)
 
@@ -136,4 +136,104 @@ def compute_knn(
         distances = distances[:, 1:]
         indices = indices[:, 1:]
 
+    return distances, indices
+
+
+def _as_float32_matrix(x, name: str) -> np.ndarray:
+    if hasattr(x, "detach"):
+        x = x.detach().cpu().numpy()
+    x = np.asarray(x)
+    if (
+        x.ndim != 2 or 0 in x.shape
+        or not np.issubdtype(x.dtype, np.number)
+        or np.iscomplexobj(x)
+    ):
+        raise MeasurementUnavailable(f"{name} must be a nonempty real numeric matrix")
+    if not np.isfinite(x).all():
+        raise MeasurementUnavailable(f"{name} contains non-finite values")
+    with np.errstate(over="ignore", invalid="ignore"):
+        converted = np.ascontiguousarray(x, dtype=np.float32)
+    bad = ~np.isfinite(converted).all(axis=1)
+    if bad.any():
+        raise unavailable_for_points(f"{name} is not finite at float32 precision", bad)
+    return converted
+
+
+def compute_knn_query(
+    reference: np.ndarray,
+    query: np.ndarray,
+    k: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """k nearest ``reference`` rows for each ``query`` row (FAISS, else sklearn).
+
+    Unlike :func:`compute_knn`, the two point sets are different, so there is
+    no self to exclude and nothing is cached. A query row that coincides with a
+    reference row gets that row back as its nearest neighbour; FAISS may report
+    a small non-zero distance for it, so callers that must exclude coincident
+    rows identify them by content, not by ``distance == 0``.
+
+    Args:
+        reference: (n_reference, n_features) point set that is searched.
+        query: (n_query, n_features) points whose neighbours are wanted.
+        k: number of neighbours, ``0 < k <= n_reference``.
+
+    Returns:
+        (distances, indices), both (n_query, k). Distances are Euclidean,
+        ascending, float64. Indices are int64 row numbers into ``reference``.
+    """
+    reference = _as_float32_matrix(reference, "reference")
+    query = _as_float32_matrix(query, "query")
+    if reference.shape[1] != query.shape[1]:
+        raise MeasurementUnavailable(
+            f"reference has {reference.shape[1]} features, query has {query.shape[1]}"
+        )
+    n_reference = reference.shape[0]
+    if (not isinstance(k, (int, np.integer)) or isinstance(k, bool)
+            or not 0 < k <= n_reference):
+        raise MeasurementUnavailable(
+            f"query kNN requires 0 < k <= n_reference; got k={k}, n_reference={n_reference}"
+        )
+    k = int(k)
+
+    try:
+        import faiss
+
+        index = faiss.IndexFlatL2(reference.shape[1])
+        backend = "faiss-cpu"
+        if getattr(faiss, "get_num_gpus", lambda: 0)() > 0:
+            try:
+                res = faiss.StandardGpuResources()
+                index = faiss.index_cpu_to_gpu(res, 0, index)
+                backend = "faiss-gpu"
+            except Exception:
+                pass
+        index.add(reference)
+        distances, indices = index.search(query, k)
+        distances = np.sqrt(np.maximum(distances, 0))
+        logger.info(
+            f"compute_knn_query: {backend}, n_reference={n_reference}, "
+            f"n_query={query.shape[0]}, k={k}"
+        )
+    except Exception as e:
+        if not isinstance(e, ImportError):
+            logger.warning(
+                f"FAISS failed ({type(e).__name__}: {e}), falling back to sklearn; "
+                "neighbors and distances may differ between backends, changing "
+                "derived measurements"
+            )
+        from sklearn.neighbors import NearestNeighbors
+
+        nbrs = NearestNeighbors(n_neighbors=k).fit(reference)
+        distances, indices = nbrs.kneighbors(query)
+        logger.info(
+            f"compute_knn_query: sklearn, n_reference={n_reference}, "
+            f"n_query={query.shape[0]}, k={k}"
+        )
+
+    distances = np.asarray(distances, dtype=np.float64)
+    indices = np.asarray(indices, dtype=np.int64)
+    bad = ~np.all(np.isfinite(distances) & (distances >= 0)
+                  & (indices >= 0) & (indices < n_reference), axis=1)
+    if bad.any():
+        raise unavailable_for_points("query neighbours are unresolved at float32 precision", bad)
     return distances, indices

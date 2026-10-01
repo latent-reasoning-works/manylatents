@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `gpd_lid` metric and `manylatents.metrics.gpd_lid`: Hill and Pickands tail-index estimators, within one cloud or against a separate reference cloud.
+- `compute_knn_query`: neighbours of query points in a separate reference set.
+- `manylatents.metrics.reference_geometry`: kNN distance, LOF novelty, PCA split, Mahalanobis distance, local participation ratio and standardization against a reference cloud.
+- `manylatents.utils.surrogates`: row shuffle, random feature subset, covariance-matched Gaussian and within-group permutation.
+- `grouped_average_precision` (bootstrap over rows or over whole groups) and `partial_spearman`.
 - MIOFlow: optional composed GAGA (Geometry-Aware Generative Autoencoder)
   encoder (`use_gaga=True`). When enabled, a GAGA encoder/decoder is
   pretrained internally during `setup()` (two-phase: distance-preserving
