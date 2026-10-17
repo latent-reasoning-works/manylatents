@@ -154,3 +154,18 @@ def test_tsne_transform_uses_fitted_dof(monkeypatch, clusters):
         monkeypatch.setattr(tsne_mod, name, lambda e, P, dof, *a, _o=original, **k: (dofs.append(float(dof)), _o(e, P, dof, *a, **k))[1])
     m.transform(x[300:])
     assert dofs and set(dofs) == {0.6}
+
+
+def test_umap_init_array_reaches_optimizer(monkeypatch, clusters):
+    """An init array reaches simplicial_set_embedding; the default stays umap-learn's 'spectral'."""
+    import umap.umap_ as umap_mod
+    from umap import UMAP as SklearnUMAP
+
+    assert UMAPModule(n_neighbors=5, n_epochs=10).model.init == SklearnUMAP().init == "spectral"
+    x, _ = clusters
+    start = np.random.default_rng(0).normal(size=(len(x), 2))
+    seen = []
+    original = umap_mod.simplicial_set_embedding
+    monkeypatch.setattr(umap_mod, "simplicial_set_embedding", lambda *a, **k: (seen.append(np.array(a[9])), original(*a, **k))[1])
+    UMAPModule(random_state=0, neighborhood_size=15, n_epochs=10, init=start).fit_transform(x)
+    np.testing.assert_allclose(seen[0], start)
