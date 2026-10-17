@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `manylatents.metrics.reference_geometry`: kNN distance, LOF novelty, PCA split, Mahalanobis distance, local participation ratio and standardization against a reference cloud.
 - `manylatents.utils.surrogates`: row shuffle, random feature subset, covariance-matched Gaussian and within-group permutation.
 - `grouped_average_precision` (bootstrap over rows or over whole groups) and `partial_spearman`.
+- `UMAPModule(repulsion_strength=...)`: passed to umap-learn; `None` keeps the umap-learn default (1.0).
+- `TSNEModule(late_exaggeration=..., dof=...)`: exaggeration in the late openTSNE phase (`None` = 1) and the
+  degrees of freedom of the output kernel (1 = Cauchy, smaller = heavier tails), applied to both phases.
+  Defaults reproduce the earlier layout. The torchdr backends raise if these are set.
 
 ## [0.1.6] - 2026-06-03
 

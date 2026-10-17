@@ -192,3 +192,29 @@ def test_umap_densmap_torchdr_raises():
     with pytest.raises(ValueError, match="densmap"):
         UMAPModule(n_components=2, random_state=42, n_neighbors=5,
                    backend="torchdr", device="cpu", densmap=True)
+
+
+def test_umap_repulsion_strength_reaches_model():
+    """repulsion_strength should reach umap-learn; None keeps the umap-learn default."""
+    from manylatents.algorithms.latent.umap import UMAPModule
+    from umap import UMAP as SklearnUMAP
+
+    assert UMAPModule(n_neighbors=5, n_epochs=10).model.repulsion_strength == SklearnUMAP().repulsion_strength
+    assert UMAPModule(n_neighbors=5, n_epochs=10, repulsion_strength=3.0).model.repulsion_strength == 3.0
+
+
+def test_umap_repulsion_strength_affects_embedding():
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    x = torch.randn(80, 10, generator=torch.Generator().manual_seed(0))
+    emb1 = UMAPModule(random_state=42, n_neighbors=10, n_epochs=50).fit_transform(x)
+    emb2 = UMAPModule(random_state=42, n_neighbors=10, n_epochs=50, repulsion_strength=3.0).fit_transform(x)
+    assert not np.allclose(emb1, emb2, atol=1e-3)
+
+
+@pytest.mark.skipif(not TORCHDR_AVAILABLE, reason="torchdr not installed")
+def test_umap_repulsion_strength_torchdr_raises():
+    from manylatents.algorithms.latent.umap import UMAPModule
+
+    with pytest.raises(ValueError, match="repulsion_strength"):
+        UMAPModule(backend="torchdr", repulsion_strength=2.0)
