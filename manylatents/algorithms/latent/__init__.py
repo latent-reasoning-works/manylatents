@@ -79,6 +79,9 @@ def _build_registry() -> None:
             if variant not in _ALGORITHM_REGISTRY:
                 _ALGORITHM_REGISTRY[variant] = obj
 
+    # file-stem alias for LocallyLinearModule (main registers file stems generically; this branch does it by name)
+    _ALGORITHM_REGISTRY.setdefault("lle", LocallyLinearModule)
+
 
 def get_algorithm(name: str) -> Type:
     """Return an algorithm class by name (case-insensitive, supports snake_case).
