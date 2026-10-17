@@ -119,6 +119,11 @@ class UMAPModule(LatentModule):
         x_np = _to_numpy(x)
         n_samples = x_np.shape[0]
         n_fit = max(1, int(self.fit_fraction * n_samples))
+        if isinstance(self.init, np.ndarray) and self.init.shape[0] != n_fit:
+            raise ValueError(
+                f"init array has {self.init.shape[0]} rows but the fit uses {n_fit} rows "
+                f"(fit_fraction={self.fit_fraction}); pass an init array with one row per fitted sample."
+            )
 
         if self._resolved_backend == "torchdr":
             import torch as th

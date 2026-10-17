@@ -166,6 +166,16 @@ def test_umap_init_array_reaches_optimizer(monkeypatch, clusters):
     start = np.random.default_rng(0).normal(size=(len(x), 2))
     seen = []
     original = umap_mod.simplicial_set_embedding
-    monkeypatch.setattr(umap_mod, "simplicial_set_embedding", lambda *a, **k: (seen.append(np.array(a[9])), original(*a, **k))[1])
-    UMAPModule(random_state=0, neighborhood_size=15, n_epochs=10, init=start).fit_transform(x)
+    monkeypatch.setattr(umap_mod, "simplicial_set_embedding", lambda *a, **k: (seen.append(np.array(k.get("init", a[9] if len(a) > 9 else None))), original(*a, **k))[1])
+    m = UMAPModule(random_state=0, neighborhood_size=15, n_epochs=10, init=start)
+    m.fit_transform(x)
     np.testing.assert_allclose(seen[0], start)
+    np.testing.assert_allclose(m.model.init, start)
+
+
+def test_umap_init_array_row_mismatch_raises(clusters):
+    """An init array must have one row per fitted sample; fit_fraction < 1 with an n-row init fails early."""
+    x, _ = clusters
+    start = np.zeros((len(x), 2))
+    with pytest.raises(ValueError, match="init array has"):
+        UMAPModule(n_neighbors=5, n_epochs=10, fit_fraction=0.5, init=start).fit(x)
