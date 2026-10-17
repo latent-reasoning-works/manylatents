@@ -139,3 +139,18 @@ def test_run_dict_route_reaches_optimizers(monkeypatch, clusters):
     assert gammas == [2.5]
     assert {d for d, _ in tsne_calls} == {0.7}
     np.testing.assert_allclose([s for _, s in tsne_calls[11:21]], 3.0, rtol=1e-6)
+
+
+def test_tsne_transform_uses_fitted_dof(monkeypatch, clusters):
+    """transform() of new points optimizes them with the dof the model was fitted with."""
+    import openTSNE.tsne as tsne_mod
+
+    x, _ = clusters
+    m = TSNEModule(random_state=0, neighborhood_size=30, n_iter_early=10, n_iter_late=10, dof=0.6)
+    m.fit(x[:300])
+    dofs = []
+    for name in ("kl_divergence_bh", "kl_divergence_fft"):
+        original = getattr(tsne_mod, name)
+        monkeypatch.setattr(tsne_mod, name, lambda e, P, dof, *a, _o=original, **k: (dofs.append(float(dof)), _o(e, P, dof, *a, **k))[1])
+    m.transform(x[300:])
+    assert dofs and set(dofs) == {0.6}
