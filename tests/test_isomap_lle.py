@@ -64,6 +64,16 @@ def test_unknown_kwarg_raises(cls):
         cls(n_neighbours=5)
 
 
+def test_isomap_radius_only_builds_radius_graph(small_roll):
+    X, _ = small_roll
+    m = IsomapModule(radius=5.0)
+    assert m.model.n_neighbors is None and m.model.radius == 5.0
+    m.fit(X)
+    assert m.model.embedding_.shape == (X.shape[0], 2)
+    # neighborhood_size still wins over radius
+    assert IsomapModule(radius=5.0, neighborhood_size=8).model.n_neighbors == 8
+
+
 def test_lle_unknown_method_raises():
     with pytest.raises(ValueError, match="Unknown method"):
         LocallyLinearModule(method="laplacian")

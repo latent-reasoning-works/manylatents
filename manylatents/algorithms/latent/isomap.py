@@ -17,9 +17,12 @@ class IsomapModule(LatentModule):
     random_state : int | None
         Seed stored as ``init_seed``. ``sklearn.manifold.Isomap`` takes no seed and its
         result does not depend on one, so this value does not reach sklearn.
-    n_neighbors : int
+    n_neighbors : int | None
         Size of the kNN graph that defines the geodesic distances. Overridden by
-        ``neighborhood_size`` when that is given.
+        ``neighborhood_size`` when that is given. The module default is 10; the
+        ``sklearn.manifold.Isomap`` default is 5. When ``radius`` is given and
+        ``neighborhood_size`` is not, the module sets ``n_neighbors`` to ``None`` so that
+        sklearn builds a radius graph.
     eigen_solver, tol, max_iter, path_method, neighbors_algorithm, metric, n_jobs
         Passed to ``sklearn.manifold.Isomap`` unchanged.
     fit_fraction : float
@@ -35,7 +38,7 @@ class IsomapModule(LatentModule):
         self,
         n_components: int = 2,
         random_state: Optional[int] = 42,
-        n_neighbors: int = 10,
+        n_neighbors: Optional[int] = 10,
         eigen_solver: str = "auto",
         tol: float = 0,
         max_iter: Optional[int] = None,
@@ -54,7 +57,11 @@ class IsomapModule(LatentModule):
             neighborhood_size=neighborhood_size, datamodule=datamodule,
         )
         self.random_state = random_state
-        self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors
+        if neighborhood_size is not None:
+            n_neighbors = neighborhood_size
+        elif extra.get("radius") is not None:
+            n_neighbors = None
+        self.n_neighbors = n_neighbors
         self.fit_fraction = fit_fraction
         self.model = Isomap(
             n_neighbors=self.n_neighbors,

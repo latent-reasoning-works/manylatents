@@ -31,7 +31,7 @@ class LocallyLinearModule(LatentModule):
         One of ``standard``, ``hessian``, ``modified``, ``ltsa``.
     n_neighbors : int
         Size of each local neighborhood. Overridden by ``neighborhood_size`` when that is
-        given. The ``hessian`` method needs ``n_neighbors > n_components * (n_components + 3) / 2``.
+        given. The module default is 10; the sklearn default is 5. The ``hessian`` method needs ``n_neighbors > n_components * (n_components + 3) / 2``.
     reg, eigen_solver, tol, max_iter, hessian_tol, modified_tol, neighbors_algorithm, n_jobs
         Passed to ``sklearn.manifold.LocallyLinearEmbedding`` unchanged.
     fit_fraction : float
