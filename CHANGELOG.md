@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `UMAPModule(repulsion_strength=...)`: passed to umap-learn; `None` keeps the umap-learn default (1.0).
+- `TSNEModule(late_exaggeration=..., dof=...)`: exaggeration in the late openTSNE phase (`None` = 1) and the
+  degrees of freedom of the output kernel (1 = Cauchy, smaller = heavier tails), applied to both phases.
+  Defaults reproduce the earlier layout. The torchdr backends raise if these are set.
+
 ## [0.1.6] - 2026-06-03
 
 ### Fixed
