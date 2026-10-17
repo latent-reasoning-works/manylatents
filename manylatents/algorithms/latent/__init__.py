@@ -6,6 +6,8 @@ from .phate import PHATEModule
 from .multiscale_phate import MultiscalePHATEModule
 from .diffusion_map import DiffusionMapModule
 from .multi_dimensional_scaling import MDSModule
+from .isomap import IsomapModule
+from .lle import LocallyLinearModule
 from .merging import MergingModule, ChannelLoadings
 from .classifier import ClassifierModule
 from .leiden import LeidenModule
@@ -23,6 +25,8 @@ __all__ = [
     "MultiscalePHATEModule",
     "DiffusionMapModule",
     "MDSModule",
+    "IsomapModule",
+    "LocallyLinearModule",
     "MergingModule",
     "ChannelLoadings",
     "ClassifierModule",

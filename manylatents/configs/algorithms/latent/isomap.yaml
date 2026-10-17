@@ -1,0 +1,11 @@
+_target_: manylatents.algorithms.latent.isomap.IsomapModule
+n_components: 2
+random_state: ${seed}
+n_neighbors: 10
+eigen_solver: auto
+path_method: auto
+neighbors_algorithm: auto
+metric: minkowski
+n_jobs: null
+fit_fraction: 1.0
+neighborhood_size: ${neighborhood_size}

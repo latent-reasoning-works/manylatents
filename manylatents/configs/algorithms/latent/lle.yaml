@@ -1,0 +1,11 @@
+_target_: manylatents.algorithms.latent.lle.LocallyLinearModule
+n_components: 2
+random_state: ${seed}
+method: standard  # choose from ['standard', 'hessian', 'modified', 'ltsa']
+n_neighbors: 10
+reg: 0.001
+eigen_solver: auto
+neighbors_algorithm: auto
+n_jobs: null
+fit_fraction: 1.0
+neighborhood_size: ${neighborhood_size}

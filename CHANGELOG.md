@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `IsomapModule` (`algorithms/latent=isomap`, `run(algorithm="isomap")`): Isomap through
+  `sklearn.manifold.Isomap`. `neighborhood_size` maps to sklearn `n_neighbors`.
+- `LocallyLinearModule` (`algorithms/latent=lle`, `run(algorithm="lle")`): locally linear
+  embedding through `sklearn.manifold.LocallyLinearEmbedding`, with `method` in
+  `standard`, `hessian`, `modified` and `ltsa`. `neighborhood_size` maps to sklearn
+  `n_neighbors`, and `random_state` reaches the sklearn eigen solver.
+- `UMAPModule(init=...)`: a string or an `(n, n_components)` array, passed to umap-learn. The default
+  `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
 - `UMAPModule(repulsion_strength=...)`: passed to umap-learn; `None` keeps the umap-learn default (1.0).
 - `TSNEModule(late_exaggeration=..., dof=...)`: exaggeration in the late openTSNE phase (`None` = 1) and the
   degrees of freedom of the output kernel (1 = Cauchy, smaller = heavier tails), applied to both phases.
