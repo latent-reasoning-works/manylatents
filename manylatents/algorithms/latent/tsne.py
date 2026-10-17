@@ -127,15 +127,15 @@ class TSNEModule(LatentModule):
                 affinities=self.affinities,
             )
 
+            # dof is stored on the embedding so that transform() of new points uses the same output kernel
             self.embedding_train = TSNEEmbedding(
-                init, self.affinities, random_state=self.random_state
+                init, self.affinities, random_state=self.random_state, dof=self.dof
             )
 
             self.embedding_train.optimize(
                 n_iter=self.n_iter_early,
                 learning_rate=self.learning_rate,
                 exaggeration=12,
-                dof=self.dof,
                 momentum=0.5,
                 inplace=True
             )
@@ -144,7 +144,6 @@ class TSNEModule(LatentModule):
                 n_iter=self.n_iter_late,
                 learning_rate=self.learning_rate,
                 exaggeration=self.late_exaggeration,
-                dof=self.dof,
                 momentum=0.8,
                 inplace=True
             )
