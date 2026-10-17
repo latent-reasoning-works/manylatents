@@ -23,6 +23,7 @@ class UMAPModule(LatentModule):
         learning_rate: float = 1.0,
         fit_fraction: float = 1.0,
         negative_sample_rate: int | None = None,
+        repulsion_strength: float | None = None,
         densmap: bool = False,
         dens_lambda: float = 2.0,
         dens_frac: float = 0.3,
@@ -46,6 +47,7 @@ class UMAPModule(LatentModule):
         self.learning_rate = learning_rate
         self.fit_fraction = fit_fraction
         self.negative_sample_rate = negative_sample_rate
+        self.repulsion_strength = repulsion_strength
         self.densmap = densmap
         self.dens_lambda = dens_lambda
         self.dens_frac = dens_frac
@@ -61,6 +63,11 @@ class UMAPModule(LatentModule):
                 raise ValueError(
                     "densmap=True is not supported by the 'torchdr' UMAP backend; "
                     "use the default umap-learn backend for densMAP."
+                )
+            if self.repulsion_strength is not None:
+                raise ValueError(
+                    "repulsion_strength is not supported by the 'torchdr' UMAP backend; "
+                    "use the default umap-learn backend."
                 )
             from torchdr import UMAP
 
@@ -78,6 +85,8 @@ class UMAPModule(LatentModule):
             kwargs = {}
             if self.negative_sample_rate is not None:
                 kwargs["negative_sample_rate"] = self.negative_sample_rate
+            if self.repulsion_strength is not None:
+                kwargs["repulsion_strength"] = self.repulsion_strength
             if self.densmap:
                 kwargs.update(
                     densmap=True,

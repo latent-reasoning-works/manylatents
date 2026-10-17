@@ -38,6 +38,8 @@ class TSNEModule(LatentModule):
         perplexity: Optional[float] = 30.0,
         n_iter_early: Optional[int] = 250,
         n_iter_late: Optional[int] = 750,
+        late_exaggeration: Optional[float] = None,
+        dof: float = 1.0,
         learning_rate: Union[float, str] = 'auto',
         metric: str = "euclidean",
         initialization: str = "random",
@@ -56,6 +58,8 @@ class TSNEModule(LatentModule):
         self.perplexity = float(neighborhood_size) if neighborhood_size is not None else perplexity
         self.n_iter_early = n_iter_early
         self.n_iter_late = n_iter_late
+        self.late_exaggeration = late_exaggeration
+        self.dof = dof
         self.learning_rate = learning_rate
         self.metric = metric
         self.initialization = initialization
@@ -67,6 +71,11 @@ class TSNEModule(LatentModule):
             self.model = self._create_torchdr_model()
 
     def _create_torchdr_model(self):
+        if self.late_exaggeration is not None or self.dof != 1.0:
+            raise ValueError(
+                "late_exaggeration and dof are not supported by the 'torchdr' t-SNE backend; "
+                "use the default openTSNE backend."
+            )
         from torchdr import TSNE
 
         return TSNE(
@@ -118,8 +127,9 @@ class TSNEModule(LatentModule):
                 affinities=self.affinities,
             )
 
+            # dof is stored on the embedding so that transform() of new points uses the same output kernel
             self.embedding_train = TSNEEmbedding(
-                init, self.affinities, random_state=self.random_state
+                init, self.affinities, random_state=self.random_state, dof=self.dof
             )
 
             self.embedding_train.optimize(
@@ -133,6 +143,7 @@ class TSNEModule(LatentModule):
             self.embedding_train.optimize(
                 n_iter=self.n_iter_late,
                 learning_rate=self.learning_rate,
+                exaggeration=self.late_exaggeration,
                 momentum=0.8,
                 inplace=True
             )

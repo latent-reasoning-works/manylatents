@@ -96,3 +96,33 @@ def test_tsne_backend_output_agreement():
     # Kernel non-negative
     assert K_cpu.min() >= -1e-7, f"CPU kernel has negative values: {K_cpu.min()}"
     assert K_tdr.min() >= -1e-7, f"TorchDR kernel has negative values: {K_tdr.min()}"
+
+
+def test_tsne_defaults_match_explicit_late_exaggeration_and_dof():
+    """late_exaggeration=None and dof=1 reproduce the layout from before these parameters existed."""
+    from manylatents.algorithms.latent.tsne import TSNEModule
+
+    x = torch.randn(60, 10, generator=torch.Generator().manual_seed(0))
+    kw = dict(random_state=42, perplexity=10, n_iter_early=50, n_iter_late=50)
+    emb0 = TSNEModule(**kw).fit_transform(x)
+    emb1 = TSNEModule(**kw, late_exaggeration=1.0, dof=1.0).fit_transform(x)
+    np.testing.assert_allclose(emb0, emb1, atol=1e-6)
+
+
+@pytest.mark.parametrize("extra", [{"late_exaggeration": 4.0}, {"dof": 0.5}])
+def test_tsne_late_exaggeration_and_dof_affect_embedding(extra):
+    from manylatents.algorithms.latent.tsne import TSNEModule
+
+    x = torch.randn(60, 10, generator=torch.Generator().manual_seed(0))
+    kw = dict(random_state=42, perplexity=10, n_iter_early=50, n_iter_late=50)
+    emb0 = TSNEModule(**kw).fit_transform(x)
+    emb1 = TSNEModule(**kw, **extra).fit_transform(x)
+    assert not np.allclose(emb0, emb1, atol=1e-3)
+
+
+@pytest.mark.skipif(not TORCHDR_AVAILABLE, reason="torchdr not installed")
+def test_tsne_late_exaggeration_torchdr_raises():
+    from manylatents.algorithms.latent.tsne import TSNEModule
+
+    with pytest.raises(ValueError, match="late_exaggeration"):
+        TSNEModule(backend="torchdr", late_exaggeration=4.0)

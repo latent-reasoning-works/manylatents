@@ -8,6 +8,7 @@ metric: 'euclidean'
 learning_rate: 1.0
 fit_fraction: 1.0
 negative_sample_rate: null
+repulsion_strength: null
 neighborhood_size: ${neighborhood_size}
 backend: null
 device: null
