@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `0.0`, matching upstream `mioflow` 2.0's `ODEFunc.momentum_beta`).
 - New config: `algorithms/lightning/mioflow_gaga.yaml`, a demo variant with
   `use_gaga: true` preset.
+- `UMAPModule(init=...)`: a string or an `(n, n_components)` array, passed to umap-learn. The default
+  `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
 
 ## [0.1.8] - 2026-10-01
 
