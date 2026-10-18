@@ -11,5 +11,6 @@ metric: "euclidean"
 initialization: "pca"
 fit_fraction: 1.0
 neighborhood_size: ${neighborhood_size}
+input_metric: ${input_metric}
 backend: null
 device: null

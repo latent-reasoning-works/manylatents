@@ -34,6 +34,8 @@ class IsomapModule(LatentModule):
         A key that ``Isomap`` does not accept raises ``TypeError``.
     """
 
+    _supports_input_metric = True
+
     def __init__(
         self,
         n_components: int = 2,
@@ -48,14 +50,17 @@ class IsomapModule(LatentModule):
         n_jobs: Optional[int] = None,
         fit_fraction: float = 1.0,
         neighborhood_size: Optional[int] = None,
+        input_metric: Optional[str] = None,
         **kwargs,
     ):
         datamodule = kwargs.pop("datamodule", None)
         extra = route_kwargs(Isomap, kwargs, context="IsomapModule")
         super().__init__(
             n_components=n_components, init_seed=random_state,
-            neighborhood_size=neighborhood_size, datamodule=datamodule,
+            neighborhood_size=neighborhood_size, input_metric=input_metric, datamodule=datamodule,
         )
+        if input_metric is not None:
+            metric = input_metric
         self.random_state = random_state
         if neighborhood_size is not None:
             n_neighbors = neighborhood_size

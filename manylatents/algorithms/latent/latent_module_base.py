@@ -32,15 +32,25 @@ def _to_output(result, input_ref):
 
 
 class LatentModule(ABC):
+    _supports_input_metric = False   # set True in modules that route input_metric to their backend
+
     def __init__(self, n_components: int = 2, init_seed: int = 42,
                  backend: str | None = None, device: str | None = None,
-                 neighborhood_size: int | None = None, **kwargs):
+                 neighborhood_size: int | None = None, input_metric: str | None = None, **kwargs):
         """Base class for latent modules (DR, clustering, etc.)."""
         self.n_components = n_components
         self.init_seed = init_seed
         self.backend = backend
         self.device = device
         self.neighborhood_size = neighborhood_size
+        # Unified input metric, routed like neighborhood_size: None keeps each module's own default.
+        # "precomputed" means the input is an (n, n) distance matrix. Modules that cannot honour it raise.
+        self.input_metric = input_metric
+        if input_metric is not None and input_metric != "euclidean" and not self._supports_input_metric:
+            raise ValueError(
+                f"{type(self).__name__} does not support input_metric={input_metric!r}; "
+                "supported by UMAPModule, TSNEModule, PHATEModule and IsomapModule."
+            )
         # Flexible handling: if datamodule is passed, store it as a weak port
         self.datamodule = kwargs.pop('datamodule', None)
         # `random_state` is the seed under its sklearn name; api.py passes it to every module
