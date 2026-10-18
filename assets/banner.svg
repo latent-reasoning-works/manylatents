@@ -1,0 +1,43 @@
+<svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg">
+  <rect width="880" height="220" fill="#0D1117"/>
+  <!-- Eigenvalue spectrum bars — decaying λ₁ > λ₂ > ... > λₙ -->
+  <g opacity="0.12">
+    <rect x="40" y="40" width="8" height="140" rx="2" fill="#8B949E"/>
+    <rect x="56" y="52" width="8" height="128" rx="2" fill="#8B949E"/>
+    <rect x="72" y="66" width="8" height="114" rx="2" fill="#8B949E"/>
+    <rect x="88" y="78" width="8" height="102" rx="2" fill="#8B949E"/>
+    <rect x="104" y="90" width="8" height="90" rx="2" fill="#8B949E"/>
+    <rect x="120" y="100" width="8" height="80" rx="2" fill="#8B949E"/>
+    <rect x="136" y="108" width="8" height="72" rx="2" fill="#8B949E"/>
+    <rect x="152" y="116" width="8" height="64" rx="2" fill="#8B949E"/>
+    <rect x="168" y="122" width="8" height="58" rx="2" fill="#8B949E"/>
+    <rect x="184" y="128" width="8" height="52" rx="2" fill="#8B949E"/>
+    <rect x="200" y="133" width="8" height="47" rx="2" fill="#8B949E"/>
+    <rect x="216" y="137" width="8" height="43" rx="2" fill="#8B949E"/>
+    <rect x="232" y="140" width="8" height="40" rx="2" fill="#8B949E"/>
+    <rect x="248" y="143" width="8" height="37" rx="2" fill="#8B949E"/>
+    <rect x="264" y="146" width="8" height="34" rx="2" fill="#8B949E"/>
+    <rect x="280" y="148" width="8" height="32" rx="2" fill="#8B949E"/>
+    <rect x="296" y="150" width="8" height="30" rx="2" fill="#8B949E"/>
+    <rect x="312" y="152" width="8" height="28" rx="2" fill="#8B949E"/>
+    <rect x="328" y="154" width="8" height="26" rx="2" fill="#8B949E"/>
+    <rect x="344" y="155" width="8" height="25" rx="2" fill="#8B949E"/>
+    <rect x="360" y="157" width="8" height="23" rx="2" fill="#8B949E"/>
+    <rect x="376" y="158" width="8" height="22" rx="2" fill="#8B949E"/>
+    <rect x="392" y="159" width="8" height="21" rx="2" fill="#8B949E"/>
+    <rect x="408" y="160" width="8" height="20" rx="2" fill="#8B949E"/>
+  </g>
+  <!-- Eigenvalue labels -->
+  <text x="44" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8321;</text>
+  <text x="108" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8325;</text>
+  <text x="200" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8321;&#8320;</text>
+  <text x="344" y="196" font-family="monospace" font-size="9" fill="#484F58">&#955;&#8345;</text>
+  <!-- Title -->
+  <text x="500" y="100" font-family="monospace" font-size="36" font-weight="700" fill="#E6EDF3" letter-spacing="-1">manyLatents</text>
+  <text x="502" y="128" font-family="monospace" font-size="13" fill="#8B949E">dimensionality reduction &amp; spectral analysis</text>
+  <!-- Accent line -->
+  <rect x="500" y="142" width="60" height="2" rx="1" fill="#8B949E" opacity="0.4"/>
+  <!-- Version badge -->
+  <rect x="500" y="156" width="42" height="18" rx="9" fill="#8B949E" opacity="0.15"/>
+  <text x="521" y="168" font-family="monospace" font-size="10" fill="#8B949E" text-anchor="middle">v0.1</text>
+</svg>
