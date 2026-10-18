@@ -11,5 +11,6 @@ n_jobs: -1
 verbose: False
 fit_fraction: 1.0
 neighborhood_size: ${neighborhood_size}
+knn_dist: euclidean
 backend: null
 device: null

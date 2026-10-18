@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `PHATEModule(knn_dist=...)`: passed to phate. `"precomputed_distance"` or `"precomputed_affinity"` take an
+  `(n, n)` matrix as input and turn off the PCA step. The default `"euclidean"` keeps prior behavior.
 - `IsomapModule` (`algorithms/latent=isomap`, `run(algorithm="isomap")`): Isomap through
   `sklearn.manifold.Isomap`. `neighborhood_size` maps to sklearn `n_neighbors`.
 - `LocallyLinearModule` (`algorithms/latent=lle`, `run(algorithm="lle")`): locally linear
