@@ -11,6 +11,8 @@ from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_den
 
 
 class UMAPModule(LatentModule):
+    _supports_input_metric = True
+
     def __init__(
         self,
         n_components: int = 2,
@@ -31,16 +33,17 @@ class UMAPModule(LatentModule):
         backend: str | None = None,
         device: str | None = None,
         neighborhood_size: Optional[int] = None,
+        input_metric: Optional[str] = None,
         **kwargs
     ):
         super().__init__(
             n_components=n_components, init_seed=random_state,
             backend=backend, device=device,
-            neighborhood_size=neighborhood_size, **kwargs,
+            neighborhood_size=neighborhood_size, input_metric=input_metric, **kwargs,
         )
         self.n_neighbors = neighborhood_size if neighborhood_size is not None else n_neighbors
         self.min_dist = min_dist
-        self.metric = metric
+        self.metric = input_metric if input_metric is not None else metric
         self.n_epochs = n_epochs
         self.learning_rate = learning_rate
         self.fit_fraction = fit_fraction

@@ -73,5 +73,10 @@ class Config:
     (n_neighbors for UMAP, knn for PHATE/DiffusionMap, perplexity*3 for t-SNE).
     Algorithm-specific params still win if set explicitly via config override."""
 
+    input_metric: Optional[str] = None
+    """Unified input metric for UMAP, t-SNE, PHATE and Isomap, routed like neighborhood_size.
+    None keeps each module's default; "precomputed" means the input is an (n, n) distance matrix.
+    Modules that cannot honour a non-Euclidean value raise instead of ignoring it."""
+
     sampling: Optional[Dict[str, Any]] = None
     """Configuration for pre-fit and post-fit sampling strategies."""

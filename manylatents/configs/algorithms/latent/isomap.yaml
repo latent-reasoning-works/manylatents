@@ -9,3 +9,4 @@ metric: minkowski
 n_jobs: null
 fit_fraction: 1.0
 neighborhood_size: ${neighborhood_size}
+input_metric: ${input_metric}
