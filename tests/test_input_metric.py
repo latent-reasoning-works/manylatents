@@ -67,9 +67,12 @@ def test_tsne_pca_start_on_distance_matrix_raises():
 def test_precomputed_euclidean_matches_features_through_run(blobs, name, kw, tol):
     """A precomputed Euclidean matrix keeps about as many neighbours as the features route."""
     x = blobs.astype(np.float32)
-    feat = np.asarray(run(input_data=x, algorithm=name, seed=0, neighborhood_size=15, **kw)["embeddings"])
-    pre = np.asarray(run(input_data=cdist(x, x).astype(np.float32), algorithm=name, seed=0, neighborhood_size=15,
-                         input_metric="precomputed", **kw)["embeddings"])
+    from manylatents.algorithms.latent import get_algorithm
+    tgt = f"{get_algorithm(name).__module__}.{get_algorithm(name).__name__}"
+    cfg = lambda **extra: {"latent": {"_target_": tgt, "random_state": 0, "neighborhood_size": 15, **kw, **extra}}
+    feat = np.asarray(run(input_data=x, algorithms=cfg(), seed=0)["embeddings"])
+    pre = np.asarray(run(input_data=cdist(x, x).astype(np.float32), algorithms=cfg(input_metric="precomputed"),
+                         seed=0)["embeddings"])
     assert pre.shape == feat.shape
     assert abs(_recall(pre, x) - _recall(feat, x)) <= tol
 

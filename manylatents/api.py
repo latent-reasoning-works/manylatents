@@ -84,7 +84,7 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, **kwargs):
     )
 
 
-def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42, neighborhood_size=None, **kwargs):
+def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42, neighborhood_size=None, input_metric=None, **kwargs):
     """Resolve algorithm specification to an instantiated module.
 
     Fast path: string name → Python registry.
@@ -113,6 +113,8 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                 algo_kwargs["random_state"] = seed
             if neighborhood_size is not None:
                 algo_kwargs["neighborhood_size"] = neighborhood_size
+            if input_metric is not None:
+                algo_kwargs["input_metric"] = input_metric
             return cls(**algo_kwargs)
         except KeyError:
             # Not in latent registry — try as algorithms dict
@@ -151,6 +153,8 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                     algo_kwargs["random_state"] = seed
                 if neighborhood_size is not None:
                     algo_kwargs["neighborhood_size"] = neighborhood_size
+                if input_metric is not None:
+                    algo_kwargs["input_metric"] = input_metric
                 return cls(**algo_kwargs)
             except KeyError:
                 pass
@@ -296,11 +300,12 @@ def run(
     from manylatents.experiment import run_experiment
 
     neighborhood_size = kwargs.pop("neighborhood_size", None)
+    input_metric = kwargs.pop("input_metric", None)
 
     datamodule = _resolve_datamodule(input_data=input_data, data=data, seed=seed)
     algo = _resolve_algorithm(
         algorithm=algorithm, algorithms=algorithms,
-        datamodule=datamodule, seed=seed, neighborhood_size=neighborhood_size,
+        datamodule=datamodule, seed=seed, neighborhood_size=neighborhood_size, input_metric=input_metric,
     )
     engine_metrics, metrics_cfg = _resolve_metrics(metrics)
     engine_sampling = _resolve_sampling(sampling)
