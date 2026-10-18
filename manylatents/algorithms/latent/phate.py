@@ -11,6 +11,8 @@ from ...utils.backend import check_torchdr_available, resolve_device
 
 
 class PHATEModule(LatentModule):
+    _supports_input_metric = True
+
     def __init__(
         self,
         n_components: int = 2,
@@ -28,12 +30,14 @@ class PHATEModule(LatentModule):
         backend: str | None = None,
         device: str | None = None,
         neighborhood_size: Optional[int] = None,
+        knn_dist: str = "euclidean",
+        input_metric: Optional[str] = None,
         **kwargs
     ):
         super().__init__(
             n_components=n_components, init_seed=random_state,
             backend=backend, device=device,
-            neighborhood_size=neighborhood_size, **kwargs,
+            neighborhood_size=neighborhood_size, input_metric=input_metric, **kwargs,
         )
         self.knn = neighborhood_size if neighborhood_size is not None else knn
         self.t = t
@@ -46,7 +50,13 @@ class PHATEModule(LatentModule):
         self.fit_fraction = fit_fraction
         self.random_state = random_state
         self.random_landmarking = random_landmarking
+        # knn_dist is passed to phate; "precomputed_distance" / "precomputed_affinity" take an (n, n) matrix as input
+        if input_metric is not None:
+            knn_dist = "precomputed_distance" if input_metric == "precomputed" else input_metric
+        self.knn_dist = knn_dist
         self._resolved_backend = self._resolve_phate_backend(backend)
+        if self._resolved_backend is not None and knn_dist != "euclidean":
+            raise ValueError(f"knn_dist={knn_dist!r} is supported only by the phate backend (backend=None).")
         self.model = self._create_model()
 
     @staticmethod
@@ -124,7 +134,10 @@ class PHATEModule(LatentModule):
                 'n_jobs': self.n_jobs,
                 'verbose': self.verbose,
                 'random_landmarking': self.random_landmarking,
+                'knn_dist': self.knn_dist,
             }
+            if self.knn_dist.startswith("precomputed"):
+                phate_kwargs['n_pca'] = None   # a precomputed matrix must not be PCA-reduced
             return PHATE(**phate_kwargs)
 
     def fit(self, x, y=None) -> None:

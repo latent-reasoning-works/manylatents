@@ -11,5 +11,6 @@ negative_sample_rate: null
 repulsion_strength: null
 init: spectral
 neighborhood_size: ${neighborhood_size}
+input_metric: ${input_metric}
 backend: null
 device: null

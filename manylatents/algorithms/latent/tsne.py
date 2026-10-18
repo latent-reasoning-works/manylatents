@@ -31,6 +31,8 @@ def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
 
 
 class TSNEModule(LatentModule):
+    _supports_input_metric = True
+
     def __init__(
         self,
         n_components: int = 2,
@@ -47,12 +49,13 @@ class TSNEModule(LatentModule):
         backend: str | None = None,
         device: str | None = None,
         neighborhood_size: Optional[int] = None,
+        input_metric: Optional[str] = None,
         **kwargs
     ):
         super().__init__(
             n_components=n_components, init_seed=random_state,
             backend=backend, device=device,
-            neighborhood_size=neighborhood_size, **kwargs,
+            neighborhood_size=neighborhood_size, input_metric=input_metric, **kwargs,
         )
         # perplexity ≈ effective neighborhood size; OpenTSNE uses k = 3*perplexity for kNN search
         self.perplexity = float(neighborhood_size) if neighborhood_size is not None else perplexity
@@ -61,7 +64,9 @@ class TSNEModule(LatentModule):
         self.late_exaggeration = late_exaggeration
         self.dof = dof
         self.learning_rate = learning_rate
-        self.metric = metric
+        self.metric = input_metric if input_metric is not None else metric
+        if self.metric == "precomputed" and isinstance(initialization, str) and initialization == "pca":
+            raise ValueError("initialization='pca' would run PCA on a distance matrix; use 'random' or 'spectral' with a precomputed input.")
         self.initialization = initialization
         self.fit_fraction = fit_fraction
         self.random_state = random_state
