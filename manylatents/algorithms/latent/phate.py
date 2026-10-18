@@ -28,6 +28,7 @@ class PHATEModule(LatentModule):
         backend: str | None = None,
         device: str | None = None,
         neighborhood_size: Optional[int] = None,
+        knn_dist: str = "euclidean",
         **kwargs
     ):
         super().__init__(
@@ -46,7 +47,11 @@ class PHATEModule(LatentModule):
         self.fit_fraction = fit_fraction
         self.random_state = random_state
         self.random_landmarking = random_landmarking
+        # knn_dist is passed to phate; "precomputed_distance" / "precomputed_affinity" take an (n, n) matrix as input
+        self.knn_dist = knn_dist
         self._resolved_backend = self._resolve_phate_backend(backend)
+        if self._resolved_backend is not None and knn_dist != "euclidean":
+            raise ValueError(f"knn_dist={knn_dist!r} is supported only by the phate backend (backend=None).")
         self.model = self._create_model()
 
     @staticmethod
@@ -124,7 +129,10 @@ class PHATEModule(LatentModule):
                 'n_jobs': self.n_jobs,
                 'verbose': self.verbose,
                 'random_landmarking': self.random_landmarking,
+                'knn_dist': self.knn_dist,
             }
+            if self.knn_dist.startswith("precomputed"):
+                phate_kwargs['n_pca'] = None   # a precomputed matrix must not be PCA-reduced
             return PHATE(**phate_kwargs)
 
     def fit(self, x, y=None) -> None:
