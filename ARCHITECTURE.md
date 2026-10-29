@@ -231,5 +231,5 @@ wheelnext uv for CUDA wheel variants (mamba-ssm, flash-attn, transformer-engine)
 | **Version** | 0.1.6 |
 | **Repository** | github.com/latent-reasoning-works/manylatents |
 | **Docs** | latent-reasoning-works.github.io/manylatents |
-| **License** | MIT |
+| **License** | Apache-2.0 |
 | **Last updated** | 2026-07-03 |

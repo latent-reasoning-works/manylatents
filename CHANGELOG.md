@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Relicensed from MIT to Apache-2.0. Releases up to and including 0.1.8 stay under MIT; NOTICE keeps the MIT notice and lists the MIOFlow files it does not cover.
+
+
 ### Added
 - `input_metric` (unified, like `neighborhood_size`; top-level Hydra key `input_metric=...`): routed to UMAP
   `metric`, t-SNE `metric`, PHATE `knn_dist` and Isomap `metric`. `"precomputed"` takes an `(n, n)` distance matrix.
