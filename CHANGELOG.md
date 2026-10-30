@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Added
+- `ReebGraphModule(max_N=5000)`: a cell cap. Above `max_N` rows, the Reeb graph is built on a
+  `max_N`-row sample drawn with the `PersistentHomology` procedure, seeded by `random_state`.
+  Rows that were not sampled take the membership of their nearest sampled row, so the
+  embedding keeps one row per input row. `extra_outputs()` gains `subsample_indices`. The four
+  `reeb_graph*` configs set `max_N: 5000`.
+- Generic `graph` output (`manylatents.outputs.graph`): `edges`, `edge_weights`, `node_ids` and
+  `node_coordinates` for any algorithm with `adjacency()` and `node_coordinates`.
+- `SaveOutputs` with `save_format: csv` writes the `graph` output as `<base>_nodes.csv`,
+  `<base>_edges.csv` and, with manykinds installed, a `manykinds.SparseGraph` archive
+  `<base>_graph.npz`. The paths are returned as `graph_nodes_path`, `graph_edges_path` and
+  `graph_npz_path`.
+- `manylatents.utils.charts.ball_cover(X, m, cache=None)`: covers `X` with kNN balls of size `m`
+  (the landmark counts as a member) around landmarks chosen by farthest-point sampling from row 0. Returns a
+  `BallCover(landmarks, members)` NamedTuple with a 2-D member array. It is deterministic. Its `cache` goes to
+  `compute_knn`, so one dict primed at the largest `m` serves every smaller `m`.
 - `input_metric` (unified, like `neighborhood_size`; top-level Hydra key `input_metric=...`): routed to UMAP
   `metric`, t-SNE `metric`, PHATE `knn_dist` and Isomap `metric`. `"precomputed"` takes an `(n, n)` distance matrix.
   `None` keeps each module's default. Other modules raise for a non-Euclidean value instead of ignoring it. t-SNE
@@ -47,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `use_gaga: true` preset.
 - `UMAPModule(init=...)`: a string or an `(n, n_components)` array, passed to umap-learn. The default
   `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
+
+### Changed
+- A Reeb graph run on more than 5000 rows now uses a 5000-row sample by default (it used all
+  rows, or ran out of memory). Pass `max_N=None` for the old behaviour.
 
 ### Fixed
 - `ArchetypalAnalysisModule` (`algorithms/latent=aa`) fits again under the locked archetypes 0.6.2,

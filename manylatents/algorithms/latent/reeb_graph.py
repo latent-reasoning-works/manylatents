@@ -1,5 +1,6 @@
 """Reeb graph approximation as a LatentModule."""
 import logging
+import random
 
 import numpy as np
 import torch
@@ -254,6 +255,18 @@ class ReebGraphModule(LatentModule):
         Multiplier on the minimum radius for the VR complex.
     density_factor : float
         Minimum component size as a fraction of ``n_points / n_bins``.
+    max_N : int or None
+        The largest number of rows that the Reeb graph is built on. When the input
+        has more rows, ``fit`` draws ``max_N`` of them with
+        ``random.Random(random_state).sample(range(N), k=max_N)``, the procedure that
+        ``PersistentHomology`` uses, without touching the global ``random`` state.
+        The lens, the distance matrix, the Rips complex and ``node_coordinates`` use
+        the sampled rows only. Each row that was not sampled gets the membership row
+        of its nearest sampled row (Euclidean, input space), so ``fit_transform``
+        still returns one row per input row. The drawn indices are reported as
+        ``subsample_indices``. ``None`` disables the cap. Default ``5000``.
+    random_state : int
+        Seed. It also seeds the row sample of ``max_N``.
     """
 
     def __init__(
@@ -277,8 +290,12 @@ class ReebGraphModule(LatentModule):
         neighborhood_size: int | None = None,
         backend: str | None = None,
         device: str | None = None,
+        max_N: int | None = 5000,
         **kwargs,
     ):
+        # The Rips step reads the second-to-last H0 bar, so it needs two rows.
+        if max_N is not None and max_N < 2:
+            raise ValueError(f"max_N must be None or at least 2, got {max_N}")
         super().__init__(
             n_components=n_components, init_seed=random_state,
             backend=backend, device=device,
@@ -293,6 +310,8 @@ class ReebGraphModule(LatentModule):
         self.min_rad_factor = min_rad_factor
         self.density_factor = density_factor
         self.random_state = random_state
+        self.max_N = max_N
+        self.subsample_indices = None  # 1-D int64 row indices the graph was built on
 
         self._reeb_graph = None
         self._membership = None  # (N, M) binary membership matrix
@@ -329,12 +348,27 @@ class ReebGraphModule(LatentModule):
         import networkx as nx
 
         x_np = _to_numpy(x)
+        n = x_np.shape[0]
+
+        # Cell cap: the same draw as PersistentHomology, on a local Random instance.
+        subsampled = self.max_N is not None and n > self.max_N
+        if subsampled:
+            subsample_indices = np.array(
+                random.Random(self.random_state).sample(range(n), k=self.max_N),
+                dtype=np.int64,
+            )
+            logger.info(f"ReebGraphModule: subsampled {n} → {self.max_N}")
+            x_sub = x_np[subsample_indices]
+        else:
+            subsample_indices = np.arange(n, dtype=np.int64)
+            x_sub = x_np
+        self.subsample_indices = subsample_indices
 
         # Compute lens function
-        function = self._compute_lens(x_np)
+        function = self._compute_lens(x_sub)
 
         # Build distance matrix and VR complex
-        D = pairwise_distances(x_np)
+        D = pairwise_distances(x_sub)
         min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
         _, skeleta = _vietoris_rips(
             D, min_rad_factor=self.min_rad_factor,
@@ -349,6 +383,19 @@ class ReebGraphModule(LatentModule):
         )
 
         self._reeb_graph = G
+        if subsampled:
+            # (max_N, M) -> (N, M): each row takes its nearest sampled row's membership,
+            # then each sampled row is reset to its own (duplicate rows stay distinct).
+            from sklearn.neighbors import NearestNeighbors
+
+            nn_idx = (
+                NearestNeighbors(n_neighbors=1)
+                .fit(x_sub)
+                .kneighbors(x_np, return_distance=False)
+            )
+            full = membership[nn_idx[:, 0]]
+            full[subsample_indices] = membership
+            membership = full
         self._membership = membership
 
         # Build adjacency matrix (M x M, where M = number of Reeb nodes)
@@ -362,14 +409,15 @@ class ReebGraphModule(LatentModule):
             adj[node_to_idx[v], node_to_idx[u]] = 1.0
         self._adjacency = adj
 
-        # Mean coordinate of data points assigned to each Reeb node
-        d = x_np.shape[1]
+        # Mean coordinate of data points assigned to each Reeb node. The node
+        # "indices" index into x_sub, the rows the graph was built on.
+        d = x_sub.shape[1]
         coords = np.zeros((m, d), dtype=np.float64)
         for node_id in node_list:
             idx = node_to_idx[node_id]
             pt_indices = G.nodes[node_id].get("indices", [])
             if len(pt_indices) > 0:
-                coords[idx] = x_np[pt_indices].mean(axis=0)
+                coords[idx] = x_sub[pt_indices].mean(axis=0)
         self.node_coordinates = coords
         # Also store as pos on the networkx graph for convenience
         nx.set_node_attributes(
@@ -429,4 +477,6 @@ class ReebGraphModule(LatentModule):
             extras["node_coordinates"] = self.node_coordinates
         if getattr(self, "structural_summary", None) is not None:
             extras["structural_summary"] = self.structural_summary
+        if getattr(self, "subsample_indices", None) is not None:
+            extras["subsample_indices"] = self.subsample_indices
         return extras

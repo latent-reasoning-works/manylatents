@@ -173,3 +173,18 @@ def test_disk_cache_roundtrip(sample_data, tmp_path):
     key = _content_key(sample_data)
     np.testing.assert_array_equal(cache1[key][1], cache2[key][1])
     np.testing.assert_array_equal(cache1[key][2], cache2[key][2])
+
+
+def test_content_key_distinguishes_interior_rows():
+    """Two arrays with the same shape and the same first and last rows must not share a cache entry."""
+    from manylatents.utils.knn import _content_key
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(500, 10)).astype(np.float32)
+    y = x.copy()
+    y[1:-1] = rng.permutation(x[1:-1])
+    assert _content_key(x) != _content_key(y)
+    cache = {}
+    _, ix = compute_knn(x, k=5, cache=cache)
+    _, iy = compute_knn(y, k=5, cache=cache)
+    _, iy_fresh = compute_knn(y, k=5)
+    np.testing.assert_array_equal(iy, iy_fresh)
