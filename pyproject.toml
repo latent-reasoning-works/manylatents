@@ -94,9 +94,11 @@ omics = ["manylatents-omics"]
 # are both imported by cflows tests but were absent from [all].
 # Support 0.14/0.15 without the removed verbose argument; review the next minor API.
 cflows = ["statsmodels>=0.14,<0.16", "manykinds>=0.1.1"]
+# Writes the SparseGraph archive (<base>_graph.npz) of a graph output.
+graph = ["manykinds>=0.1.1"]
 # All optional extras (excluding docs/dev)
 all = [
-    "manylatents[hf,torchdr,jax,omics,cflows]",
+    "manylatents[hf,torchdr,jax,omics,cflows,graph]",
 ]
 
 [project.scripts]
@@ -135,6 +137,7 @@ pythonpath = ["."]
 testpaths = ["tests", "manylatents"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "source_checkout: needs the repository checkout, not only the installed package",
 ]
 
 # NOTE: a `[[tool.uv.dependency-metadata]]` block for `archetypes` used to live here,

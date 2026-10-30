@@ -1196,6 +1196,9 @@ docs = [
     { name = "mkdocs-macros-plugin" },
     { name = "mkdocs-material" },
 ]
+graph = [
+    { name = "manykinds" },
+]
 hf = [
     { name = "datasets" },
     { name = "transformers" },
@@ -1238,7 +1241,8 @@ requires-dist = [
     { name = "leidenalg", specifier = ">=0.10" },
     { name = "lightning", specifier = ">=2.5" },
     { name = "manykinds", marker = "extra == 'cflows'", specifier = ">=0.1.1" },
-    { name = "manylatents", extras = ["hf", "torchdr", "jax", "omics", "cflows"], marker = "extra == 'all'" },
+    { name = "manykinds", marker = "extra == 'graph'", specifier = ">=0.1.1" },
+    { name = "manylatents", extras = ["hf", "torchdr", "jax", "omics", "cflows", "graph"], marker = "extra == 'all'" },
     { name = "manylatents-omics", marker = "extra == 'omics'", git = "https://github.com/latent-reasoning-works/manylatents-omics.git" },
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6" },
@@ -1268,7 +1272,7 @@ requires-dist = [
     { name = "umap-learn", specifier = ">=0.5" },
     { name = "wandb", specifier = ">=0.25.0" },
 ]
-provides-extras = ["hf", "torchdr", "jax", "docs", "omics", "cflows", "all"]
+provides-extras = ["hf", "torchdr", "jax", "docs", "omics", "cflows", "graph", "all"]
 
 [package.metadata.requires-dev]
 dev = [
