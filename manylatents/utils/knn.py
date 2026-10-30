@@ -9,7 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 def _content_key(data) -> str:
-    """O(1) content hash: shape + dtype + first/last row bytes.
+    """Content hash: shape + dtype + the full array bytes.
+
+    Hashing only the first and last rows let two different arrays with the same shape and the same end rows share a
+    key, so a shared cache returned the wrong neighbours (for example a permuted or perturbed copy, or two subsamples
+    whose sorted indices share their end rows). The full hash costs about 0.6 ms at n = 10000, d = 50.
 
     Always normalizes to float32 contiguous so the hash is consistent
     regardless of whether the caller passes the original or converted data.
@@ -20,9 +24,8 @@ def _content_key(data) -> str:
         data = data.detach().cpu().numpy()
     data = np.ascontiguousarray(data, dtype=np.float32)
     h = hashlib.sha256()
-    h.update(f"knn-self-v2{data.shape}{data.dtype}".encode())
-    h.update(data[0].tobytes())
-    h.update(data[-1].tobytes())
+    h.update(f"knn-self-v3{data.shape}{data.dtype}".encode())
+    h.update(memoryview(data))
     return h.hexdigest()[:16]
 
 
