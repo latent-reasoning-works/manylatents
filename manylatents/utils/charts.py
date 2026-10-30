@@ -28,8 +28,19 @@ def ball_cover(X, m: int, cache: dict | None = None) -> BallCover:
     points. The first landmark is row 0. Each next landmark is the uncovered
     point farthest (squared Euclidean) from all landmarks so far. Its ``m``
     nearest neighbours become covered. Selection stops when every row is
-    covered. The result is deterministic for a given ``X``, ``m`` and kNN
-    backend; ties in ``argmax`` go to the lowest row index.
+    covered. The result is deterministic for a given ``X``, ``m``, kNN
+    backend and cache state; ties in ``argmax`` go to the lowest row index.
+
+    Distances are squared Euclidean in float64, computed as
+    ``|x|^2 - 2 x.y + |y|^2``. Two consequences:
+
+    - Exact ties, such as duplicate rows, can carry round-off of about
+      1e-13, so the farthest point among equally far points is not always
+      the lowest row index.
+    - For data far from the origin compared with its spread (a ratio of
+      about 1e5 or more), the formula loses precision and can pick a point
+      that is not exactly the farthest. Centred data, such as PCA
+      coordinates, is not affected.
 
     Args:
         X: ``(n, d)`` real array. float32 and float64 are both accepted.
@@ -38,7 +49,11 @@ def ball_cover(X, m: int, cache: dict | None = None) -> BallCover:
             every row.
         cache: Optional dict passed to :func:`compute_knn`. Use one dict per
             ``X``. Calling first with the largest ``m`` lets every smaller ``m``
-            slice the stored neighbours instead of searching again.
+            slice the stored neighbours instead of searching again. With the
+            faiss backend a slice equals a fresh search. With the sklearn
+            fallback, neighbours at exactly equal distance can be chosen
+            differently, so a filled cache can give a different, equally
+            valid cover.
 
     Returns:
         A :class:`BallCover` of landmark indices and a 2-D member array.
