@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Relicensed from MIT to Apache-2.0. Releases up to and including 0.1.8 stay under MIT; NOTICE keeps the MIT notice and lists the MIOFlow files it does not cover.
-
+## [0.1.9] - 2026-10-30
 
 ### Added
 - `graph` extra: `pip install "manylatents[graph]"` installs manykinds, which `SaveOutputs` needs to
@@ -78,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
 
 ### Changed
+- Relicensed from MIT to Apache-2.0. Releases up to and including 0.1.8 stay under MIT; NOTICE keeps the MIT notice and lists the MIOFlow files it does not cover.
 - `run(data=..., data_kwargs={"random_state": ...})`: a `random_state` in `data_kwargs` now wins over
   `seed` without a retry. Without it, the datamodule still gets `random_state=seed`.
 - A Reeb graph run on more than 5000 rows now uses a 5000-row sample by default (it used all
