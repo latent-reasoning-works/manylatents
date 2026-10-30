@@ -73,6 +73,11 @@ def _resolve_datamodule(input_data=None, data=None, seed=42, time=None, **kwargs
     if data is not None:
         from manylatents.data import get_datamodule
 
+        # A ``random_state`` the caller declared in ``data_kwargs`` wins over the run seed,
+        # so a datamodule's subsample seed can be fixed apart from ``seed``.
+        if "random_state" in kwargs:
+            return get_datamodule(data, **kwargs)
+
         try:
             return get_datamodule(data, random_state=seed, **kwargs)
         except ValueError:
