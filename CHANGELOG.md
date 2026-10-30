@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Added
+- Entry-point group `manylatents.datamodules`: an extension package makes its datamodule reachable by
+  name (`get_datamodule`, `run(data=...)`) with an entry point `<name> = "module:Class"`. A core name
+  always wins; `list_datamodules()` includes the entry-point names; an entry point that fails to load
+  raises `ImportError` that names it.
 - `THIRD_PARTY_NOTICES.md`: the nine files ported from KrishnaswamyLab code (seven modules
   and the two MIOFlow configs), listed under their upstream repositories (MIOFlow, cflows,
   AAnet) with the verbatim Yale non-commercial license text and the upstream commit it was
@@ -72,6 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
 
 ### Changed
+- `run(data=..., data_kwargs={"random_state": ...})`: a `random_state` in `data_kwargs` now wins over
+  `seed` without a retry. Without it, the datamodule still gets `random_state=seed`.
 - A Reeb graph run on more than 5000 rows now uses a 5000-row sample by default (it used all
   rows, or ran out of memory). Pass `max_N=None` for the old behaviour.
 
