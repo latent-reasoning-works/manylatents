@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `UMAPModule(init=...)`: a string or an `(n, n_components)` array, passed to umap-learn. The default
   `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
 
+### Fixed
+- `ArchetypalAnalysisModule` (`algorithms/latent=aa`) fits again under the locked archetypes 0.6.2,
+  scikit-learn 1.8 and NumPy 2. It passed the archetypes 0.11 keywords `method` and `method_kwargs`,
+  so every fit raised `TypeError`. It now passes `n_archetypes`, `max_iter` and `random_state` to a
+  private subclass of `archetypes.AA` that restores `_validate_data` (removed in scikit-learn 1.6)
+  and avoids the `np.mat` call (removed in NumPy 2.0) in the furthest-sum start. `method` is still
+  accepted and is not forwarded. Known limit: the scipy `nnls` solver inside archetypes 0.6.2 can
+  raise `RuntimeError: Maximum number of iterations reached.`, for example with many archetypes.
+
 ## [0.1.8] - 2026-10-01
 
 ### Added
