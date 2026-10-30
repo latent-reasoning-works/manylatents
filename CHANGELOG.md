@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Added
+- `manylatents.utils.charts.ball_cover(X, m, cache=None)`: covers `X` with kNN balls of size `m`
+  (the landmark counts as a member) around landmarks chosen by farthest-point sampling from row 0. Returns a
+  `BallCover(landmarks, members)` NamedTuple with a 2-D member array. It is deterministic. Its `cache` goes to
+  `compute_knn`, so one dict primed at the largest `m` serves every smaller `m`.
 - `input_metric` (unified, like `neighborhood_size`; top-level Hydra key `input_metric=...`): routed to UMAP
   `metric`, t-SNE `metric`, PHATE `knn_dist` and Isomap `metric`. `"precomputed"` takes an `(n, n)` distance matrix.
   `None` keeps each module's default. Other modules raise for a non-Euclidean value instead of ignoring it. t-SNE
