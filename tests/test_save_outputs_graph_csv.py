@@ -94,6 +94,7 @@ def test_manykinds_missing(tmp_path, monkeypatch, caplog):
         and "manykinds" in r.getMessage()
     ]
     assert len(hits) == 1
+    assert "manylatents[graph]" in hits[0].getMessage()
 
 
 def test_csv_mode_skips_graph_json(tmp_path):

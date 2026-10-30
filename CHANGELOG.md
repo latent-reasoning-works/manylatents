@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Added
+- `graph` extra: `pip install "manylatents[graph]"` installs manykinds, which `SaveOutputs` needs to
+  write the `<base>_graph.npz` SparseGraph archive. `all` includes it.
 - Entry-point group `manylatents.datamodules`: an extension package makes its datamodule reachable by
   name (`get_datamodule`, `run(data=...)`) with an entry point `<name> = "module:Class"`. A core name
   always wins; `list_datamodules()` includes the entry-point names; an entry point that fails to load

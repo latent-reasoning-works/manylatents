@@ -175,7 +175,7 @@ class SaveOutputs(EmbeddingCallback):
         except ImportError:
             logger.warning(
                 "manykinds is not installed; skipping the SparseGraph archive "
-                f"{base_name}_graph.npz (install the 'cflows' extra to write it)."
+                f"{base_name}_graph.npz (install manylatents[graph] to write it)."
             )
             return
         npz_path = self._get_save_path(f"{base_name}_graph.npz")
