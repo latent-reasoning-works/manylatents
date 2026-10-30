@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 """Cflows LightningModule — MIOFlow-family neural-ODE trajectory model.
 
 Trains a time-conditioned flow that pushes a point cloud from one measured

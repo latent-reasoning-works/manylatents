@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 _target_: manylatents.algorithms.lightning.mioflow.MIOFlow
 _recursive_: false
 datamodule: ${data}

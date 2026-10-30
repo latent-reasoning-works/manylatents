@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 """Trajectory losses ported from the MIOFlow family used by Cflows.
 
 Reference: ``KrishnaswamyLab/cflows`` file ``BEMIOflow/MIOFlow/losses.py``

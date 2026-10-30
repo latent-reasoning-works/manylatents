@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 """MIOFlow network components: ODEFunc and loss functions.
 
 MIOFlow (Manifold Interpolating Optimal-Transport Flows) learns a Neural ODE

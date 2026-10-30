@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 # src/networks/aanet/base.py
 
 from abc import abstractmethod
