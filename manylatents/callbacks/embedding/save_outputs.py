@@ -58,7 +58,10 @@ class SaveOutputs(EmbeddingCallback):
 
         Args:
             save_dir: Base directory for saving outputs (Hydra will create subdirs)
-            save_format: Format for main embeddings ("csv", "npy", etc.)
+            save_format: Format for main embeddings ("csv", "npy", etc.). With "csv", an
+                outputs dict that has a ``graph`` key also gets ``<base>_nodes.csv``,
+                ``<base>_edges.csv`` and, when manykinds is installed, ``<base>_graph.npz``,
+                whatever the value of ``save_additional_outputs``.
             experiment_name: Name for file naming
             use_timestamp: Whether to include timestamp in names
             save_additional_outputs: Whether to save non-embeddings keys as separate files
@@ -84,6 +87,9 @@ class SaveOutputs(EmbeddingCallback):
 
         base_name = self._get_base_filename()
         self._save_main_embeddings(embeddings, base_name)
+
+        if self.save_format.lower() == "csv" and "graph" in embeddings:
+            self._save_graph_files(embeddings["graph"], base_name)
 
         if self.save_additional_outputs:
             self._save_additional_outputs(embeddings, base_name)
@@ -136,10 +142,60 @@ class SaveOutputs(EmbeddingCallback):
             metadata["labels"] = embeddings["label"]
         save_embeddings(X, self.save_path, format=self.save_format, metadata=metadata)
 
+    def _save_graph_files(self, graph: dict, base_name: str) -> None:
+        """Write the ``graph`` output as nodes/edges CSV files and a SparseGraph archive.
+
+        ``<base>_nodes.csv`` has ``node_id, x0..x{D-1}``; ``<base>_edges.csv`` has
+        ``source, target, weight``. ``<base>_graph.npz`` is a ``manykinds.SparseGraph``;
+        without manykinds it is skipped with one warning.
+        """
+        node_ids = np.asarray(graph["node_ids"], dtype=np.int64)
+        coords = np.asarray(graph["node_coordinates"], dtype=np.float64)
+        edges = np.asarray(graph["edges"], dtype=np.int64).reshape(-1, 2)
+        weights = np.asarray(graph["edge_weights"], dtype=np.float64)
+
+        nodes_df = pd.DataFrame({"node_id": node_ids})
+        for j in range(coords.shape[1]):
+            nodes_df[f"x{j}"] = coords[:, j]
+        nodes_path = self._get_save_path(f"{base_name}_nodes.csv")
+        nodes_df.to_csv(nodes_path, index=False)
+
+        edges_df = pd.DataFrame(
+            {"source": edges[:, 0], "target": edges[:, 1], "weight": weights}
+        )
+        edges_path = self._get_save_path(f"{base_name}_edges.csv")
+        edges_df.to_csv(edges_path, index=False)
+
+        self.register_output("graph_nodes_path", nodes_path)
+        self.register_output("graph_edges_path", edges_path)
+        logger.info(f"Saved graph nodes to {nodes_path} and edges to {edges_path}")
+
+        try:
+            from manykinds import SparseGraph
+        except ImportError:
+            logger.warning(
+                "manykinds is not installed; skipping the SparseGraph archive "
+                f"{base_name}_graph.npz (install the 'cflows' extra to write it)."
+            )
+            return
+        npz_path = self._get_save_path(f"{base_name}_graph.npz")
+        SparseGraph(
+            edges=edges,
+            node_ids=node_ids,
+            provenance=("manylatents.outputs.graph",),
+            edge_weights=weights,
+        ).serialize(npz_path)
+        self.register_output("graph_npz_path", npz_path)
+        logger.info(f"Saved graph archive to {npz_path}")
+
     def _save_additional_outputs(self, embeddings: dict, base_name: str) -> None:
         """Save additional outputs as separate files."""
+        csv_mode = self.save_format.lower() == "csv"
         for key, value in embeddings.items():
             if key in ["embeddings", "metadata"]:
+                continue
+            if key == "graph" and csv_mode:
+                # Already written as nodes/edges CSV files by _save_graph_files.
                 continue
 
             value = self._to_numpy(value)

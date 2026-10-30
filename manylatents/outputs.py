@@ -26,6 +26,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict
 
+import numpy as np
 import torch
 from torch import Tensor
 
@@ -169,6 +170,54 @@ def affinity(algorithm) -> dict:
 def adjacency(algorithm) -> dict:
     """Adjacency matrix, as the algorithm's ``adjacency()`` returns it."""
     return _matrix_output(algorithm, "adjacency")
+
+
+@register_output(
+    description="Node/edge view of an (M, M) adjacency with node coordinates",
+    requires=("adjacency",),
+)
+def graph(algorithm) -> dict:
+    """``{"graph": {edges, edge_weights, node_ids, node_coordinates}}`` from ``adjacency()``.
+
+    Declines (``{}``) without calling ``adjacency()`` when the algorithm has no
+    ``node_coordinates``: a nodes file needs positions, and a kNN graph such as
+    Leiden's would otherwise allocate an (N, N) matrix for nothing. Each undirected
+    edge appears once, ``source <= target``, in row-major order. A coordinate row
+    count that differs from M is a defect in the algorithm, so it raises.
+    """
+    try:
+        coords = getattr(algorithm, "node_coordinates", None)
+    except _ABSENT:
+        return {}
+    if coords is None:
+        return {}
+    fn = _accessor(algorithm, "adjacency")
+    if fn is None:
+        return {}
+    try:
+        A = fn()
+    except _ABSENT:
+        return {}
+    if isinstance(A, Tensor):
+        A = A.detach().cpu().numpy()
+    A = np.asarray(A)
+    if isinstance(coords, Tensor):
+        coords = coords.detach().cpu().numpy()
+    coords = np.asarray(coords, dtype=np.float64)
+    m = A.shape[0]
+    if coords.shape[0] != m:
+        raise ValueError(
+            f"node_coordinates has {coords.shape[0]} rows but adjacency() has {m} nodes"
+        )
+    edges = np.argwhere(np.triu(A)).astype(np.int64)
+    return {
+        "graph": {
+            "edges": edges,
+            "edge_weights": A[edges[:, 0], edges[:, 1]].astype(np.float64),
+            "node_ids": np.arange(m, dtype=np.int64),
+            "node_coordinates": coords,
+        }
+    }
 
 
 @register_output(
