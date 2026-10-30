@@ -77,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `'spectral'` keeps prior behavior. The torchdr backend raises a `ValueError` for any other value.
 
 ### Changed
+- `ball_cover` docstring: states how exact distance ties and data far from the origin affect the
+  landmarks, and that with the sklearn kNN fallback a filled cache can choose differently among
+  equally near neighbours. No behaviour change.
 - Relicensed from MIT to Apache-2.0. Releases up to and including 0.1.8 stay under MIT; NOTICE keeps the MIT notice and lists the MIOFlow files it does not cover.
 - `run(data=..., data_kwargs={"random_state": ...})`: a `random_state` in `data_kwargs` now wins over
   `seed` without a retry. Without it, the datamodule still gets `random_state=seed`.
