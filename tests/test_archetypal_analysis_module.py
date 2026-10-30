@@ -133,6 +133,7 @@ def test_pin_comment_names_the_06_api():
     text = (REPO_ROOT / "pyproject.toml").read_text()
     assert "aa.py targets the archetypes 0.6 API" in text
     assert "written against the 0.11" not in text
+    assert "float64" in text and "`_nnls`" in text
 
 
 # ── the solver: float64 input, and nnls that cannot stop at its iteration cap ──────────────────
