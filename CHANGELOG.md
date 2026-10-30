@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name (`get_datamodule`, `run(data=...)`) with an entry point `<name> = "module:Class"`. A core name
   always wins; `list_datamodules()` includes the entry-point names; an entry point that fails to load
   raises `ImportError` that names it.
+- `THIRD_PARTY_NOTICES.md`: the nine files ported from KrishnaswamyLab code (seven modules
+  and the two MIOFlow configs), listed under their upstream repositories (MIOFlow, cflows,
+  AAnet) with the verbatim Yale non-commercial license text and the upstream commit it was
+  copied from. A separate `archetypes` section carries the BSD-3-Clause notice for the two
+  functions that `aa.py` adapts. Each of the nine files now starts with
+  `# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial`. `NOTICE` lists all nine files
+  and names the three upstream repositories. Nothing moves: import paths, extras and the
+  package license metadata are unchanged.
 - `ReebGraphModule(max_N=5000)`: a cell cap. Above `max_N` rows, the Reeb graph is built on a
   `max_N`-row sample drawn with the `PersistentHomology` procedure, seeded by `random_state`.
   Rows that were not sampled take the membership of their nearest sampled row, so the

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 """MIOFlow LightningModule training wrapper.
 
 Manifold Interpolating Optimal-Transport Flows for trajectory inference.

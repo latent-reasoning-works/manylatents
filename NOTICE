@@ -13,13 +13,21 @@ Not covered by the Apache-2.0 relicense:
 
   manylatents/algorithms/lightning/mioflow.py
   manylatents/algorithms/lightning/networks/mioflow_net.py
+  manylatents/algorithms/lightning/networks/gaga_net.py
   manylatents/configs/algorithms/lightning/mioflow.yaml
   manylatents/configs/algorithms/lightning/mioflow_gaga.yaml
+  manylatents/algorithms/cflows_granger.py
+  manylatents/algorithms/lightning/cflows.py
+  manylatents/algorithms/lightning/losses/cflows.py
+  manylatents/algorithms/lightning/networks/aanet.py
 
-These files implement MIOFlow, a method whose reference code Yale University
-publishes under a non-commercial license (github.com/KrishnaswamyLab/MIOFlow).
-They keep the terms under which they were first distributed until their status
-is settled.
+These files are ported from code that Yale University publishes under a
+non-commercial license in three repositories: KrishnaswamyLab/MIOFlow
+(github.com/KrishnaswamyLab/MIOFlow), KrishnaswamyLab/cflows
+(github.com/KrishnaswamyLab/cflows) and KrishnaswamyLab/AAnet
+(github.com/KrishnaswamyLab/AAnet). THIRD_PARTY_NOTICES.md lists each file
+under its upstream repository, with the upstream license text. These files keep
+the terms under which they were first distributed until their status is settled.
 
 ------------------------------------------------------------------------
 

@@ -17,6 +17,8 @@
 [![uv](https://img.shields.io/badge/pkg-uv-2DD4BF.svg)](https://docs.astral.sh/uv/)
 [![PyPI](https://img.shields.io/badge/PyPI-manylatents-2DD4BF.svg)](https://pypi.org/project/manylatents/)
 
+<sub>Nine files ported from KrishnaswamyLab code (MIOFlow, cflows, AAnet) are Yale non-commercial, not Apache-2.0; see <a href="THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</sub>
+
 </div>
 
 ---

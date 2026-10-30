@@ -238,6 +238,29 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     `_recursive_: false` prevents Hydra from eagerly instantiating nested configs — the `Reconstruction` module handles deferred instantiation in `setup()` once `input_dim` is known from the datamodule.
 
 
+## Licensing of Yale-derived modules
+
+manylatents is Apache-2.0, but nine of its files are Yale non-commercial. They are ported
+from KrishnaswamyLab repositories (MIOFlow, cflows and AAnet), whose code Yale University
+publishes under a non-commercial license. The Apache-2.0 license does not apply to them.
+Each file starts with `# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial`.
+
+| Yale-derived file | Upstream |
+|---|---|
+| `manylatents/algorithms/lightning/mioflow.py` | KrishnaswamyLab/MIOFlow |
+| `manylatents/algorithms/lightning/networks/mioflow_net.py` | KrishnaswamyLab/MIOFlow |
+| `manylatents/algorithms/lightning/networks/gaga_net.py` | KrishnaswamyLab/MIOFlow |
+| `manylatents/configs/algorithms/lightning/mioflow.yaml` | KrishnaswamyLab/MIOFlow |
+| `manylatents/configs/algorithms/lightning/mioflow_gaga.yaml` | KrishnaswamyLab/MIOFlow |
+| `manylatents/algorithms/cflows_granger.py` | KrishnaswamyLab/cflows |
+| `manylatents/algorithms/lightning/cflows.py` | KrishnaswamyLab/cflows |
+| `manylatents/algorithms/lightning/losses/cflows.py` | KrishnaswamyLab/cflows |
+| `manylatents/algorithms/lightning/networks/aanet.py` | KrishnaswamyLab/AAnet |
+
+The core imports (`import manylatents`, `manylatents.algorithms.latent`, `manylatents.api`)
+do not load any of these modules. The upstream license texts are in
+[THIRD_PARTY_NOTICES.md](https://github.com/latent-reasoning-works/manylatents/blob/main/THIRD_PARTY_NOTICES.md).
+
 ## MIOFlow encoders and checkpoints
 
 MIOFlow accepts an optional `encoder` Hydra config, like Reconstruction's

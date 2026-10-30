@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 """Granger-causality gene regulatory network (GRN) estimator.
 
 Ported from ``KrishnaswamyLab/cflows`` (``src/granger.py`` plus the signed-score

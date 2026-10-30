@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
 """GAGA network components: Preprocessor, GAGANetwork, and loss functions.
 
 GAGA (Geometry-Aware Generative Autoencoder) learns a low-dimensional latent
