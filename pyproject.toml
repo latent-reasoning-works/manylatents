@@ -40,12 +40,14 @@ dependencies = [
     "umap-learn>=0.5",
     "opentsne>=1.0",
     "multiscale-phate",
-    # NOTE: aa.py is written against the 0.11 `method`/`method_kwargs` API, but
-    # `archetypes>=0.11` is UNSATISFIABLE under the `scipy<1.15` bound above (uv: "your
-    # project's requirements are unsatisfiable"). That conflict is why the fake
-    # dependency-metadata block existed — it made an unresolvable pin look resolved by
-    # installing the package without its dependencies. Resolve the scipy bound or port
-    # aa.py to the 0.6 API; do not paper over it again.
+    # NOTE: aa.py targets the archetypes 0.6 API (`n_archetypes`, `max_iter`,
+    # `random_state`); `archetypes>=0.11` is unsatisfiable under the `scipy<1.15` bound
+    # above. aa.py adds two shims in a private subclass of `archetypes.AA`:
+    # `_validate_data` (scikit-learn 1.6 and later removed it) and `_init_coefs`
+    # (NumPy 2.0 removed the `np.mat` that `furthest_sum` calls). It also fits in float64 and
+    # solves with its own `_nnls` (bvls on wide systems, nnls with a bvls fallback otherwise),
+    # because scipy 1.14 `nnls` stops at its iteration cap. Do not reintroduce a
+    # fake dependency-metadata block to pin a newer archetypes.
     "archetypes>=0.6",
     # Graph tools (used by phate/graphtools)
     "graphtools>=2.0",

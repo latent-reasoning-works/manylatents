@@ -67,6 +67,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Reeb graph run on more than 5000 rows now uses a 5000-row sample by default (it used all
   rows, or ran out of memory). Pass `max_N=None` for the old behaviour.
 
+### Fixed
+- `ArchetypalAnalysisModule` (`algorithms/latent=aa`) fits again under the locked archetypes 0.6.2,
+  scikit-learn 1.8 and NumPy 2. It passed the archetypes 0.11 keywords `method` and `method_kwargs`,
+  so every fit raised `TypeError`. It now passes `n_archetypes`, `max_iter` and `random_state` to a
+  private subclass of `archetypes.AA` that restores `_validate_data` (removed in scikit-learn 1.6)
+  and avoids the `np.mat` call (removed in NumPy 2.0) in the furthest-sum start. `method` is still
+  accepted and is not forwarded.
+- `ArchetypalAnalysisModule` no longer raises `RuntimeError: Maximum number of iterations reached.`
+  from scipy `nnls` (for example `data=swissroll` with 3 archetypes on float32 input, or 8
+  archetypes on any input). It fits in float64, and its solver sends each wide subproblem (more
+  unknowns than equations, as in the archetype step) to `scipy.optimize.lsq_linear(method="bvls")`,
+  which solves the same problem; other subproblems use `nnls`, falling back to `bvls` at its
+  iteration cap. Where plain `nnls` converged, the fit is unchanged to within round-off.
+
 ## [0.1.8] - 2026-10-01
 
 ### Added
