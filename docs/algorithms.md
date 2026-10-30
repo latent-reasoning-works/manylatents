@@ -27,6 +27,27 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
 
     {{ algorithm_table("latent") }}
 
+    ### Reeb graph: cell cap
+
+    `ReebGraphModule` builds an (N, N) distance matrix and a Vietoris-Rips complex, so its
+    memory grows as N². `max_N` (default `5000`; `None` disables it) caps the number of rows
+    the graph is built on. When N > `max_N`, `fit` draws `max_N` rows with
+    `random.Random(random_state).sample(range(N), k=max_N)`. This is the procedure that
+    `PersistentHomology` uses, and the global `random` state is not changed. The seed is the
+    existing `random_state`, which the Hydra configs set to `${seed}`.
+
+    The lens, the distance matrix, the Reeb graph, `node_coordinates` and
+    `structural_summary` come from the sampled rows only. The membership output still has
+    one row per input row: each row that was not sampled copies the membership row of its
+    nearest sampled row (Euclidean distance in input space), and each sampled row keeps its
+    own. `extra_outputs()["subsample_indices"]` holds the sampled row indices (1-D `int64`,
+    in draw order; `arange(N)` when no sampling happened). For N ≤ `max_N` the result is the
+    same as without a cap.
+
+    The generic `graph` output turns the Reeb `adjacency()` and `node_coordinates` into
+    `edges`, `edge_weights`, `node_ids` and `node_coordinates`. `SaveOutputs` with
+    `save_format: csv` writes it as nodes and edges CSV files (see Callbacks).
+
     ### FoundationEncoder Pattern
 
     Frozen pretrained models also use LatentModule — `fit()` is a no-op and `transform()` wraps the model's forward pass. This is a usage convention, not a separate class. Implementations live in `manylatents-omics/manylatents/dogma/encoders/` (Evo2, ESM3, Orthrus, AlphaGenome).

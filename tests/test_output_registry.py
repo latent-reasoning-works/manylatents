@@ -20,6 +20,7 @@ from manylatents.outputs import (
     collect_outputs,
     collect_registered_outputs,
     get_output_registry,
+    graph,
     kernel,
     list_outputs,
     trajectories,
@@ -45,7 +46,7 @@ class _MinimalModule(LatentModule):
 def test_registry_is_enumerable_without_fitting_anything():
     """The whole reason for a registry: 'what can an algorithm emit' is answerable
     from the registry, not from a fitted object."""
-    assert list_outputs() == ["adjacency", "affinity", "kernel", "trajectories"]
+    assert list_outputs() == ["adjacency", "affinity", "graph", "kernel", "trajectories"]
 
 
 def test_registry_specs_carry_their_requirements():
@@ -60,7 +61,7 @@ def test_registry_specs_carry_their_requirements():
 # ------------------------------------------------------------------- absence --
 
 
-@pytest.mark.parametrize("extractor", [trajectories, affinity, adjacency, kernel])
+@pytest.mark.parametrize("extractor", [trajectories, affinity, adjacency, graph, kernel])
 def test_extractor_is_empty_when_the_hook_is_absent(extractor):
     assert extractor(_Bare()) == {}
 
