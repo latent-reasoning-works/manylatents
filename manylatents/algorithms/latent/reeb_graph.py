@@ -8,6 +8,7 @@ from torch import Tensor
 from sklearn.metrics import pairwise_distances
 from sklearn.decomposition import PCA
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 logger = logging.getLogger(__name__)
@@ -268,6 +269,41 @@ class ReebGraphModule(LatentModule):
     random_state : int
         Seed. It also seeds the row sample of ``max_N``.
     """
+
+    # lens and max_N mirror the checks in this module; lens_k mirrors compute_knn. The Reeb and
+    # Rips construction checks no other parameter, so those carry no bounds.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": _p.unused("Unused; the output width is the number of Reeb nodes found."),
+        "n_bins": {"role": "knob", "meaning": "Number of bins over the lens range.",
+                   "more": "More Reeb nodes and branch detail.", "less": "Coarser slices; branches merge."},
+        "overlap": {"role": "knob", "meaning": "Fraction of bin width added on each side; 0 gives strict bins.",
+                    "more": "Points join more nodes.", "less": "Closer to a strict partition."},
+        "lens": {"type": "choice", "choices": ["default", "density", "pca1", "diffusion1"], "role": "knob",
+                 "meaning": "Scalar function over the points that the graph slices."},
+        "lens_k": _p.neighbours(
+            "Neighbourhood size of the density and diffusion1 lenses.",
+            "Smoother lens.", "More local, noisier lens.",
+            limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "lens_t": {"role": "knob", "meaning": "Diffusion time of the diffusion1 lens."},
+        "sparse": {"also": [None], "role": "knob",
+                   "meaning": "Sparse Rips approximation factor; None builds the exact complex."},
+        "min_rad_factor": {"role": "knob",
+                           "meaning": "Multiplier on the smallest H0 radius that sets the Rips edge length.",
+                           "more": "More Rips edges; components join.", "less": "Fewer edges; components split."},
+        "density_factor": {"role": "knob",
+                           "meaning": "Smallest kept component, as a fraction of n_points / n_bins.",
+                           "more": "Small components are dropped.", "less": "Small components are kept."},
+        "random_state": _p.seed("Seed; it also seeds the max_N row sample.", numpy=False),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces lens_k.",
+            "Smoother lens.", "More local, noisier lens.",
+            also=[None], limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "backend": _p.unused("Stored by the base class; not used.", "str") | {"also": [None]},
+        "device": _p.unused("Stored by the base class; not used.", "str") | {"also": [None]},
+        "max_N": {"min": 2, "also": [None], "role": "knob",
+                  "cost": {"time": "up", "memory": "up", "note": "the graph uses more rows"},
+                  "meaning": "Most rows the graph is built on; other rows take the nearest sampled row."},
+    }
 
     def __init__(
         self,

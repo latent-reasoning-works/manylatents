@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
 from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
@@ -32,6 +33,52 @@ def build_dense_distance_matrix(distances, neighbors) -> np.ndarray:
 
 class TSNEModule(LatentModule):
     _supports_input_metric = True
+
+    # metric mirrors openTSNE 1.0.4 (method="approx"); backend mirrors resolve_backend.
+    # perplexity: fit() replaces openTSNE's check_perplexity (perplexity > 0) with a no-op; the
+    # bound below keeps that check's meaning.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"role": "knob", "meaning": "Number of output coordinates."},
+        "random_state": _p.seed(),
+        "perplexity": {"min": 0, "min_open": True, "role": "knob",
+                       "sensible": {"lo": 5, "hi": 50, "scale": "log", "source": {
+                           "kind": "paper",
+                           "ref": "van der Maaten and Hinton 2008, Visualizing Data using t-SNE, "
+                                  "JMLR 9: typical perplexity values are between 5 and 50"}},
+                       "cost": {"time": "up", "memory": "up", "note": "3 * perplexity neighbours per point"},
+                       "meaning": "Effective number of neighbours of the input affinities.",
+                       "more": "Wider neighbourhoods; more global structure.",
+                       "less": "Narrower neighbourhoods; more local detail."},
+        "n_iter_early": _p.iterations("Iterations of the early-exaggeration phase."),
+        "n_iter_late": _p.iterations("Iterations of the main optimisation phase."),
+        "late_exaggeration": {"also": [None], "role": "knob",
+                              "meaning": "Exaggeration of attraction in the main phase; None means 1.",
+                              "more": "Tighter, more separated clusters.", "less": "Looser clusters."},
+        "dof": {"role": "knob", "meaning": "Degrees of freedom of the Student-t output kernel.",
+                "more": "Lighter tails; clusters merge.", "less": "Heavier tails; finer separation."},
+        "learning_rate": {"also": ["auto"], "role": "knob",
+                          "meaning": "Gradient step size; 'auto' uses n_samples / exaggeration."},
+        "metric": {"type": "choice", "choices": _p.OPENTSNE_METRICS, "role": "knob",
+                   "meaning": "Distance between input rows for the neighbour search."},
+        # _get_tsne_initialization
+        "initialization": {"type": "choice", "choices": ["pca", "random", "spectral", "rescale", "jitter"],
+                           "role": "knob", "meaning": "How the starting embedding is built."},
+        "fit_fraction": _p.fit_fraction(),
+        "backend": _p.backend(["sklearn", "torchdr", "auto"],
+                              "Implementation; None or 'sklearn' uses openTSNE."),
+        "device": _p.device(),
+        "neighborhood_size": {"min": 1, "also": [None], "role": "knob",
+                              "sensible": {"lo": 5, "hi": 50, "scale": "log", "source": {
+                                  "kind": "paper",
+                                  "ref": "van der Maaten and Hinton 2008, Visualizing Data using t-SNE, "
+                                         "JMLR 9: typical perplexity values are between 5 and 50"}},
+                              "cost": {"time": "up", "memory": "up", "note": "3 * perplexity neighbours per point"},
+                              "meaning": "Shared neighbour count; when set it replaces perplexity.",
+                              "more": "Wider neighbourhoods; more global structure.",
+                              "less": "Narrower neighbourhoods; more local detail."},
+        "input_metric": {"type": "choice", "choices": _p.OPENTSNE_METRICS, "also": [None], "role": "knob",
+                         "meaning": "Shared input metric; when set it replaces metric."},
+    }
 
     def __init__(
         self,

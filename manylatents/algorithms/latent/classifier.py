@@ -14,6 +14,8 @@ import torch
 from sklearn.linear_model import LogisticRegression
 from torch import Tensor
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
@@ -32,6 +34,14 @@ class ClassifierModule(LatentModule):
     Attributes:
         _clf: Fitted sklearn classifier.
     """
+
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "model": {"type": "choice", "choices": ["logistic"], "role": "knob",  # fit() check
+                  "meaning": "Classifier type."},
+        "n_components": _p.unused("Unused; the output is always one column, P(y=1|x)."),
+        # sklearn 1.8.0 LogisticRegression: max_iter is an int >= 0.
+        "max_iter": _p.iterations("Maximum iterations of the logistic regression solver.", min=0),
+    }
 
     def __init__(
         self,

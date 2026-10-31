@@ -48,6 +48,14 @@ _MATCHERS = ("truncate", "resample")
 class TrajectoryAligner(LatentModule):
     """Re-express a source trajectory on a reference trajectory's step-grid."""
 
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "matcher": {"type": "choice", "choices": list(_MATCHERS), "role": "knob",  # __init__ check
+                    "meaning": "Truncate to the shorter run, or resample to the reference grid."},
+        # __init__ raises NotImplementedError for any mapper but None.
+        "mapper": {"type": "choice", "choices": [], "also": [None], "role": "infra",
+                   "meaning": "Reserved cross-model feature map; only None is accepted."},
+    }
+
     def __init__(self, matcher: str = "truncate", mapper: str | None = None, **kwargs):
         super().__init__(**kwargs)
         if matcher not in _MATCHERS:

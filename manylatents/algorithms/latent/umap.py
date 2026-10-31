@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
 from ...utils.backend import resolve_backend, resolve_device, torchdr_knn_to_dense
@@ -13,6 +14,57 @@ from ...utils.kwargs import route_kwargs
 
 class UMAPModule(LatentModule):
     _supports_input_metric = True
+
+    # Bounds mirror umap-learn 0.5.11 UMAP._validate_parameters; backend mirrors resolve_backend.
+    _N_NEIGHBORS_DOCS = {  # noqa: RUF012 - read-only
+        "lo": 2, "hi": 100, "scale": "log",
+        "source": {"kind": "docs",
+                   "ref": "umap-learn 0.5.11 UMAP docstring, n_neighbors: "
+                          "'In general values should be in the range 2 to 100.'"},
+    }
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"min": 1, "role": "knob", "meaning": "Number of output coordinates."},
+        "random_state": _p.seed("Seed; an int also makes umap-learn run on one thread."),
+        # umap-learn truncates n_neighbors >= n_samples to n_samples - 1 (a warning).
+        "n_neighbors": _p.neighbours(
+            "Size of the local neighbourhood of the fuzzy graph.",
+            "More global structure; local detail blurs.", "More local detail; the graph can fragment.",
+            min=2, sensible=_N_NEIGHBORS_DOCS, limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        # min_dist <= spread, and this module leaves spread at its default 1.0.
+        "min_dist": {"min": 0, "max": 1.0, "role": "knob",
+                     "meaning": "Smallest distance between embedded points.",
+                     "more": "Points spread out; looser clusters.", "less": "Points pack tightly."},
+        "metric": {"type": "choice", "choices": _p.UMAP_METRICS, "role": "knob",
+                   "meaning": "Distance between input rows."},
+        "n_epochs": _p.iterations("Optimisation epochs; None picks 200 or 500 by dataset size.",
+                                  min=0, also=[None]),
+        "learning_rate": {"min": 0, "role": "knob", "meaning": "Initial step size of the layout optimisation.",
+                          "more": "Larger steps; can be unstable.", "less": "Smaller steps; slower."},
+        "fit_fraction": _p.fit_fraction(),
+        "negative_sample_rate": {"min": 0, "also": [None], "role": "knob",
+                                 "cost": {"time": "up", "memory": "none", "note": "more negative samples per edge"},
+                                 "meaning": "Negative samples per positive edge; None keeps umap-learn's 5.",
+                                 "more": "Stronger repulsion.", "less": "Weaker repulsion."},
+        "repulsion_strength": {"min": 0, "also": [None], "role": "knob",
+                               "meaning": "Weight of negative samples; None keeps umap-learn's 1.0.",
+                               "more": "Clusters spread.", "less": "Clusters compress."},
+        "init": {"type": "choice", "choices": ["pca", "spectral", "random", "tswspectral"], "role": "knob",
+                 "meaning": "How the starting embedding is built; an array of start points also works."},
+        "densmap": {"role": "knob", "meaning": "Use densMAP, which also preserves local density."},
+        "dens_lambda": {"min": 0, "role": "knob", "meaning": "densMAP weight of the density term."},
+        "dens_frac": {"min": 0, "max": 1, "role": "knob", "meaning": "densMAP fraction of epochs with the density term."},
+        "dens_var_shift": {"min": 0, "role": "knob", "meaning": "densMAP regulariser of the local radius variance."},
+        "backend": _p.backend(["sklearn", "torchdr", "auto"],
+                              "Implementation; None or 'sklearn' uses umap-learn."),
+        "device": _p.device(),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces n_neighbors.",
+            "More global structure; local detail blurs.", "More local detail; the graph can fragment.",
+            min=2, also=[None], sensible=_N_NEIGHBORS_DOCS,
+            limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "input_metric": {"type": "choice", "choices": _p.UMAP_METRICS, "also": [None], "role": "knob",
+                         "meaning": "Shared input metric; when set it replaces metric."},
+    }
 
     def __init__(
         self,

@@ -136,7 +136,7 @@ manyLatents has two callback systems: **embedding callbacks** for post-embedding
     | Parameter | Default | Description |
     |-----------|---------|-------------|
     | `save_dir` | Hydra output dir | Base directory for saved files |
-    | `save_format` | `"csv"` | Format: `"csv"` or `"npy"`. With `"csv"`, an outputs dict that has a `graph` key (for example a Reeb graph run) also gets `<base>_nodes.csv` (`node_id, x0..x{D-1}`), `<base>_edges.csv` (`source, target, weight`) and, when manykinds is installed (`cflows` extra), `<base>_graph.npz` (a `manykinds.SparseGraph`). These do not depend on `save_additional_outputs`. |
+    | `save_format` | `"csv"` | Format: `"csv"` or `"npy"`. With `"csv"`, an outputs dict that has a `graph` key (for example a Reeb graph run) also gets `<base>_nodes.csv` (`node_id, x0..x{D-1}`), `<base>_edges.csv` (`source, target, weight`) and, when the `graph` extra is installed (`uv add "manylatents[graph]"`), `<base>_graph.npz` (a `manykinds.SparseGraph`). These do not depend on `save_additional_outputs`. |
     | `save_metric_tables` | `false` | Save separate scalar + per-sample metric CSVs |
     | `save_additional_outputs` | `false` | Save non-embedding keys as separate files |
 

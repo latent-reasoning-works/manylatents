@@ -238,6 +238,75 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     `_recursive_: false` prevents Hydra from eagerly instantiating nested configs — the `Reconstruction` module handles deferred instantiation in `setup()` once `input_dim` is known from the datamodule.
 
 
+## Parameter declarations
+
+A parameter declaration says which values each parameter of a method accepts, in plain data
+that any program can read. A caller that offers a method's parameters reads the declaration
+instead of copying each library's checks.
+
+The format (declaration version 1) and its two checks, `check_declaration` and `check`, belong
+to manykinds, a core dependency of manylatents. The
+[manykinds documentation](https://github.com/latent-reasoning-works/manykinds/blob/main/docs/param-declarations.md)
+defines every key of a declaration and of a parameter entry, the roles `knob`, `fixed` and
+`infra`, and what each check refuses. This section says how manylatents produces its
+declarations. Every declaration that manylatents produces has `origin: manylatents` and passes
+`manykinds.params.check_declaration`.
+
+### Where the declarations of manylatents come from
+
+`legal.type` and `default` come from the constructor signature of a latent module, or from the
+composed config of a Lightning config. They are never written twice. The other keys come from a
+source:
+
+- A latent module has a class attribute `PARAMS`, with one entry per constructor parameter
+  except `self` and `**kwargs`. A comment beside an entry names the library check that its
+  bounds mirror. Shared fragments are in `manylatents.params.sources`.
+- A Lightning config `configs/algorithms/lightning/<name>.yaml` has the source file
+  `configs/algorithms/lightning/domains/<name>.yaml`. Its keys are dotted override paths: under
+  `algorithms.lightning` (for example `network.hidden_dim`, `optimizer.lr`, `loss.which`), and
+  `trainer.*` for the trainer group `trainer=default`. Every scalar of the composed config is
+  declared, except `_target_`-style keys, `datamodule`, `input_dim` (set from the data), lists,
+  interpolations and the trainer's `logger` and `callbacks`.
+
+A source entry holds only `type` (when the signature or the value does not give it), the
+bounds, `choices`, `also`, `sensible`, `ladder`, `limits`, `role`, `precomputed`, `cost` and the
+texts. It never holds `default`. A value that is not simple, such as a dict, a list of channels
+or another module, is declared `type: str` with `role: infra`.
+
+### Reading and checking
+
+```python
+from manylatents import params
+
+params.names("latent")                     # every latent method with a declaration
+params.domain("phate")["params"]["t"]      # {"legal": {"type": "int", "min": 1, "also": ["auto"], ...}, ...}
+params.domain("cflows", group="lightning")
+params.check(params.domain("phate"), {"knn": 100}, n_samples=50)
+# ['knn=100: must be <= n_samples - 2 (n_samples=50)']
+```
+
+| Function | Returns |
+|---|---|
+| `domain(name, group="latent")` | the declaration of one method. A latent name resolves through the registry, then through a config `algorithms/latent/<name>.yaml` on the Hydra search path, extensions included. `KeyError` for an unknown name; `ValueError` for a class without `PARAMS`. |
+| `names(group="latent")` | every method name of the group that has a declaration, sorted |
+| `check_declaration`, `check` | re-exported from `manykinds.params` unchanged (the same objects), so a caller of manylatents needs one import |
+
+Reading a Lightning declaration composes the config with Hydra and imports no Lightning module.
+`check` is for callers; each library keeps its own checks.
+
+### Command line
+
+| Command | Output | Exit |
+|---|---|---|
+| `python -m manylatents.params show NAME [--group G]` | the declaration as JSON | 0; 2 for an unknown name |
+| `python -m manylatents.params dump DIR` | one `<group>.<name>.json` per method | 0; 2 when `DIR` cannot be written |
+
+To check a declaration file from any producer, run `python -m manykinds.params check FILE`.
+
+A new latent module must declare `PARAMS`, and a new Lightning config must have a domain file.
+`tests/test_param_declarations.py` fails otherwise.
+
+
 ## Licensing of Yale-derived modules
 
 manylatents is Apache-2.0, but nine of its files are Yale non-commercial. They are ported

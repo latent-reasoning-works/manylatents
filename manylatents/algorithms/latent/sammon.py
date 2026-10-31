@@ -29,6 +29,7 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.decomposition import PCA
 
 from .latent_module_base import LatentModule, _to_numpy, _to_output
+from manylatents.params import sources as _p
 
 
 class SammonMapping:
@@ -151,6 +152,21 @@ class SammonMapping:
 
 class SammonModule(LatentModule):
     """LatentModule wrapper around Sammon mapping."""
+
+    # distance_metric mirrors scipy pdist (SammonMapping computes the input distances with pdist).
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"min": 1, "role": "knob", "meaning": "Dimension of the embedding."},
+        "random_state": _p.seed(),
+        "distance_metric": {"type": "choice", "choices": _p.PDIST_METRICS, "role": "knob",
+                            "meaning": "Distance between input rows (scipy pdist metric)."},
+        "max_iter": _p.iterations("Maximum iterations of the Sammon stress minimisation."),
+        "tol": _p.tolerance("Stop when the relative change of the stress falls below this."),
+        "eps": {"min": 0, "role": "infra", "meaning": "Small constant added to distances to avoid division by zero."},
+        "verbose": _p.verbose(),
+        "neighborhood_size": {**_p.unused("Sammon mapping uses all pairwise distances; no neighbourhood.", "int"), "also": [None]},
+        "backend": {**_p.unused("Sammon mapping has one backend.", "str"), "also": [None]},
+        "device": {**_p.unused("Sammon mapping runs on the CPU.", "str"), "also": [None]},
+    }
 
     def __init__(
         self,

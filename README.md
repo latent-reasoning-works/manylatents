@@ -39,10 +39,11 @@ uv add manylatents[all]        # everything
 ```
 
 <details>
-<summary>pip also works</summary>
+<summary>as a command-line tool, or for one run</summary>
 
 ```bash
-pip install manylatents
+uv tool install manylatents                                            # the manylatents command
+uv run --with manylatents manylatents algorithms/latent=pca data=swissroll   # one run, no project
 ```
 
 </details>

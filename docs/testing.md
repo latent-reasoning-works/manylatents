@@ -125,11 +125,11 @@ Testing strategy and CI pipeline for manyLatents.
     Install the extension package:
 
     ```bash
-    pip install manylatents-omics
+    uv add manylatents-omics
     # or for development
     uv add -e /path/to/manylatents-omics --no-deps
     ```
 
     ### CLI Breaks With Extension
 
-    The `manylatents.dogma` namespace is imported conditionally. If the extension has unmet dependencies, the CLI may fail. Install with all extras: `pip install manylatents-omics[all]`.
+    The `manylatents.dogma` namespace is imported conditionally. If the extension has unmet dependencies, the CLI may fail. Install with all extras: `uv add "manylatents-omics[all]"`.

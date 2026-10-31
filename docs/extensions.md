@@ -368,7 +368,7 @@ The genomics, population genetics, and single-cell extension for manyLatents.
     yourext = "manylatents.yourext_plugin:YourExtSearchPathPlugin"
     ```
 
-    When your extension is installed (`uv pip install -e .`, `uv add`, or `pip install`),
+    When your extension is installed (`uv add` or `uv pip install -e .`),
     core's `manylatents.main` will automatically discover and register your plugin at startup.
     No custom entry point needed.
 

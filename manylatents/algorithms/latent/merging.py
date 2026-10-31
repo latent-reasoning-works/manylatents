@@ -52,6 +52,8 @@ import torch
 from sklearn.decomposition import PCA, TruncatedSVD
 from torch import Tensor
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
@@ -130,6 +132,27 @@ class MergingModule(LatentModule):
     )
 
     PROJECTION_STRATEGIES = ("concat_pca", "modality_proj", "svd")
+
+    # strategy and proj_aggregation mirror _validate_init_params. Not expressed: the projection
+    # strategies (concat_pca, modality_proj, svd) need target_dim.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "embeddings": {"type": "str", "also": [None], "role": "infra",
+                       "meaning": "In-memory dict of channel name to array; None reads the datamodule."},
+        "strategy": {"type": "choice", "choices": list(STRATEGIES), "role": "knob",
+                     "meaning": "How the channel embeddings are combined into one representation."},
+        "channels": {"type": "str", "also": [None], "role": "infra",
+                     "meaning": "List of channel names to merge; None merges every channel."},
+        "weights": {"type": "str", "also": [None], "role": "infra",
+                    "meaning": "Dict of channel name to weight for weighted_sum."},
+        "normalize": {"role": "knob", "meaning": "L2-normalise each channel before merging."},
+        # sklearn 1.8.0 TruncatedSVD: n_components >= 1.
+        "target_dim": {"min": 1, "also": [None], "role": "knob",
+                       "meaning": "Output dimension of concat_pca, modality_proj and svd.",
+                       "more": "Keeps more variance.", "less": "Stronger compression."},
+        "proj_aggregation": {"type": "choice", "choices": ["concat", "mean"], "role": "knob",
+                             "meaning": "How modality_proj combines the projected channels."},
+        "n_components": _p.unused("Expected output width; replaced by the merged width.") | {"also": [None]},
+    }
 
     def __init__(
         self,
@@ -638,7 +661,7 @@ class DiffusionMerging:
         except ImportError:
             raise ImportError(
                 "ot_barycenter strategy requires POT library. "
-                "Install with: pip install POT"
+                "Install with: uv add POT"
             )
 
         weights = self._get_weights(operators)

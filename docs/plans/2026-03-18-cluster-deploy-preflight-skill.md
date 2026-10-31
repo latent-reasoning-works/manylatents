@@ -340,7 +340,7 @@ narval:
   rsync_target: "~/scratch/"
   notes: >
     Air-gapped (no internet). Must rsync data and wheels before submission.
-    pip install from local wheelhouse only.
+    Install packages from the local wheelhouse only.
   hydra_config: manylatents/configs/cluster/narval.yaml
 
 tamia:

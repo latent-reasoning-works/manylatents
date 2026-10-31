@@ -71,7 +71,7 @@ def resolve_backend(backend: str | None) -> str | None:
         if not check_torchdr_available():
             raise ImportError(
                 "TorchDR backend requested but not installed. "
-                "Install with: pip install manylatents[torchdr]"
+                "Install with: uv add 'manylatents[torchdr]'"
             )
         return "torchdr"
     if backend == "auto":

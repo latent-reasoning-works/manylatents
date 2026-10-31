@@ -1,0 +1,218 @@
+# Parameter declaration source for algorithms/lightning=mioflow.
+# Keys are dotted override paths: under algorithms.lightning, and trainer.* for the trainer
+# group trainer=default. Type and default come from the composed config. Read by
+# manylatents.params; see docs/algorithms.md, "Parameter declarations".
+
+# torch.nn.Linear: a negative size is refused.
+network.hidden_dim:
+  min: 0
+  cost: {"time": "up", "memory": "up", "note": "wider layers"}
+  role: "knob"
+  meaning: "Hidden width of the velocity-field MLP."
+  more: "More capacity."
+  less: "Less capacity."
+# torch 2.10.0 Adam: 'Invalid learning rate' for lr < 0.
+optimizer.lr:
+  min: 0
+  role: "knob"
+  meaning: "Adam learning rate of the network weights."
+  more: "Larger steps; less stable training."
+  less: "Smaller steps; slower training."
+n_local_epochs:
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Epochs of local, per-interval, pretraining; 0 or less skips it."
+n_global_epochs:
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Epochs of global, whole-trajectory, training."
+n_post_local_epochs:
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Epochs of local fine-tuning after global training."
+lambda_ot:
+  role: "knob"
+  meaning: "Weight of the optimal-transport loss."
+lambda_energy:
+  role: "knob"
+  meaning: "Weight of the velocity-energy regulariser."
+lambda_density:
+  role: "knob"
+  meaning: "Weight of the k-NN density hinge loss; 0 or less skips it."
+energy_time_steps:
+  cost: {"time": "up", "memory": "up", "note": "more ODE evaluations"}
+  role: "knob"
+  meaning: "Time points at which the energy loss is evaluated."
+sample_size:
+  type: "int"
+  also: [null]
+  cost: {"time": "up", "memory": "up", "note": "more points per loss"}
+  role: "knob"
+  meaning: "Points sampled per time point for the losses; null uses all."
+n_trajectories:
+  cost: {"time": "up", "memory": "up", "note": "more generated paths"}
+  role: "knob"
+  meaning: "Trajectories generated after training, at most the data size."
+n_bins:
+  cost: {"time": "up", "memory": "up", "note": "finer time grid"}
+  role: "knob"
+  meaning: "Time bins of each generated trajectory."
+density_top_k:
+  role: "knob"
+  meaning: "Neighbours of the density hinge loss."
+density_hinge_value:
+  role: "knob"
+  meaning: "Distance below which the density loss is zero."
+grad_clip:
+  type: "float"
+  also: [null]
+  role: "knob"
+  meaning: "Largest gradient norm; null turns clipping off."
+gaga_encoder_epochs:
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Epochs of GAGA encoder pretraining."
+gaga_decoder_epochs:
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Epochs of GAGA decoder pretraining."
+gaga_dist_weight_phase1:
+  role: "knob"
+  meaning: "Weight of the distance loss in GAGA phase 1."
+gaga_recon_weight_phase2:
+  role: "knob"
+  meaning: "Weight of the reconstruction loss in GAGA phase 2."
+# torch 2.10.0 Adam: 'Invalid learning rate' for lr < 0.
+gaga_lr:
+  min: 0
+  role: "knob"
+  meaning: "Adam learning rate of GAGA pretraining."
+# phate 2.0.0 _check_params: knn is a positive int; graphtools honours knn <= n_samples - 2.
+gaga_phate_knn:
+  min: 1
+  limits: [{"op": "le", "fact": "n_samples", "offset": -2}]
+  role: "knob"
+  meaning: "PHATE knn of the target distances of GAGA."
+# phate 2.0.0 _check_params: t is a positive int or 'auto'.
+gaga_phate_t:
+  type: "int"
+  min: 1
+  also: ["auto"]
+  role: "knob"
+  meaning: "PHATE diffusion time of the target distances; 'auto' picks the knee."
+# phate 2.0.0 _check_params: n_components is a positive int.
+gaga_phate_n_components:
+  min: 1
+  role: "knob"
+  meaning: "Dimensions of the PHATE embedding whose distances GAGA matches."
+encoder:
+  type: "str"
+  also: [null]
+  role: "infra"
+  meaning: "Optional encoder config node; null trains the flow on the raw data."
+# MIOFlow.__init__: encoder_pretraining must be 'none' or 'gaga'.
+encoder_pretraining:
+  type: "choice"
+  choices: ["none", "gaga"]
+  also: [null]
+  role: "knob"
+  meaning: "Encoder pretraining; null means gaga when use_gaga, else none."
+use_gaga:
+  role: "knob"
+  meaning: "Build a GAGA encoder from the gaga_* keys."
+# MIOFlow: encoder.latent_dim must be a positive int.
+gaga_latent_dim:
+  type: "int"
+  min: 1
+  also: [null]
+  role: "knob"
+  meaning: "GAGA bottleneck size; required when use_gaga is true."
+gaga_hidden_dims:
+  cost: {"time": "up", "memory": "up", "note": "wider layers"}
+  role: "knob"
+  meaning: "Hidden width of the use_gaga encoder."
+# Any other name silently becomes ReLU, so only these three are honoured.
+gaga_activation:
+  type: "choice"
+  choices: ["relu", "tanh", "sigmoid"]
+  role: "knob"
+  meaning: "Activation of the use_gaga encoder."
+trainer.accelerator:
+  role: "infra"
+  meaning: "Hardware the trainer runs on, such as auto, cpu, gpu or mps."
+trainer.strategy:
+  role: "infra"
+  meaning: "Distribution strategy of the trainer."
+trainer.devices:
+  also: ["auto"]
+  role: "infra"
+  meaning: "Number of devices; 'auto' lets Lightning choose."
+trainer.deterministic:
+  role: "fixed"
+  meaning: "Use deterministic algorithms, so a seed reproduces the run."
+trainer.min_epochs:
+  also: [null]
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Fewest epochs before early stopping may end training."
+# lightning 2.6.1 fit_loop: max_epochs must be >= -1.
+trainer.max_epochs:
+  min: -1
+  also: [null]
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Most epochs of training; -1 trains without an epoch limit."
+  more: "Trains longer."
+  less: "Stops sooner."
+# lightning 2.6.1 _PRECISION_INPUT: the ints, the strings and the aliases.
+trainer.precision:
+  type: "choice"
+  choices: [64, 32, 16, "transformer-engine", "transformer-engine-float16", "16-true", "16-mixed", "bf16-true", "bf16-mixed", "32-true", "64-true", "64", "32", "16", "bf16"]
+  role: "fixed"
+  meaning: "Numeric precision of training."
+# lightning 2.6.1 _determine_batch_limits: [0, 1] or a whole number above 1 (a non-whole value above 1 is refused; not expressed).
+trainer.limit_train_batches:
+  type: "float"
+  min: 0
+  cost: {"time": "up", "memory": "none", "note": "more batches per epoch"}
+  role: "knob"
+  meaning: "Training batches per epoch: a fraction in [0, 1] or a whole count."
+trainer.limit_val_batches:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "Validation batches: a fraction in [0, 1] or a whole count."
+trainer.limit_test_batches:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "Test batches: a fraction in [0, 1] or a whole count."
+trainer.val_check_interval:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "How often validation runs within an epoch."
+trainer.check_val_every_n_epoch:
+  also: [null]
+  role: "infra"
+  meaning: "Run validation every this many epochs."
+# lightning 2.6.1: an int, a float or None; clipping runs when > 0.
+trainer.gradient_clip_val:
+  type: "float"
+  also: [null]
+  role: "knob"
+  meaning: "Gradient clipping value; null turns clipping off."
+trainer.accumulate_grad_batches:
+  role: "knob"
+  meaning: "Batches whose gradients add up before each optimizer step."
+  more: "Larger effective batch."
+  less: "Smaller effective batch."
+trainer.log_every_n_steps:
+  role: "infra"
+  meaning: "Log metrics every this many steps."
+trainer.detect_anomaly:
+  role: "infra"
+  meaning: "Run autograd anomaly detection (slow)."
+trainer.fast_dev_run:
+  role: "infra"
+  meaning: "Run one batch of each loop to test the code."

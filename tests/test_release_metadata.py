@@ -19,9 +19,14 @@ def _pyproject():
 
 def test_graph_extra_names_only_manykinds():
     extras = _pyproject()["project"]["optional-dependencies"]
-    assert extras["graph"] == ["manykinds>=0.1.1"]
+    assert extras["graph"] == ["manykinds[arrays]>=0.1.2"]
     assert extras["all"] == ["manylatents[hf,torchdr,jax,omics,cflows,graph]"]
-    assert "manykinds>=0.1.1" in extras["cflows"]
+    assert "manykinds[arrays]>=0.1.2" in extras["cflows"]
+
+
+def test_manykinds_is_a_core_dependency():
+    # manylatents.params re-exports the checks of manykinds.params (standard library only).
+    assert "manykinds>=0.1.2" in _pyproject()["project"]["dependencies"]
 
 
 def test_no_split_distribution():
@@ -136,7 +141,8 @@ def test_changelog_0_1_9_names_both_changes():
     version = _versions()["pyproject"]
     if _version_tuple(version) < (0, 1, 9):
         pytest.skip(f"version {version} is below 0.1.9")
-    section = _section((ROOT / "CHANGELOG.md").read_text(), version)
+    # The 0.1.9 names live in the [0.1.9] section, whatever the current version is.
+    section = _section((ROOT / "CHANGELOG.md").read_text(), "0.1.9")
     assert missing_changelog_names(section) == []
 
 
@@ -147,3 +153,14 @@ def test_unreleased_is_empty_at_release_tag():
     if tag != f"v{version}":
         pytest.skip("not on the release tag")
     assert unreleased_bullets((ROOT / "CHANGELOG.md").read_text()) == []
+
+
+CHANGELOG_NAMES_0_1_10 = ["manylatents.params", "check_declaration", "PARAMS", "manykinds>=0.1.2"]
+
+
+def test_changelog_0_1_10_names_param_domains():
+    version = _versions()["pyproject"]
+    if _version_tuple(version) < (0, 1, 10):
+        pytest.skip(f"version {version} is below 0.1.10")
+    section = _section((ROOT / "CHANGELOG.md").read_text(), "0.1.10")
+    assert [n for n in CHANGELOG_NAMES_0_1_10 if n not in section] == []

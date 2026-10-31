@@ -3,6 +3,7 @@ from typing import Optional
 
 from sklearn.manifold import Isomap
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kwargs import route_kwargs
 
@@ -35,6 +36,37 @@ class IsomapModule(LatentModule):
     """
 
     _supports_input_metric = True
+
+    # Bounds mirror sklearn 1.8.0 Isomap._parameter_constraints unless noted.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"min": 1, "role": "knob", "meaning": "Number of output coordinates."},
+        "random_state": _p.seed("Stored seed; sklearn Isomap takes none, so the result does not use it."),
+        # NearestNeighbors.kneighbors: "Expected n_neighbors < n_samples_fit".
+        "n_neighbors": _p.neighbours(
+            "Size of the kNN graph that defines geodesic distances; None needs a radius.",
+            "Geodesics shortcut across folds; closer to linear MDS.",
+            "The graph can disconnect; geodesics follow the manifold more closely.",
+            also=[None], limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "eigen_solver": {"type": "choice", "choices": ["auto", "arpack", "dense"], "role": "infra",
+                         "meaning": "Eigen solver of the kernel PCA step."},
+        "tol": _p.tolerance("Convergence tolerance of the arpack solver; 0 lets arpack choose.", min=0),
+        "max_iter": _p.iterations("Maximum arpack iterations; None lets arpack choose.", min=1, also=[None]),
+        "path_method": {"type": "choice", "choices": ["auto", "FW", "D"], "role": "infra",
+                        "meaning": "Shortest-path algorithm: Floyd-Warshall, Dijkstra, or automatic."},
+        "neighbors_algorithm": {"type": "choice", "choices": ["auto", "brute", "kd_tree", "ball_tree"],
+                                "role": "infra", "meaning": "Nearest-neighbour search algorithm."},
+        "metric": {"type": "choice", "choices": _p.ISOMAP_METRICS, "role": "knob",
+                   "meaning": "Distance between input rows for the neighbour search."},
+        "n_jobs": _p.n_jobs(),
+        "fit_fraction": _p.fit_fraction(),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces n_neighbors.",
+            "Geodesics shortcut across folds; closer to linear MDS.",
+            "The graph can disconnect; geodesics follow the manifold more closely.",
+            also=[None], limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "input_metric": {"type": "choice", "choices": _p.ISOMAP_METRICS, "also": [None], "role": "knob",
+                         "meaning": "Shared input metric; when set it replaces metric."},
+    }
 
     def __init__(
         self,
