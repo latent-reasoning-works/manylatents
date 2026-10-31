@@ -139,7 +139,7 @@ class PHATEModule(LatentModule):
             if not check_torchdr_available():
                 raise ImportError(
                     "PHATE backend='torchdr' requested but torchdr is not installed. "
-                    "Install with: pip install manylatents[torchdr] "
+                    "Install with: uv add 'manylatents[torchdr]' "
                     "or use backend='gpu_phate'."
                 )
             if self.random_landmarking:

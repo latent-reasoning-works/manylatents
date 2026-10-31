@@ -661,7 +661,7 @@ class DiffusionMerging:
         except ImportError:
             raise ImportError(
                 "ot_barycenter strategy requires POT library. "
-                "Install with: pip install POT"
+                "Install with: uv add POT"
             )
 
         weights = self._get_weights(operators)

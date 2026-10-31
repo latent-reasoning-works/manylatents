@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `manykinds>=0.1.2` is a core dependency. manykinds 0.1.2 moved its array packages to its extra
   `arrays`, so the core gains no array package. The `graph` and `cflows` extras now require
   `manykinds[arrays]>=0.1.2` (was `manykinds>=0.1.1`).
+- Install text uses uv instead of pip: `uv add` in README.md, docs/testing.md, docs/extensions.md
+  and the import-error messages of the POT barycenter, the TorchDR backend and geosketch
+  sampling; README.md also shows `uv tool install manylatents` and `uv run --with manylatents`.
+  `tests/test_install_text.py` refuses `pip install` (other than `uv pip install`) in README.md,
+  docs/ and the string literals of the package.
 
 ## [0.1.9] - 2026-10-30
 
