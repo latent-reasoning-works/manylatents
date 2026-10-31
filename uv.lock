@@ -1124,18 +1124,20 @@ wheels = [
 
 [[package]]
 name = "manykinds"
-version = "0.1.1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
+sdist = { url = "https://files.pythonhosted.org/packages/97/04/093ccf5bff1beb186fc80f7fb9ce22e8dbb87e2adf2cf7806ff4880aadbb/manykinds-0.1.2.tar.gz", hash = "sha256:869f0bd0a744979cdcf517103c92903f4a34a2fb0b94901d4239137cdb9e5b61", size = 41745, upload-time = "2026-10-31T07:13:48.137Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/15/ad961f9d1903feda9752216c474f9e1795f5f839c04e6c811c53c42a1ad5/manykinds-0.1.2-py3-none-any.whl", hash = "sha256:e621d9caa3ed3a711effb6aafc1ac091ad6555a71e763fe1494cb78a1d4f7d76", size = 28224, upload-time = "2026-10-31T07:13:46.592Z" },
+]
+
+[package.optional-dependencies]
+arrays = [
     { name = "numba" },
     { name = "numpy" },
     { name = "sparse" },
     { name = "xarray" },
     { name = "zarr" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/74/85/8cd4d08c6a31f9c1c08ce80e78f62950709c52bceaf4d1f40f3fbf92f77d/manykinds-0.1.1.tar.gz", hash = "sha256:154e0f9a3bf008b01a3ba5b161e423d678f493d5cb582532ffe9527c18bb0de5", size = 16458, upload-time = "2026-07-15T19:02:19.001Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/e8/f6f1660e6dda86db23fcd4d060680b2f71b9a7bcbd942f9e17ac7a853158/manykinds-0.1.1-py3-none-any.whl", hash = "sha256:5efbb8874b86857dbcee5d06706c73dfdfee3285d0acb5dc68261c151eb20742", size = 15094, upload-time = "2026-07-15T19:02:17.773Z" },
 ]
 
 [[package]]
@@ -1152,6 +1154,7 @@ dependencies = [
     { name = "hydra-zen" },
     { name = "leidenalg" },
     { name = "lightning" },
+    { name = "manykinds" },
     { name = "matplotlib" },
     { name = "multiscale-phate" },
     { name = "numpy" },
@@ -1179,7 +1182,7 @@ all = [
     { name = "diffrax" },
     { name = "faiss-cpu" },
     { name = "jax" },
-    { name = "manykinds" },
+    { name = "manykinds", extra = ["arrays"] },
     { name = "manylatents-omics" },
     { name = "optax" },
     { name = "ott-jax" },
@@ -1188,7 +1191,7 @@ all = [
     { name = "transformers" },
 ]
 cflows = [
-    { name = "manykinds" },
+    { name = "manykinds", extra = ["arrays"] },
     { name = "statsmodels" },
 ]
 docs = [
@@ -1197,7 +1200,7 @@ docs = [
     { name = "mkdocs-material" },
 ]
 graph = [
-    { name = "manykinds" },
+    { name = "manykinds", extra = ["arrays"] },
 ]
 hf = [
     { name = "datasets" },
@@ -1240,8 +1243,9 @@ requires-dist = [
     { name = "jax", marker = "extra == 'jax'" },
     { name = "leidenalg", specifier = ">=0.10" },
     { name = "lightning", specifier = ">=2.5" },
-    { name = "manykinds", marker = "extra == 'cflows'", specifier = ">=0.1.1" },
-    { name = "manykinds", marker = "extra == 'graph'", specifier = ">=0.1.1" },
+    { name = "manykinds", specifier = ">=0.1.2" },
+    { name = "manykinds", extras = ["arrays"], marker = "extra == 'cflows'", specifier = ">=0.1.2" },
+    { name = "manykinds", extras = ["arrays"], marker = "extra == 'graph'", specifier = ">=0.1.2" },
     { name = "manylatents", extras = ["hf", "torchdr", "jax", "omics", "cflows", "graph"], marker = "extra == 'all'" },
     { name = "manylatents-omics", marker = "extra == 'omics'", git = "https://github.com/latent-reasoning-works/manylatents-omics.git" },
     { name = "matplotlib", specifier = ">=3.8" },

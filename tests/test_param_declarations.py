@@ -1,12 +1,10 @@
-"""Parameter declarations: the format, the generated declarations and their coverage.
+"""Parameter declarations: the declarations manylatents generates and their coverage.
 
-The format is defined by the prose in docs/algorithms.md ("Parameter declarations"), by
-``manylatents.params.check_declaration`` and by the fixtures in
-``tests/fixtures/param_declarations/``.
+The format, ``check_declaration``, ``check`` and their fixtures belong to manykinds
+(``manykinds.params``) and are tested there. These tests cover manylatents' own declarations.
 """
 from __future__ import annotations
 
-import copy
 import inspect
 import json
 import os
@@ -22,7 +20,6 @@ from manylatents.algorithms.latent import get_algorithm, list_algorithms
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 REPO = Path(__file__).resolve().parent.parent
-FIXTURES = Path(__file__).resolve().parent / "fixtures" / "param_declarations"
 LIGHTNING_CONFIGS = REPO / "manylatents" / "configs" / "algorithms" / "lightning"
 DOMAINS = LIGHTNING_CONFIGS / "domains"
 
@@ -33,127 +30,23 @@ ENTRY_KEYS = {
 
 
 # ---------------------------------------------------------------------------
-# The format: fixtures
+# The format and its checks come from manykinds
 # ---------------------------------------------------------------------------
 
-def _fixtures(kind: str) -> list[Path]:
-    root = FIXTURES / kind
-    assert root.is_dir(), root
-    files = sorted(root.glob("*.yaml"))
-    assert files, root
-    return files
+def test_one_function():
+    import manykinds.params
+
+    assert params.check_declaration is manykinds.params.check_declaration
+    assert params.check is manykinds.params.check
 
 
-def _expected_message(path: Path) -> str:
-    for line in path.read_text().splitlines():
-        if line.startswith("# expect: "):
-            return line[len("# expect: "):]
-    raise AssertionError(f"{path.name} names no expected message")
+def test_manylatents_defines_no_check_of_its_own():
+    import manykinds.params
 
-
-@pytest.mark.parametrize("path", _fixtures("valid"), ids=lambda p: p.stem)
-def test_valid_fixture_has_no_problem(path):
-    doc = yaml.safe_load(path.read_text())
-    assert params.check_declaration(doc) == []
-
-
-def test_one_valid_fixture_per_group():
-    groups = sorted(yaml.safe_load(p.read_text())["group"] for p in _fixtures("valid"))
-    assert groups == ["latent", "lightning", "tool"]
-
-
-@pytest.mark.parametrize("path", _fixtures("invalid"), ids=lambda p: p.stem)
-def test_invalid_fixture_gives_its_named_message(path):
-    doc = yaml.safe_load(path.read_text())
-    expected = _expected_message(path)
-    problems = params.check_declaration(doc)
-    assert any(expected in p for p in problems), (expected, problems)
-
-
-def test_invalid_fixtures_cover_every_rule():
-    names = {p.stem for p in _fixtures("invalid")}
-    assert {
-        "unknown_key", "missing_key", "bad_type", "default_refused", "sensible_log_lo",
-        "limit_fact", "bad_role", "empty_meaning", "bad_cost",
-    } <= names
-
-
-def test_hand_written_yaml_tool_declaration_passes():
-    text = (FIXTURES / "valid" / "tool.yaml").read_text()
-    doc = yaml.safe_load(text)
-    assert doc["origin"] != "manylatents"
-    assert params.check_declaration(doc) == []
-
-
-def _valid_doc() -> dict:
-    return yaml.safe_load((FIXTURES / "valid" / "tool.yaml").read_text())
-
-
-@pytest.mark.parametrize(
-    "mutate, expected",
-    [
-        (lambda d: d.update(schema_version=2), "schema_version: 2 is not 1"),
-        (lambda d: d.update(group="model"), "group: 'model' is not one of latent, lightning, tool"),
-        (lambda d: d.pop("origin"), "missing key 'origin'"),
-        (lambda d: d.update(extra=1), "unknown key 'extra'"),
-        (lambda d: d["params"]["min_counts"].update(ladder=[100, -1]), "params.min_counts.ladder[1]: -1 is refused by legal"),
-        (lambda d: d["params"]["min_counts"].update(
-            sensible={"lo": -5, "hi": 10, "scale": "linear", "source": {"kind": "docs", "ref": "x"}}),
-         "params.min_counts.sensible.lo: -5 is refused by legal"),
-        (lambda d: d["params"]["min_counts"].update(
-            sensible={"lo": 10, "hi": 5, "scale": "linear", "source": {"kind": "docs", "ref": "x"}}),
-         "params.min_counts.sensible: lo 10 is greater than hi 5"),
-        (lambda d: d["params"]["min_counts"].update(
-            sensible={"lo": 1, "hi": 5, "scale": "exp", "source": {"kind": "docs", "ref": "x"}}),
-         "params.min_counts.sensible.scale: 'exp' is not one of linear, log"),
-        (lambda d: d["params"]["min_counts"].update(
-            sensible={"lo": 1, "hi": 5, "scale": "linear", "source": {"kind": "guess", "ref": "x"}}),
-         "params.min_counts.sensible.source.kind: 'guess' is not one of docs, paper, measured"),
-        (lambda d: d["params"]["min_counts"].update(precomputed=True),
-         "params.min_counts.precomputed: precomputed is true but role is 'knob', not 'fixed'"),
-        (lambda d: d["params"]["min_counts"].update(meaning="x" * 121),
-         "params.min_counts.meaning: must be 1 to 120 characters"),
-        (lambda d: d["params"]["min_counts"].update(more=""),
-         "params.min_counts.more: must be null or 1 to 120 characters"),
-        (lambda d: d["params"]["min_counts"].update(cost={"time": "sideways", "memory": "none", "note": None}),
-         "params.min_counts.cost.time: 'sideways' is not one of up, down, none"),
-        (lambda d: d["params"]["min_counts"].update(cost={"time": "up", "memory": "slow", "note": None}),
-         "params.min_counts.cost.memory: 'slow' is not one of up, down, none"),
-        (lambda d: d["params"]["min_counts"].update(cost={"time": "up", "memory": "up"}),
-         "params.min_counts.cost.note: missing key 'note'"),
-        (lambda d: d["params"]["min_counts"].update(cost={"time": "up", "memory": "up", "note": None, "screen": "x"}),
-         "params.min_counts.cost.screen: unknown key 'screen'"),
-        (lambda d: d["params"]["min_counts"]["limits"].append({"op": "ge", "fact": "n_samples", "offset": 0}),
-         "params.min_counts.limits[0].op: 'ge' is not one of le, lt"),
-        (lambda d: d["params"]["flavor"].update(default="pearson"),
-         "params.flavor.default: 'pearson' is refused by legal"),
-    ],
-)
-def test_check_declaration_refuses(mutate, expected):
-    doc = _valid_doc()
-    mutate(doc)
-    problems = params.check_declaration(doc)
-    assert any(expected in p for p in problems), (expected, problems)
-
-
-def test_check_declaration_reports_every_problem():
-    doc = _valid_doc()
-    doc["params"]["min_counts"]["role"] = "tunable"
-    doc["params"]["flavor"]["meaning"] = ""
-    assert len(params.check_declaration(doc)) == 2
-
-
-def test_every_message_starts_with_a_dotted_field_path():
-    import re
-
-    paths = re.compile(r"^[A-Za-z_][\w]*(\.[\w]+|\[\d+\])*: ")
-    for path in _fixtures("invalid"):
-        for message in params.check_declaration(yaml.safe_load(path.read_text())):
-            assert paths.match(message), message
-
-
-def test_check_declaration_of_a_non_mapping():
-    assert params.check_declaration([]) == ["declaration: expected a mapping, got list"]
+    source = inspect.getsource(params)
+    assert "def check_declaration" not in source
+    assert "def check(" not in source
+    assert params.SCHEMA_VERSION is manykinds.params.SCHEMA_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -322,23 +215,6 @@ def test_check_refuses_illegal_and_unknown_values():
     assert any("nope" in p for p in problems)
 
 
-def test_check_does_not_read_sensible_or_ladder():
-    doc = _valid_doc()
-    doc["params"]["min_counts"]["sensible"] = {
-        "lo": 100, "hi": 500, "scale": "linear", "source": {"kind": "measured", "ref": "x"},
-    }
-    assert params.check(doc, {"min_counts": 7}) == []
-
-
-def test_check_applies_n_features_limits():
-    doc = _valid_doc()
-    doc["params"]["n_top_genes"]["role"] = "knob"
-    doc["params"]["n_top_genes"]["precomputed"] = False
-    assert params.check(doc, {"n_top_genes": 30}, n_features=30) == []
-    problems = params.check(doc, {"n_top_genes": 31}, n_features=30)
-    assert len(problems) == 1 and "n_features" in problems[0]
-
-
 # ---------------------------------------------------------------------------
 # Generated declarations: Lightning
 # ---------------------------------------------------------------------------
@@ -452,42 +328,24 @@ def test_show_unknown_name_exits_2():
     assert out.stdout == ""
 
 
-def test_check_names_the_field(tmp_path):
-    doc = _valid_doc()
-    doc["params"]["knn"] = copy.deepcopy(doc["params"]["min_counts"])
-    doc["params"]["knn"]["legal"]["min"] = 1
-    doc["params"]["knn"]["default"] = 0
-    bad = tmp_path / "bad.yaml"
-    bad.write_text(yaml.safe_dump(doc))
-    out = _cli("check", str(bad))
-    assert out.returncode == 1, out.stderr
-    result = json.loads(out.stdout)
-    assert result["ok"] is False
-    assert any(p["path"] == "params.knn.default" for p in result["problems"]), result
-    assert all(set(p) == {"path", "message"} for p in result["problems"])
-
-
-def test_check_valid_json_file_exits_0(tmp_path):
+def test_check_is_not_a_command_of_manylatents(tmp_path):
+    # A caller checks a declaration file with `python -m manykinds.params check FILE`.
     good = tmp_path / "good.json"
-    good.write_text(json.dumps(_valid_doc()))
+    good.write_text(json.dumps(params.domain("phate")))
     out = _cli("check", str(good))
-    assert out.returncode == 0, out.stderr
+    assert out.returncode == 2
+    assert "invalid choice" in out.stderr
+
+
+def test_a_shown_declaration_passes_the_manykinds_command(tmp_path):
+    path = tmp_path / "phate.json"
+    path.write_text(_cli("show", "phate").stdout)
+    out = subprocess.run(
+        [sys.executable, "-m", "manykinds.params", "check", str(path)],
+        capture_output=True, text=True, stdin=subprocess.DEVNULL, check=False,
+    )
+    assert out.returncode == 0, out.stdout + out.stderr
     assert json.loads(out.stdout) == {"ok": True, "problems": []}
-
-
-@pytest.mark.parametrize("content", [None, "{not: [valid", "- just\n- a list\n"])
-def test_check_unreadable_file_exits_2(tmp_path, content):
-    path = tmp_path / "file.yaml"
-    if content is not None:
-        path.write_text(content)
-    out = _cli("check", str(path))
-    if content is not None and content.startswith("-"):
-        # readable, but not a mapping: a problem of the document, not of the file
-        assert out.returncode == 1
-    else:
-        assert out.returncode == 2
-    result = json.loads(out.stdout)
-    assert result["ok"] is False and result["problems"]
 
 
 def test_dump_writes_one_valid_file_per_method(tmp_path):

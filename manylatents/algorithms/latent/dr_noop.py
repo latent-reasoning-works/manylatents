@@ -4,7 +4,7 @@ from manylatents.algorithms.latent.latent_module_base import LatentModule
 
 
 class NoOpModule(LatentModule):
-    PARAMS: dict = {}
+    PARAMS: dict = {}  # noqa: RUF012 - a read-only declaration source
 
     def __init__(self, **kwargs):
         super().__init__(n_components=0, init_seed=42, **kwargs)
