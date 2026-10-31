@@ -1,6 +1,6 @@
 [project]
 name = "manylatents"
-version = "0.1.9"
+version = "0.1.10"
 description = "Unified dimensionality reduction and neural network analysis framework"
 license = "Apache-2.0"
 authors = [

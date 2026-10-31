@@ -141,7 +141,8 @@ def test_changelog_0_1_9_names_both_changes():
     version = _versions()["pyproject"]
     if _version_tuple(version) < (0, 1, 9):
         pytest.skip(f"version {version} is below 0.1.9")
-    section = _section((ROOT / "CHANGELOG.md").read_text(), version)
+    # The 0.1.9 names live in the [0.1.9] section, whatever the current version is.
+    section = _section((ROOT / "CHANGELOG.md").read_text(), "0.1.9")
     assert missing_changelog_names(section) == []
 
 
@@ -152,3 +153,14 @@ def test_unreleased_is_empty_at_release_tag():
     if tag != f"v{version}":
         pytest.skip("not on the release tag")
     assert unreleased_bullets((ROOT / "CHANGELOG.md").read_text()) == []
+
+
+CHANGELOG_NAMES_0_1_10 = ["manylatents.params", "check_declaration", "PARAMS", "manykinds>=0.1.2"]
+
+
+def test_changelog_0_1_10_names_param_domains():
+    version = _versions()["pyproject"]
+    if _version_tuple(version) < (0, 1, 10):
+        pytest.skip(f"version {version} is below 0.1.10")
+    section = _section((ROOT / "CHANGELOG.md").read_text(), "0.1.10")
+    assert [n for n in CHANGELOG_NAMES_0_1_10 if n not in section] == []
