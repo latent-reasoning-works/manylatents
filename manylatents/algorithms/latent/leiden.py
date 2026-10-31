@@ -4,6 +4,8 @@ import scipy.sparse
 import torch
 from torch import Tensor
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
@@ -22,6 +24,25 @@ class LeidenModule(LatentModule):
     random_state : int
         Random seed for reproducibility.
     """
+
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": _p.unused("Unused; the output is one column of cluster labels."),
+        # leidenalg 0.11.0 RBConfigurationVertexPartition checks no bound on the resolution.
+        "resolution": {"role": "knob", "meaning": "Resolution of the RB configuration partition.",
+                       "more": "More, smaller clusters.", "less": "Fewer, larger clusters."},
+        # manylatents.utils.knn.compute_knn: 0 < k < n_samples.
+        "n_neighbors": _p.neighbours(
+            "Nearest neighbours of each point in the kNN graph.",
+            "Denser graph; clusters merge.", "Sparser graph; clusters split.",
+            limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "random_state": _p.seed("Seed of the Leiden optimiser.", numpy=False),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces n_neighbors.",
+            "Denser graph; clusters merge.", "Sparser graph; clusters split.",
+            also=[None], limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "backend": _p.unused("Stored by the base class; Leiden does not use it.", "str") | {"also": [None]},
+        "device": _p.unused("Stored by the base class; Leiden does not use it.", "str") | {"also": [None]},
+    }
 
     def __init__(
         self,

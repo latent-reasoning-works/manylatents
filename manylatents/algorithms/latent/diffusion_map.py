@@ -15,6 +15,7 @@ from torch import Tensor
 from typing import Optional, Union
 import logging
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 logger = logging.getLogger(__name__)
@@ -474,6 +475,57 @@ class DiffusionMapModule(LatentModule):
       Useful for rapid prototyping on large datasets but not recommended
       for results that must match prior graphtools-based runs.
     """
+
+    # Bounds mirror graphtools 2.1.0 (through the DiffusionMap wrapper above) unless noted.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        # No library check: the embedding is evecs[:, 1:n_components + 1], so at most
+        # n_samples - 1 columns exist.
+        "n_components": {"min": 1, "role": "knob",
+                         "limits": [{"op": "le", "fact": "n_samples", "offset": -1}],
+                         "meaning": "Number of diffusion coordinates kept."},
+        "random_state": _p.seed(),
+        # graphtools kNNGraph: knn > n_samples - 2 becomes n_samples - 2; None needs a bandwidth.
+        "knn": _p.neighbours(
+            "Number of nearest neighbours that sets each point's kernel bandwidth.",
+            "Smoother graph; small structure merges.", "Sparser graph; noise can split clusters.",
+            limits=[{"op": "le", "fact": "n_samples", "offset": -2}]),
+        # The graphtools path computes evals ** t, so a text such as 'auto' fails there; the
+        # torchdr path replaces a non-int t by 5. Only ints are declared.
+        "t": {"role": "knob",
+              "meaning": "Diffusion time: eigenvalues are raised to this power.",
+              "more": "Smoother coordinates; small eigenvalues vanish.",
+              "less": "Finer coordinates; more small-scale structure."},
+        "decay": {"also": [None], "role": "knob",
+                  "meaning": "Decay rate of the alpha-decay kernel tails; None turns alpha decay off.",
+                  "more": "Sharper kernel.", "less": "Heavier kernel tails."},
+        # graphtools base.py: n_pca < 0 raises; n_pca >= min(n_samples, n_features) turns PCA off.
+        "n_pca": {"min": 0, "also": [None], "role": "knob",
+                  "limits": [{"op": "lt", "fact": "n_samples", "offset": 0},
+                             {"op": "lt", "fact": "n_features", "offset": 0}],
+                  "cost": {"time": "up", "memory": "up", "note": "more components in the kNN search"},
+                  "meaning": "Principal components used to build the graph; None or 0 uses the raw data."},
+        "n_landmark": {"also": [None], "role": "knob",
+                       "cost": {"time": "up", "memory": "up", "note": "a larger landmark operator"},
+                       "meaning": "Landmarks of the graph; None, or at least n_samples, uses every sample."},
+        "n_jobs": _p.n_jobs(),
+        "verbose": _p.verbose(),
+        "fit_fraction": _p.fit_fraction(),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces knn.",
+            "Smoother graph; small structure merges.", "Sparser graph; noise can split clusters.",
+            also=[None], limits=[{"op": "le", "fact": "n_samples", "offset": -2}]),
+        "mode": {"type": "choice", "choices": ["embed", "cluster"], "role": "knob",  # __init__ check
+                 "meaning": "Return diffusion coordinates (embed) or k-means labels on them (cluster)."},
+        # sklearn 1.8.0 KMeans: n_clusters is an int >= 1 and at most n_samples.
+        "n_clusters": {"min": 1, "also": ["auto"], "role": "knob",
+                       "limits": [{"op": "le", "fact": "n_samples", "offset": 0}],
+                       "meaning": "Clusters in mode 'cluster'; 'auto' counts eigenvalues near 1.",
+                       "more": "More, smaller clusters.", "less": "Fewer, larger clusters."},
+        # manylatents.utils.backend.resolve_backend
+        "backend": _p.backend(["sklearn", "torchdr", "auto"],
+                              "Implementation; None or 'sklearn' uses graphtools."),
+        "device": _p.device(),
+    }
 
     def __init__(
         self,

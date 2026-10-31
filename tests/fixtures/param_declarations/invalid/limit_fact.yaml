@@ -1,0 +1,29 @@
+# Invalid: a limits fact other than n_samples or n_features.
+# expect: params.knn.limits[0].fact: 'n_genes' is not one of n_samples, n_features
+schema_version: 1
+method: example
+group: tool
+origin: an-example-lab
+params:
+  knn:
+    legal:
+      type: int
+      min: 1
+      min_open: false
+      max: null
+      max_open: false
+      choices: []
+      also: []
+    default: 5
+    sensible: null
+    ladder: null
+    limits:
+    - op: lt
+      fact: n_genes
+      offset: 0
+    role: knob
+    precomputed: false
+    cost: null
+    meaning: Number of nearest neighbours of each point.
+    more: null
+    less: null

@@ -1,0 +1,54 @@
+# A latent declaration, as manylatents.params.domain("...") returns it.
+schema_version: 1
+method: example_embedding
+group: latent
+origin: manylatents
+params:
+  knn:
+    legal: {type: int, min: 1, min_open: false, max: null, max_open: false, choices: [], also: []}
+    default: 5
+    sensible: {lo: 2, hi: 100, scale: log, source: {kind: docs, ref: "library docstring of knn"}}
+    ladder: [5, 15, 30]
+    limits: [{op: lt, fact: n_samples, offset: 0}]
+    role: knob
+    precomputed: false
+    cost: {time: up, memory: up, note: more neighbours per point}
+    meaning: Number of nearest neighbours of each point.
+    more: Smoother graph.
+    less: Sparser graph.
+  t:
+    legal: {type: int, min: 1, min_open: false, max: null, max_open: false, choices: [], also: [auto]}
+    default: auto
+    sensible: null
+    ladder: null
+    limits: []
+    role: knob
+    precomputed: false
+    cost: null
+    meaning: Diffusion time.
+    more: null
+    less: null
+  random_state:
+    legal: {type: int, min: 0, min_open: false, max: null, max_open: false, choices: [], also: [null]}
+    default: 42
+    sensible: null
+    ladder: null
+    limits: []
+    role: fixed
+    precomputed: false
+    cost: null
+    meaning: Seed of the random number generators.
+    more: null
+    less: null
+  n_jobs:
+    legal: {type: int, min: null, min_open: false, max: null, max_open: false, choices: [], also: []}
+    default: -1
+    sensible: null
+    ladder: null
+    limits: []
+    role: infra
+    precomputed: false
+    cost: null
+    meaning: Number of parallel jobs.
+    more: null
+    less: null

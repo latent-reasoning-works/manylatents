@@ -19,6 +19,7 @@ import torch
 from torch import Tensor
 from typing import Optional, Union
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 import logging
 import warnings
@@ -197,6 +198,24 @@ class MultidimensionalScaling():
 # PyTorch Lightning Module wrapper
 
 class MDSModule(LatentModule):
+    # how and solver mirror MultidimensionalScaling.embed_MDS; distance_metric mirrors scipy pdist.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        # sklearn 1.8.0 PCA (randomized) on the n x n Gram matrix, and smacof n_components >= 1.
+        "n_components": {"min": 1, "role": "knob",
+                         "limits": [{"op": "le", "fact": "n_samples", "offset": 0}],
+                         "meaning": "Dimension of the embedding."},
+        "random_state": _p.seed(),
+        "how": {"type": "choice", "choices": ["classic", "metric", "nonmetric"], "role": "knob",
+                "meaning": "MDS variant: classical, metric or non-metric; each starts from the previous."},
+        "solver": {"type": "choice", "choices": ["sgd", "smacof"], "role": "knob",
+                   "meaning": "Solver of the metric step: stochastic gradient descent or SMACOF."},
+        "distance_metric": {"type": "choice", "choices": _p.PDIST_METRICS, "role": "knob",
+                            "meaning": "Distance between input rows (scipy pdist metric)."},
+        "n_jobs": _p.n_jobs(),  # sklearn smacof: None or an int
+        "verbose": _p.verbose(),
+        "fit_fraction": _p.fit_fraction(),
+    }
+
     def __init__(
         self,
         n_components: int = 2,

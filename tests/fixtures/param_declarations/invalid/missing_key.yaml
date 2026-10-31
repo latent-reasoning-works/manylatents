@@ -1,0 +1,28 @@
+# Invalid: a missing key.
+# expect: params.knn.role: missing key 'role'
+schema_version: 1
+method: example
+group: tool
+origin: an-example-lab
+params:
+  knn:
+    legal:
+      type: int
+      min: 1
+      min_open: false
+      max: null
+      max_open: false
+      choices: []
+      also: []
+    default: 5
+    sensible: null
+    ladder: null
+    limits:
+    - op: lt
+      fact: n_samples
+      offset: 0
+    precomputed: false
+    cost: null
+    meaning: Number of nearest neighbours of each point.
+    more: null
+    less: null

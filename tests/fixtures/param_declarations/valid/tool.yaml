@@ -1,0 +1,54 @@
+# A tool declaration written by hand, with no manylatents import.
+schema_version: 1
+method: count_matrix_filter
+group: tool
+origin: an-example-lab
+params:
+  min_counts:
+    legal: {type: int, min: 0, min_open: false, max: null, max_open: false, choices: [], also: []}
+    default: 200
+    sensible: null
+    ladder: [100, 200, 500]
+    limits: []
+    role: knob
+    precomputed: false
+    cost: null
+    meaning: Smallest total count that a cell must have to be kept.
+    more: Fewer cells are kept.
+    less: More cells are kept.
+  flavor:
+    legal: {type: choice, min: null, min_open: false, max: null, max_open: false, choices: [seurat, cell_ranger], also: []}
+    default: seurat
+    sensible: null
+    ladder: null
+    limits: []
+    role: knob
+    precomputed: false
+    cost: null
+    meaning: Method that selects the variable genes.
+    more: null
+    less: null
+  n_top_genes:
+    legal: {type: int, min: 1, min_open: false, max: null, max_open: false, choices: [], also: []}
+    default: 2000
+    sensible: null
+    ladder: null
+    limits: [{op: le, fact: n_features, offset: 0}]
+    role: fixed
+    precomputed: true
+    cost: null
+    meaning: Number of variable genes, recorded from the precomputation.
+    more: null
+    less: null
+  use_gpu:
+    legal: {type: bool, min: null, min_open: false, max: null, max_open: false, choices: [], also: []}
+    default: false
+    sensible: null
+    ladder: null
+    limits: []
+    role: infra
+    precomputed: false
+    cost: null
+    meaning: Run on a GPU when one is available.
+    more: null
+    less: null

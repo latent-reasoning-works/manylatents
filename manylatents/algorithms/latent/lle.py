@@ -3,6 +3,7 @@ from typing import Optional
 
 from sklearn.manifold import LocallyLinearEmbedding
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kwargs import route_kwargs
 
@@ -42,6 +43,42 @@ class LocallyLinearModule(LatentModule):
         Other ``LocallyLinearEmbedding`` parameters. A key that sklearn does not accept
         raises ``TypeError``.
     """
+
+    # Bounds mirror sklearn 1.8.0 LocallyLinearEmbedding._parameter_constraints unless noted.
+    # Not expressed: method='hessian' needs n_neighbors > n_components * (n_components + 3) / 2.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        # sklearn: "output dimension must be less than or equal to input dimension".
+        "n_components": {"min": 1, "role": "knob",
+                         "limits": [{"op": "le", "fact": "n_features", "offset": 0}],
+                         "meaning": "Number of output coordinates."},
+        "random_state": _p.seed("Seed of the arpack eigen solver."),
+        "method": {"type": "choice", "choices": ["standard", "hessian", "modified", "ltsa"],
+                   "role": "knob", "meaning": "Variant: standard LLE, Hessian eigenmaps, modified LLE, or LTSA."},
+        # sklearn: "Expected n_neighbors < n_samples".
+        "n_neighbors": _p.neighbours(
+            "Size of each local neighbourhood.",
+            "Smoother, more global embedding; local detail blurs.",
+            "More local detail; the embedding can fragment.",
+            limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "reg": {"min": 0, "role": "knob", "meaning": "Regularisation of the local weight systems.",
+                "more": "Stabler weights; less faithful local reconstruction.",
+                "less": "More faithful weights; can be ill-conditioned."},
+        "eigen_solver": {"type": "choice", "choices": ["auto", "arpack", "dense"], "role": "infra",
+                         "meaning": "Eigen solver of the embedding step."},
+        "tol": _p.tolerance("Convergence tolerance of the arpack solver.", min=0),
+        "max_iter": _p.iterations("Maximum arpack iterations.", min=1),
+        "hessian_tol": {"min": 0, "role": "knob", "meaning": "Tolerance of Hessian eigenmapping (method 'hessian')."},
+        "modified_tol": {"min": 0, "role": "knob", "meaning": "Tolerance of modified LLE (method 'modified')."},
+        "neighbors_algorithm": {"type": "choice", "choices": ["auto", "brute", "kd_tree", "ball_tree"],
+                                "role": "infra", "meaning": "Nearest-neighbour search algorithm."},
+        "n_jobs": _p.n_jobs(),
+        "fit_fraction": _p.fit_fraction(),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces n_neighbors.",
+            "Smoother, more global embedding; local detail blurs.",
+            "More local detail; the embedding can fragment.",
+            also=[None], limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+    }
 
     def __init__(
         self,

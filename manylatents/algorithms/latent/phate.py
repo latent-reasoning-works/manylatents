@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from manylatents.params import sources as _p
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 from ...utils.kernel_utils import symmetric_diffusion_operator
 from ...utils.backend import check_torchdr_available, resolve_device
@@ -12,6 +13,60 @@ from ...utils.backend import check_torchdr_available, resolve_device
 
 class PHATEModule(LatentModule):
     _supports_input_metric = True
+
+    # Bounds mirror phate 2.0.0 PHATE._check_params unless a comment says otherwise.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"min": 1, "role": "knob", "meaning": "Number of embedding dimensions.",
+                         "cost": {"time": "up", "memory": "up", "note": "MDS solves for more axes"}},
+        "random_state": _p.seed(),
+        # graphtools 2.1.0 kNNGraph replaces knn > n_samples - 2 by n_samples - 2 (a warning),
+        # so only knn <= n_samples - 2 is honoured.
+        "knn": _p.neighbours(
+            "Number of nearest neighbours that sets each point's kernel bandwidth.",
+            "Smoother graph; small structure merges.", "Sparser graph; noise can split clusters.",
+            limits=[{"op": "le", "fact": "n_samples", "offset": -2}]),
+        "t": {"min": 1, "also": ["auto"], "role": "knob",
+              "cost": {"time": "up", "memory": "none", "note": "more powers of the operator"},
+              "meaning": "Diffusion time, the power of the diffusion operator; 'auto' picks the knee.",
+              "more": "More diffusion; smoother, more global structure.",
+              "less": "Less diffusion; finer, noisier local structure."},
+        "decay": {"min": 0, "min_open": True, "also": [None], "role": "knob",
+                  "meaning": "Decay rate of the alpha-decay kernel tails; None turns alpha decay off.",
+                  "more": "Sharper kernel; affinity drops faster past the k-th neighbour.",
+                  "less": "Heavier kernel tails; more distant points connect."},
+        "gamma": {"min": -1, "max": 1, "role": "knob",
+                  "meaning": "Informational distance: 1 is the log potential, 0 the square root."},
+        # graphtools 2.1.0 base.py turns PCA off (n_pca=None, a warning) when
+        # n_pca >= min(n_samples, n_features).
+        "n_pca": {"min": 1, "also": [None], "role": "knob",
+                  "limits": [{"op": "lt", "fact": "n_samples", "offset": 0},
+                             {"op": "lt", "fact": "n_features", "offset": 0}],
+                  "cost": {"time": "up", "memory": "up", "note": "more components in the kNN search"},
+                  "meaning": "Principal components used to build the kNN graph; None uses the raw data.",
+                  "more": "Keeps more variance.", "less": "Faster; may drop real structure."},
+        "n_landmark": {"min": 1, "also": [None], "role": "knob",
+                       "cost": {"time": "up", "memory": "up", "note": "a larger landmark operator"},
+                       "meaning": "Landmarks of the fast diffusion operator; None uses every sample.",
+                       "more": "Closer to exact PHATE.", "less": "Coarser diffusion operator."},
+        "n_jobs": _p.n_jobs(also_none=False),  # check_int(n_jobs): None is refused
+        "verbose": _p.verbose(),
+        "fit_fraction": _p.fit_fraction(),
+        "random_landmarking": {"role": "knob",
+                               "meaning": "Choose landmarks at random instead of by spectral clustering."},
+        # manylatents PHATEModule._resolve_phate_backend
+        "backend": _p.backend(["sklearn", "torchdr", "gpu_phate", "auto"],
+                              "Implementation; None or 'sklearn' is the phate library."),
+        "device": _p.device(),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces knn.",
+            "Smoother graph; small structure merges.", "Sparser graph; noise can split clusters.",
+            also=[None], limits=[{"op": "le", "fact": "n_samples", "offset": -2}]),
+        "knn_dist": {"type": "choice", "choices": _p.PHATE_DISTANCES, "role": "knob",
+                     "meaning": "Distance for the kNN graph, or how a precomputed input matrix is read."},
+        # manylatents maps "precomputed" to phate's "precomputed_distance"; others pass through.
+        "input_metric": {"type": "choice", "choices": _p.PHATE_DISTANCES, "also": [None], "role": "knob",
+                         "meaning": "Shared input metric; when set it replaces knn_dist."},
+    }
 
     def __init__(
         self,

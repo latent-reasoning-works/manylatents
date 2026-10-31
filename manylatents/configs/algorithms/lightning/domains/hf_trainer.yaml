@@ -1,0 +1,113 @@
+# Parameter declaration source for algorithms/lightning=hf_trainer.
+# Keys are dotted override paths: under algorithms.lightning, and trainer.* for the trainer
+# group trainer=default. Type and default come from the composed config. Read by
+# manylatents.params; see docs/algorithms.md, "Parameter declarations".
+
+config.model_name_or_path:
+  role: "fixed"
+  meaning: "Hugging Face model identifier or local path."
+# torch 2.10.0 AdamW: 'Invalid learning rate' for lr < 0.
+config.learning_rate:
+  min: 0
+  role: "knob"
+  meaning: "AdamW learning rate."
+  more: "Larger steps."
+  less: "Smaller steps."
+# torch 2.10.0 AdamW: 'Invalid weight_decay value' for < 0.
+config.weight_decay:
+  min: 0
+  role: "knob"
+  meaning: "AdamW decoupled weight decay."
+config.warmup_steps:
+  role: "knob"
+  meaning: "Linear learning-rate warmup steps; 0 or less, no schedule."
+# torch 2.10.0 AdamW: 'Invalid epsilon value' for eps < 0.
+config.adam_epsilon:
+  min: 0
+  role: "knob"
+  meaning: "AdamW epsilon added to the denominator."
+config.trust_remote_code:
+  role: "infra"
+  meaning: "Allow model code from the hub to run on load."
+config.output_hidden_states:
+  role: "infra"
+  meaning: "Return the hidden states of every layer from forward."
+trainer.accelerator:
+  role: "infra"
+  meaning: "Hardware the trainer runs on, such as auto, cpu, gpu or mps."
+trainer.strategy:
+  role: "infra"
+  meaning: "Distribution strategy of the trainer."
+trainer.devices:
+  also: ["auto"]
+  role: "infra"
+  meaning: "Number of devices; 'auto' lets Lightning choose."
+trainer.deterministic:
+  role: "fixed"
+  meaning: "Use deterministic algorithms, so a seed reproduces the run."
+trainer.min_epochs:
+  also: [null]
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Fewest epochs before early stopping may end training."
+# lightning 2.6.1 fit_loop: max_epochs must be >= -1.
+trainer.max_epochs:
+  min: -1
+  also: [null]
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Most epochs of training; -1 trains without an epoch limit."
+  more: "Trains longer."
+  less: "Stops sooner."
+# lightning 2.6.1 _PRECISION_INPUT: the ints, the strings and the aliases.
+trainer.precision:
+  type: "choice"
+  choices: [64, 32, 16, "transformer-engine", "transformer-engine-float16", "16-true", "16-mixed", "bf16-true", "bf16-mixed", "32-true", "64-true", "64", "32", "16", "bf16"]
+  role: "fixed"
+  meaning: "Numeric precision of training."
+# lightning 2.6.1 _determine_batch_limits: [0, 1] or a whole number above 1 (a non-whole value above 1 is refused; not expressed).
+trainer.limit_train_batches:
+  type: "float"
+  min: 0
+  cost: {"time": "up", "memory": "none", "note": "more batches per epoch"}
+  role: "knob"
+  meaning: "Training batches per epoch: a fraction in [0, 1] or a whole count."
+trainer.limit_val_batches:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "Validation batches: a fraction in [0, 1] or a whole count."
+trainer.limit_test_batches:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "Test batches: a fraction in [0, 1] or a whole count."
+trainer.val_check_interval:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "How often validation runs within an epoch."
+trainer.check_val_every_n_epoch:
+  also: [null]
+  role: "infra"
+  meaning: "Run validation every this many epochs."
+# lightning 2.6.1: an int, a float or None; clipping runs when > 0.
+trainer.gradient_clip_val:
+  type: "float"
+  also: [null]
+  role: "knob"
+  meaning: "Gradient clipping value; null turns clipping off."
+trainer.accumulate_grad_batches:
+  role: "knob"
+  meaning: "Batches whose gradients add up before each optimizer step."
+  more: "Larger effective batch."
+  less: "Smaller effective batch."
+trainer.log_every_n_steps:
+  role: "infra"
+  meaning: "Log metrics every this many steps."
+trainer.detect_anomaly:
+  role: "infra"
+  meaning: "Run autograd anomaly detection (slow)."
+trainer.fast_dev_run:
+  role: "infra"
+  meaning: "Run one batch of each loop to test the code."

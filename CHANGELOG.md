@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Parameter declarations (`manylatents.params`): one plain-data document, version 1, that says
+  which values each parameter of a method accepts. Each entry gives `legal` (type, bounds,
+  choices, other legal values), `default`, `sensible` (a sourced range, or `null`), `ladder`,
+  `limits` that depend on `n_samples` or `n_features`, `role` (`knob`, `fixed` or `infra`),
+  `precomputed`, `cost` (`time` and `memory`) and the texts `meaning`, `more` and `less`. Type and
+  default come from the constructor signature or the composed config, never written twice.
+  Every latent module has a class attribute `PARAMS`; every Lightning config has a source file
+  `configs/algorithms/lightning/domains/<config>.yaml` keyed by override paths over the module,
+  network, loss, optimizer and trainer. The configs themselves do not change.
+- `domain(name, group)`, `names(group)`, `check_declaration(doc)` (one message per problem, each
+  starting with the dotted field path) and `check(doc, values, n_samples=, n_features=)`.
+  Reading a Lightning declaration imports no Lightning module. The format is defined in
+  docs/algorithms.md, "Parameter declarations", by `check_declaration` and by the fixtures in
+  `tests/fixtures/param_declarations/`; there is no schema file.
+- `python -m manylatents.params show NAME [--group G]`, `check FILE` and `dump DIR`, with JSON
+  output and documented exit codes.
+
 ## [0.1.9] - 2026-10-30
 
 ### Added

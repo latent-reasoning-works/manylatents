@@ -4,6 +4,8 @@ import torch
 from sklearn.decomposition import PCA
 from torch import Tensor
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 _VALID_METHODS = {'standard', 'robust_admm', 'robust_ialm', 'robust_local'}
@@ -51,6 +53,50 @@ class PCAModule(LatentModule):
     verbose : bool
         Print solver progress.
     """
+
+    # n_components mirrors sklearn 1.8.0 PCA; method and robust_method mirror the checks in
+    # this module and in manylatents.utils.robust_pca_solvers. The robust solvers check no other
+    # parameter, so the solver settings carry no bounds.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"min": 0, "role": "knob",
+                         "limits": [{"op": "le", "fact": "n_samples", "offset": 0},
+                                    {"op": "le", "fact": "n_features", "offset": 0}],
+                         "meaning": "Number of principal components kept."},
+        "random_state": _p.seed(),
+        "fit_fraction": _p.fit_fraction(),
+        "method": {"type": "choice", "choices": ["standard", "robust_admm", "robust_ialm", "robust_local"],
+                   "role": "knob",
+                   "meaning": "sklearn PCA, global robust PCA (ADMM or IALM), or local robust PCA."},
+        "lmbda": {"also": [None], "role": "knob",
+                  "meaning": "Robust PCA weight of the sparse term; None uses 1/sqrt(max(n_samples, n_features)).",
+                  "more": "Fewer entries go to the sparse (outlier) part.",
+                  "less": "More entries go to the sparse (outlier) part."},
+        "solver_max_iter": _p.iterations("Maximum iterations of the robust PCA solver."),
+        "tol": _p.tolerance("Robust PCA tolerance on the relative Frobenius error."),
+        "delta": {"also": [None], "role": "knob",
+                  "meaning": "Noise bound of stable PCP; None solves exact PCP."},
+        "mu": {"also": [None], "role": "knob",
+               "meaning": "Initial augmented Lagrangian penalty; None picks the solver's default."},
+        "mu_max": {"role": "knob", "meaning": "Upper limit of the growing penalty (robust_ialm)."},
+        "rho": {"role": "knob", "meaning": "Growth factor of the penalty per iteration (robust_ialm).",
+                "more": "Penalty grows faster; fewer iterations.", "less": "Penalty grows slower."},
+        "use_truncated_svd": {"role": "infra",
+                              "meaning": "Use a truncated SVD inside the robust PCA solver for speed."},
+        # manylatents.utils.knn.compute_knn: 0 < k < n_samples (robust_local only).
+        "n_neighbors": _p.neighbours(
+            "Neighbourhood size of robust_local.",
+            "Smoother local frames.", "More local detail and more noise.",
+            limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "robust_method": {"type": "choice", "choices": ["none", "trimmed", "mcd", "huber", "gaussian"],
+                          "role": "knob", "meaning": "Local covariance estimator of robust_local."},
+        # sklearn 1.8.0 MinCovDet: support_fraction in (0, 1].
+        "support_fraction": {"min": 0, "min_open": True, "max": 1, "role": "knob",
+                             "meaning": "Fraction of neighbours that MCD keeps (robust_method 'mcd').",
+                             "more": "Keeps more points; less robust.", "less": "Keeps fewer points; more robust."},
+        "trim_fraction": {"role": "knob",
+                          "meaning": "Fraction of farthest neighbours that 'trimmed' drops (robust_local)."},
+        "verbose": _p.verbose(),
+    }
 
     def __init__(
         self,
