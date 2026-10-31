@@ -10,6 +10,10 @@ import numpy as np
 from manylatents.metrics.registry import register_metric
 from manylatents.utils.metrics import compute_knn
 
+_SINGLE_ARRAY_NOTE = (
+    "These are CROSS-MODAL metrics: they compare two or more embeddings of the same"
+)
+
 
 def _ensure_2d(arr: np.ndarray) -> np.ndarray:
     """Ensure array is 2D, squeezing if needed."""
@@ -115,10 +119,10 @@ def CrossModalJaccard(
     """
     # Single array case
     if isinstance(embeddings, np.ndarray):
-        n = _ensure_2d(embeddings).shape[0]
-        if return_per_sample:
-            return np.ones(n)  # Self-comparison is perfect
-        return 1.0
+        raise ValueError(
+            "CrossModalJaccard compares two or more embeddings and cannot score a single "
+            "array. Pass a dict of named embeddings.\n\n    " + _SINGLE_ARRAY_NOTE
+        )
 
     # Multi-modal case
     modality_names = list(embeddings.keys())

@@ -27,6 +27,27 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
 
     {{ algorithm_table("latent") }}
 
+    ### Reeb graph: cell cap
+
+    `ReebGraphModule` builds an (N, N) distance matrix and a Vietoris-Rips complex, so its
+    memory grows as N². `max_N` (default `5000`; `None` disables it) caps the number of rows
+    the graph is built on. When N > `max_N`, `fit` draws `max_N` rows with
+    `random.Random(random_state).sample(range(N), k=max_N)`. This is the procedure that
+    `PersistentHomology` uses, and the global `random` state is not changed. The seed is the
+    existing `random_state`, which the Hydra configs set to `${seed}`.
+
+    The lens, the distance matrix, the Reeb graph, `node_coordinates` and
+    `structural_summary` come from the sampled rows only. The membership output still has
+    one row per input row: each row that was not sampled copies the membership row of its
+    nearest sampled row (Euclidean distance in input space), and each sampled row keeps its
+    own. `extra_outputs()["subsample_indices"]` holds the sampled row indices (1-D `int64`,
+    in draw order; `arange(N)` when no sampling happened). For N ≤ `max_N` the result is the
+    same as without a cap.
+
+    The generic `graph` output turns the Reeb `adjacency()` and `node_coordinates` into
+    `edges`, `edge_weights`, `node_ids` and `node_coordinates`. `SaveOutputs` with
+    `save_format: csv` writes it as nodes and edges CSV files (see Callbacks).
+
     ### FoundationEncoder Pattern
 
     Frozen pretrained models also use LatentModule — `fit()` is a no-op and `transform()` wraps the model's forward pass. This is a usage convention, not a separate class. Implementations live in `manylatents-omics/manylatents/dogma/encoders/` (Evo2, ESM3, Orthrus, AlphaGenome).
@@ -215,3 +236,77 @@ manyLatents provides two algorithm base classes. The decision rule is binary: if
     ```
 
     `_recursive_: false` prevents Hydra from eagerly instantiating nested configs — the `Reconstruction` module handles deferred instantiation in `setup()` once `input_dim` is known from the datamodule.
+
+
+## Licensing of Yale-derived modules
+
+manylatents is Apache-2.0, but nine of its files are Yale non-commercial. They are ported
+from KrishnaswamyLab repositories (MIOFlow, cflows and AAnet), whose code Yale University
+publishes under a non-commercial license. The Apache-2.0 license does not apply to them.
+Each file starts with `# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial`.
+
+| Yale-derived file | Upstream |
+|---|---|
+| `manylatents/algorithms/lightning/mioflow.py` | KrishnaswamyLab/MIOFlow |
+| `manylatents/algorithms/lightning/networks/mioflow_net.py` | KrishnaswamyLab/MIOFlow |
+| `manylatents/algorithms/lightning/networks/gaga_net.py` | KrishnaswamyLab/MIOFlow |
+| `manylatents/configs/algorithms/lightning/mioflow.yaml` | KrishnaswamyLab/MIOFlow |
+| `manylatents/configs/algorithms/lightning/mioflow_gaga.yaml` | KrishnaswamyLab/MIOFlow |
+| `manylatents/algorithms/cflows_granger.py` | KrishnaswamyLab/cflows |
+| `manylatents/algorithms/lightning/cflows.py` | KrishnaswamyLab/cflows |
+| `manylatents/algorithms/lightning/losses/cflows.py` | KrishnaswamyLab/cflows |
+| `manylatents/algorithms/lightning/networks/aanet.py` | KrishnaswamyLab/AAnet |
+
+The core imports (`import manylatents`, `manylatents.algorithms.latent`, `manylatents.api`)
+do not load any of these modules. The upstream license texts are in
+[THIRD_PARTY_NOTICES.md](https://github.com/latent-reasoning-works/manylatents/blob/main/THIRD_PARTY_NOTICES.md).
+
+## MIOFlow encoders and checkpoints
+
+MIOFlow accepts an optional `encoder` Hydra config, like Reconstruction's
+`network` config. `configure_model()` instantiates the encoder, preprocessing
+buffers, and flow once. Repeated calls retain trained weights. The encoder must
+be an `nn.Module` satisfying `HasEncode` (`networks/network.py`): `encode(x)` maps
+`(batch, ambient_dim)` to `(batch, latent_dim)`, and `latent_dim` is a positive
+integer. Configs use `input_dim` for the ambient dimension; it can be inferred
+from data, or supplied with `ambient_dim`.
+
+Decoding is optional because the flow integrates fixed latent coordinates under
+`no_grad()`. The flow optimizer includes only flow parameters. Encoder dropout
+and BatchNorm remain in evaluation mode. `encode()` returns latent endpoints;
+generated trajectories are decoded to ambient space if the encoder offers
+`decode(z)`, otherwise they remain latent.
+
+The `mioflow_gaga` catalog config selects `GAGANetwork` and
+`encoder_pretraining: gaga`. Its PHATE statistics and two-phase fitting run in
+`on_fit_start()`, after Lightning restores checkpoint state. The legacy
+`use_gaga=True` shortcut remains available. For a fixed plain autoencoder, use:
+
+```yaml
+encoder:
+  _target_: manylatents.algorithms.lightning.networks.autoencoder.Autoencoder
+  input_dim: 15
+  hidden_dims: [32, 16]
+  latent_dim: 3
+encoder_pretraining: none
+```
+
+`none` uses the supplied encoder weights with identity preprocessing; it does
+not pretrain an autoencoder. An already-trained encoder instance may also be
+passed. GAGA's pretraining routine specifically requires `GAGANetwork`; the
+minimal encoder contract does not require its reconstruction training structure.
+
+Config-based checkpoints persist resolved architecture configs, ambient/latent
+dimensions, normalization statistics, training time bounds, and encoder-stage
+completion. `MIOFlow.load_from_checkpoint(path, strict=True)` restores without a
+datamodule or fitting. A completed stage is also skipped when resuming with
+`Trainer.fit(ckpt_path=...)`; an unfinished stage is fitted when training resumes.
+For live network/encoder objects, construction metadata cannot be inferred in
+general: supply the corresponding `network=` or `encoder=` object again to
+`load_from_checkpoint`. Old PR checkpoints lack the required construction
+metadata and are not automatically migrated.
+
+Explicit batch `time` takes precedence over `labels`, then `label`; populations
+are ordered by time. `MIOFlowODEFunc` retains positional `init_seed` and makes
+`momentum_beta` keyword-only. Momentum starts from zero after reset, so its first
+velocity is `(1 - beta) * raw_velocity`, matching the reference.

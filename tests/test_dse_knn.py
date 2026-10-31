@@ -3,6 +3,28 @@ import pytest
 from sklearn.datasets import make_blobs, make_swiss_roll
 
 
+def test_dse_unspecified_k_uses_existing_default():
+    from manylatents.metrics.diffusion_spectral_entropy import DiffusionSpectralEntropy
+    from manylatents.utils.metrics import _content_key
+
+    X = np.random.default_rng(42).normal(size=(100, 3)).astype(np.float32)
+    cache = {}
+    actual = DiffusionSpectralEntropy(X, k=None, cache=cache)
+    assert cache[_content_key(X)][0] == 15
+    assert actual == pytest.approx(DiffusionSpectralEntropy(X))
+    assert actual == pytest.approx(DiffusionSpectralEntropy(X, k=15))
+
+
+@pytest.mark.parametrize("k", [0, -1, 100, 101, 1.5, True])
+def test_dse_explicit_impossible_k_still_refuses(k):
+    from manylatents.metrics.diffusion_spectral_entropy import DiffusionSpectralEntropy
+    from manylatents.utils.exceptions import MeasurementUnavailable
+
+    X = np.random.default_rng(42).normal(size=(100, 3))
+    with pytest.raises(MeasurementUnavailable, match="0 < k < n_samples"):
+        DiffusionSpectralEntropy(X, k=k)
+
+
 def test_knn_diffusion_matrix_blobs_5_eigenvalues_alpha1():
     """5 well-separated clusters at alpha=1.0 (Laplace-Beltrami) should produce
     exactly 5 persistent eigenvalues regardless of cluster size variation.

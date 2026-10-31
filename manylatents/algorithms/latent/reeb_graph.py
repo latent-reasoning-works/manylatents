@@ -1,5 +1,6 @@
 """Reeb graph approximation as a LatentModule."""
 import logging
+import random
 
 import numpy as np
 import torch
@@ -72,16 +73,31 @@ _LENS_REGISTRY = {
 # Vietoris-Rips and Reeb graph construction
 # ---------------------------------------------------------------------------
 
-def _vietoris_rips(D, min_rad_factor=1.5, max_dim=2, sparse=0.5, min_rad=None):
+def _vietoris_rips(D, min_rad_factor=1.5, max_dim=2, sparse=None, min_rad=None):
     from ripser import ripser
     import gudhi as gd
 
     if min_rad is None:
         min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
     radius = min_rad_factor * min_rad
+    # `sparse` defaults to None (exact complex), not 0.5. gudhi's sparse Rips approximation
+    # draws on an RNG this code never seeds, which was invisible while the filtration below
+    # was being consumed before use — every skeleton past the 0th came back empty regardless.
+    # Materializing the filtration exposed it: the embedding WIDTH (one column per Reeb node)
+    # varied across calls at a fixed seed in a single process — measured 12, 12, 12, 11 over
+    # four runs. A feature matrix whose column count is not a function of its inputs cannot be
+    # stacked into a results table or chained into a next step, so exactness wins over the
+    # approximation's speed here. Callers who want the approximation can pass `sparse=` and
+    # own the nondeterminism.
     rips = gd.RipsComplex(distance_matrix=D, max_edge_length=radius, sparse=sparse)
     st = rips.create_simplex_tree(max_dimension=max_dim)
-    filt = st.get_filtration()
+    # `list(...)`, not the bare generator: gudhi's get_filtration() yields once, so the first
+    # comprehension below consumed it and `one_skel` / `two_skel` were ALWAYS empty. With no
+    # 1-simplices the Reeb graph has no real edges — only bin-overlap duplicates of single
+    # points — so `structural_summary["n_branch_points"]` was a constant 0 for a path, a Y, a
+    # double bifurcation and blobs alike. Measured on the same complex: as written
+    # `zero=200 one=0 two=0`; materialized `zero=200 one=1277 two=3203`.
+    filt = list(st.get_filtration())
     zero_skel = [s[0][0] for s in filt if len(s[0]) == 1]
     one_skel = [s[0] for s in filt if len(s[0]) == 2]
     two_skel = [s[0] for s in filt if len(s[0]) == 3]
@@ -231,12 +247,26 @@ class ReebGraphModule(LatentModule):
         Neighbourhood size for density / diffusion lenses.
     lens_t : int
         Diffusion time for the diffusion1 lens.
-    sparse : float
-        Sparsity parameter for the Vietoris-Rips complex.
+    sparse : float or None
+        Sparsity parameter for the Vietoris-Rips complex. ``None`` (default) builds the exact
+        complex; a float invokes gudhi's unseeded sparse approximation, which makes the output
+        width nondeterministic.
     min_rad_factor : float
         Multiplier on the minimum radius for the VR complex.
     density_factor : float
         Minimum component size as a fraction of ``n_points / n_bins``.
+    max_N : int or None
+        The largest number of rows that the Reeb graph is built on. When the input
+        has more rows, ``fit`` draws ``max_N`` of them with
+        ``random.Random(random_state).sample(range(N), k=max_N)``, the procedure that
+        ``PersistentHomology`` uses, without touching the global ``random`` state.
+        The lens, the distance matrix, the Rips complex and ``node_coordinates`` use
+        the sampled rows only. Each row that was not sampled gets the membership row
+        of its nearest sampled row (Euclidean, input space), so ``fit_transform``
+        still returns one row per input row. The drawn indices are reported as
+        ``subsample_indices``. ``None`` disables the cap. Default ``5000``.
+    random_state : int
+        Seed. It also seeds the row sample of ``max_N``.
     """
 
     def __init__(
@@ -247,15 +277,25 @@ class ReebGraphModule(LatentModule):
         lens: str = "default",
         lens_k: int = 15,
         lens_t: int = 1,
-        sparse: float = 0.5,
+        # None = exact complex. `0.5` invoked gudhi's sparse Rips approximation, whose RNG is
+        # never seeded here, which made the embedding WIDTH (one column per Reeb node) vary
+        # across calls at a fixed random_state — 12, 12, 12, 11 over four runs in one process.
+        # A feature matrix whose column count is not a function of its inputs cannot be
+        # stacked into a results table or chained into a next step. Pass `sparse=0.5` to opt
+        # back into the approximation and own the nondeterminism.
+        sparse: float | None = None,
         min_rad_factor: float = 2,
         density_factor: float = 0.0,
         random_state: int = 42,
         neighborhood_size: int | None = None,
         backend: str | None = None,
         device: str | None = None,
+        max_N: int | None = 5000,
         **kwargs,
     ):
+        # The Rips step reads the second-to-last H0 bar, so it needs two rows.
+        if max_N is not None and max_N < 2:
+            raise ValueError(f"max_N must be None or at least 2, got {max_N}")
         super().__init__(
             n_components=n_components, init_seed=random_state,
             backend=backend, device=device,
@@ -270,6 +310,8 @@ class ReebGraphModule(LatentModule):
         self.min_rad_factor = min_rad_factor
         self.density_factor = density_factor
         self.random_state = random_state
+        self.max_N = max_N
+        self.subsample_indices = None  # 1-D int64 row indices the graph was built on
 
         self._reeb_graph = None
         self._membership = None  # (N, M) binary membership matrix
@@ -306,12 +348,27 @@ class ReebGraphModule(LatentModule):
         import networkx as nx
 
         x_np = _to_numpy(x)
+        n = x_np.shape[0]
+
+        # Cell cap: the same draw as PersistentHomology, on a local Random instance.
+        subsampled = self.max_N is not None and n > self.max_N
+        if subsampled:
+            subsample_indices = np.array(
+                random.Random(self.random_state).sample(range(n), k=self.max_N),
+                dtype=np.int64,
+            )
+            logger.info(f"ReebGraphModule: subsampled {n} → {self.max_N}")
+            x_sub = x_np[subsample_indices]
+        else:
+            subsample_indices = np.arange(n, dtype=np.int64)
+            x_sub = x_np
+        self.subsample_indices = subsample_indices
 
         # Compute lens function
-        function = self._compute_lens(x_np)
+        function = self._compute_lens(x_sub)
 
         # Build distance matrix and VR complex
-        D = pairwise_distances(x_np)
+        D = pairwise_distances(x_sub)
         min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
         _, skeleta = _vietoris_rips(
             D, min_rad_factor=self.min_rad_factor,
@@ -326,6 +383,19 @@ class ReebGraphModule(LatentModule):
         )
 
         self._reeb_graph = G
+        if subsampled:
+            # (max_N, M) -> (N, M): each row takes its nearest sampled row's membership,
+            # then each sampled row is reset to its own (duplicate rows stay distinct).
+            from sklearn.neighbors import NearestNeighbors
+
+            nn_idx = (
+                NearestNeighbors(n_neighbors=1)
+                .fit(x_sub)
+                .kneighbors(x_np, return_distance=False)
+            )
+            full = membership[nn_idx[:, 0]]
+            full[subsample_indices] = membership
+            membership = full
         self._membership = membership
 
         # Build adjacency matrix (M x M, where M = number of Reeb nodes)
@@ -339,14 +409,15 @@ class ReebGraphModule(LatentModule):
             adj[node_to_idx[v], node_to_idx[u]] = 1.0
         self._adjacency = adj
 
-        # Mean coordinate of data points assigned to each Reeb node
-        d = x_np.shape[1]
+        # Mean coordinate of data points assigned to each Reeb node. The node
+        # "indices" index into x_sub, the rows the graph was built on.
+        d = x_sub.shape[1]
         coords = np.zeros((m, d), dtype=np.float64)
         for node_id in node_list:
             idx = node_to_idx[node_id]
             pt_indices = G.nodes[node_id].get("indices", [])
             if len(pt_indices) > 0:
-                coords[idx] = x_np[pt_indices].mean(axis=0)
+                coords[idx] = x_sub[pt_indices].mean(axis=0)
         self.node_coordinates = coords
         # Also store as pos on the networkx graph for convenience
         nx.set_node_attributes(
@@ -355,6 +426,7 @@ class ReebGraphModule(LatentModule):
 
         self.structural_summary = _structural_summary(G)
         self._is_fitted = True
+        self._remember_fit_input(x)
 
         logger.info(
             f"ReebGraphModule(lens={self.lens}, overlap={self.overlap}): "
@@ -364,9 +436,21 @@ class ReebGraphModule(LatentModule):
         )
 
     def transform(self, x):
-        """Return (N, M) binary membership matrix. Matches input type."""
+        """Return the (N, M) binary membership matrix for the FITTED rows.
+
+        Transductive: a Reeb node is a connected component of the fit-time graph, so there is
+        no assignment for unseen points. This previously returned `self._membership` whatever
+        `x` was — including a shorter array, which produced fit-row-count output paired with
+        the caller's rows. Measured on gaussian_blob through `run_experiment`: AMI against
+        ground truth -0.0098, no error, plausible shape.
+        """
         if not self._is_fitted:
             raise RuntimeError("ReebGraphModule is not fitted. Call fit() first.")
+        if not self._same_as_fit_input(x):
+            raise NotImplementedError(
+                "ReebGraphModule is transductive: Reeb-node membership is defined only for "
+                "the rows it was fitted on. Call fit_transform(x) instead."
+            )
         return _to_output(self._membership, x)
 
     def adjacency(self, ignore_diagonal: bool = False) -> np.ndarray:
@@ -382,10 +466,17 @@ class ReebGraphModule(LatentModule):
         return A
 
     def extra_outputs(self) -> dict:
-        """Collect ReebGraph-specific outputs in addition to base outputs."""
-        extras = super().extra_outputs()
+        """Collect ReebGraph's OWN outputs — the node geometry and the summary.
+
+        No `super()`: `adjacency` is collected generically by `manylatents.outputs`,
+        and the engine merges both halves (`outputs.collect_outputs`). Calling super()
+        here would just recompute the registry pass.
+        """
+        extras: dict = {}
         if getattr(self, "node_coordinates", None) is not None:
             extras["node_coordinates"] = self.node_coordinates
         if getattr(self, "structural_summary", None) is not None:
             extras["structural_summary"] = self.structural_summary
+        if getattr(self, "subsample_indices", None) is not None:
+            extras["subsample_indices"] = self.subsample_indices
         return extras

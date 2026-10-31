@@ -16,16 +16,18 @@ class Reconstruction(LightningModule):
     'input_dim' provided via the config.
     """
     def __init__(self, datamodule, 
-                 network: DictConfig, 
+                 network: DictConfig | dict | nn.Module,
                  loss: DictConfig,
                  optimizer: DictConfig, 
                  init_seed: int = 42):
         """
         Parameters:
             datamodule: Object used to load train/val/test data.
-            network: The config of the network (e.g. AAnet or Autoencoder) to instantiate. Must include 'input_dim'.
+            network: Network config (e.g. AAnet or Autoencoder), or an existing
+                module whose identity and weights are preserved. Seed an existing
+                module at construction, e.g. Autoencoder(..., init_seed=42).
             optimizer: The config for the optimizer.
-            init_seed: Seed for deterministic weight initialization.
+            init_seed: Seed before config construction; never resets supplied weights.
         """
         super().__init__()
         self.datamodule = datamodule
@@ -34,28 +36,20 @@ class Reconstruction(LightningModule):
         self.init_seed = init_seed
         self.loss_config = loss
 
-        self.save_hyperparameters(ignore=["datamodule"])
+        self.save_hyperparameters(ignore=["datamodule", "network", "loss"])
         self.network: nn.Module | None = None
 
     def setup(self, stage=None):
         """
         Set up the network using the provided network config.
         """
-        # 1) Infer feature-dim if not provided, and write it back into the config
-        if self.network_config.input_dim is None:
-            first_batch = next(iter(self.datamodule.train_dataloader()))["data"]
-            feat_dim = first_batch.shape[1]
-            # Patch the DictConfig so that instantiate() sees a real int
-            self.network_config.input_dim = feat_dim
-        else:
-            feat_dim = self.network_config.input_dim
-
-        # 2) Now instantiate with a concrete input_dim
+        if self.network is not None:
+            return
+        if isinstance(self.network_config, (dict, DictConfig)):
+            if self.network_config.get("input_dim") is None and self.datamodule is not None:
+                first_batch = next(iter(self.datamodule.train_dataloader()))["data"]
+                self.network_config["input_dim"] = first_batch.shape[1]
         self.configure_model()
-
-        logger.info(
-            f"Reconstruction network configured with input_dim={feat_dim}"
-        )
         
 
     def configure_model(self):
@@ -63,6 +57,9 @@ class Reconstruction(LightningModule):
         Instantiate the network from the Hydra config.
         Assumes that 'input_dim' is already set in the config.
         """
+        # Lightning calls this hook for every stage, even when setup() returns early.
+        if self.network is not None:
+            return
         torch.manual_seed(self.init_seed)
 
         cfg_map = {

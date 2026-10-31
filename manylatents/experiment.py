@@ -16,7 +16,9 @@ from lightning import (
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.callbacks.embedding.base import EmbeddingCallback
+from manylatents.outputs import collect_outputs
 from manylatents.utils.data import determine_data_source
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +91,93 @@ def _load_precomputed_from_datamodule(datamodule: LightningDataModule) -> dict[s
 # ---------------------------------------------------------------------------
 
 
+def _index_ambient(value: Any, idx: list[int]) -> Any:
+    """Restrict an ambient array (or a dict of them, e.g. ``metadata``) to ``idx``."""
+    if isinstance(value, dict):
+        return {k: _index_ambient(v, idx) for k, v in value.items()}
+    try:
+        return value[idx]                      # numpy / torch fancy indexing
+    except Exception:                          # noqa: BLE001 - lists, or anything unindexable
+        try:
+            return [value[i] for i in idx]
+        except Exception:                      # noqa: BLE001
+            return value
+
+
+class _SubsetView:
+    """Attribute view over a torch ``Subset`` that keeps ambient arrays row-aligned.
+
+    Metrics receive the evaluation dataset and read ``.data`` (the ambient matrix) or
+    ``.metadata`` (population labels) to compare against the embeddings. ``random_split``
+    hands back a ``torch.utils.data.Subset``, which exposes neither, so `trustworthiness`,
+    `continuity`, `knn_preservation` and `kmeans_stratification` all raised
+    ``AttributeError: 'Subset' object has no attribute 'data'`` for every datamodule that
+    splits (torus, saddle_surface) while working fine for those running ``mode="full"``.
+
+    Slicing by ``subset.indices`` is the point: forwarding the UNDERLYING dataset instead
+    would hand N embeddings alongside M > N ambient rows, which `correlation` catches as a
+    shape mismatch but the neighbourhood metrics would silently score against the wrong rows.
+    """
+
+    def __init__(self, subset: Any) -> None:
+        self._subset = subset
+        self._base = subset.dataset
+        self._idx = list(subset.indices)
+
+    #: Row-indexed attributes we know how to realign, by kind.
+    _SLICED_ATTRS = ("data", "metadata")            # (N, …) arrays → slice rows
+    _SLICED_CALLABLES = ("get_labels", "step_trace_ids")   # callables returning (N, …)
+    _SQUARE_CALLABLES = ("get_gt_dists",)           # callables returning (N, N) → slice BOTH
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("_"):               # never recurse into our own slots
+            raise AttributeError(name)
+        value = getattr(self._base, name)
+
+        if name in self._SLICED_ATTRS:
+            return _index_ambient(value, self._idx)
+
+        if name in self._SLICED_CALLABLES or name in self._SQUARE_CALLABLES:
+            square = name in self._SQUARE_CALLABLES
+
+            def _realigned(*args: Any, **kwargs: Any) -> Any:
+                out = value(*args, **kwargs)
+                if out is None:
+                    return None
+                out = _index_ambient(out, self._idx)
+                if square and getattr(out, "ndim", 0) == 2:
+                    out = out[:, self._idx]        # a distance matrix needs both axes
+                return out
+
+            return _realigned
+
+        # Anything else is NOT realigned, and forwarding it whole is how a protective guard
+        # becomes a silent wrong answer: metrics gate on `hasattr(dataset, 'get_gt_dists')`
+        # (geodesic_distance_correlation.py:43, trajectory_geometry.py:86) and
+        # `assert hasattr(dataset, 'get_gt_dists')` (preservation.py:175). If those guards see
+        # a full-dataset attribute behind a subset view, they pass and then index N_full rows
+        # against N_subset embeddings — either an IndexError or, worse, a plausible number
+        # computed against the wrong ground truth. Raising keeps the guards protective.
+        raise AttributeError(
+            f"{name!r} is not row-realigned for a dataset Subset. Add it to "
+            "_SubsetView._SLICED_* if it is row-indexed, or read it from the base dataset "
+            "explicitly if it is not."
+        )
+
+    def __len__(self) -> int:
+        return len(self._subset)
+
+    def __getitem__(self, i: Any) -> Any:
+        return self._subset[i]
+
+
+def _unwrap_for_metrics(ds: Any) -> Any:
+    """A ``Subset`` becomes a row-aligned view; anything else passes through untouched."""
+    from torch.utils.data import Subset
+
+    return _SubsetView(ds) if isinstance(ds, Subset) else ds
+
+
 def run_experiment(
     datamodule: LightningDataModule,
     algorithm,
@@ -158,7 +247,29 @@ def run_experiment(
         results = _load_precomputed_from_datamodule(datamodule) or {}
     else:
         # ---- 4a. Unroll dataloaders to tensors ----
-        train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
+        #
+        # The FIT tensor is unrolled in dataset order, not loader order. `train_dataloader()`
+        # shuffles by default (every synthetic datamodule sets `shuffle_traindata=True` in
+        # Python, though every YAML says false — which is why the Hydra CLI never hit this and
+        # the programmatic API always did), while `test_dataloader()` does not. In the default
+        # `mode='full'` the two datasets are THE SAME OBJECT, so a LatentModule was being
+        # fitted on a permutation of the exact array it was then asked to transform. Any module
+        # whose output is defined on its fit rows returned the right shape with the wrong
+        # pairing, silently: measured on gaussian_blob, `leiden` AMI against ground truth
+        # -0.0090 versus +1.0000, `reeb_graph` -0.0098 versus +0.6877.
+        #
+        # Shuffling exists for SGD in the LightningModule branch, which still uses
+        # `train_loader` below and is unaffected. A fit/transform estimator gains nothing from
+        # it and, here, was actively broken by it.
+        train_dataset = getattr(datamodule, "train_dataset", None)
+        if isinstance(algorithm, LatentModule) and train_dataset is not None:
+            from torch.utils.data import DataLoader
+
+            ordered = DataLoader(train_dataset, batch_size=getattr(datamodule, "batch_size", 128),
+                                 shuffle=False)
+            train_tensor = torch.cat([b[field_index].cpu() for b in ordered], dim=0)
+        else:
+            train_tensor = torch.cat([b[field_index].cpu() for b in train_loader], dim=0)
         test_tensor = torch.cat([b[field_index].cpu() for b in test_loader], dim=0)
 
         # ---- 4b. Extract train labels if available ----
@@ -224,15 +335,60 @@ def run_experiment(
 
         if isinstance(algorithm, LatentModule):
             # ---- LatentModule path ----
-            algorithm.fit(train_tensor, train_labels)
-            try:
-                latents = algorithm.transform(test_tensor)
-            except NotImplementedError:
-                logger.warning(
-                    f"{type(algorithm).__name__} does not support transform(). "
-                    "Falling back to fit_transform() on test data (transductive mode)."
+            #
+            # When the fit rows and the eval rows are the SAME SET, fit once and use that
+            # embedding. `mode='full'` datamodules set `test_dataset = train_dataset`, so the
+            # old `fit(train); transform(test)` fitted on a SHUFFLED view of exactly the array
+            # it then transformed — `train_dataloader()` shuffles by default,
+            # `test_dataloader()` does not. Any module whose output is defined on its fit rows
+            # (a clusterer, an MDS embedding, a Reeb membership matrix) then returned the right
+            # shape with the wrong row pairing, silently. Measured on gaussian_blob: `leiden`
+            # AMI against ground truth -0.0090 versus +1.0000, `reeb_graph` -0.0098 versus
+            # +0.6877 — repaired by this alone, with their transform() bodies untouched.
+            #
+            # Note the YAMLs all say `shuffle_traindata: false` while the Python defaults say
+            # True, so the Hydra CLI never hit this and the programmatic API always did.
+            # `fit_fraction < 1` is deliberately excluded from the shortcut. PHATE and TSNE
+            # override `fit_transform` to embed only the fitted subset, so it returns `n_fit`
+            # rows — correct for that method, but it would then trip the row-cardinality
+            # postcondition below and turn a shipped, documented parameter into a hard raise.
+            # Those modules keep the fit-then-transform path, where `transform` extends the
+            # embedding back over all rows.
+            fits_all_rows = float(getattr(algorithm, "fit_fraction", 1.0)) >= 1.0
+            same_rows = (fits_all_rows
+                         and train_tensor.shape == test_tensor.shape
+                         and torch.equal(train_tensor, test_tensor))
+            if same_rows:
+                latents = algorithm.fit_transform(train_tensor, train_labels)
+            else:
+                algorithm.fit(train_tensor, train_labels)
+                try:
+                    latents = algorithm.transform(test_tensor)
+                except NotImplementedError:
+                    logger.warning(
+                        f"{type(algorithm).__name__} does not support transform(). "
+                        "Falling back to fit_transform() on test data (transductive mode)."
+                    )
+                    # `train_labels` belong to the fit rows, not these — pass the eval labels
+                    # if we have them. Previously nothing was passed, so a supervised
+                    # transductive module silently retrained unsupervised.
+                    fallback_y = output_labels if output_labels is not None else None
+                    if fallback_y is not None and not isinstance(fallback_y, torch.Tensor):
+                        fallback_y = torch.as_tensor(np.asarray(fallback_y))
+                    latents = algorithm.fit_transform(test_tensor, fallback_y)
+
+            # Postcondition, not a type: whatever a module returns, it must return one row per
+            # input row. This is the axis on which `reeb_graph`, `merging`, `multiscale_phate`
+            # and `diffusion_map(mode='cluster')` all fail — they return their FIT row count
+            # regardless of the array handed in. Checkable here, once, without any per-module
+            # cooperation or a declaration on the ABC.
+            n_in = (train_tensor if same_rows else test_tensor).shape[0]
+            if latents is not None and latents.shape[0] != n_in:
+                raise ValueError(
+                    f"{type(algorithm).__name__}.transform returned {latents.shape[0]} rows "
+                    f"for {n_in} input rows. A latent module must emit one row per input row; "
+                    "returning stored fit-time output silently mispairs rows with results."
                 )
-                latents = algorithm.fit_transform(test_tensor)
             logger.info(f"LatentModule embedding shape: {latents.shape}")
 
         elif isinstance(algorithm, LightningModule):
@@ -263,6 +419,29 @@ def run_experiment(
             else:
                 logger.warning(f"LightningModule {type(algorithm).__name__} has no 'encode' method — skipping")
 
+        else:
+            # NEITHER BRANCH MATCHED, and until now that was SILENT. `latents` stayed None, the
+            # `if latents is not None` guard below skipped packaging, and `run_experiment`
+            # returned a results dict with no embeddings, no error and no log line saying why —
+            # indistinguishable from an algorithm that ran and produced nothing.
+            #
+            # It is reachable: the two branches above are the only ones, so any algorithm that
+            # is not a `LatentModule` or a `LightningModule` lands here. A second GPU substrate
+            # (a JAX module, say) hits it on its first run.
+            #
+            # Refusing by NAME rather than logging: a caller who passed the wrong object gets a
+            # sentence naming what it was and what the engine accepts, at the point of failure.
+            # The capability hooks (`encode`, `extra_outputs`, `test_step`, `fit_fraction`) are
+            # all `hasattr` and so already framework-free — it is only this dispatch that is
+            # bound to two base classes. Whether that should become a protocol is a design
+            # question, deliberately not answered here.
+            raise TypeError(
+                f"run_experiment() cannot fit {type(algorithm).__name__}: it is neither a "
+                f"LatentModule (fit/transform) nor a LightningModule (trainer.fit + encode). "
+                f"Those are the two shapes the fit dispatch knows; an algorithm outside both "
+                f"produces no embeddings and cannot be packaged into a result."
+            )
+
         step_time = time.perf_counter() - t_step_start
 
         # ---- 4f. Package results ----
@@ -282,13 +461,17 @@ def run_experiment(
             if model_metrics:
                 results.setdefault("scores", {}).update(model_metrics)
 
-            # ---- 4g. Attach extra outputs from LatentModule ----
-            if isinstance(algorithm, LatentModule):
-                extras = algorithm.extra_outputs()
-                for key, val in extras.items():
-                    results[key] = val
-                    shape_info = f" shape={val.shape}" if hasattr(val, "shape") else ""
-                    logger.info(f"Extra output attached: {key}{shape_info}")
+            # ---- 4g. Attach extra outputs from any algorithm that exposes them ----
+            # Two halves, one call. The GENERIC outputs (trajectories/affinity/
+            # adjacency/kernel) come from the registry in `manylatents.outputs`, so they
+            # no longer depend on the algorithm inheriting LatentModule — that inheritance
+            # is why MIOFlow's trajectories were unreachable (#295). ALGORITHM-SPECIFIC
+            # ones still come from the algorithm's own extra_outputs() (Cflows' GRN head).
+            # The `hasattr` gate is gone because collect_outputs() handles absence.
+            for key, val in collect_outputs(algorithm).items():
+                results[key] = val
+                shape_info = f" shape={val.shape}" if hasattr(val, "shape") else ""
+                logger.info(f"Extra output attached: {key}{shape_info}")
 
             # ---- 4h. Evaluate embedding metrics ----
             if metrics is not None:
@@ -306,6 +489,7 @@ def run_experiment(
                     ds = datamodule.test_dataset
                 else:
                     ds = datamodule.train_dataset
+                ds = _unwrap_for_metrics(ds)   # random_split yields a Subset; metrics need .data
 
                 t_eval_start = time.perf_counter()
                 embedding_scores = _evaluate(
@@ -341,10 +525,13 @@ def run_experiment(
         scores = results["scores"]
         scalar_metrics = {}
         for name, val in scores.items():
-            if isinstance(val, tuple) and len(val) == 2:
+            if isinstance(val, MeasurementUnavailable):
+                wandb_run.log({f"metrics/{name}": val.to_dict()})
+            elif isinstance(val, tuple) and len(val) == 2:
                 scalar_metrics[f"metrics/{name}"] = float(val[0])
             elif np.ndim(val) == 0:
-                scalar_metrics[f"metrics/{name}"] = float(val)
+                # Keep the null policy (and other string provenance) with scores.
+                scalar_metrics[f"metrics/{name}"] = val if isinstance(val, str) else float(val)
         if scalar_metrics:
             wandb_run.log(scalar_metrics)
             logger.info(f"Auto-logged {len(scalar_metrics)} metrics to wandb: {list(scalar_metrics.keys())}")

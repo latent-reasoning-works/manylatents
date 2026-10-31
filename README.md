@@ -12,10 +12,12 @@
   one geometry, learned through many latents
 </pre>
 
-[![license](https://img.shields.io/badge/license-MIT-2DD4BF.svg)](LICENSE)
+[![license](https://img.shields.io/badge/license-Apache--2.0-2DD4BF.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.11+-2DD4BF.svg)](https://www.python.org)
 [![uv](https://img.shields.io/badge/pkg-uv-2DD4BF.svg)](https://docs.astral.sh/uv/)
 [![PyPI](https://img.shields.io/badge/PyPI-manylatents-2DD4BF.svg)](https://pypi.org/project/manylatents/)
+
+<sub>Nine files ported from KrishnaswamyLab code (MIOFlow, cflows, AAnet) are Yale non-commercial, not Apache-2.0; see <a href="THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</sub>
 
 </div>
 
@@ -168,7 +170,7 @@ If manylatents was useful in your research, a citation goes a long way:
   author    = {Valdez C{\'o}rdova, C{\'e}sar Miguel and Scicluna, Matthew and Ni, Shuang},
   year      = {2026},
   url       = {https://github.com/latent-reasoning-works/manylatents},
-  license   = {MIT}
+  license   = {Apache-2.0}
 }
 ```
 
@@ -177,5 +179,5 @@ If manylatents was useful in your research, a citation goes a long way:
 <br><br>
 
 <p align="center">
-<sub>MIT License &middot; <a href="https://github.com/latent-reasoning-works">Latent Reasoning Works</a></sub>
+<sub>Apache-2.0 License &middot; <a href="https://github.com/latent-reasoning-works">Latent Reasoning Works</a></sub>
 </p>

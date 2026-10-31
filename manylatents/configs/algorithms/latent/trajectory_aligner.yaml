@@ -1,0 +1,2 @@
+_target_: manylatents.algorithms.latent.trajectory_aligner.TrajectoryAligner
+matcher: truncate

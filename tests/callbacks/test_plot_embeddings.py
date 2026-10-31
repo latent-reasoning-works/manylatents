@@ -1,6 +1,8 @@
 """Tests for PlotEmbeddings callback."""
 
+import json
 import os
+import re
 import tempfile
 import warnings
 from typing import Optional
@@ -558,3 +560,143 @@ class TestColorByFullPipeline:
             result = callback.on_latent_end(dataset, embeddings)
 
             assert os.path.exists(result["embedding_plot_path"])
+
+
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+class TestExportPlotData:
+    """Tests for the machine-readable plot-data sidecar (issue #273)."""
+
+    @_disable_wandb
+    def test_categorical_export_writes_npz_and_json(self):
+        """Categorical run writes coords + color_values .npz and a faithful .json."""
+        labels = np.array([0, 1, 0, 2, 1, 2])
+        embeddings = {
+            "embeddings": np.array(
+                [[0, 0], [1, 1], [0.5, 0.5], [2, 2], [1.5, 1.5], [2.5, 2.5]]
+            ),
+            "label": labels,
+        }
+        dataset = MockDataset(labels)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, legend=True, enable_wandb_upload=False
+            )
+            result = callback.on_latent_end(dataset, embeddings)
+
+            # Sidecar paths registered and on disk
+            assert "embedding_data_path" in result
+            assert "embedding_data_meta_path" in result
+            npz_path = result["embedding_data_path"]
+            json_path = result["embedding_data_meta_path"]
+            assert npz_path.endswith(".npz") and os.path.exists(npz_path)
+            assert json_path.endswith(".json") and os.path.exists(json_path)
+
+            # .npz: coords (n, 2) and color_values (n,)
+            data = np.load(npz_path)
+            assert data["coords"].shape == (6, 2)
+            assert data["coords"].dtype == np.float32
+            assert data["color_values"].shape == (6,)
+
+            # .json: categorical metadata with a faithful category->hex map
+            with open(json_path) as f:
+                meta = json.load(f)
+            assert meta["is_categorical"] is True
+            assert meta["n_points"] == 6
+            assert set(meta["category_colors"].keys()) == {
+                str(v) for v in np.unique(labels)
+            }
+            for hex_color in meta["category_colors"].values():
+                assert _HEX_RE.match(hex_color), hex_color
+
+    @_disable_wandb
+    def test_export_disabled_writes_no_sidecar(self):
+        """With export_plot_data=False, no sidecar output is registered."""
+        labels = np.array([0, 1, 0, 1])
+        embeddings = {
+            "embeddings": np.array([[0, 0], [1, 1], [0.5, 0.5], [1.5, 1.5]]),
+            "label": labels,
+        }
+        dataset = MockDataset(labels)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            callback = PlotEmbeddings(
+                save_dir=tmpdir, enable_wandb_upload=False, export_plot_data=False
+            )
+            result = callback.on_latent_end(dataset, embeddings)
+
+            assert "embedding_plot_path" in result
+            assert "embedding_data_path" not in result
+            assert "embedding_data_meta_path" not in result
+
+
+class TestCategoricalColorValueConsistency:
+    """Issue #277: legend + sidecar colors must match the scatter (by value, not rank)."""
+
+    def test_sidecar_matches_scatter_for_nonuniform_labels(self):
+        """Gappy integer labels [0,1,10] -> sidecar hex == the color the scatter draws.
+
+        The categorical string-cmap scatter normalizes by value over [min,max];
+        the old rank-based mapping disagreed (label 1 -> rank 0.5 vs value 0.1).
+        """
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import Normalize
+
+        labels = np.array([0, 1, 10, 0, 1, 10])
+        cmap_name = "viridis"
+
+        # Ground truth: the color matplotlib's scatter assigns each value.
+        norm = Normalize(vmin=labels.min(), vmax=labels.max())
+        cmap = plt.colormaps.get_cmap(cmap_name)
+        expected = {str(v): mcolors.to_hex(cmap(norm(v))) for v in np.unique(labels)}
+
+        cmap_info = ColormapInfo(cmap=cmap_name, label_names=None, is_categorical=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cb = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
+            got = cb._resolve_category_colors(labels, cmap_info)
+
+        assert got == expected
+        # The rank-based bug would map label 1 -> 0.5; value-based maps it -> 0.1.
+        assert got["1"] != mcolors.to_hex(cmap(0.5))
+
+    def test_legend_and_sidecar_agree_for_nonuniform_labels(self):
+        """The same resolver feeds both, so legend swatches == sidecar hexes."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+
+        labels = np.array([0, 1, 10])
+        cmap_info = ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cb = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
+            sidecar = cb._resolve_category_colors(labels, cmap_info)
+
+            fig, ax = plt.subplots()
+            cb._add_categorical_legend_from_data(ax, labels, cmap_info)
+            legend = ax.get_legend()
+            handles = getattr(legend, "legend_handles", None) or legend.legendHandles
+            legend_colors = {
+                text.get_text(): mcolors.to_hex(handle.get_facecolor())
+                for handle, text in zip(handles, legend.get_texts())
+            }
+            plt.close(fig)
+
+        assert legend_colors == sidecar
+
+    def test_uniform_labels_unchanged(self):
+        """Evenly-spaced labels: value-normalization equals the old rank mapping."""
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+
+        labels = np.array([0, 1, 2])
+        cmap = plt.colormaps.get_cmap("viridis")
+        # rank == value for 0,1,2 over [0,2]
+        expected = {str(v): mcolors.to_hex(cmap(v / 2)) for v in labels}
+
+        cmap_info = ColormapInfo(cmap="viridis", label_names=None, is_categorical=True)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cb = PlotEmbeddings(save_dir=tmpdir, enable_wandb_upload=False)
+            assert cb._resolve_category_colors(labels, cmap_info) == expected

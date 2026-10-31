@@ -106,6 +106,7 @@ class MultiscalePHATEModule(LatentModule):
         self._n_input = x_np.shape[0]
         self.embedding_, self.clusters_, self.sizes_ = self.model.fit_transform(x_np)
         self._is_fitted = True
+        self._remember_fit_input(x)
 
     def transform(self, x):
         """
@@ -129,6 +130,15 @@ class MultiscalePHATEModule(LatentModule):
         if not self._is_fitted:
             raise RuntimeError(
                 "Multiscale PHATE model is not fitted yet. Call `fit` first."
+            )
+        # Transductive: the condensation embedding is computed per cluster at fit time and
+        # broadcast back to the fit rows, so only `x.shape[0]` was ever read — a different
+        # array of the same length silently received the fit rows' coordinates, and a shorter
+        # one received the padding branch below rather than its own embedding.
+        if not self._same_as_fit_input(x):
+            raise NotImplementedError(
+                "MultiscalePHATEModule is transductive: the condensed embedding is defined "
+                "only for the rows it was fitted on. Call fit_transform(x) instead."
             )
         n_expected = x.shape[0]
         n_emb = self.embedding_.shape[0]

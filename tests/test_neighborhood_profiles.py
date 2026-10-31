@@ -113,7 +113,7 @@ def test_full_input_hash_detects_interior_mutation():
     other[2] = [10., 0, 0]
     assert_array_equal(X[[0, -1]], other[[0, -1]])
     from manylatents.utils.knn import _content_key
-    assert _content_key(X) == _content_key(other)  # Known partial-cache collision.
+    assert _content_key(X) != _content_key(other)  # full-content key since v0.1.9 (#323): no partial-cache collision
     first = neighborhood_profiles(X, X[[0]], [0], RADII)
     second = neighborhood_profiles(other, X[[0]], [0], RADII)
     assert first['metadata']['X_sha256'] != second['metadata']['X_sha256']

@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: LicenseRef-Yale-Non-Commercial
+# See THIRD_PARTY_NOTICES.md at the repository root.
+"""MIOFlow network components: ODEFunc and loss functions.
+
+MIOFlow (Manifold Interpolating Optimal-Transport Flows) learns a Neural ODE
+velocity field over time-labeled cell populations. The ODEFunc takes [t, x] as
+input (time concatenated), unlike the existing LatentODE ODEFunc which ignores t.
+
+Reference: Huguet et al., arXiv:2206.14928 (2022)
+"""
+
+import torch
+import torch.nn as nn
+from torch import Tensor
+
+
+class MIOFlowODEFunc(nn.Module):
+    """Learned velocity field dx/dt = f(t, x) with time conditioning.
+
+    Takes [t, x] concatenated as input, producing a time-dependent flow.
+
+    Args:
+        input_dim: Spatial dimensionality of the data.
+        hidden_dim: Width of hidden layers in the MLP.
+        init_seed: Seed before creating weights. None uses the caller's RNG,
+            including the seed set by a config-building Lightning wrapper.
+        momentum_beta: Exponential-smoothing factor applied to the predicted
+            velocity, ``v_t = beta * v_{t-1} + (1 - beta) * f(t, x)``. ``0.0``
+            (default) disables smoothing and reproduces the un-smoothed
+            velocity field exactly, matching upstream mioflow 2.0's
+            ``ODEFunc.momentum_beta`` default. Call :meth:`reset_momentum`
+            before each fresh integration (``odeint`` call) since the
+            smoothing state is carried across ``forward`` calls. After reset,
+            the previous velocity is zero, so the first result is
+            ``(1 - beta) * raw_velocity``, as in the reference.
+    """
+
+    def __init__(
+        self, input_dim: int, hidden_dim: int = 64, init_seed: int | None = None,
+        *, momentum_beta: float = 0.0,
+    ):
+        super().__init__()
+        if init_seed is not None:
+            torch.manual_seed(init_seed)
+        self.input_dim = input_dim
+        self.net = nn.Sequential(
+            nn.Linear(input_dim + 1, hidden_dim),
+            nn.SiLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.SiLU(),
+            nn.Linear(hidden_dim, input_dim),
+        )
+        self.momentum_beta = momentum_beta
+        self._previous_v: Tensor | None = None
+
+    def reset_momentum(self) -> None:
+        """Clear the carried velocity state before a fresh integration."""
+        self._previous_v = None
+
+    def forward(self, t: Tensor, x: Tensor) -> Tensor:
+        t_expanded = t.expand(x.size(0), 1)
+        dxdt = self.net(torch.cat([t_expanded, x], dim=-1))
+        if self.momentum_beta > 0:
+            if self._previous_v is None or self._previous_v.shape != dxdt.shape:
+                self._previous_v = torch.zeros_like(dxdt)
+            dxdt = self.momentum_beta * self._previous_v + (1 - self.momentum_beta) * dxdt
+            self._previous_v = dxdt.detach()
+        return dxdt
+
+
+def mioflow_ot_loss(source: Tensor, target: Tensor) -> Tensor:
+    """Earth Mover Distance (2-Wasserstein) between two point clouds.
+
+    Uses POT library for exact OT computation.
+    """
+    import ot
+
+    mu = torch.tensor(ot.unif(source.size(0)), dtype=source.dtype, device=source.device)
+    nu = torch.tensor(ot.unif(target.size(0)), dtype=target.dtype, device=target.device)
+    M = torch.cdist(source, target) ** 2
+    return ot.emd2(mu, nu, M)
+
+
+def mioflow_energy_loss(model: MIOFlowODEFunc, x0: Tensor, t_seq: Tensor) -> Tensor:
+    """Penalizes large velocity magnitudes along the ODE trajectory."""
+    from torchdiffeq import odeint
+
+    if hasattr(model, "reset_momentum"):
+        model.reset_momentum()
+    trajectory = odeint(model, x0, t_seq)
+    total_energy = 0.0
+    num_evaluations = 0
+    for i, t_val in enumerate(t_seq):
+        x_t = trajectory[i]
+        dx_dt = model(t_val, x_t)
+        total_energy = total_energy + torch.sum(dx_dt**2)
+        num_evaluations += x_t.size(0)
+    return total_energy / num_evaluations
+
+
+def mioflow_density_loss(
+    source: Tensor, target: Tensor, top_k: int = 5, hinge_value: float = 0.01
+) -> Tensor:
+    """k-NN hinge loss enforcing density matching between distributions."""
+    c_dist = torch.cdist(source, target)
+    values, _ = torch.topk(c_dist, top_k, dim=1, largest=False, sorted=False)
+    return torch.mean(torch.clamp(values - hinge_value, min=0.0))

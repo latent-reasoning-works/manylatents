@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
     aliases=["outlier", "lof", "outlier_score"],
     default_params={"k": 20, "return_scores": False},
     description="Outlier scores using Local Outlier Factor",
+    # Pins the value this already recorded; without it `_to_scalar` now raises
+    # rather than picking a key by insertion order. (std is the spread of the same measurement, not a second one.)
+    scalar_key="mean",
 )
 def OutlierScore(
     embeddings: np.ndarray,

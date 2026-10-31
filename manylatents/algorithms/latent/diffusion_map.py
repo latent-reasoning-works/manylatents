@@ -261,18 +261,22 @@ class DiffusionMap():
         else:
             n_landmark = self.n_landmark
 
-        if self.G is None:
-            self.G = graphtools.Graph(X, 
-                                      n_pca=self.n_pca, 
-                                      n_landmark=self.n_landmark,
-                                      distance=self.knn_dist,
-                                      knn=self.knn,
-                                      knn_max=self.knn_max,
-                                      decay=self.decay,
-                                      thresh=1e-4,
-                                      n_jobs=self.n_jobs,
-                                      verbose=self.verbose,
-                                      random_state=self.random_state)
+        # Rebuild the graph on every fit. `if self.G is None` made a re-fit a no-op, so the
+        # `NotImplementedError -> fit_transform` fallback in run_experiment silently reused the
+        # graph from the FIRST fit while the fingerprint recorded the second array — split-mode
+        # `spectral_clustering` then returned 800 rows for 200 inputs and died at the row
+        # postcondition. A fit that does not re-fit is not a fit.
+        self.G = graphtools.Graph(X,
+                                  n_pca=self.n_pca,
+                                  n_landmark=self.n_landmark,
+                                  distance=self.knn_dist,
+                                  knn=self.knn,
+                                  knn_max=self.knn_max,
+                                  decay=self.decay,
+                                  thresh=1e-4,
+                                  n_jobs=self.n_jobs,
+                                  verbose=self.verbose,
+                                  random_state=self.random_state)
 
         K = self.G.kernel
         K = np.array(K.todense())
@@ -550,6 +554,7 @@ class DiffusionMapModule(LatentModule):
         else:
             self.model.fit(x_np[:n_fit])
         self._is_fitted = True
+        self._remember_fit_input(x)
 
         if self.mode == "cluster":
             self._fit_clusters()
@@ -653,6 +658,15 @@ class DiffusionMapModule(LatentModule):
             raise RuntimeError("DiffusionMap model is not fitted yet. Call `fit` first.")
 
         if self.mode == "cluster":
+            # Transductive in THIS mode only: cluster assignments belong to the fit rows,
+            # while mode="embed" below is a genuine per-row map and stays inductive. Returning
+            # stored labels for a different array scored AMI +0.0086 against ground truth via
+            # `run_experiment`, versus +0.4246 when honestly re-fitted.
+            if not self._same_as_fit_input(x):
+                raise NotImplementedError(
+                    "DiffusionMapModule(mode='cluster') is transductive: cluster labels are "
+                    "defined only for the rows it was fitted on. Call fit_transform(x)."
+                )
             labels_np = self._labels.reshape(-1, 1).astype(np.float32)
             return _to_output(labels_np, x)
 

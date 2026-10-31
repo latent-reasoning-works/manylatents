@@ -11,11 +11,19 @@ import numpy as np
 
 from manylatents.algorithms.latent.latent_module_base import LatentModule
 from manylatents.metrics.registry import register_metric
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 
 # ---------------------------------------------------------------------------
 # Pure-numpy helpers
 # ---------------------------------------------------------------------------
+
+
+def _validate_trajectory(embeddings, min_steps):
+    if embeddings.ndim != 2 or len(embeddings) < min_steps:
+        raise MeasurementUnavailable(f"trajectory measurement requires at least {min_steps} steps")
+    if not np.all(np.isfinite(embeddings)):
+        raise MeasurementUnavailable("trajectory measurement requires finite coordinates")
 
 
 def compute_velocity(embeddings: np.ndarray) -> np.ndarray:
@@ -27,6 +35,7 @@ def compute_velocity(embeddings: np.ndarray) -> np.ndarray:
     Returns:
         Array of shape (T-1, D).
     """
+    _validate_trajectory(embeddings, 2)
     return embeddings[1:] - embeddings[:-1]
 
 
@@ -39,7 +48,10 @@ def compute_cosine_velocity(embeddings: np.ndarray) -> np.ndarray:
     Returns:
         Array of shape (T-1,) with values in [0, 2].
     """
-    norms = np.maximum(np.linalg.norm(embeddings, axis=1, keepdims=True), 1e-8)
+    _validate_trajectory(embeddings, 2)
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    if np.any(norms == 0):
+        raise MeasurementUnavailable("Cosine trajectory velocity requires nonzero vector norms")
     normed = embeddings / norms
     cos_sim = np.sum(normed[:-1] * normed[1:], axis=1)
     return 1.0 - cos_sim
@@ -58,18 +70,20 @@ def compute_menger_curvature(embeddings: np.ndarray) -> np.ndarray:
     Returns:
         Array of shape (T-2,) of non-negative curvature values.
     """
+    _validate_trajectory(embeddings, 3)
     u = embeddings[1:-1] - embeddings[:-2]   # (T-2, D)
     v = embeddings[2:] - embeddings[1:-1]     # (T-2, D)
 
-    u_norm = np.maximum(np.linalg.norm(u, axis=1), 1e-8)
-    v_norm = np.maximum(np.linalg.norm(v, axis=1), 1e-8)
+    u_norm = np.linalg.norm(u, axis=1)
+    v_norm = np.linalg.norm(v, axis=1)
+    chord = np.linalg.norm(embeddings[2:] - embeddings[:-2], axis=1)
+    if np.any(u_norm == 0) or np.any(v_norm == 0) or np.any(chord == 0):
+        raise MeasurementUnavailable("Menger curvature requires three distinct points per triple")
 
     cos_uv = np.sum(u * v, axis=1) / (u_norm * v_norm)
     cos_uv = np.clip(cos_uv, -1.0, 1.0)
 
     sin_uv = np.sqrt(np.maximum(1.0 - cos_uv ** 2, 0.0))
-
-    chord = np.maximum(np.linalg.norm(embeddings[2:] - embeddings[:-2], axis=1), 1e-8)
 
     return 2.0 * sin_uv / chord
 
@@ -94,19 +108,18 @@ def _per_trace_mean(embeddings, dataset, metric_fn):
     trace_ids = _get_trace_ids(dataset)
     if trace_ids is None:
         vals = metric_fn(embeddings)
-        return float(np.mean(vals)) if vals.size > 0 else 0.0
+        return float(np.mean(vals))
 
+    if len(trace_ids) != len(embeddings) or len(embeddings) == 0:
+        raise MeasurementUnavailable("trajectory IDs must match a nonempty sequence")
     unique_ids = np.unique(trace_ids)
     means = []
     for tid in unique_ids:
         mask = trace_ids == tid
         trace_emb = embeddings[mask]
-        if len(trace_emb) < 2:
-            continue
         vals = metric_fn(trace_emb)
-        if vals.size > 0:
-            means.append(float(np.mean(vals)))
-    return float(np.mean(means)) if means else 0.0
+        means.append(float(np.mean(vals)))
+    return float(np.mean(means))
 
 
 @register_metric(
@@ -136,8 +149,4 @@ def TrajectoryCurvature(
     cache: Optional[dict] = None,
 ) -> float:
     """Mean Menger curvature across all traces."""
-    def _curvature(emb):
-        if len(emb) < 3:
-            return np.array([])
-        return compute_menger_curvature(emb)
-    return _per_trace_mean(embeddings, dataset, _curvature)
+    return _per_trace_mean(embeddings, dataset, compute_menger_curvature)

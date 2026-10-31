@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import warnings
@@ -58,6 +59,7 @@ class PlotEmbeddings(EmbeddingCallback):
         alpha: float = 0.8,
         log_key: str = "embedding_plot",
         enable_wandb_upload: bool = True,
+        export_plot_data: bool = True,
         # User overrides for colormap (take precedence over metric/dataset)
         cmap_override: str = None,
         is_categorical_override: bool = None,
@@ -87,6 +89,9 @@ class PlotEmbeddings(EmbeddingCallback):
             alpha: Transparency of the points (0 = transparent, 1 = opaque).
             log_key: Key for WandB logging. Can be customized for step-aware logging.
             enable_wandb_upload: Whether to upload to WandB when available.
+            export_plot_data: Whether to also write a machine-readable sidecar
+                (coords + per-point color values + resolved colormap) next to the
+                PNG, so downstream tools can re-color the embedding interactively.
             cmap_override: Override colormap (e.g., "viridis", "plasma"). Takes precedence
                           over metric-declared and dataset-declared colormaps.
             is_categorical_override: Override categorical/continuous treatment.
@@ -119,6 +124,7 @@ class PlotEmbeddings(EmbeddingCallback):
         self.alpha = alpha
         self.log_key = log_key
         self.enable_wandb_upload = enable_wandb_upload
+        self.export_plot_data = export_plot_data
         # User overrides
         self.cmap_override = cmap_override
         self.is_categorical_override = is_categorical_override
@@ -372,6 +378,50 @@ class PlotEmbeddings(EmbeddingCallback):
             fontsize=8,
         )
 
+    @staticmethod
+    def _category_color_basis(color_array):
+        """Compute (unique_labels, numeric, vmin, vmax) for categorical coloring.
+
+        ``vmin``/``vmax`` mirror the implicit ``Normalize`` the categorical
+        scatter applies: ``ax.scatter(c=color_array, cmap=...)`` with no explicit
+        norm normalizes over ``[min, max]`` of the values.
+        """
+        unique_labels = sorted(set(color_array))
+        arr = np.asarray(color_array)
+        numeric = arr.size > 0 and np.issubdtype(arr.dtype, np.number)
+        vmin = float(arr.min()) if numeric else 0.0
+        vmax = float(arr.max()) if numeric else 0.0
+        return unique_labels, numeric, vmin, vmax
+
+    def _category_color(self, lbl, cmap_info, unique_labels, numeric, vmin, vmax):
+        """Resolve one categorical label to the exact color the scatter draws.
+
+        Shared by the legend (``_add_categorical_legend_from_data``) and the
+        exported sidecar (``_resolve_category_colors``) so the two cannot drift
+        (issue #277). For non-dict colormaps the categorical scatter lets
+        matplotlib's ``Normalize`` map each point by **value** over
+        ``[vmin, vmax]``; indexing by **rank** instead disagrees for
+        non-uniformly-spaced integer labels (e.g. ``[0, 1, 10]``: value
+        ``1 -> 0.1`` but rank ``1 -> 0.5``). We mirror the value normalization so
+        the PNG, its legend, and the sidecar agree. The dict-cmap path is exact
+        and is used as the reference.
+        """
+        if isinstance(cmap_info.cmap, dict):
+            return cmap_info.cmap.get(lbl, "#808080")
+        cmap = (
+            cmap_info.cmap
+            if isinstance(cmap_info.cmap, ListedColormap)
+            else plt.colormaps.get_cmap(cmap_info.cmap)
+        )
+        if numeric:
+            # Match the scatter's value normalization over [vmin, vmax].
+            frac = (float(lbl) - vmin) / ((vmax - vmin) or 1.0)
+        else:
+            # Non-numeric labels never reach the value-normalized scatter path;
+            # fall back to rank so legend/sidecar stay defined and consistent.
+            frac = unique_labels.index(lbl) / max(1, len(unique_labels) - 1)
+        return cmap(frac)
+
     def _add_categorical_legend_from_data(
         self,
         ax: plt.Axes,
@@ -381,28 +431,25 @@ class PlotEmbeddings(EmbeddingCallback):
         """
         Add categorical legend when no label_names provided, using unique labels from data.
 
+        Colors are resolved via :meth:`_category_color` so each legend swatch
+        matches the color the scatter actually draws for that label (issue #277).
+
         Args:
             ax: Matplotlib axes object.
             labels: Array of label values.
             cmap_info: ColormapInfo containing the colormap.
         """
-        unique_labels = sorted(set(labels))
+        unique_labels, numeric, vmin, vmax = self._category_color_basis(labels)
 
-        patches = []
-        for lbl in unique_labels:
-            if isinstance(cmap_info.cmap, dict):
-                color = cmap_info.cmap.get(lbl, "#808080")
-            elif isinstance(cmap_info.cmap, ListedColormap):
-                colors = cmap_info.cmap.colors
-                # For numeric labels, use as index; for others, use hash
-                idx = lbl if isinstance(lbl, (int, np.integer)) else hash(lbl)
-                color = colors[int(idx) % len(colors)]
-            else:
-                cmap = plt.colormaps.get_cmap(cmap_info.cmap)
-                n_unique = len(unique_labels)
-                idx = unique_labels.index(lbl)
-                color = cmap(idx / max(1, n_unique - 1))
-            patches.append(Patch(facecolor=color, label=str(lbl)))
+        patches = [
+            Patch(
+                facecolor=self._category_color(
+                    lbl, cmap_info, unique_labels, numeric, vmin, vmax
+                ),
+                label=str(lbl),
+            )
+            for lbl in unique_labels
+        ]
 
         ax.legend(
             handles=patches,
@@ -411,6 +458,58 @@ class PlotEmbeddings(EmbeddingCallback):
             ncol=min(8, len(patches)),
             fontsize=8,
         )
+
+    def _resolve_category_colors(self, color_array, cmap_info) -> Dict[str, str]:
+        """Map each unique categorical label to the hex color the scatter draws.
+
+        Uses the same value-normalized resolver as the legend
+        (:meth:`_category_color`) so the PNG, its legend, and the exported
+        sidecar agree even for non-uniformly-spaced labels (issue #277).
+        """
+        unique_labels, numeric, vmin, vmax = self._category_color_basis(color_array)
+        return {
+            str(lbl): mcolors.to_hex(
+                self._category_color(lbl, cmap_info, unique_labels, numeric, vmin, vmax)
+            )
+            for lbl in unique_labels
+        }
+
+    def _export_plot_data(
+        self, embeddings_to_plot, color_array, cmap_info, base_name
+    ) -> None:
+        """Write ``{base_name}.npz`` (coords + color_values) and ``{base_name}.json`` (metadata)."""
+        npz_path = os.path.join(self.save_dir, f"{base_name}.npz")
+        json_path = os.path.join(self.save_dir, f"{base_name}.json")
+        os.makedirs(self.save_dir, exist_ok=True)
+        arrays = {"coords": np.asarray(embeddings_to_plot, dtype=np.float32)}
+        meta = {
+            "color_by": self.color_by or self.label_col,
+            "is_categorical": bool(cmap_info.is_categorical),
+            "n_points": int(embeddings_to_plot.shape[0]),
+        }
+        if color_array is not None:
+            arrays["color_values"] = np.asarray(color_array)
+            if cmap_info.is_categorical:
+                meta["category_colors"] = self._resolve_category_colors(
+                    color_array, cmap_info
+                )
+            else:
+                finite = np.asarray(color_array, dtype=float)
+                finite = finite[np.isfinite(finite)]
+                if len(finite):
+                    meta["vmin"] = float(finite.min())
+                    meta["vmax"] = float(finite.max())
+                # Derive the real colormap name for non-string cmaps (Colormap/
+                # ListedColormap) so the sidecar records what the PNG actually used,
+                # instead of silently falling back to "viridis".
+                cm = cmap_info.cmap
+                meta["cmap"] = cm if isinstance(cm, str) else getattr(cm, "name", "viridis")
+        np.savez_compressed(npz_path, **arrays)
+        with open(json_path, "w") as f:
+            json.dump(meta, f, indent=2)
+        logger.info(f"Saved plot data sidecar to {npz_path} and {json_path}")
+        self.register_output("embedding_data_path", npz_path)
+        self.register_output("embedding_data_meta_path", json_path)
 
     def _upload_to_wandb(self) -> None:
         """Upload plot to WandB if enabled and run is active."""
@@ -560,6 +659,15 @@ class PlotEmbeddings(EmbeddingCallback):
         plt.close(fig)
 
         logger.info(f"Saved 2D embeddings plot to {self.save_path}")
+
+        # Machine-readable sidecar (paired with the PNG via the same timestamp)
+        if self.export_plot_data:
+            self._export_plot_data(
+                embeddings_to_plot,
+                color_array,
+                cmap_info,
+                f"embedding_data_{self.experiment_name}_{timestamp}",
+            )
 
         # WandB upload
         self._upload_to_wandb()

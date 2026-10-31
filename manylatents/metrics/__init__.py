@@ -45,6 +45,7 @@ except ImportError:
     pass
 from manylatents.metrics.local_spectral_analysis import LocalSpectralAnalysis, ParticipationRatio
 from manylatents.metrics.lid import LocalIntrinsicDimensionality
+from manylatents.metrics.gpd_lid import GeneralizedLID
 from manylatents.metrics.score_jacobian_id import ScoreJacobianID
 from manylatents.metrics.loglog_consistency import LogLogConsistency
 from manylatents.metrics.trustworthiness import Trustworthiness
@@ -57,7 +58,19 @@ from manylatents.metrics.correlation import PearsonCorrelation
 from manylatents.metrics.knn_preservation import KNNPreservation
 from manylatents.metrics.tangent_space import TangentSpaceApproximation
 from manylatents.metrics.auc import AUC
+from manylatents.metrics.grouped_average_precision import (
+    grouped_average_precision,
+    grouped_average_precision_difference,
+)
 from manylatents.metrics.outlier_score import OutlierScore
+from manylatents.metrics.reference_geometry import (
+    knn_distance_score,
+    local_participation_ratio,
+    lof_novelty_score,
+    mahalanobis_score,
+    pca_reference_scores,
+    standardize_against,
+)
 
 # Cross-modal alignment metrics
 from manylatents.metrics.cka import CKA, cka_pairwise
@@ -88,6 +101,7 @@ except ImportError:
 
 # Embedding quality metrics
 from manylatents.metrics.silhouette import SilhouetteScore
+from manylatents.metrics.subspace_commitment import SubspaceCommitment
 
 # Dataset metrics
 from manylatents.metrics.geodesic_distance_correlation import GeodesicDistanceCorrelation
@@ -132,6 +146,7 @@ __all__ = [
     "LocalSpectralAnalysis",
     "ParticipationRatio",
     "LocalIntrinsicDimensionality",
+    "GeneralizedLID",
     "ScoreJacobianID",
     "LogLogConsistency",
     "Trustworthiness",
@@ -143,7 +158,15 @@ __all__ = [
     "KNNPreservation",
     "TangentSpaceApproximation",
     "AUC",
+    "grouped_average_precision",
+    "grouped_average_precision_difference",
     "OutlierScore",
+    "knn_distance_score",
+    "local_participation_ratio",
+    "lof_novelty_score",
+    "mahalanobis_score",
+    "pca_reference_scores",
+    "standardize_against",
     # Cross-modal alignment metrics
     "CKA",
     "cka_pairwise",
@@ -170,6 +193,7 @@ __all__ = [
     "MagnitudeDimension",
     # Embedding quality metrics
     "SilhouetteScore",
+    "SubspaceCommitment",
     # Dataset metrics
     "GeodesicDistanceCorrelation",
     "DatasetTopologyDescriptor",

@@ -11,12 +11,13 @@ try:
 except (ImportError, AttributeError):
     wandb = None
 from manylatents.callbacks.embedding.base import EmbeddingCallback
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
 class WandbLogScores(EmbeddingCallback):
     """
-    1) 0-D scalars → one wandb.log() with keys like "DR/…"
+    1) 0-D scalars (including string provenance) → wandb.log() with "DR/…" keys
     2) per-sample table → key "DR/per_sample_metrics"
     3) k-curve tables → keys like "DR/continuity__k_curve_table"
     """
@@ -51,7 +52,7 @@ class WandbLogScores(EmbeddingCallback):
             return {}
 
         # 0) first, unpack any (scalar, per_sample_array) tuples into two entries
-        scores: dict[str, np.ndarray | float] = {}
+        scores: dict[str, np.ndarray | float | str] = {}
         for name, vals in raw_scores.items():
             if isinstance(vals, tuple) and len(vals) == 2:
                 scalar, arr = vals
@@ -62,9 +63,19 @@ class WandbLogScores(EmbeddingCallback):
 
         tag = embeddings.get("metadata", {}).get("source", "embedding")
 
+        unavailable = {
+            f"{tag}/{name}": value.to_dict()
+            for name, value in scores.items()
+            if isinstance(value, MeasurementUnavailable)
+        }
+        if unavailable:
+            wandb.log(unavailable, commit=False)
+        scores = {name: value for name, value in scores.items()
+                  if not isinstance(value, MeasurementUnavailable)}
+
         # 1) summary scalars (0-D only)
         scalar_summary = {
-            f"{tag}/{name}": float(v)
+            f"{tag}/{name}": v if isinstance(v, str) else float(v)
             for name, v in scores.items()
             if np.ndim(v) == 0
         }
@@ -137,6 +148,8 @@ class WandbLogScores(EmbeddingCallback):
         if self.log_k_curve_table and scalar_summary:
             groups: dict[str, list[tuple[int, float]]] = {}
             for full_name, val in scalar_summary.items():
+                if isinstance(val, str):
+                    continue  # Provenance is logged, but is not a numeric curve.
                 _, inner = full_name.split("/", 1)
                 m = self._knn_re.match(inner)
                 if m:

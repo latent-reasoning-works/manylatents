@@ -16,6 +16,7 @@ method is registered automatically.
 """
 
 import importlib
+import importlib.metadata
 import inspect
 import logging
 from pathlib import Path
@@ -160,8 +161,27 @@ def get_dataset(name: str, **kwargs: Any) -> Any:
     )
 
 
+#: Entry-point group through which an extension package makes its datamodules reachable by
+#: name. Each entry point's name is the datamodule name; its value is ``module:Class``.
+DATAMODULE_ENTRY_POINT_GROUP = "manylatents.datamodules"
+
+
+def _datamodule_entry_points() -> list:
+    """The entry points of the datamodule group, read on each call (not cached at import)."""
+    return list(importlib.metadata.entry_points(group=DATAMODULE_ENTRY_POINT_GROUP))
+
+
 def get_datamodule(name: str, **kwargs: Any) -> Any:
-    """Get a LightningDataModule instance by name."""
+    """Get a LightningDataModule instance by name.
+
+    Core datamodules (this package) are looked up first, so a core name always wins. A name
+    that core does not have is looked up, in its normalized form, among the entry points of
+    the ``manylatents.datamodules`` group.
+
+    Raises:
+        ImportError: If the matching entry point fails to load.
+        ValueError: If neither core nor an entry point has the name.
+    """
     if not _DATAMODULE_REGISTRY:
         _discover_datasets()
 
@@ -172,7 +192,20 @@ def get_datamodule(name: str, **kwargs: Any) -> Any:
     if name_lower in _DATAMODULE_REGISTRY:
         return _DATAMODULE_REGISTRY[name_lower](**kwargs)
 
-    available = sorted(set(k.lower() for k in _DATAMODULE_REGISTRY.keys()))
+    eps = _datamodule_entry_points()
+    for ep in eps:
+        if ep.name == name_lower:
+            try:
+                loaded = ep.load()
+            except Exception as e:
+                # A broken extension must not read as "Unknown datamodule".
+                raise ImportError(
+                    f"Datamodule entry point '{ep.name}' ({ep.value}) in group "
+                    f"'{DATAMODULE_ENTRY_POINT_GROUP}' failed to load: {e}"
+                ) from e
+            return loaded(**kwargs)
+
+    available = sorted({k.lower() for k in _DATAMODULE_REGISTRY} | {ep.name for ep in eps})
     raise ValueError(f"Unknown datamodule: '{name}'. Available: {available}")
 
 
@@ -184,10 +217,11 @@ def list_datasets() -> List[str]:
 
 
 def list_datamodules() -> List[str]:
-    """Return list of available datamodule names."""
+    """Return the available datamodule names: core names and entry-point names."""
     if not _DATAMODULE_REGISTRY:
         _discover_datasets()
-    return sorted(set(k.lower() for k in _DATAMODULE_REGISTRY.keys()))
+    core = {k.lower() for k in _DATAMODULE_REGISTRY}
+    return sorted(core | {ep.name for ep in _datamodule_entry_points()})
 
 
 # Run discovery on import

@@ -11,6 +11,7 @@ import rich
 import rich.logging
 import torch
 from omegaconf import DictConfig, OmegaConf
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,11 @@ def should_disable_wandb(cfg: DictConfig) -> bool:
 
 
 class NumpyEncoder(json.JSONEncoder):
-    """JSON encoder that handles numpy types."""
+    """JSON encoder that handles numpy types and unavailable measurements."""
 
     def default(self, obj):
+        if isinstance(obj, MeasurementUnavailable):
+            return obj.to_dict()
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         if isinstance(obj, (np.integer,)):

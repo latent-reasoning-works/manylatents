@@ -49,10 +49,11 @@ class PrecomputedDataModule(LightningDataModule):
         mode: str = 'full',
         test_split: float = 0.2,
         seed: int = 42,
+        time: Optional[Union[np.ndarray, torch.Tensor]] = None,
     ):
         super().__init__()
-        # Ignore 'data' to prevent Lightning from trying to save the whole array in checkpoints
-        self.save_hyperparameters(ignore=['data'])
+        # Ignore 'data'/'time' so Lightning doesn't try to checkpoint the whole arrays
+        self.save_hyperparameters(ignore=['data', 'time'])
 
         if path is None and data is None:
             raise ValueError("PrecomputedDataModule requires either a 'path' or 'data' argument.")
@@ -70,6 +71,15 @@ class PrecomputedDataModule(LightningDataModule):
         else:
             self.data_tensor = None
 
+        # Per-cell timepoint labels (for trajectory models); stored like data_tensor, not a hparam.
+        if time is not None:
+            self.time_tensor = (
+                torch.from_numpy(np.asarray(time)).float()
+                if not isinstance(time, torch.Tensor) else time.float()
+            )
+        else:
+            self.time_tensor = None
+
         self.channels = channels
         self._channel_embeddings: Dict[str, torch.Tensor] = {}
         self._labels: Optional[np.ndarray] = None
@@ -80,7 +90,7 @@ class PrecomputedDataModule(LightningDataModule):
     def setup(self, stage: str = None):
         if self.data_tensor is not None:
             # In-memory data path: use InMemoryDataset for LatentOutputs compatibility
-            full_dataset = InMemoryDataset(self.data_tensor)
+            full_dataset = InMemoryDataset(self.data_tensor, time=self.time_tensor)
         elif self.channels is not None:
             # Multi-channel mode: load each channel from path
             full_dataset = self._setup_multi_channel()

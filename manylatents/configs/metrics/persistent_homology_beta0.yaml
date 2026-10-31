@@ -5,5 +5,9 @@ persistent_homology:
   _target_: manylatents.metrics.persistent_homology.PersistentHomology
   _partial_: True
   homology_dim: 0  # beta_0 = connected components
+  # `absolute` is pinned here on purpose. The metric's default is now "relative", where the
+  # threshold is a FRACTION OF THE CLOUD DIAMETER — under which 3.0 would mean 3x the
+  # diameter and pin the count at 1 for every input. This sweep wants absolute units.
+  threshold_mode: absolute
   persistence_threshold: 3.0  # Override via multirun: ...threshold=0.5,1.0,3.0,5.0,10.0
   at: embedding

@@ -262,3 +262,7 @@ Current extras: `hf` (transformers), `torchdr` (TorchDR + faiss), `jax` (JAX + d
 - [API usage](https://latent-reasoning-works.github.io/manylatents/api_usage/)
 - [Cache protocol](https://latent-reasoning-works.github.io/manylatents/cache/)
 - Issues: open a [GitHub issue](https://github.com/latent-reasoning-works/manylatents/issues)
+
+## License of contributions
+
+Unless you state otherwise, any contribution you intentionally submit for inclusion in manylatents is licensed under the Apache License, Version 2.0, as section 5 of the license describes, without any additional terms or conditions. That includes the license's patent grant (section 3).

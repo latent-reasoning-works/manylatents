@@ -2,6 +2,8 @@
 import numpy as np
 import pytest
 
+from manylatents.outputs import collect_outputs
+
 
 def make_rpca_test_data(m=200, n=100, rank=5, sparse_frac=0.05,
                          noise_std=0.0, seed=42):
@@ -119,7 +121,10 @@ class TestPCAModuleRobust:
         assert 'robust_rank' in extras
         assert 'convergence_history' in extras
         assert extras['robust_rank'] == 5
-        assert 'kernel' in extras
+        # `kernel` is a GENERIC output now, so it is no longer in PCA's own
+        # extra_outputs() — it arrives through the registry. What the engine attaches to
+        # the results dict is the union, which is what this asserts.
+        assert 'kernel' in collect_outputs(mod)
 
     def test_robust_transform_new_data(self):
         from manylatents.algorithms.latent.pca import PCAModule

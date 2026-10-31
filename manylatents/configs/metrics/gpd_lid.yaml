@@ -1,0 +1,6 @@
+gpd_lid:
+  _target_: manylatents.metrics.gpd_lid.GeneralizedLID
+  _partial_: True
+  k: 20
+  method: mle
+  at: embedding

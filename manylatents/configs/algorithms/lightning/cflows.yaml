@@ -1,0 +1,32 @@
+# Cflows — MIOFlow-family neural-ODE trajectory model (v0 / LOCAL regime).
+#
+# Reuses LatentODENetwork: integrate in the latent, OT/density-match in DATA
+# space via the decoder (see cflows.py docstring for why). Time enters through
+# batch["time"]; training t_spans come from the data's timepoints. This config's
+# `loss` node is the OT point-cloud loss (Cflows owns the density loss + energy
+# penalty internally, weighted by lambda_density / lambda_energy).
+_target_: manylatents.algorithms.lightning.cflows.Cflows
+_recursive_: false
+datamodule: ${data}
+network:
+  _target_: manylatents.algorithms.lightning.networks.latent_ode.LatentODENetwork
+  input_dim: null # inferred from data in setup()
+  latent_dim: 16
+  hidden_dim: 128
+  encoder_hidden_dims: [256, 128]
+  decoder_hidden_dims: [128, 256]
+  ode_n_layers: 2
+  solver: dopri5
+  rtol: 1e-4
+  atol: 1e-4
+  use_adjoint: true
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+loss:
+  _target_: manylatents.algorithms.lightning.losses.cflows.OTLoss
+  which: emd
+integration_times: [0.0, 1.0]
+lambda_density: 1.0
+lambda_energy: 0.0

@@ -25,17 +25,34 @@ class InMemoryDataset(Dataset):
             "label": tensor,       # Optional labels
         }
     """
-    def __init__(self, data_tensor: torch.Tensor, labels: Optional[torch.Tensor] = None):
+    def __init__(
+        self,
+        data_tensor: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+        time: Optional[torch.Tensor] = None,
+    ):
         """
         Args:
             data_tensor (torch.Tensor): The embeddings tensor
             labels (torch.Tensor, optional): Optional labels tensor
+            time (torch.Tensor, optional): Optional per-cell timepoint labels. Registered
+                in ``embedding_outputs`` so each batch dict carries a ``"time"`` key —
+                the seam ``Cflows`` reads in ``shared_step`` and ``MIOFlow`` in
+                ``_group_by_time``. (Not ``LatentODE``: it integrates over its
+                ``integration_times`` hyperparameter and ignores the batch's time.)
+                Kept separate from ``labels``/``"label"`` on purpose — that key is the
+                colouring + metric channel (``experiment.py:286``,
+                ``metrics/silhouette.py:81``, ``metrics/auc.py:59``,
+                ``callbacks/embedding/plot_embeddings.py:319``), so a timepoint written
+                there would silently recolour every plot and feed the metrics a clock.
         """
         self.data = data_tensor
         self.embedding_outputs = {"embeddings": data_tensor}
 
         if labels is not None:
             self.embedding_outputs["label"] = labels
+        if time is not None:
+            self.embedding_outputs["time"] = time
 
     def __len__(self):
         return len(self.data)
@@ -61,6 +78,13 @@ class InMemoryDataset(Dataset):
             labels = self.embedding_outputs["label"]
             return labels.numpy() if isinstance(labels, torch.Tensor) else labels
         return np.zeros(len(self.data))
+
+    def get_time(self):
+        """Returns all per-cell timepoint labels, or None if unset (mirrors get_labels)."""
+        if "time" in getattr(self, "embedding_outputs", {}):
+            t = self.embedding_outputs["time"]
+            return t.numpy() if isinstance(t, torch.Tensor) else t
+        return None
 
 
 class PrecomputedDataset(Dataset):
@@ -191,6 +215,13 @@ class PrecomputedDataset(Dataset):
             labels = self.embedding_outputs["label"]
             return labels.numpy() if isinstance(labels, torch.Tensor) else labels
         return np.zeros(len(self.data))
+
+    def get_time(self):
+        """Returns all per-cell timepoint labels, or None if unset (mirrors get_labels)."""
+        if "time" in getattr(self, "embedding_outputs", {}):
+            t = self.embedding_outputs["time"]
+            return t.numpy() if isinstance(t, torch.Tensor) else t
+        return None
 
 
 class MultiChannelDataset(Dataset):

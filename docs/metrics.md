@@ -2,6 +2,40 @@
 
 The evaluation system for manyLatents: metrics for measuring embedding quality, dataset properties, and algorithm internals. All metric configs live in a flat `configs/metrics/` directory. Each config declares its evaluation target via the `at` field.
 
+## Metric smoke failures: absent parameters and incompatible affinities
+
+`metrics=dse_knn` inherits `k` from the nullable `neighborhood_size` setting.
+An absent size (`null` / `None`) resolves to DSE's existing default, **15**, in
+the metric itself. Explicit values still reach `compute_knn` unchanged: zero,
+negative, noninteger, or `k >= n_samples` requests raise `MeasurementUnavailable`.
+The default is not clipped to fit smaller datasets either.
+
+`metrics=mismatch_ratio` with `algorithms/latent=pca` correctly refuses the
+pairing. `PCAModule.affinity()` returns
+`X_centered @ X_centered.T / (n_samples - 1)`: a scaled sample Gram matrix,
+documented by PCA as a covariance, **not a transition matrix**. On the smoke
+dataset (5 distributions × 20 points, rotated to 50 dimensions), direct
+execution reproduced the negative-weight refusal. Inspection of the fitted
+module confirmed exact equality with that formula, negative entries, and row
+sums approximately zero. Removing the diagonal, as mismatch does, retains the
+negative entries; it cannot turn this matrix into neighborhood probabilities.
+
+Mismatch measures `k_eff = (sum w)^2 / sum(w^2)` for each row. This equals
+`1 / sum(p^2)` after normalizing nonnegative weights into probabilities, so
+positive row scaling is harmless and rows need not already sum to one (the
+diagonal is removed). Signed covariance entries cannot supply that probability
+interpretation. The finite, nonnegative, nonempty-row checks remain intact;
+substituting a neighborhood size when they fail would invent a result.
+
+The CI metric sweep therefore pairs **only mismatch_ratio with PHATE**, whose
+affinity is nonnegative and row-stochastic, instead of PCA. The metric config
+still runs; it is not skipped or given a fabricated affinity. Regression tests
+in `tests/test_metric_smoke.py` execute both actual pairings through `run()` and
+the shared experiment/evaluation engine, assert PCA's refusal and matrix
+properties, and compare PHATE's measured `k_eff` against its row probabilities.
+They also execute the DSE config's five diffusion times with an absent and an
+explicit neighborhood size. Config composition alone did not catch either bug.
+
 ## Pipeline Execution Model
 
 Metrics and sampling operate on **named pipeline outputs** — a dict built as `run_experiment()` progresses. Understanding when each output becomes available is key to understanding what `at` and `sampling` can target.
@@ -18,9 +52,10 @@ run_experiment()
 ├─ algorithm.transform(test_tensor) → embeddings
 │   outputs["embedding"] = embeddings                     ← embedding available
 │   outputs["module"]    = algorithm                      ← module available
-│   outputs["affinity"]  = algorithm.extra_outputs()      ← extras available
-│   outputs["kernel"]    = ...                              (algorithm-dependent)
-│   outputs["adjacency"] = ...
+│   outputs.update(collect_outputs(algorithm))            ← extras available
+│     ├─ registry (manylatents/outputs.py): trajectories,   (algorithm-dependent)
+│     │    affinity, adjacency, kernel — off ANY algorithm
+│     └─ algorithm.extra_outputs(): its own artifacts only
 │
 ├─ evaluate()   [evaluate.py]
 │   ├─ [sampling.embedding] ── subsample before metrics   ← POSITION 2
@@ -39,11 +74,19 @@ run_experiment()
 | `dataset` | `datamodule.setup()` | `ds.data` | Yes |
 | `embedding` | `algorithm.transform()` | Embedding array | Yes |
 | `module` | `algorithm.fit()` | Fitted LatentModule | Yes (for LatentModules) |
-| `affinity` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
-| `kernel` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
-| `adjacency` | `algorithm.fit()` | `module.extra_outputs()` | No — algorithm-dependent |
+| `affinity` | `algorithm.fit()` | output registry → `algorithm.affinity()` | No — algorithm-dependent |
+| `kernel` | `algorithm.fit()` | output registry → `algorithm.kernel()` | No — algorithm-dependent |
+| `adjacency` | `algorithm.fit()` | output registry → `algorithm.adjacency()` | No — algorithm-dependent |
+| `trajectories` | `algorithm.fit()` | output registry → `algorithm.trajectories` | No — algorithm-dependent |
 
-New outputs can be added by having a LatentModule return them from `extra_outputs()`. Metrics can immediately target them via `at: "<key>"` — no code changes needed in the evaluation pipeline.
+Two ways to add an output, and the first is the one to reach for:
+
+- **Generic** — register an extractor with `@register_output` in `manylatents/outputs.py`. It then runs against *any* algorithm that has the hook, whatever the algorithm inherits. The four above are registered this way; `list_outputs()` enumerates them without fitting anything.
+- **Algorithm-specific** — return it from that algorithm's `extra_outputs()` (PCA's robust decomposition, Reeb's node coordinates, Cflows' GRN head). Reserved for real per-algorithm computation, not attribute reads.
+
+`collect_outputs()` merges both, and metrics can immediately target either via `at: "<key>"` — no code changes needed in the evaluation pipeline.
+
+The split exists because generic behaviour used to live on `LatentModule.extra_outputs()`, which meant it reached exactly the classes that inherited it: MIOFlow is a LightningModule, computed `.trajectories`, and could never emit them (#295).
 
 ### Sampling positions
 
@@ -52,7 +95,7 @@ Sampling has two categories with different infrastructure:
 - **Pre-fit** (`sampling.dataset`): Fixed integration point in `run_experiment()` BEFORE `fit()`. Reduces what the algorithm sees. This is inherently positional — it changes the algorithm's input, not just what metrics evaluate on.
 - **Post-fit** (any other key): Dynamic loop in `evaluate()` over the `outputs` dict. Any array-valued output can be sampled. If `sampling.embedding` is configured, the dataset is auto-sliced to matching indices for cross-space metrics.
 
-Post-fit sampling uses the same dynamic resolution as metric routing — it iterates the sampling config, matches keys against the `outputs` dict, and applies the sampler to any matching array. New outputs from `extra_outputs()` are automatically sampleable.
+Post-fit sampling uses the same dynamic resolution as metric routing — it iterates the sampling config, matches keys against the `outputs` dict, and applies the sampler to any matching array. New outputs are automatically sampleable, whether they come from the registry or from `extra_outputs()`.
 
 The `get_indices()` method on samplers accepts `**kwargs` for future extensibility — complex samplers (e.g., diffusion condensation) may need access to the kNN cache, outputs dict, or fitted module to build their sampling operator.
 
@@ -67,6 +110,46 @@ manylatents algorithms/latent=pca data=swissroll metrics=trustworthiness
 # Bundle (composes multiple metrics)
 manylatents algorithms/latent=pca data=swissroll metrics=standard
 ```
+
+## Scoring against a reference cloud
+
+Most metrics measure one cloud. These score *query* points against a separate
+*reference* cloud, so the query points never act as each other's neighbours.
+They are plain functions, because they take a second array the metric protocol
+has no slot for.
+
+```python
+import numpy as np
+from manylatents.metrics.gpd_lid import tail_distances, hill_tail_index, pickands_tail_index
+from manylatents.metrics import knn_distance_score, lof_novelty_score, pca_reference_scores
+
+distances = tail_distances(query, k=20, reference=reference)   # (n_query, 20)
+lid = 1.0 / hill_tail_index(distances)                          # local intrinsic dimension
+xi = pickands_tail_index(tail_distances(query, k=100, reference=reference))  # signed tail shape
+far = knn_distance_score(query, reference, k=20)
+```
+
+| Function | What it returns per query point |
+|---|---|
+| `grouped_average_precision_difference` | paired difference of group-weighted AP, with 95% row and optional cluster bootstrap intervals (aggregate across rows) |
+| `gpd_lid.tail_distances` | ascending distances to its k nearest reference points |
+| `gpd_lid.hill_tail_index` | tail index xi > 0; `1/xi` is the LID |
+| `gpd_lid.pickands_tail_index` | signed tail index: positive power-law, near zero exponential, negative bounded |
+| `gpd_lid.exponentiality` | 0 to 1, how well the power-law assumption fits |
+| `knn_distance_score` | mean distance to its k nearest reference points |
+| `lof_novelty_score` | local outlier factor relative to the reference |
+| `pca_reference_scores` | norm inside and outside the reference's leading principal subspace |
+| `mahalanobis_score` | distance from the reference mean in units of the reference's spread along every direction |
+| `local_participation_ratio` | number of directions its reference neighbourhood spans |
+| `standardize_against` | z-scores using the reference's column moments |
+
+A measurement that is undefined at some points raises `MeasurementUnavailable`
+with the offending row numbers in `.indices`; nothing is filled in or dropped.
+
+Controls live in `manylatents.utils.surrogates` (`shuffle_within_rows`,
+`random_feature_subset`, `gaussian_surrogate`, `permute_within_groups`), and
+`manylatents.metrics.grouped_average_precision` and
+`manylatents.utils.stats.partial_spearman` cover evaluation.
 
 ## Embedding Metrics
 

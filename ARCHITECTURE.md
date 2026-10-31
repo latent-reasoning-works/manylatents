@@ -1,8 +1,10 @@
 # Architecture Overview
 
 Manylatents is a unified dimensionality reduction and neural network analysis framework.
-It wraps 20+ algorithms behind two base classes, evaluates them with 40+ metrics through
-a shared cache, and orchestrates everything via Hydra configs or a Hydra-free Python API.
+It wraps ~19 algorithm classes behind two base classes, evaluates them with ~38 metrics
+(110 registered names incl. aliases) through a shared cache, and orchestrates everything
+via Hydra configs or a Hydra-free Python API. Both counts are discovered live from the
+registry — never hardcoded — so they track the installed version.
 
 This document is a coarse map of the codebase — read it once, then use symbol search to
 find specifics. Revisit a couple times a year; not every commit.
@@ -56,8 +58,15 @@ manylatents/
 │   └── lightning/           # LightningModule implementations (trainer.fit)
 │       ├── reconstruction.py       # Autoencoder-based DR
 │       ├── latent_ode.py           # Neural ODE latent dynamics
+│       ├── distillation.py         # Activation-distillation aux-loss (task_loss + α·align_loss)
+│       ├── phase1_align.py         # Staged alignment training
+│       ├── mioflow.py              # Neural-ODE trajectory inference over time-labeled
+│       │                           #   populations; swappable fixed encoder config,
+│       │                           #   optional GAGA pretraining in on_fit_start();
+│       │                           #   checkpoint construction in configure_model()
 │       ├── losses/                 # MSELoss, geometric losses
-│       └── networks/               # Autoencoder, AANet, LatentODE architectures
+│       └── networks/               # Autoencoder, AANet, LatentODE, MIOFlowODEFunc,
+│                                    #   GAGANetwork architectures
 │
 ├── metrics/
 │   ├── metric.py            # Metric protocol (function signature contract)
@@ -65,7 +74,7 @@ manylatents/
 │   ├── trustworthiness.py, continuity.py, knn_preservation.py, ...
 │   ├── persistent_homology.py, fractal_dimension.py          # topological
 │   ├── diffusion_spectral_entropy.py, spectral_gap_ratio.py  # spectral
-│   └── ... (40+ metric modules)
+│   └── ... (~38 metric functions across embedding/dataset/module contexts)
 │
 ├── data/
 │   ├── capabilities.py      # Protocol-based dataset capability detection
@@ -101,6 +110,9 @@ manylatents/
 │   └── utils.py             # Logging, path helpers, misc
 │
 ├── lightning/               # Lightning-specific infrastructure
+│   ├── hooks.py             # Read-only forward hooks; resolve_layer() (Arm-2 write-hook attach site)
+│   ├── activation_snapshot.py  # Frozen ActivationSnapshot — the distillation align target
+│   ├── hf_trainer.py        # HF Trainer wrapper
 │   └── callbacks/           # Trainer-level callbacks (checkpointing, etc.)
 │
 tests/                       # ~60 test files, ~489 test functions
@@ -216,8 +228,8 @@ wheelnext uv for CUDA wheel variants (mamba-ssm, flash-attn, transformer-engine)
 | | |
 |---|---|
 | **Project** | manylatents |
-| **Version** | 0.1.3 |
+| **Version** | 0.1.6 |
 | **Repository** | github.com/latent-reasoning-works/manylatents |
 | **Docs** | latent-reasoning-works.github.io/manylatents |
-| **License** | MIT |
-| **Last updated** | 2026-04-01 |
+| **License** | Apache-2.0 |
+| **Last updated** | 2026-07-03 |
