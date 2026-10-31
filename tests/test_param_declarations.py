@@ -503,6 +503,18 @@ def test_dump_writes_one_valid_file_per_method(tmp_path):
         assert all(set(entry) == ENTRY_KEYS for entry in doc["params"].values())
 
 
+def _assert_accepted(declared, accepted):
+    """Every declared choice is one the installed library accepts.
+
+    Not equality: the libraries are not pinned, and a release that adds a choice (umap-learn
+    0.5.12 added three metrics) must not fail the suite. A new choice is simply not offered
+    until the list is updated; a choice the library dropped still fails here.
+    """
+    missing = sorted(set(declared) - set(accepted))
+    assert not missing, f"declared but not accepted by the installed library: {missing}"
+    assert len(set(declared)) == len(declared), "a choice is declared twice"
+
+
 def test_dump_to_an_unwritable_directory_exits_2(tmp_path):
     blocker = tmp_path / "file"
     blocker.write_text("x")
@@ -520,7 +532,7 @@ def test_isomap_metrics_match_sklearn():
     from manylatents.params import sources
 
     options = Isomap._parameter_constraints["metric"][0].options
-    assert sorted(sources.ISOMAP_METRICS) == sorted(options)
+    _assert_accepted(sources.ISOMAP_METRICS, options)
 
 
 def test_pdist_metrics_match_scipy():
@@ -528,7 +540,7 @@ def test_pdist_metrics_match_scipy():
 
     from manylatents.params import sources
 
-    assert sorted(sources.PDIST_METRICS) == sorted(distance._METRICS_NAMES)
+    _assert_accepted(sources.PDIST_METRICS, distance._METRICS_NAMES)
 
 
 def test_umap_metrics_match_umap_learn():
@@ -537,7 +549,7 @@ def test_umap_metrics_match_umap_learn():
     from manylatents.params import sources
 
     expected = set(umap_distances.named_distances) | set(pynn.named_distances) | {"precomputed"}
-    assert sorted(sources.UMAP_METRICS) == sorted(expected)
+    _assert_accepted(sources.UMAP_METRICS, expected)
 
 
 def test_opentsne_metrics_match_opentsne():
@@ -547,7 +559,7 @@ def test_opentsne_metrics_match_opentsne():
 
     expected = (set(nn.Annoy.VALID_METRICS) | set(nn.NNDescent.VALID_METRICS)
                 | set(pynn.named_distances) | {"precomputed"})
-    assert sorted(sources.OPENTSNE_METRICS) == sorted(expected)
+    _assert_accepted(sources.OPENTSNE_METRICS, expected)
 
 
 def test_phate_distances_match_phate():
@@ -559,4 +571,4 @@ def test_phate_distances_match_phate():
     with pytest.raises(ValueError) as excinfo:
         phate.PHATE(knn_dist="no_such_distance")
     listed = ast.literal_eval(str(excinfo.value).split("Choose from ", 1)[1])
-    assert sources.PHATE_DISTANCES == listed
+    _assert_accepted(sources.PHATE_DISTANCES, listed)
