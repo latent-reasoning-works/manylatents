@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-10-31
+
 ### Added
 - Parameter declarations (`manylatents.params`): one plain-data document per method, in the
   format (declaration version 1) that manykinds defines in `manykinds.params`, from
@@ -33,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sampling; README.md also shows `uv tool install manylatents` and `uv run --with manylatents`.
   `tests/test_install_text.py` refuses `pip install` (other than `uv pip install`) in README.md,
   docs/ and the string literals of the package.
+
+### Fixed
+- The `SparseGraph` warning in `SaveOutputs` names the missing array packages and
+  `manylatents[graph]`, not a missing manykinds, which is now always installed.
 
 ## [0.1.9] - 2026-10-30
 
