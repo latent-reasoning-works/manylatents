@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Parameter declarations (`manylatents.params`): one plain-data document per method, in the
+  format (declaration version 1) that manykinds defines in `manykinds.params`, from
+  `manykinds>=0.1.2`. Every declaration that manylatents produces has `origin: manylatents` and
+  passes `manykinds.params.check_declaration`. Type and default come from the constructor
+  signature or the composed config, never written twice. Every latent module has a class
+  attribute `PARAMS`; every Lightning config has a source file
+  `configs/algorithms/lightning/domains/<config>.yaml` keyed by override paths over the module,
+  network, loss, optimizer and trainer. The configs themselves do not change.
+- `domain(name, group)` and `names(group)`. `check_declaration` and `check` are re-exported from
+  `manykinds.params` as the same objects; manylatents has no copy of either. Reading a Lightning
+  declaration imports no Lightning module. The format is documented in manykinds
+  (`docs/param-declarations.md`); docs/algorithms.md, "Parameter declarations", says how
+  manylatents produces its declarations.
+- `python -m manylatents.params show NAME [--group G]` and `dump DIR`, with JSON output and
+  documented exit codes. To check a declaration file, run `python -m manykinds.params check FILE`.
+
+### Changed
+- `manykinds>=0.1.2` is a core dependency. manykinds 0.1.2 moved its array packages to its extra
+  `arrays`, so the core gains no array package. The `graph` and `cflows` extras now require
+  `manykinds[arrays]>=0.1.2` (was `manykinds>=0.1.1`).
+- Install text uses uv instead of pip: `uv add` in README.md, docs/testing.md, docs/extensions.md
+  and the import-error messages of the POT barycenter, the TorchDR backend and geosketch
+  sampling; README.md also shows `uv tool install manylatents` and `uv run --with manylatents`.
+  `tests/test_install_text.py` refuses `pip install` (other than `uv pip install`) in README.md,
+  docs/ and the string literals of the package.
+
 ## [0.1.9] - 2026-10-30
 
 ### Added

@@ -800,7 +800,7 @@ class GeosketchSampling:
 
     Requires the optional ``geosketch`` package::
 
-        pip install geosketch
+        uv add geosketch
 
     Note:
         geosketch operates on the raw coordinate matrix. If your data has
@@ -858,7 +858,7 @@ class GeosketchSampling:
         except ImportError as e:
             raise ImportError(
                 "GeosketchSampling requires the 'geosketch' package. "
-                "Install it with: pip install geosketch"
+                "Install it with: uv add geosketch"
             ) from e
 
         seed = seed if seed is not None else self.seed

@@ -5,6 +5,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 logger = logging.getLogger(__name__)
@@ -121,6 +123,38 @@ class SelectiveCorrectionModule(LatentModule):
         correction_k_min: Minimum k for the embedding-space log-log sweep.
         correction_k_steps: Number of log-spaced k values for the sweep.
     """
+
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "inner": {"type": "str", "also": [None], "role": "infra",
+                  "meaning": "Required: the LatentModule object that is wrapped and corrected."},
+        "n_components": _p.unused("Unused; the output width is the inner module's."),
+        "random_state": _p.seed("Seed stored on the wrapper; the inner module keeps its own.", numpy=False),
+        "neighborhood_size": _p.unused("Stored by the base class; no parameter of the wrapper reads it.")
+        | {"also": [None]},
+        "backend": _p.unused("Stored by the base class; not used.", "str") | {"also": [None]},
+        "device": _p.unused("Stored by the base class; not used.", "str") | {"also": [None]},
+        "diagnostic_k": {"role": "knob",
+                         "meaning": "Largest k of the input-space log-log sweep; clipped to n_samples - 1."},
+        "r2_threshold": {"role": "knob", "meaning": "Log-log R^2 that defines a point's valid regime.",
+                         "more": "Stricter regime.", "less": "Looser regime."},
+        "v_max": {"role": "knob", "meaning": "Mismatch ratio above which a point counts as overshoot.",
+                  "more": "Fewer points flagged.", "less": "More points flagged."},
+        "v_min": {"role": "knob", "meaning": "Mismatch ratio below which a point counts as undershoot.",
+                  "more": "More points flagged.", "less": "Fewer points flagged."},
+        # torch 2.10.0 Adam: "Invalid learning rate" for lr < 0.
+        "correction_lr": {"min": 0, "role": "knob", "meaning": "Adam learning rate of the correction.",
+                          "more": "Larger moves per step.", "less": "Smaller moves per step."},
+        "correction_steps": _p.iterations("Optimisation steps of the correction."),
+        # sklearn 1.8.0 NearestNeighbors: n_neighbors >= 1; kneighbors() without X needs k < n.
+        "correction_k": _p.neighbours(
+            "Neighbours per point of the embedding-space R^2 loss.",
+            "The loss sees larger scales.", "The loss stays local.",
+            limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
+        "correction_k_min": {"role": "knob", "meaning": "Smallest k of the embedding-space log-log sweep."},
+        # numpy 2.2.6 logspace: the number of samples must be non-negative.
+        "correction_k_steps": {"min": 0, "role": "knob",
+                               "meaning": "Number of log-spaced k values in the embedding-space sweep."},
+    }
 
     def __init__(
         self,

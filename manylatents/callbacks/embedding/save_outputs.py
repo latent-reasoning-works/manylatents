@@ -174,8 +174,9 @@ class SaveOutputs(EmbeddingCallback):
             from manykinds import SparseGraph
         except ImportError:
             logger.warning(
-                "manykinds is not installed; skipping the SparseGraph archive "
-                f"{base_name}_graph.npz (install manylatents[graph] to write it)."
+                "manykinds.SparseGraph is not available (its array packages are not "
+                f"installed); skipping the SparseGraph archive {base_name}_graph.npz "
+                "(install manylatents[graph] to write it)."
             )
             return
         npz_path = self._get_save_path(f"{base_name}_graph.npz")

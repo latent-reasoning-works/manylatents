@@ -2,6 +2,8 @@ import functools
 
 import numpy as np
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
@@ -142,6 +144,19 @@ def _archetypes_aa_class():
 
 
 class ArchetypalAnalysisModule(LatentModule):
+    # Bounds mirror archetypes 0.6.2 AA._check_parameters and AA._check_data.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": {"min": 1, "role": "knob",
+                         "limits": [{"op": "le", "fact": "n_samples", "offset": 0}],
+                         "cost": {"time": "up", "memory": "up", "note": "more archetypes"},
+                         "meaning": "Number of archetypes.",
+                         "more": "Finer description of the data's extremes.",
+                         "less": "Coarser, more interpretable corners."},
+        "method": _p.unused("Unused; kept so that configs which set it still load."),
+        "max_iter": _p.iterations("Number of outer iterations of archetypal analysis.", min=1),
+        "random_state": _p.seed(),
+    }
+
     def __init__(
         self,
         n_components: int = 3,

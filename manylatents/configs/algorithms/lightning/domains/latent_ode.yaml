@@ -1,0 +1,134 @@
+# Parameter declaration source for algorithms/lightning=latent_ode.
+# Keys are dotted override paths: under algorithms.lightning, and trainer.* for the trainer
+# group trainer=default. Type and default come from the composed config. Read by
+# manylatents.params; see docs/algorithms.md, "Parameter declarations".
+
+# torch.nn.Linear: a negative size is refused.
+network.latent_dim:
+  min: 0
+  cost: {"time": "up", "memory": "up", "note": "wider layers"}
+  role: "knob"
+  meaning: "Size of the latent ODE state and of the embedding."
+  more: "More capacity."
+  less: "Less capacity."
+# torch.nn.Linear: a negative size is refused.
+network.hidden_dim:
+  min: 0
+  cost: {"time": "up", "memory": "up", "note": "wider layers"}
+  role: "knob"
+  meaning: "Hidden width of the ODE vector-field MLP."
+  more: "More capacity."
+  less: "Less capacity."
+network.ode_n_layers:
+  cost: {"time": "up", "memory": "up", "note": "more layers"}
+  role: "knob"
+  meaning: "Hidden layers of the ODE vector-field MLP; 0 or less gives one linear map."
+  more: "Deeper vector field."
+  less: "Shallower vector field."
+# torchdiffeq 0.2.5 odeint: method must be a key of SOLVERS.
+network.solver:
+  type: "choice"
+  choices: ["adaptive_heun", "bosh3", "dopri5", "dopri8", "euler", "explicit_adams", "fehlberg2", "fixed_adams", "heun2", "heun3", "implicit_adams", "midpoint", "rk4", "scipy_solver"]
+  role: "knob"
+  meaning: "torchdiffeq integration method."
+network.rtol:
+  cost: {"time": "down", "memory": "down", "note": "fewer solver steps"}
+  role: "knob"
+  meaning: "Relative error tolerance of the adaptive ODE solvers."
+  more: "Looser integration; faster."
+  less: "Tighter integration; slower."
+network.atol:
+  cost: {"time": "down", "memory": "down", "note": "fewer solver steps"}
+  role: "knob"
+  meaning: "Absolute error tolerance of the adaptive ODE solvers."
+  more: "Looser integration; faster."
+  less: "Tighter integration; slower."
+network.use_adjoint:
+  role: "infra"
+  meaning: "Backpropagate with the adjoint method, in constant memory."
+# torch 2.10.0 Adam: 'Invalid learning rate' for lr < 0.
+optimizer.lr:
+  min: 0
+  role: "knob"
+  meaning: "Adam learning rate of the network weights."
+  more: "Larger steps; less stable training."
+  less: "Smaller steps; slower training."
+trainer.accelerator:
+  role: "infra"
+  meaning: "Hardware the trainer runs on, such as auto, cpu, gpu or mps."
+trainer.strategy:
+  role: "infra"
+  meaning: "Distribution strategy of the trainer."
+trainer.devices:
+  also: ["auto"]
+  role: "infra"
+  meaning: "Number of devices; 'auto' lets Lightning choose."
+trainer.deterministic:
+  role: "fixed"
+  meaning: "Use deterministic algorithms, so a seed reproduces the run."
+trainer.min_epochs:
+  also: [null]
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Fewest epochs before early stopping may end training."
+# lightning 2.6.1 fit_loop: max_epochs must be >= -1.
+trainer.max_epochs:
+  min: -1
+  also: [null]
+  cost: {"time": "up", "memory": "none", "note": "more epochs"}
+  role: "knob"
+  meaning: "Most epochs of training; -1 trains without an epoch limit."
+  more: "Trains longer."
+  less: "Stops sooner."
+# lightning 2.6.1 _PRECISION_INPUT: the ints, the strings and the aliases.
+trainer.precision:
+  type: "choice"
+  choices: [64, 32, 16, "transformer-engine", "transformer-engine-float16", "16-true", "16-mixed", "bf16-true", "bf16-mixed", "32-true", "64-true", "64", "32", "16", "bf16"]
+  role: "fixed"
+  meaning: "Numeric precision of training."
+# lightning 2.6.1 _determine_batch_limits: [0, 1] or a whole number above 1 (a non-whole value above 1 is refused; not expressed).
+trainer.limit_train_batches:
+  type: "float"
+  min: 0
+  cost: {"time": "up", "memory": "none", "note": "more batches per epoch"}
+  role: "knob"
+  meaning: "Training batches per epoch: a fraction in [0, 1] or a whole count."
+trainer.limit_val_batches:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "Validation batches: a fraction in [0, 1] or a whole count."
+trainer.limit_test_batches:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "Test batches: a fraction in [0, 1] or a whole count."
+trainer.val_check_interval:
+  type: "float"
+  min: 0
+  role: "infra"
+  meaning: "How often validation runs within an epoch."
+trainer.check_val_every_n_epoch:
+  also: [null]
+  role: "infra"
+  meaning: "Run validation every this many epochs."
+# lightning 2.6.1: an int, a float or None; clipping runs when > 0.
+trainer.gradient_clip_val:
+  type: "float"
+  also: [null]
+  role: "knob"
+  meaning: "Gradient clipping value; null turns clipping off."
+trainer.accumulate_grad_batches:
+  role: "knob"
+  meaning: "Batches whose gradients add up before each optimizer step."
+  more: "Larger effective batch."
+  less: "Smaller effective batch."
+trainer.log_every_n_steps:
+  role: "infra"
+  meaning: "Log metrics every this many steps."
+trainer.detect_anomaly:
+  role: "infra"
+  meaning: "Run autograd anomaly detection (slow)."
+trainer.fast_dev_run:
+  role: "infra"
+  meaning: "Run one batch of each loop to test the code."

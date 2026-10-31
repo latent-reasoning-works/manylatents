@@ -11,6 +11,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from manylatents.params import sources as _p
+
 from .latent_module_base import LatentModule, _to_numpy, _to_output
 
 
@@ -45,6 +47,43 @@ class MultiscalePHATEModule(LatentModule):
     random_state : int, optional, default=42
         Random seed for reproducibility.
     """
+
+    # Multiscale_PHATE runs phate.PHATE (phate 2.0.0 _check_params) on its PCA output, so knn,
+    # decay, gamma, landmarks and n_jobs mirror that check.
+    PARAMS = {  # noqa: RUF012 - a read-only declaration source
+        "n_components": _p.unused("Unused; Multiscale PHATE embeds in two dimensions."),
+        # No library check: condense multiplies the merge radius by scale until points merge,
+        # so scale <= 1 never ends.
+        "scale": {"min": 1, "min_open": True, "role": "knob",
+                  "meaning": "Growth factor of the merge radius between levels.",
+                  "more": "Fewer, coarser levels.", "less": "More, finer levels; slower."},
+        # No library check: the first radius is granularity times a data scale; <= 0 never grows.
+        "granularity": {"min": 0, "min_open": True, "role": "knob",
+                        "meaning": "Size of the first merge radius, relative to the data spread.",
+                        "more": "Coarser first level.", "less": "Finer first level; slower."},
+        "landmarks": {"min": 1, "role": "knob",
+                      "cost": {"time": "up", "memory": "up", "note": "a larger landmark operator"},
+                      "meaning": "Landmarks of the diffusion operator; above n_samples, every sample."},
+        "knn": _p.neighbours(
+            "Number of nearest neighbours that sets each point's kernel bandwidth.",
+            "Smoother graph; small structure merges.", "Sparser graph; noise can split clusters.",
+            limits=[{"op": "le", "fact": "n_samples", "offset": -2}]),
+        "decay": {"min": 0, "min_open": True, "also": [None], "role": "knob",
+                  "meaning": "Decay rate of the alpha-decay kernel tails; None turns alpha decay off."},
+        "gamma": {"min": -1, "max": 1, "role": "knob",
+                  "meaning": "Informational distance: 1 is the log potential, 0 the square root."},
+        # sklearn 1.8.0 PCA(n_components=n_pca); None uses min(n_samples, n_features), capped at 100.
+        "n_pca": {"min": 0, "also": [None], "role": "knob",
+                  "limits": [{"op": "le", "fact": "n_samples", "offset": 0},
+                             {"op": "le", "fact": "n_features", "offset": 0}],
+                  "meaning": "Principal components computed before diffusion."},
+        "n_jobs": _p.n_jobs(also_none=False),
+        "random_state": _p.seed(),
+        "neighborhood_size": _p.neighbours(
+            "Shared neighbour count; when set it replaces knn.",
+            "Smoother graph; small structure merges.", "Sparser graph; noise can split clusters.",
+            also=[None], limits=[{"op": "le", "fact": "n_samples", "offset": -2}]),
+    }
 
     def __init__(
         self,

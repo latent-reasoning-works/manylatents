@@ -19,9 +19,14 @@ def _pyproject():
 
 def test_graph_extra_names_only_manykinds():
     extras = _pyproject()["project"]["optional-dependencies"]
-    assert extras["graph"] == ["manykinds>=0.1.1"]
+    assert extras["graph"] == ["manykinds[arrays]>=0.1.2"]
     assert extras["all"] == ["manylatents[hf,torchdr,jax,omics,cflows,graph]"]
-    assert "manykinds>=0.1.1" in extras["cflows"]
+    assert "manykinds[arrays]>=0.1.2" in extras["cflows"]
+
+
+def test_manykinds_is_a_core_dependency():
+    # manylatents.params re-exports the checks of manykinds.params (standard library only).
+    assert "manykinds>=0.1.2" in _pyproject()["project"]["dependencies"]
 
 
 def test_no_split_distribution():
