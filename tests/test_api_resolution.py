@@ -475,3 +475,17 @@ def test_api_run_string_names():
     assert "embeddings" in result
     assert "scores" in result
     assert "FractalDimension" in result["scores"]
+
+
+@pytest.mark.parametrize("form", ["algorithm", "algorithms"])
+def test_an_explicit_random_state_wins_over_the_run_seed(form):
+    """A step's own `random_state` reaches the module; `seed` fills it only when absent."""
+    from manylatents.api import _resolve_algorithm
+
+    def resolve(**kw):
+        if form == "algorithm":
+            return _resolve_algorithm(algorithm="leiden", **kw)
+        return _resolve_algorithm(algorithms={"latent": "leiden"}, **kw)
+
+    assert resolve(seed=42, random_state=7).random_state == 7
+    assert resolve(seed=42).random_state == 42
