@@ -245,8 +245,10 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
             # and `diffusion_map` was unreachable by name at any dataset under 2000 rows
             # because its `n_landmark=2000` default could not be overridden.
             algo_kwargs = dict(kwargs)
+            # `setdefault`: a `random_state` the caller passed is the step's own seed and wins,
+            # as `init_seed` does on the lightning branch; `seed` fills it only when absent.
             if seed is not None:
-                algo_kwargs["random_state"] = seed
+                algo_kwargs.setdefault("random_state", seed)
             if neighborhood_size is not None:
                 algo_kwargs["neighborhood_size"] = neighborhood_size
             return cls(**algo_kwargs)
@@ -289,7 +291,7 @@ def _resolve_algorithm(algorithm=None, algorithms=None, datamodule=None, seed=42
                 # `params` never reached an algorithm through it.
                 algo_kwargs = dict(kwargs)
                 if seed is not None:
-                    algo_kwargs["random_state"] = seed
+                    algo_kwargs.setdefault("random_state", seed)  # as above
                 if neighborhood_size is not None:
                     algo_kwargs["neighborhood_size"] = neighborhood_size
                 return cls(**algo_kwargs)
