@@ -11,6 +11,15 @@ from .latent_module_base import LatentModule, _to_numpy, _to_output
 _IMPLEMENTATIONS = ("leidenalg", "sknetwork")
 
 
+def _libc():
+    """The C library whose `rand()` scikit-network's compiled Leiden calls."""
+    import ctypes
+    import ctypes.util
+
+    name = ctypes.util.find_library("c")
+    return ctypes.CDLL(name) if name is not None else ctypes.cdll.msvcrt
+
+
 class LeidenModule(LatentModule):
     """Cluster data using the Leiden algorithm on a kNN graph.
 
@@ -103,9 +112,16 @@ class LeidenModule(LatentModule):
         return self._run_leidenalg(adjacency)
 
     def _run_sknetwork(self, adjacency: scipy.sparse.spmatrix) -> np.ndarray:
-        """scikit-network (BSD) Leiden; imports neither igraph nor leidenalg."""
+        """scikit-network (BSD) Leiden; imports neither igraph nor leidenalg.
+
+        Not thread-safe: scikit-network 0.33.5's refinement step draws from libc `rand()`
+        (`leiden_core.pyx`), which its `random_state` does not seed. This seeds libc with
+        `srand(random_state)` right before the fit, and `srand` is process-global.
+        """
         from sknetwork.clustering import Leiden
 
+        if self.random_state is not None:
+            _libc().srand(int(self.random_state) & 0xFFFFFFFF)
         model = Leiden(resolution=self.resolution, random_state=self.random_state)
         labels = model.fit_predict(scipy.sparse.csr_matrix(adjacency))
         return np.asarray(labels, dtype=np.int64).reshape(-1)

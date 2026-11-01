@@ -67,6 +67,17 @@ def test_sknetwork_is_deterministic_for_one_random_state():
     torch.testing.assert_close(a, b)
 
 
+def test_sknetwork_repeats_on_a_graph_with_ties():
+    # scikit-network 0.33.5 draws from libc rand() in its refinement step, which its
+    # random_state does not seed. On structureless data that draw changes the partition.
+    data = np.random.default_rng(0).normal(size=(2000, 10)).astype(np.float32)
+    lm = LeidenModule(resolution=0.5, n_neighbors=15, random_state=42, implementation="sknetwork")
+    adjacency = lm._build_adjacency(data)
+    first = lm._run_leiden(adjacency)
+    for _ in range(4):
+        np.testing.assert_array_equal(lm._run_leiden(adjacency), first)
+
+
 def test_sknetwork_works_without_igraph_and_leidenalg(monkeypatch):
     monkeypatch.setitem(sys.modules, "igraph", None)
     monkeypatch.setitem(sys.modules, "leidenalg", None)
