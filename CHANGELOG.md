@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `LeidenModule(implementation=...)`: `"leidenalg"` (the default, unchanged) or `"sknetwork"`
+  (scikit-network, BSD, now a base dependency `scikit-network>=0.33.1`). leidenalg and
+  python-igraph are GPL; the sknetwork path imports neither, so anyone who redistributes
+  manylatents in a closed program has a permissive install path. The two implementations use
+  different resolution scales, so one resolution value can give a different number of clusters.
+
 ## [0.1.10] - 2026-10-31
 
 ### Added
