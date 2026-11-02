@@ -53,6 +53,7 @@ from manylatents.metrics.trustworthiness import Trustworthiness
 # Additional embedding metrics
 from manylatents.metrics.continuity import Continuity
 from manylatents.metrics.anisotropy import Anisotropy
+from manylatents.metrics.spectral_smoothness import SpectralSmoothness
 from manylatents.metrics.fractal_dimension import FractalDimension
 from manylatents.metrics.correlation import PearsonCorrelation
 from manylatents.metrics.knn_preservation import KNNPreservation
@@ -150,6 +151,7 @@ __all__ = [
     # Additional metrics
     "Continuity",
     "Anisotropy",
+    "SpectralSmoothness",
     "FractalDimension",
     "PearsonCorrelation",
     "KNNPreservation",
