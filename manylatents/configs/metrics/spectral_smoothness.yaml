@@ -1,0 +1,6 @@
+spectral_smoothness:
+  _target_: manylatents.metrics.spectral_smoothness.SpectralSmoothness
+  _partial_: True
+  eigen_index: 3
+  n_neighbors: 15
+  at: dataset
