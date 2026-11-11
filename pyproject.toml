@@ -71,7 +71,9 @@ dependencies = [
     "python-igraph>=1.0",
     # Permissive (BSD) Leiden, for LeidenModule(implementation="sknetwork"): leidenalg and
     # python-igraph are GPL. 0.33.1 is the first release with Leiden that imports under NumPy 2.
-    "scikit-network>=0.33.1",
+    # Below 0.34: upstream commit ef3e053 ("Make Leiden reproducible", unreleased) changes the
+    # Leiden move rule, so 0.34 gives different labels for the same seed. Lift the bound on purpose.
+    "scikit-network>=0.33.1,<0.34",
     # Parameter declarations: the format and its checks (manykinds.params, standard library
     # only). The array kinds are in manykinds' extra "arrays", which graph and cflows add.
     "manykinds>=0.1.2",

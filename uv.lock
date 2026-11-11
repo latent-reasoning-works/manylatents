@@ -1265,7 +1265,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.9" },
     { name = "ripser", specifier = ">=0.6" },
     { name = "scikit-learn", specifier = ">=1.2" },
-    { name = "scikit-network", specifier = ">=0.33.1" },
+    { name = "scikit-network", specifier = ">=0.33.1,<0.34" },
     { name = "scipy", specifier = ">=1.8,<1.15" },
     { name = "statsmodels", marker = "extra == 'cflows'", specifier = ">=0.14,<0.16" },
     { name = "torch", specifier = ">=2.3,<3.0" },
