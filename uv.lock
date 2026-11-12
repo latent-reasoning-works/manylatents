@@ -1275,7 +1275,7 @@ requires-dist = [
     { name = "torchsde", specifier = ">=0.2" },
     { name = "tqdm", specifier = ">=4.67" },
     { name = "transformers", marker = "extra == 'hf'", specifier = ">=4.40" },
-    { name = "umap-learn", specifier = ">=0.5" },
+    { name = "umap-learn", specifier = ">=0.5,<0.6" },
     { name = "wandb", specifier = ">=0.25.0" },
 ]
 provides-extras = ["hf", "torchdr", "jax", "docs", "omics", "cflows", "graph", "all"]

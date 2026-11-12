@@ -37,7 +37,9 @@ dependencies = [
     "hydra-zen>=0.13",
     # Dimensionality reduction algorithms
     "phate>=2.0",
-    "umap-learn>=0.5",
+    # Below 0.6: 0.6.0 (2026-11-10) changes the default init to "auto" and other defaults.
+    # Lift the bound after its changes are checked against the UMAP module and its tests.
+    "umap-learn>=0.5,<0.6",
     "opentsne>=1.0",
     "multiscale-phate",
     # NOTE: aa.py targets the archetypes 0.6 API (`n_archetypes`, `max_iter`,
