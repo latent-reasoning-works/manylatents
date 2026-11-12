@@ -459,6 +459,7 @@ def run(
     seed: int = 42,
     time: np.ndarray | None = None,
     data_kwargs: dict[str, Any] | None = None,
+    return_input_data: bool = False,
     **kwargs,
 ) -> dict[str, Any]:
     """
@@ -466,6 +467,7 @@ def run(
 
     Args:
         input_data: In-memory array (wraps in PrecomputedDataModule).
+        return_input_data: Include the already loaded output-row matrix in the result.
         data: Dataset name (e.g. ``"swissroll"``).
         algorithm: String name (``"pca"``), or pre-built instance.
         algorithms: Dict config, e.g. ``{"latent": "pca"}``,
@@ -559,4 +561,5 @@ def run(
         metrics_cfg=metrics_cfg,
         sampling=engine_sampling,
         seed=seed,
+        return_input_data=return_input_data,
     )
