@@ -1362,10 +1362,14 @@ class Archetypal(SyntheticDataset):
         interpolation: X_euclidean = X_bary @ vertices.
         """
         K = X_bary.shape[1]  # number of vertices
-        # Regular simplex: center K unit vectors in R^K, then SVD to R^{K-1}
-        centered = np.eye(K) - 1.0 / K
-        U, S, _ = np.linalg.svd(centered, full_matrices=False)
-        vertices = U[:, : K - 1] * S[: K - 1]
+        # Helmert columns form an orthonormal basis of the sum-zero subspace.
+        # Each column sums to zero, so (I - 1/K) @ H = H: its rows are
+        # centred simplex vertices, with a fixed orientation on every platform.
+        vertices = np.zeros((K, K - 1))
+        for j in range(1, K):
+            scale = 1.0 / np.sqrt(j * (j + 1))
+            vertices[:j, j - 1] = scale
+            vertices[j, j - 1] = -j * scale
         # Scale so edge length = simplex_radius
         edge_len = np.linalg.norm(vertices[0] - vertices[1])
         if edge_len > 0:

@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   different resolution scales, so one resolution value can give a different number of clusters.
 
 ### Changed
+- Archetypal data changes for the same seed; it is now the same on every platform.
 - `ReebGraphModule.fit` with the default `sparse=None` uses bin-local sparse radius
   matrices and a dense Prim traversal instead of a global NetworkX edge graph, ripser,
   and a Rips complex. The Reeb graph, the membership matrix (with its column order) and
