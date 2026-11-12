@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `ReebGraphModule.fit` builds only vertices and edges with `max_dim=1`. This avoids
+  cubic memory use from unused triangles on well-separated clusters while preserving
+  the fitted graph and membership. The `_vietoris_rips` default remains `max_dim=2`.
+
 ### Added
 - `LeidenModule(implementation=...)`: `"leidenalg"` (the default, unchanged) or `"sknetwork"`
   (scikit-network, BSD, now a base dependency `scikit-network>=0.33.1`). leidenalg and

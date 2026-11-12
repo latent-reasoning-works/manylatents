@@ -18,6 +18,66 @@ def _make_swissroll(n=200, seed=42):
 
 
 class TestReebGraphModule:
+    def test_fit_builds_no_triangles(self, monkeypatch):
+        """Fit requests only vertices and edges, even for separated blobs."""
+        from sklearn.datasets import make_blobs
+        from manylatents.algorithms.latent import reeb_graph
+
+        data, _ = make_blobs(
+            n_samples=30, centers=[[-10, 0], [0, 10], [10, 0]],
+            cluster_std=0.2, random_state=42,
+        )
+        real_vietoris_rips = reeb_graph._vietoris_rips
+        calls = []
+
+        def record_vietoris_rips(*args, **kwargs):
+            tree, skeleta = real_vietoris_rips(*args, **kwargs)
+            calls.append((kwargs.get("max_dim", 2), tree.dimension(), len(skeleta[2])))
+            return tree, skeleta
+
+        monkeypatch.setattr(reeb_graph, "_vietoris_rips", record_vietoris_rips)
+        reeb_graph.ReebGraphModule(n_bins=5).fit(data)
+
+        assert calls == [(1, 1, 0)]
+
+    def test_one_skeleton_preserves_skeleta_and_fitted_graph(self, monkeypatch):
+        """Removing triangles preserves vertices, edges, and fitted membership."""
+        from sklearn.metrics import pairwise_distances
+        from manylatents.algorithms.latent import reeb_graph
+
+        rng = np.random.default_rng(42)
+        theta = np.linspace(0, 2 * np.pi, 150, endpoint=False)
+        data = np.column_stack([np.cos(theta), np.sin(theta)])
+        data += rng.normal(scale=0.02, size=data.shape)
+        distances = pairwise_distances(data)
+        real_vietoris_rips = reeb_graph._vietoris_rips
+        _, one = real_vietoris_rips(distances, min_rad_factor=2, max_dim=1)
+        _, two = real_vietoris_rips(distances, min_rad_factor=2, max_dim=2)
+        assert one[0] == two[0]
+        assert one[1] == two[1]
+        assert one[2] == []
+        assert two[2]  # Ensure the comparison actually removes triangles.
+
+        def fit_with_dimension(max_dim):
+            def force_dimension(*args, **kwargs):
+                kwargs["max_dim"] = max_dim
+                return real_vietoris_rips(*args, **kwargs)
+
+            monkeypatch.setattr(reeb_graph, "_vietoris_rips", force_dimension)
+            model = reeb_graph.ReebGraphModule(n_bins=10, overlap=0.25)
+            model.fit(data)
+            return model
+
+        one_model = fit_with_dimension(1)
+        two_model = fit_with_dimension(2)
+        assert set(one_model._reeb_graph.nodes) == set(two_model._reeb_graph.nodes)
+        assert set(one_model._reeb_graph.edges) == set(two_model._reeb_graph.edges)
+        for node in one_model._reeb_graph:
+            assert set(one_model._reeb_graph.nodes[node]["indices"]) == set(
+                two_model._reeb_graph.nodes[node]["indices"]
+            )
+        np.testing.assert_array_equal(one_model.transform(data), two_model.transform(data))
+
     def test_is_latent_module(self):
         """ReebGraphModule is a LatentModule subclass."""
         from manylatents.algorithms.latent.reeb_graph import ReebGraphModule

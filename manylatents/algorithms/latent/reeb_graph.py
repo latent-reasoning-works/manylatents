@@ -403,11 +403,12 @@ class ReebGraphModule(LatentModule):
         # Compute lens function
         function = self._compute_lens(x_sub)
 
-        # Build distance matrix and VR complex
+        # Build only vertices and edges: _vr_to_graph does not use triangles,
+        # which can consume cubic memory when the radius connects all points.
         D = pairwise_distances(x_sub)
         min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
         _, skeleta = _vietoris_rips(
-            D, min_rad_factor=self.min_rad_factor,
+            D, min_rad_factor=self.min_rad_factor, max_dim=1,
             sparse=self.sparse, min_rad=min_rad,
         )
         H = _vr_to_graph(skeleta, function, with_weights=True)
