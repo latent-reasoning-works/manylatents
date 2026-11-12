@@ -192,6 +192,7 @@ def run_experiment(
     pretrained_ckpt: str | None = None,
     cache_dir: str | None = None,
     wandb_run=None,
+    return_input_data: bool = False,
 ) -> dict[str, Any]:
     """Hydra-free experiment engine.
 
@@ -456,6 +457,9 @@ def run_experiment(
                     "step_time": step_time,
                 },
             }
+
+            if return_input_data:
+                results["input_data"] = test_tensor.numpy()
 
             # Merge model metrics (LightningModule path)
             if model_metrics:

@@ -41,6 +41,31 @@ def _distinct_rows(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     return xc[index], np.asarray(inverse).ravel()
 
 
+def _lid_from_distances(distances: np.ndarray) -> np.ndarray:
+    """Evaluate Eq. (8) on sorted positive neighbour distances."""
+    k = np.asarray(distances).shape[1]
+    distances = np.asarray(distances, dtype=np.float64)
+    if not np.all(np.isfinite(distances) & (distances > 0)):
+        raise MeasurementUnavailable(
+            "neighbor distances must be finite and positive; geometry is unresolved "
+            "at float32 working precision"
+        )
+
+    # Float64 division prevents ratios of positive float32 distances underflowing
+    # to zero before the log. For sorted positive distances d_j <= r_k, each log
+    # is <= 0; -(k-1)/sum requires a finite strictly negative sum.
+    r_k = distances[:, -1]
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
+        log_sum = np.sum(np.log(distances[:, :k-1] / r_k[:, None]), axis=1)
+    if not np.all(np.isfinite(log_sum) & (log_sum < 0)):
+        raise MeasurementUnavailable("LID requires a finite strictly negative log-distance sum")
+    with np.errstate(over="ignore", divide="ignore"):
+        lid_values = -(k - 1) / log_sum
+    if not np.all(np.isfinite(lid_values) & (lid_values > 0)):
+        raise MeasurementUnavailable("LID estimates are not finite and positive at working precision")
+    return lid_values
+
+
 @register_metric(
     aliases=["local_intrinsic_dim", "lid", "intrinsic_dim"],
     default_params={"return_per_sample": False},
@@ -140,25 +165,7 @@ def LocalIntrinsicDimensionality(
         )
 
     distances, _ = compute_knn(points, k=k, include_self=False, cache=cache)
-    distances = np.asarray(distances, dtype=np.float64)
-    if not np.all(np.isfinite(distances) & (distances > 0)):
-        raise MeasurementUnavailable(
-            "neighbor distances must be finite and positive; geometry is unresolved "
-            "at float32 working precision"
-        )
-
-    # Float64 division prevents ratios of positive float32 distances underflowing
-    # to zero before the log. For sorted positive distances d_j <= r_k, each log
-    # is <= 0; -(k-1)/sum requires a finite strictly negative sum.
-    r_k = distances[:, -1]
-    with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
-        log_sum = np.sum(np.log(distances[:, :k-1] / r_k[:, None]), axis=1)
-    if not np.all(np.isfinite(log_sum) & (log_sum < 0)):
-        raise MeasurementUnavailable("LID requires a finite strictly negative log-distance sum")
-    with np.errstate(over="ignore", divide="ignore"):
-        lid_values = -(k - 1) / log_sum
-    if not np.all(np.isfinite(lid_values) & (lid_values > 0)):
-        raise MeasurementUnavailable("LID estimates are not finite and positive at working precision")
+    lid_values = _lid_from_distances(distances)
     lid_values = lid_values[inverse]
 
     mean_lid = float(np.mean(lid_values))
