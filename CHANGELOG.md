@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manylatents in a closed program has a permissive install path. The two implementations use
   different resolution scales, so one resolution value can give a different number of clusters.
 
+### Changed
+- `scikit-network` is bounded below 0.34 (`>=0.33.1,<0.34`). The next release changes the
+  Leiden move rule, so the same seed would give different labels. 0.33.x needs the `srand`
+  seed workaround in `LeidenModule`; remove it when the bound is lifted.
+- `umap-learn` is bounded below 0.6 (`>=0.5,<0.6`). umap-learn 0.6.0 changes the default
+  `init` from `"spectral"` to `"auto"`, and its other changes are not yet checked.
+
 ## [0.1.10] - 2026-10-31
 
 ### Added
