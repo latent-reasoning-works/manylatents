@@ -23,6 +23,7 @@ class TorusDataModule(LightningDataModule):
         n_clusters: int = 16,
         n_gaps: int = 0,
         mode: str = 'split',
+        noise_mode: str = "absolute",
     ):
         """
         Initialize the TorusDataModule with configuration parameters for data loading
@@ -79,6 +80,7 @@ class TorusDataModule(LightningDataModule):
         # Torus specific
         self.n_points = n_points
         self.noise = noise
+        self.noise_mode = noise_mode
         self.major_radius = major_radius
         self.minor_radius = minor_radius
         self.random_state = random_state
@@ -101,6 +103,7 @@ class TorusDataModule(LightningDataModule):
             self.train_dataset = Torus(
                 n_points=self.n_points,
                 noise=self.noise,
+                noise_mode=self.noise_mode,
                 major_radius=self.major_radius,
                 minor_radius=self.minor_radius,
                 random_state=self.random_state,
@@ -114,6 +117,7 @@ class TorusDataModule(LightningDataModule):
             self.dataset = Torus(
                 n_points=self.n_points,
                 noise=self.noise,
+                noise_mode=self.noise_mode,
                 major_radius=self.major_radius,
                 minor_radius=self.minor_radius,
                 random_state=self.random_state,

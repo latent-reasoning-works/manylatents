@@ -15,3 +15,6 @@ shuffle_traindata: false
 use_gap: false
 n_gaps: 3
 gap_fraction: 0.3
+
+# Ambient noise: absolute standard deviation or relative to clean cloud spread.
+noise_mode: absolute

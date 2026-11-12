@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the fitted graph and membership. The `_vietoris_rips` default remains `max_dim=2`.
 
 ### Added
+- Synthetic generators accept opt-in `noise_mode="relative"` to scale ambient noise
+  by the clean cloud's root mean squared distance from its centroid. Noise settings
+  are recorded in `generation_info`, `noise_scale`, and `noise_std` separately from labels.
+- `GaussianBlobs(min_separation=...)` draws centers with an absolute minimum distance
+  using bounded rejection sampling independently of cluster standard deviation.
+- `DLATreeFromGraph(gt_metric="clean_length")` computes ground truth using clean
+  Euclidean edge lengths, preserving graph topology and connections at shared junctions.
+  Matching data modules and configs expose all options; defaults remain unchanged.
 - `LeidenModule(implementation=...)`: `"leidenalg"` (the default, unchanged) or `"sknetwork"`
   (scikit-network, BSD, now a base dependency `scikit-network>=0.33.1`). leidenalg and
   python-igraph are GPL; the sknetwork path imports neither, so anyone who redistributes

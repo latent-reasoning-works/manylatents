@@ -146,6 +146,7 @@ manylatents-omics = { git = "https://github.com/latent-reasoning-works/manylaten
 pythonpath = ["."]
 testpaths = ["tests", "manylatents"]
 markers = [
+    "measurement: fast generator connectivity measurements (run by default)",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "source_checkout: needs the repository checkout, not only the installed package",
 ]

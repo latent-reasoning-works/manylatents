@@ -12,3 +12,5 @@ shuffle_traindata: false
 random_state: ${seed}
 return_centers: false
 mode: full
+# Optional absolute minimum distance between generated centers.
+min_separation: null
