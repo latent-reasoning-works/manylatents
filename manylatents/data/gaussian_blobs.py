@@ -27,6 +27,7 @@ class GaussianBlobDataModule(LightningDataModule):
         random_state: Optional[int] = 42,
         return_centers: bool = False,
         mode: str = 'full',
+        min_separation: Optional[float] = None,
     ):
         """
         Initialize the GaussianBlobDataModule with configuration parameters for data loading
@@ -88,6 +89,7 @@ class GaussianBlobDataModule(LightningDataModule):
         self.center_box = tuple(center_box) if isinstance(center_box, list) else center_box
         self.random_state = random_state
         self.return_centers = return_centers
+        self.min_separation = min_separation
 
         self.mode = mode
 
@@ -109,6 +111,7 @@ class GaussianBlobDataModule(LightningDataModule):
                 center_box=self.center_box,
                 random_state=self.random_state,
                 return_centers=self.return_centers,
+                min_separation=self.min_separation,
             )
             self.test_dataset = self.train_dataset
 
@@ -121,6 +124,7 @@ class GaussianBlobDataModule(LightningDataModule):
                 center_box=self.center_box,
                 random_state=self.random_state,
                 return_centers=self.return_centers,
+                min_separation=self.min_separation,
             )
 
             test_size = int(len(self.dataset) * self.test_split)

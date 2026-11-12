@@ -34,6 +34,7 @@ class ArchetypalDataModule(LightningDataModule):
         vertex_weights: Optional[List[float]] = None,
         save_figure: bool = False,
         save_dir: str = "outputs",
+        noise_mode: str = "absolute",
     ):
         super().__init__()
 
@@ -47,6 +48,7 @@ class ArchetypalDataModule(LightningDataModule):
         self.n_obs = n_obs
         self.concentration = concentration
         self.noise = noise
+        self.noise_mode = noise_mode
         self.random_state = random_state
         self.output_dims = output_dims
 
@@ -72,6 +74,7 @@ class ArchetypalDataModule(LightningDataModule):
             n_obs=self.n_obs,
             concentration=self.concentration,
             noise=self.noise,
+            noise_mode=self.noise_mode,
             random_state=self.random_state,
             output_dims=self.output_dims,
             use_gap=self.use_gap,

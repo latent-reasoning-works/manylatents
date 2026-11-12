@@ -181,6 +181,8 @@ class DLATreeFromGraphDataModule(LightningDataModule):
         save_graph_viz: bool = True,
         save_dir: str = "outputs",
         mode: str = 'full',
+        noise_mode: str = "absolute",
+        gt_metric: str = "hops",
         **kwargs
     ):
         """
@@ -200,6 +202,8 @@ class DLATreeFromGraphDataModule(LightningDataModule):
         self.rand_multiplier = rand_multiplier
         self.random_state = random_state
         self.sigma = sigma
+        self.gt_metric = gt_metric
+        self.noise_mode = noise_mode
         self.save_graph_viz = save_graph_viz
         self.save_dir = save_dir
 
@@ -222,6 +226,8 @@ class DLATreeFromGraphDataModule(LightningDataModule):
                 rand_multiplier=self.rand_multiplier,
                 random_state=self.random_state,
                 sigma=self.sigma,
+                gt_metric=self.gt_metric,
+                noise_mode=self.noise_mode,
                 save_graph_viz=self.save_graph_viz,
                 save_dir=self.save_dir,
             )
@@ -235,6 +241,8 @@ class DLATreeFromGraphDataModule(LightningDataModule):
                 rand_multiplier=self.rand_multiplier,
                 random_state=self.random_state,
                 sigma=self.sigma,
+                gt_metric=self.gt_metric,
+                noise_mode=self.noise_mode,
                 save_graph_viz=self.save_graph_viz,
                 save_dir=self.save_dir,
             )

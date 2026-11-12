@@ -17,3 +17,6 @@ n_gaps: 0
 project_to_sphere: true
 vertex_weights: null
 save_dir: ${hydra:runtime.output_dir}
+
+# Ambient noise: absolute standard deviation or relative to clean cloud spread.
+noise_mode: absolute

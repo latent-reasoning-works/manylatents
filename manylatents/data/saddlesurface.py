@@ -27,6 +27,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
         use_gap: bool = False,
         n_gaps: int = 3,
         gap_fraction: float = 0.12,
+        noise_mode: str = "absolute",
     ):
         """
         Initialize the SaddleSurfaceDataModule with configuration parameters for data loading
@@ -93,6 +94,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
         self.n_distributions = n_distributions
         self.n_points_per_distribution = n_points_per_distribution
         self.noise = noise
+        self.noise_mode = noise_mode
         self.manifold_noise = manifold_noise
         self.a = a
         self.b = b
@@ -118,6 +120,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
                 n_distributions=self.n_distributions,
                 n_points_per_distribution=self.n_points_per_distribution,
                 noise=self.noise,
+                noise_mode=self.noise_mode,
                 manifold_noise=self.manifold_noise,
                 a=self.a,
                 b=self.b,
@@ -134,6 +137,7 @@ class SaddleSurfaceDataModule(LightningDataModule):
                 n_distributions=self.n_distributions,
                 n_points_per_distribution=self.n_points_per_distribution,
                 noise=self.noise,
+                noise_mode=self.noise_mode,
                 manifold_noise=self.manifold_noise,
                 a=self.a,
                 b=self.b,

@@ -39,3 +39,7 @@ excluded_edges: []
 
 # Use colorful discrete colormap
 sampling_density_factors: null
+# Ambient noise: absolute standard deviation or relative to clean cloud spread.
+noise_mode: absolute
+# Ground truth: unit edge hops or clean Euclidean edge lengths.
+gt_metric: hops

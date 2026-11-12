@@ -1,0 +1,53 @@
+{
+  "SwissRoll": {
+    "streams": [
+      {
+        "bit_generator": "PCG64",
+        "state": {
+          "state": 52563073177620330332035097717174303255,
+          "inc": 332724090758049132448979897138935081983
+        },
+        "has_uint32": 0,
+        "uinteger": 0
+      }
+    ]
+  },
+  "SwissRollGap": {
+    "streams": [
+      {
+        "bit_generator": "PCG64",
+        "state": {
+          "state": 53995878599930478953989632312124377028,
+          "inc": 332724090758049132448979897138935081983
+        },
+        "has_uint32": 0,
+        "uinteger": 2995172878
+      }
+    ]
+  },
+  "SaddleSurface": {
+    "streams": []
+  },
+  "Torus": {
+    "streams": [
+      {
+        "bit_generator": "PCG64",
+        "state": {
+          "state": 236691628023936895207794857365692790580,
+          "inc": 332724090758049132448979897138935081983
+        },
+        "has_uint32": 1,
+        "uinteger": 659764508
+      }
+    ]
+  },
+  "Archetypal": {
+    "streams": []
+  },
+  "DLATreeFromGraph": {
+    "streams": []
+  },
+  "GaussianBlobs": {
+    "streams": []
+  }
+}

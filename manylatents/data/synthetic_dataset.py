@@ -16,9 +16,31 @@ from typing import Union, List, Optional, Dict, Tuple
 from ..utils.dla_tree_visualization import DLATreeGraphVisualizer
 
 
+def _noise_info(clean, noise, noise_mode):
+    """Resolve ambient standard deviation without consuming random numbers."""
+    if noise_mode not in ("absolute", "relative"):
+        raise ValueError("noise_mode must be 'absolute' or 'relative'")
+    scale = 1.0
+    if noise_mode == "relative":
+        # The empty cloud has no spread and receives no noise samples.
+        scale = float(np.sqrt(np.mean(np.sum(
+            (clean - clean.mean(axis=0)) ** 2, axis=1
+        )))) if len(clean) else 0.0
+    return {"noise_mode": noise_mode, "noise_scale": scale,
+            "noise_std": noise if noise_mode == "absolute" else noise * scale}
+
+
 class SyntheticDataset(Dataset):
     """
     Base class for synthetic datasets.
+
+    Generators supporting ``noise_mode`` default to ``"absolute"``, which uses
+    the ambient noise argument directly as the standard deviation. In
+    ``"relative"`` mode, that argument is multiplied by the clean cloud's root
+    mean squared distance from its centroid immediately before adding noise.
+    Manifold noise and per-sample scaling factors are unchanged.
+    ``noise_scale``, ``noise_std``, and ``generation_info`` record these settings;
+    ``metadata`` continues to contain labels.
     """
 
     def __init__(self):
@@ -26,6 +48,12 @@ class SyntheticDataset(Dataset):
         self.data = None
         self.metadata = None
         self.graph = None
+
+    def _set_noise_info(self, clean, noise, noise_mode):
+        """Record ambient noise settings separately from label metadata."""
+        self.generation_info = _noise_info(clean, noise, noise_mode)
+        self.noise_scale = self.generation_info["noise_scale"]
+        self.noise_std = self.generation_info["noise_std"]
 
     def __len__(self):
         return self.data.shape[0]
@@ -87,6 +115,7 @@ class SwissRoll(SyntheticDataset):
         width=10.0,
         random_state=42,
         rotate_to_dim=3,
+        noise_mode: str = "absolute",
     ):
         """
         Initialize a synthetic Swiss Roll dataset with parameters to control 
@@ -183,6 +212,9 @@ class SwissRoll(SyntheticDataset):
         # Build observation-level data (N, 3) before adding noise
         M_obs = X.T.copy()  # shape (N, 3)
 
+        self._set_noise_info(M_obs, noise, noise_mode)
+        noise = self.noise_std
+
         # labels per-sample (used to scale observation noise)
         labels = np.repeat(np.arange(n_distributions), counts)
         if labels.size != N:
@@ -256,6 +288,8 @@ class SwissRollGap(SyntheticDataset):
         rotate_to_dim: int = 3,
         n_gaps: int = 3,
         gap_fraction: float = 0.12,
+        noise_mode: str = "absolute",
+        _generation_info: Optional[dict] = None,
     ):
         """Create a swiss-roll like point cloud with gaps between some blobs.
 
@@ -353,6 +387,11 @@ class SwissRollGap(SyntheticDataset):
         else:
             M_obs = M_gt_cart.copy()
 
+        info = _noise_info(M_obs, noise, noise_mode)
+        if _generation_info is not None:
+            _generation_info.update(info)
+        noise = info["noise_std"]
+
         # add observation noise scaled per-sample according to blob size
         # build labels per-sample so we can broadcast per-distribution scaling
         labels = np.repeat(np.arange(n_distributions), counts)
@@ -387,9 +426,11 @@ class SwissRollGap(SyntheticDataset):
         rotate_to_dim=3,
         n_gaps: int = 3,
         gap_fraction: float = 0.12,
+        noise_mode: str = "absolute",
     ):
         super().__init__()
 
+        self.generation_info = {}
         # Generate the swissroll with gaps (returns noisy obs, ground-truth coords, labels)
         M, M_gt, C = self.generate_swissroll_gap(
             n_distributions=n_distributions,
@@ -401,8 +442,12 @@ class SwissRollGap(SyntheticDataset):
             rotate_to_dim=rotate_to_dim,
             n_gaps=n_gaps,
             gap_fraction=gap_fraction,
+            noise_mode=noise_mode,
+            _generation_info=self.generation_info,
         )
 
+        self.noise_scale = self.generation_info["noise_scale"]
+        self.noise_std = self.generation_info["noise_std"]
         self.data = M
 
         # Keep ground-truth coordinates and labels accessible
@@ -443,6 +488,7 @@ class SaddleSurface(SyntheticDataset):
         n_gaps: int = 0,
         gap_fraction: float = 0.1,
         use_gap: bool = False,
+        noise_mode: str = "absolute",
     ):
         """
         Initialize a synthetic Saddle Surface dataset with tunable parameters for geometry and noise.
@@ -491,6 +537,7 @@ class SaddleSurface(SyntheticDataset):
         self.n_distributions = n_distributions
         self.counts = self._normalize_counts(n_points_per_distribution, n_distributions)
         self.noise = noise
+        self.noise_mode = noise_mode
         self.manifold_noise = manifold_noise
         self.a = a
         self.b = b
@@ -581,7 +628,8 @@ class SaddleSurface(SyntheticDataset):
 
     def _apply_noise(self, X):
         """Add noise to the points in the Cartesian space to simulate noisy data."""
-        X = X + np.random.normal(0, self.noise, X.shape)
+        self._set_noise_info(X, self.noise, self.noise_mode)
+        X = X + np.random.normal(0, self.noise_std, X.shape)
         return X
 
     def _saddle_to_cartesian(self, u, v):
@@ -879,6 +927,7 @@ class Torus(SyntheticDataset):
         rotate_to_dim=3,
         n_clusters=10,
         n_gaps=0,
+        noise_mode: str = "absolute",
     ):
         """
         Initialize a synthetic Torus dataset with uniformly distributed points.
@@ -934,6 +983,9 @@ class Torus(SyntheticDataset):
 
         X = np.stack((x, y, z))  # shape (3, N)
         X = X.T  # Transpose to shape (N, 3) for proper 3D representation
+
+        self._set_noise_info(X, noise, noise_mode)
+        noise = self.noise_std
 
         # Add global noise
         noise_term = noise * rng.normal(size=X.shape)
@@ -1006,7 +1058,13 @@ class Torus(SyntheticDataset):
 
 class GaussianBlobs(SyntheticDataset):
     """
-    Gaussian K blobs using sklearn's make_blobs
+    Gaussian K blobs using sklearn's make_blobs.
+
+    ``min_separation=None`` preserves sklearn's center generation. A finite,
+    nonnegative distance instead draws uniform centers in ``center_box`` from a
+    dedicated seeded stream, with at most 10000 attempts per center. This
+    absolute distance is independent of ``cluster_std``. Only integer or None
+    ``centers`` are accepted in this mode, and ``self.centers`` is always stored.
     """
 
     def __init__(
@@ -1017,7 +1075,8 @@ class GaussianBlobs(SyntheticDataset):
         cluster_std: Union[float, List[float]] = 1.0,
         center_box: Tuple[float, float] = (-10.0, 10.0),
         random_state: Optional[int] = 42,
-        return_centers: bool = False
+        return_centers: bool = False,
+        min_separation: Optional[float] = None,
     ):
         super().__init__()
 
@@ -1025,6 +1084,34 @@ class GaussianBlobs(SyntheticDataset):
         # Ensure center_box is a tuple (Hydra may convert it to list or other sequence types)
         if not isinstance(center_box, tuple):
             center_box = tuple(center_box)
+
+        if min_separation is not None:
+            if centers is not None and not isinstance(centers, (int, np.integer)):
+                raise ValueError("centers must be an int or None with min_separation")
+            if not np.isfinite(min_separation) or min_separation < 0:
+                raise ValueError("min_separation must be finite and nonnegative")
+            if centers is None:
+                # make_blobs' default: one center per entry of a list n_samples, else 3.
+                count = 3 if isinstance(n_samples, (int, np.integer)) else len(n_samples)
+            else:
+                count = int(centers)
+            if count < 1:
+                raise ValueError("centers must be positive")
+            rng = np.random.default_rng(random_state)
+            drawn = []
+            for _ in range(count):
+                for attempt in range(10000):
+                    candidate = rng.uniform(*center_box, size=n_features)
+                    if all(np.linalg.norm(candidate - other) >= min_separation for other in drawn):
+                        drawn.append(candidate)
+                        break
+                else:
+                    raise ValueError(
+                        f"min_separation_unsatisfiable: centers={count}, "
+                        f"n_features={n_features}, center_box={center_box}, "
+                        f"min_separation={min_separation}"
+                    )
+            centers = np.asarray(drawn)
 
         result = make_blobs(
             n_samples=n_samples,
@@ -1041,7 +1128,7 @@ class GaussianBlobs(SyntheticDataset):
             X, y, self.centers = result
         else:
             X, y = result
-            self.centers = None
+            self.centers = centers if min_separation is not None else None
 
         # Set data and metadata for SyntheticDataset interface
         self.data = X
@@ -1101,7 +1188,8 @@ class Archetypal(SyntheticDataset):
         project_to_sphere: bool = True,
         vertex_weights: Optional[List[float]] = None,
         save_dir: str = "outputs",
-        save_figure: bool = False
+        save_figure: bool = False,
+        noise_mode: str = "absolute",
     ):
         """
         Parameters
@@ -1218,6 +1306,9 @@ class Archetypal(SyntheticDataset):
         if output_dims > ambient_dim:
             self.data = self.rotate_to_dim(output_dims)
 
+        self._set_noise_info(self.data, noise, noise_mode)
+        noise = self.noise_std
+
         # Add global noise in ambient space
         if noise > 0:
             self.data = self.data + np.random.normal(0, noise, self.data.shape)
@@ -1330,6 +1421,8 @@ class DLATreeFromGraph(SyntheticDataset):
         save_dir: str = "outputs",
         # Gap functionality: simply exclude these edge_ids from data generation
         excluded_edges: Optional[List] = None,
+        noise_mode: str = "absolute",
+        gt_metric: str = "hops",
     ):
         """
         Generate a DLA (Diffusion-Limited Aggregation) tree from explicit graph topology.
@@ -1422,6 +1515,10 @@ class DLATreeFromGraph(SyntheticDataset):
         - Root node is automatically detected as the node with no incoming edges
         """
         super().__init__()
+        if gt_metric not in ("hops", "clean_length"):
+            raise ValueError("gt_metric must be 'hops' or 'clean_length'")
+        self.gt_metric = gt_metric
+        self.noise_mode = noise_mode
         self.graph_edges = graph_edges
         self.excluded_edges = set(excluded_edges or [])  # Convert to set for fast lookup
         self.n_dim = n_dim
@@ -1625,9 +1722,21 @@ class DLATreeFromGraph(SyntheticDataset):
         # Combine all data
         M_complete = np.vstack(all_data) if all_data else np.empty((0, self.n_dim))
 
+        self.M_complete_clean = M_complete.copy()
+        self._set_noise_info(M_complete, self.sigma, self.noise_mode)
+        if self.gt_metric == "clean_length":
+            self.adj_matrix_clean_length = self.adj_matrix_complete.copy()
+            rows, cols = self.adj_matrix_complete.nonzero()
+            lengths = np.linalg.norm(M_complete[rows] - M_complete[cols], axis=1)
+            # Junction samples share coordinates. Keep their edges nonzero even
+            # after dense conversion. A simple path has at most N-1 edges, so
+            # replacing zeros adds less than 1e-13 to any shortest path.
+            epsilon = 1e-13 / max(1, len(M_complete))
+            self.adj_matrix_clean_length.data = np.where(lengths == 0, epsilon, lengths)
+
         # Add noise if specified
         if self.sigma > 0:
-            M_complete += np.random.normal(0, self.sigma, M_complete.shape)
+            M_complete += np.random.normal(0, self.noise_std, M_complete.shape)
 
         # Store complete data
         self.M_complete = M_complete
@@ -1850,12 +1959,17 @@ class DLATreeFromGraph(SyntheticDataset):
         """
         Compute geodesic distances as shortest paths over the complete tree graph.
 
+        ``gt_metric="hops"`` uses unit edge weights. ``"clean_length"`` uses
+        Euclidean edge lengths from ``M_complete_clean``, before ambient noise.
+        Shared junctions receive a tiny positive weight to preserve topology.
+
         Args:
             include_gaps: If True, return complete matrix including gap samples.
                           If False, return matrix aligned to dataset.data rows only.
         """
         geodesic_dist_complete = shortest_path(
-            csgraph=self.adj_matrix_complete.tocsr(), directed=False
+            csgraph=(self.adj_matrix_complete if self.gt_metric == "hops"
+                     else self.adj_matrix_clean_length).tocsr(), directed=False
         )
 
         if include_gaps:

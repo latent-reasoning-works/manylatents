@@ -26,6 +26,7 @@ class SwissRollDataModule(LightningDataModule):
         use_gap: bool = False,
         n_gaps: int = 3,
         gap_fraction: float = 0.12,
+        noise_mode: str = "absolute",
     ):
         """
         Initialize the SwissRollDataModule with configuration parameters for data loading
@@ -82,6 +83,7 @@ class SwissRollDataModule(LightningDataModule):
         self.n_distributions = n_distributions
         self.n_points_per_distribution = n_points_per_distribution
         self.noise = noise
+        self.noise_mode = noise_mode
         self.manifold_noise = manifold_noise
         self.width = width
         self.random_state = random_state
@@ -110,6 +112,7 @@ class SwissRollDataModule(LightningDataModule):
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,
                     noise=self.noise,
+                    noise_mode=self.noise_mode,
                     manifold_noise=self.manifold_noise,
                     width=self.width,
                     random_state=self.random_state,
@@ -123,6 +126,7 @@ class SwissRollDataModule(LightningDataModule):
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,
                     noise=self.noise,
+                    noise_mode=self.noise_mode,
                     manifold_noise=self.manifold_noise,
                     width=self.width,
                     random_state=self.random_state,
@@ -136,6 +140,7 @@ class SwissRollDataModule(LightningDataModule):
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,
                     noise=self.noise,
+                    noise_mode=self.noise_mode,
                     manifold_noise=self.manifold_noise,
                     width=self.width,
                     random_state=self.random_state,
@@ -149,6 +154,7 @@ class SwissRollDataModule(LightningDataModule):
                     n_distributions=self.n_distributions,
                     n_points_per_distribution=self.n_points_per_distribution,
                     noise=self.noise,
+                    noise_mode=self.noise_mode,
                     manifold_noise=self.manifold_noise,
                     width=self.width,
                     random_state=self.random_state,
