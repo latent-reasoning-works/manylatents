@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   different resolution scales, so one resolution value can give a different number of clusters.
 
 ### Changed
+- `ReebGraphModule.fit` with the default `sparse=None` uses bin-local sparse radius
+  matrices and a dense Prim traversal instead of a global NetworkX edge graph, ripser,
+  and a Rips complex. The Reeb graph, the membership matrix (with its column order) and
+  the transform output are unchanged. At 5,000 points in three separated blobs, the peak
+  is about 0.68 GB instead of about 8.5 GB. Component index lists are now ascending;
+  node coordinate means can differ in the last bits. A non-`None` `sparse` keeps the
+  gudhi approximation path, with edges only.
 - `scikit-network` is bounded below 0.34 (`>=0.33.1,<0.34`). The next release changes the
   Leiden move rule, so the same seed would give different labels. 0.33.x needs the `srand`
   seed workaround in `LeidenModule`; remove it when the bound is lifted.

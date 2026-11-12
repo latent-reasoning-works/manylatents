@@ -196,6 +196,108 @@ def _reeb_approx_graph(H, function, n_bins, overlap=0.0, density_factor=0.1):
     return G, membership
 
 
+def _minimum_radius(D):
+    """Largest finite H0 death, with ripser's float32 rounding.
+
+    Dense Prim uses O(N) extra memory, includes zero edges, and does not
+    discard distances below 1e-8 as scipy's dense MST conversion does.
+    Ripser reads the upper triangle. Monotone float32 rounding commutes
+    with the minimum/maximum operations that determine the MST bottleneck.
+    """
+    n = len(D)
+    if n < 2:
+        raise IndexError("at least two points are required")
+    best = np.full(n, np.inf)
+    seen = np.zeros(n, dtype=bool)
+    best[0] = 0
+    largest = 0.0
+    indices = np.arange(n)
+    for _ in range(n):
+        vertex = int(np.argmin(best))
+        largest = max(largest, float(best[vertex]))
+        seen[vertex] = True
+        distances = D[np.minimum(indices, vertex), np.maximum(indices, vertex)]
+        np.minimum(best, distances, out=best)
+        best[seen] = np.inf
+    radius = float(np.float32(largest))
+    if radius == 0:
+        # Ripser omits zero-length bars, leaving only the infinite bar.
+        raise IndexError("no positive finite H0 death")
+    return radius
+
+
+def _radius_block(D, rows, cols, radius):
+    """Threshold original lower-triangle values, as gudhi does.
+
+    Blocks of at most 128 rows bound temporary storage even for one huge bin.
+    The upper and lower triangles can differ in their last bits.
+    """
+    rows = np.asarray(rows)[:, None]
+    cols = np.asarray(cols)[None, :]
+    return D[np.maximum(rows, cols), np.minimum(rows, cols)] <= radius
+
+
+def _bin_components(D, subset, radius, vertices):
+    """Components ordered exactly like NetworkX's induced subgraph.
+
+    Gudhi's zero-filtration vertices are in ascending index order, including
+    tied zero-distance edges. A vertex-only graph preserves NetworkX's
+    subgraph iteration optimization, which can use set order for small bins.
+    Index lists within each component are now sorted in ascending order.
+    """
+    from scipy.sparse import csr_matrix, vstack
+    from scipy.sparse.csgraph import connected_components
+
+    if not len(subset):
+        return []
+    blocks = [csr_matrix(_radius_block(D, subset[i:i + 128], subset, radius))
+              for i in range(0, len(subset), 128)]
+    adjacency = vstack(blocks, format="csr")
+    del blocks
+    _, labels = connected_components(adjacency, directed=False)
+    point_labels = dict(zip(subset, labels))
+    order = dict.fromkeys(point_labels[v] for v in vertices.subgraph(subset))
+    return [subset[labels == label].tolist() for label in order]
+
+
+def _reeb_from_distances(D, radius, function, n_bins, overlap, density_factor):
+    """Build only bin-local radius matrices, never a global edge graph."""
+    import networkx as nx
+
+    n = len(function)
+    vertices = nx.empty_graph(n)
+    f_min, f_max = np.min(function), np.max(function) + 1e-6
+    width = (f_max - f_min) / n_bins
+    ext = overlap * width
+    G = nx.Graph()
+    previous = []
+    for j in range(n_bins):
+        subset = np.where((f_min + j * width - ext <= function) &
+                          (function < f_min + (j + 1) * width + ext))[0]
+        components = _bin_components(D, subset, radius, vertices)
+        current = []
+        for comp in components:
+            if len(comp) <= n / n_bins * density_factor:
+                continue
+            node = len(G)
+            G.add_node(node, indices=comp)
+            for prev_node, prev in previous:
+                # Both sets are already connected. Their union is connected iff
+                # they intersect or have at least one edge between them.
+                joined = not set(comp).isdisjoint(prev)
+                if not joined:
+                    joined = any(_radius_block(D, comp[i:i + 128], prev, radius).any()
+                                 for i in range(0, len(comp), 128))
+                if joined:
+                    G.add_edge(node, prev_node)
+            current.append((node, comp))
+        previous = current
+    membership = np.zeros((n, len(G)), dtype=np.float32)
+    for node, attrs in G.nodes(data=True):
+        membership[attrs["indices"], node] = 1
+    return G, membership
+
+
 def _structural_summary(G) -> dict:
     """Extract topological invariants from a Reeb graph."""
     import networkx as nx
@@ -249,9 +351,8 @@ class ReebGraphModule(LatentModule):
     lens_t : int
         Diffusion time for the diffusion1 lens.
     sparse : float or None
-        Sparsity parameter for the Vietoris-Rips complex. ``None`` (default) builds the exact
-        complex; a float invokes gudhi's unseeded sparse approximation, which makes the output
-        width nondeterministic.
+        Compatibility parameter. ``fit`` requires ``None`` for exact radius
+        connectivity. Approximate complexes remain available through ``_vietoris_rips``.
     min_rad_factor : float
         Multiplier on the minimum radius for the VR complex.
     density_factor : float
@@ -261,7 +362,7 @@ class ReebGraphModule(LatentModule):
         has more rows, ``fit`` draws ``max_N`` of them with
         ``random.Random(random_state).sample(range(N), k=max_N)``, the procedure that
         ``PersistentHomology`` uses, without touching the global ``random`` state.
-        The lens, the distance matrix, the Rips complex and ``node_coordinates`` use
+        The lens, the distance matrix and ``node_coordinates`` use
         the sampled rows only. Each row that was not sampled gets the membership row
         of its nearest sampled row (Euclidean, input space), so ``fit_transform``
         still returns one row per input row. The drawn indices are reported as
@@ -286,7 +387,7 @@ class ReebGraphModule(LatentModule):
             limits=[{"op": "lt", "fact": "n_samples", "offset": 0}]),
         "lens_t": {"role": "knob", "meaning": "Diffusion time of the diffusion1 lens."},
         "sparse": {"also": [None], "role": "knob",
-                   "meaning": "Sparse Rips approximation factor; None builds the exact complex."},
+                   "meaning": "Compatibility parameter; fit requires None for exact radius connectivity."},
         "min_rad_factor": {"role": "knob",
                            "meaning": "Multiplier on the smallest H0 radius that sets the Rips edge length.",
                            "more": "More Rips edges; components join.", "less": "Fewer edges; components split."},
@@ -313,12 +414,7 @@ class ReebGraphModule(LatentModule):
         lens: str = "default",
         lens_k: int = 15,
         lens_t: int = 1,
-        # None = exact complex. `0.5` invoked gudhi's sparse Rips approximation, whose RNG is
-        # never seeded here, which made the embedding WIDTH (one column per Reeb node) vary
-        # across calls at a fixed random_state — 12, 12, 12, 11 over four runs in one process.
-        # A feature matrix whose column count is not a function of its inputs cannot be
-        # stacked into a results table or chained into a next step. Pass `sparse=0.5` to opt
-        # back into the approximation and own the nondeterminism.
+        # Retained for constructor compatibility; fit requires the exact mode.
         sparse: float | None = None,
         min_rad_factor: float = 2,
         density_factor: float = 0.0,
@@ -329,7 +425,7 @@ class ReebGraphModule(LatentModule):
         max_N: int | None = 5000,
         **kwargs,
     ):
-        # The Rips step reads the second-to-last H0 bar, so it needs two rows.
+        # A finite H0 death requires at least two rows.
         if max_N is not None and max_N < 2:
             raise ValueError(f"max_N must be None or at least 2, got {max_N}")
         super().__init__(
@@ -379,8 +475,6 @@ class ReebGraphModule(LatentModule):
             )
 
     def fit(self, x, y=None) -> None:
-        from ripser import ripser  # noqa: F401
-        import gudhi  # noqa: F401
         import networkx as nx
 
         x_np = _to_numpy(x)
@@ -403,21 +497,31 @@ class ReebGraphModule(LatentModule):
         # Compute lens function
         function = self._compute_lens(x_sub)
 
-        # Build only vertices and edges: _vr_to_graph does not use triangles,
-        # which can consume cubic memory when the radius connects all points.
         D = pairwise_distances(x_sub)
-        min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
-        _, skeleta = _vietoris_rips(
-            D, min_rad_factor=self.min_rad_factor, max_dim=1,
-            sparse=self.sparse, min_rad=min_rad,
-        )
-        H = _vr_to_graph(skeleta, function, with_weights=True)
+        if self.sparse is not None:
+            # The declared `sparse` knob opts into gudhi's sparse Rips approximation, which
+            # only gudhi builds. Keep that path; build vertices and edges only (max_dim=1).
+            from ripser import ripser
 
-        # Approximate Reeb graph
-        G, membership = _reeb_approx_graph(
-            H, function, self.n_bins,
-            overlap=self.overlap, density_factor=self.density_factor,
-        )
+            min_rad = ripser(D, distance_matrix=True, maxdim=0)['dgms'][0][-2][1]
+            _, skeleta = _vietoris_rips(
+                D, min_rad_factor=self.min_rad_factor, max_dim=1,
+                sparse=self.sparse, min_rad=min_rad,
+            )
+            H = _vr_to_graph(skeleta, function, with_weights=True)
+            G, membership = _reeb_approx_graph(
+                H, function, self.n_bins,
+                overlap=self.overlap, density_factor=self.density_factor,
+            )
+        else:
+            # Exact default: the same radius graph, built per bin from D, never as one
+            # global graph. On separated clusters the radius graph is complete.
+            min_rad = _minimum_radius(D)
+            G, membership = _reeb_from_distances(
+                D, self.min_rad_factor * min_rad, function, self.n_bins,
+                overlap=self.overlap, density_factor=self.density_factor,
+            )
+        del D
 
         self._reeb_graph = G
         if subsampled:

@@ -18,8 +18,13 @@ def _make_swissroll(n=200, seed=42):
 
 
 class TestReebGraphModule:
-    def test_fit_builds_no_triangles(self, monkeypatch):
-        """Fit requests only vertices and edges, even for separated blobs."""
+    @pytest.mark.parametrize("sparse, expected", [(None, []), (0.5, [(1, 1, 0)])])
+    def test_fit_builds_no_triangles(self, monkeypatch, sparse, expected):
+        """Fit never builds triangles, even for separated blobs.
+
+        The exact default builds no simplicial complex at all. The opt-in sparse
+        approximation asks gudhi for vertices and edges only.
+        """
         from sklearn.datasets import make_blobs
         from manylatents.algorithms.latent import reeb_graph
 
@@ -36,9 +41,9 @@ class TestReebGraphModule:
             return tree, skeleta
 
         monkeypatch.setattr(reeb_graph, "_vietoris_rips", record_vietoris_rips)
-        reeb_graph.ReebGraphModule(n_bins=5).fit(data)
+        reeb_graph.ReebGraphModule(n_bins=5, sparse=sparse).fit(data)
 
-        assert calls == [(1, 1, 0)]
+        assert calls == expected
 
     def test_one_skeleton_preserves_skeleta_and_fitted_graph(self, monkeypatch):
         """Removing triangles preserves vertices, edges, and fitted membership."""
