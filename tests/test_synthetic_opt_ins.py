@@ -5,8 +5,8 @@ the global and dedicated RNG states, captured with the unchanged generators at
 db669f0 on darwin-arm64. Random-stream states, integer arrays and the global
 draw after generation are compared exactly on every platform. Float arrays are
 compared with a tight tolerance only on the capture platform: BLAS results
-differ between platforms, and Archetypal's SVD can flip signs on Linux even on
-db669f0, so a stored float reference is not portable.
+differ between platforms. Archetypal's data and ground-truth floats are excluded
+because its closed-form simplex intentionally changes the old orientation.
 """
 import json
 import platform
@@ -66,8 +66,12 @@ def assert_matches_original(name, result):
     with np.load(here / 'synthetic_original_arrays.npz') as original:
         expected = [original[f'{name}__{i}'] for i in range(len(result['arrays']))]
     np.testing.assert_array_equal(result['arrays'][3], expected[3])  # global RNG draw
-    for got, want in zip(result['arrays'], expected):
+    for index, (got, want) in enumerate(zip(result['arrays'], expected)):
         assert got.shape == want.shape and got.dtype == want.dtype
+        # The Helmert basis replaces the old platform-dependent orientation.
+        # Keep checking labels, random-stream states and the global draw.
+        if name == 'Archetypal' and index in (0, 2):
+            continue
         if want.dtype.kind == 'f':
             if f'{sys.platform}-{platform.machine()}' == CAPTURE_PLATFORM:
                 np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-12)
