@@ -2,10 +2,15 @@
 
 synthetic_original_arrays.npz holds the arrays, and synthetic_original_results.json
 the global and dedicated RNG states, captured with the unchanged generators at
-db669f0. Float arrays are compared with a tight tolerance, not by hash, because
-BLAS results differ in the last bits between platforms.
+db669f0 on darwin-arm64. Random-stream states, integer arrays and the global
+draw after generation are compared exactly on every platform. Float arrays are
+compared with a tight tolerance only on the capture platform: BLAS results
+differ between platforms, and Archetypal's SVD can flip signs on Linux even on
+db669f0, so a stored float reference is not portable.
 """
 import json
+import platform
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -51,16 +56,21 @@ def snapshot(name, options):
                 streams=[rng.bit_generator.state for rng in streams])
 
 
+CAPTURE_PLATFORM = 'darwin-arm64'
+
+
 def assert_matches_original(name, result):
     here = Path(__file__).parent
     streams = json.loads((here / 'synthetic_original_results.json').read_text())[name]['streams']
     assert result['streams'] == streams
     with np.load(here / 'synthetic_original_arrays.npz') as original:
         expected = [original[f'{name}__{i}'] for i in range(len(result['arrays']))]
+    np.testing.assert_array_equal(result['arrays'][3], expected[3])  # global RNG draw
     for got, want in zip(result['arrays'], expected):
         assert got.shape == want.shape and got.dtype == want.dtype
         if want.dtype.kind == 'f':
-            np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-12)
+            if f'{sys.platform}-{platform.machine()}' == CAPTURE_PLATFORM:
+                np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-12)
         else:
             np.testing.assert_array_equal(got, want)
 
