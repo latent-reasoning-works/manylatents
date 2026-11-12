@@ -1,9 +1,10 @@
 """Opt-in generator contracts and frozen pre-option regression results.
 
-synthetic_original_results.json was captured with snapshot() before changing
-synthetic_dataset.py at db669f0. It includes global and dedicated RNG states.
+synthetic_original_arrays.npz holds the arrays, and synthetic_original_results.json
+the global and dedicated RNG states, captured with the unchanged generators at
+db669f0. Float arrays are compared with a tight tolerance, not by hash, because
+BLAS results differ in the last bits between platforms.
 """
-import hashlib
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -46,19 +47,32 @@ def snapshot(name, options):
     arrays = [obj.data, obj.metadata, obj.get_gt_dists(), np.random.random(10)]
     if name == 'GaussianBlobs':
         arrays.append(obj.centers)
-    return dict(arrays=[hashlib.sha256(np.asarray(a).tobytes()).hexdigest() for a in arrays],
+    return dict(arrays=[np.asarray(a) for a in arrays],
                 streams=[rng.bit_generator.state for rng in streams])
+
+
+def assert_matches_original(name, result):
+    here = Path(__file__).parent
+    streams = json.loads((here / 'synthetic_original_results.json').read_text())[name]['streams']
+    assert result['streams'] == streams
+    with np.load(here / 'synthetic_original_arrays.npz') as original:
+        expected = [original[f'{name}__{i}'] for i in range(len(result['arrays']))]
+    for got, want in zip(result['arrays'], expected):
+        assert got.shape == want.shape and got.dtype == want.dtype
+        if want.dtype.kind == 'f':
+            np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-12)
+        else:
+            np.testing.assert_array_equal(got, want)
 
 
 @pytest.mark.parametrize('name', CASES)
 def test_defaults_match_frozen_original(name):
-    expected = json.loads(Path(__file__).with_name('synthetic_original_results.json').read_text())[name]
     options = CASES[name]
-    assert snapshot(name, options) == expected
+    assert_matches_original(name, snapshot(name, options))
     defaults = dict(min_separation=None) if name == 'GaussianBlobs' else dict(noise_mode='absolute')
     if name == 'DLATreeFromGraph':
         defaults['gt_metric'] = 'hops'
-    assert snapshot(name, dict(options, **defaults)) == expected
+    assert_matches_original(name, snapshot(name, dict(options, **defaults)))
 
 
 @pytest.mark.parametrize('name', list(CASES)[:-1])

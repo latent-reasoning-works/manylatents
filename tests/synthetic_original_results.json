@@ -1,11 +1,5 @@
 {
   "SwissRoll": {
-    "arrays": [
-      "d0cd6a8576c15ee478c89d0d9fd2913b143d310a42e64dc69583ecf5c18633da",
-      "21d3c1f0d3879451d9e5059580c0195743e44d04103878336f8196304f17a77f",
-      "62a8250156c06717fd436272e6a5c300bd23b02a70defdf9ed563bb8ad7ca166",
-      "3b64fea88088b458af47c7a88e9deeb9941c7701a1487d9a4dc49e47528e6799"
-    ],
     "streams": [
       {
         "bit_generator": "PCG64",
@@ -19,12 +13,6 @@
     ]
   },
   "SwissRollGap": {
-    "arrays": [
-      "52c1b8aab98591a130f5040446c305564371d2787e4c59ee36c2b3d46337ced2",
-      "21d3c1f0d3879451d9e5059580c0195743e44d04103878336f8196304f17a77f",
-      "e4d89e3862a41ed4c144cae792ff3e3b5f12c9bd39b8be916d1eed9e1b364dbf",
-      "e0778068ca51eaabc809b94f19f808fcd412be020546e237722ea9c179f40141"
-    ],
     "streams": [
       {
         "bit_generator": "PCG64",
@@ -38,21 +26,9 @@
     ]
   },
   "SaddleSurface": {
-    "arrays": [
-      "95dfdf33f87e52d908dc595dcdfe46eb2b2dfe91812969d59c8cd9fea7aa9b70",
-      "21d3c1f0d3879451d9e5059580c0195743e44d04103878336f8196304f17a77f",
-      "25a9c2984076017330fa5813f588f26fcae96e9eb55ead89cb91268a79394a4b",
-      "17a88f9e5ea0fed35aacb9f43ef8fa9bc90486d82b39ef9972981e8c5507ce17"
-    ],
     "streams": []
   },
   "Torus": {
-    "arrays": [
-      "95db9b8da3ca50ae03654385b9ec00bc854ab2efc944b6d0d2a60e4fd623ffeb",
-      "4cc4425d04b9072bd36f12544bab9e4d98339cd92bc0b446e093a59a7c9b9a79",
-      "4740333a03d2c612bd9e4fa396daf744e050f9c2df53be3bd10bf4e9873dd099",
-      "3b64fea88088b458af47c7a88e9deeb9941c7701a1487d9a4dc49e47528e6799"
-    ],
     "streams": [
       {
         "bit_generator": "PCG64",
@@ -66,31 +42,12 @@
     ]
   },
   "Archetypal": {
-    "arrays": [
-      "145f7e4980311fb54121cbff85ae2fe6c6314a5473f887c8bd6c462830abd72f",
-      "22792dea0f29adfa953d51f483bdbde899d638395214ce818e80fd2f640a18af",
-      "51cefbac624431c981aacc9cc0dec8d63d3e3e3559e105a2538a986e067e107e",
-      "840ba0cd996e471ee77391c4e09dc10dec917632bd8439850acc69c24ba7515b"
-    ],
     "streams": []
   },
   "DLATreeFromGraph": {
-    "arrays": [
-      "59dbab7480a22379367ae26ae8fc23f222d5cb3fdba21321d4dc51d11619a6c9",
-      "6fa1831683d677dfa325b380e719951858bda9b1a4344166e667981dbd87d188",
-      "a7219eff45d983a905646d17eec8b3c7ffd0fbe6616b5e06a91aa8c8340116a2",
-      "bda1d2d0fb49ff36877bdcf1980e9a1ca75df2c0362e7f0d7c56bc2b718f8843"
-    ],
     "streams": []
   },
   "GaussianBlobs": {
-    "arrays": [
-      "6b69df2edcbcfc94c065380950e5f73fe9185cd1167ad4b48397ae7cc55ab482",
-      "26ff791e8b9b21f20d25dc0c41a4fade5c9d730d7b67b86739f08eb89c96cc2e",
-      "a2e476384c56f4dba01867425cde1631e3c9cf8e698e3ed6b0d4d4326aa58243",
-      "b39b9fc4545ce59060e9f22babf3b6efcdd9cd836fdd2bfb569d0d5d66e806ce",
-      "b13ce10af51bfec4e118df556f97e979b65309e5c4af9ec147aa3374f31a3c63"
-    ],
     "streams": []
   }
 }
