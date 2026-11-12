@@ -206,3 +206,114 @@ covering the paper's 20 datasets or a subset. Its source depends on question 5.
 7. **Scope.** Which of `uniform`, `kerf`, `oob`, `boosted` are worth exposing in manylatents
    beyond `gap`, and is there a planned ForestGeom API change (node or path geometry, GPU)
    we should wait for?
+
+---
+
+## 5. Implementation handoff
+
+The implementation will be done by a coding agent (Codex) that starts with none of the
+context above. Each task below is written to be handed over as it stands: one task, one
+branch, one PR.
+
+**Rules for every task**
+
+- Read `CLAUDE.md`, `ARCHITECTURE.md` and `CONTRIBUTING.md` first. They are the repository's
+  contributor rules, whatever the file name says.
+- Run with `uv run`. Before pushing:
+  `uv run pytest tests/ -x -q && uv run pytest manylatents/callbacks/tests/ -x -q`.
+- Keep the change to the files named in the task. Do not add experiment configs, sweeps or
+  analysis scripts.
+- A measurement that cannot be made raises
+  `manylatents.utils.exceptions.MeasurementUnavailable`. It never returns NaN or a
+  placeholder.
+- Every new test must fail on `main` and pass on the branch.
+
+**What is ready and what is blocked**
+
+| Task | State |
+|---|---|
+| T0.1 – T0.4 (phase 0) | Ready now. No dependency on ForestGeom or on Adrien's answers. |
+| Phase 1 | Ready after T0.1 and T0.2. Scheme list waits on question 7; `gap` and `kerf` are safe to start with. |
+| Phase 4: `knn_accuracy`, `oos_*` | Ready after T0.4, once question 3 confirms the K grid and averaging. |
+| Phase 4: importances and `sia` | Blocked on question 3. |
+| Phases 2 and 3 | Blocked on questions 2 and 4. |
+| Phase 5 | Blocked on question 5. |
+
+### T0.1 — labels reach the module in split mode
+
+- **Problem:** `run_experiment` (`manylatents/experiment.py`, step 4b) reads
+  `train_dataset.get_labels` and `test_dataset.get_labels`. In `mode="split"` both datasets
+  are `torch.utils.data.Subset`, which has no `get_labels`, so `algorithm.fit(x, None)` is
+  called and the returned `label` is `None`.
+- **Change:** pass both datasets through the existing `_unwrap_for_metrics` before the
+  `hasattr(..., "get_labels")` checks. `_SubsetView` already realigns `get_labels` by
+  `subset.indices`.
+- **Files:** `manylatents/experiment.py`; new `tests/test_supervised_labels.py`.
+- **Test:** `run(data="gaussian_blob", algorithm=<LatentModule that records y>,
+  data_kwargs={"n_samples": 400, "mode": "split"})`. Assert `fit` received 320 labels, that
+  they equal the full dataset's labels at the train subset's indices, and that
+  `result["label"]` has 80 entries.
+
+### T0.2 — labels for in-memory data
+
+- **Problem:** `run(input_data=X)` wraps `X` in `PrecomputedDataModule`, which accepts labels
+  only from a file (`label_col`, `labels_path`).
+- **Change:** add `labels: np.ndarray | None = None` to `run()` in `manylatents/api.py` and
+  to `PrecomputedDataModule.__init__`, next to the existing `time` argument and handled the
+  same way (kept out of `save_hyperparameters`, passed to `InMemoryDataset`). A length that
+  differs from `len(input_data)` raises `ValueError`. `labels` with `data=<name>` raises
+  `ValueError`: named datasets carry their own labels.
+- **Files:** `manylatents/api.py`, `manylatents/data/precomputed_datamodule.py`,
+  `manylatents/data/precomputed_dataset.py`, `tests/test_supervised_labels.py`,
+  `docs/api_usage.md`.
+- **Test:** `run(input_data=X, labels=y, algorithm=<recorder>)` in both modes; `fit`
+  receives `y` row-aligned with `x`. Mismatched length raises.
+
+### T0.3 — a dataset with no labels reports none
+
+- **Problem:** the three dataset classes in `manylatents/data/precomputed_dataset.py` return
+  `np.zeros(len(self.data))` from `get_labels()` when they have no labels. The engine passes
+  that to `fit` as real labels. Measured: `ClassifierModule` receives 200 labels with one
+  class.
+- **Change:** add a `has_labels` property to those three classes, `False` exactly when
+  `get_labels()` would fabricate zeros. In `run_experiment` step 4b, set
+  `train_labels = None` when the (unwrapped) dataset has `has_labels` and it is `False`. A
+  dataset without the attribute behaves as today. Leave `get_labels()` and `output_labels`
+  unchanged, because plotting callbacks rely on the zeros. Add `has_labels` to the
+  attributes `_SubsetView` forwards unsliced.
+- **Files:** `manylatents/data/precomputed_dataset.py`, `manylatents/experiment.py`,
+  `tests/test_supervised_labels.py`.
+- **Test:** `run(input_data=X, algorithm=<recorder>)` gives `fit` a `y` of `None`;
+  `ClassifierModule` then raises its own "requires labels" error. `result["label"]` is
+  unchanged from `main`.
+
+### T0.4 — a train-side reference for metrics
+
+- **Problem:** a metric receives `(embeddings, dataset, module, cache)`, which describe the
+  evaluated rows only. Out-of-sample scores need the train rows in both spaces and the
+  train labels. In split mode the train embedding is never computed.
+- **Change:**
+  1. `LatentModule.training_embedding(x)` in `latent_module_base.py`: a non-abstract method
+     that returns `self.transform(x)`. Modules whose fitted embedding differs from
+     `transform` of the fit rows override it.
+  2. `evaluate()` in `manylatents/evaluate.py` takes `reference: dict | None = None` and
+     passes it to every metric whose signature has a parameter named `reference`, on both
+     the registry path and the Hydra path. Metrics without that parameter are called
+     exactly as today.
+  3. `run_experiment` builds
+     `{"data": X_train, "labels": y_train or None, "embedding": Z_train}` only when at least
+     one requested metric declares `reference`. Use `inspect.signature`, as
+     `extract_k_requirements` does for `k`. `Z_train` is `training_embedding(train_tensor)`
+     for a LatentModule and `encode(train_tensor)` for a LightningModule. In `mode="full"`
+     the reference is the evaluated rows themselves and the already computed embedding is
+     reused. All three values are numpy arrays in the fit row order.
+  4. A metric that declares `reference` and receives `None` raises
+     `MeasurementUnavailable`.
+- **Files:** `manylatents/algorithms/latent/latent_module_base.py`,
+  `manylatents/evaluate.py`, `manylatents/experiment.py`, `manylatents/metrics/metric.py`
+  (document the parameter), `docs/evaluation.md`, new `tests/test_metric_reference.py`.
+- **Test:** register a test-only metric that returns `reference["embedding"].shape[0]`. In
+  split mode on `gaussian_blob` with 400 samples it returns 320, and
+  `reference["labels"]` matches the labels `fit` received. A run whose metrics do not
+  declare `reference` never calls `training_embedding` (assert with a module that raises
+  from it). Existing metric tests pass unchanged.
