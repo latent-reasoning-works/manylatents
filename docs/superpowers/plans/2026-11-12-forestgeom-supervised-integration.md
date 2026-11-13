@@ -1,6 +1,6 @@
 # ForestGeom and supervised representation learning in manylatents: audit and plan
 
-**Status:** plan for discussion. No code in this PR. Nothing below is decided until the open
+**Status:** plan for discussion. No library code in this PR. Nothing below is decided until the open
 questions in the last section are answered.
 
 **Goal:** make supervised, forest-guided dimensionality reduction a first-class part of
@@ -106,58 +106,94 @@ training rows, which is the weakness RF-AE was built to fix.
 Five phases. Each is one or more PRs that pass CI by themselves. Phases 1 and 4 both depend
 on phase 0 and on nothing else, so they can proceed in parallel.
 
-### Phase 0 — labels and a train-side reference (no ForestGeom)
+### Design decisions
 
-- Labels reach the module in split mode (M1), and `run(input_data=X, labels=y)` works (M2).
-- A dataset with no labels reports none (M3). The zeros stay available to plotting callbacks
-  only.
-- **Reference slot (M4).** A metric that declares a `reference` parameter receives
-  `{"data": X_train, "labels": y_train, "embedding": Z_train}`. The engine builds it only
-  when a requested metric asks for it, by the same signature scan that `prewarm_cache` uses
-  for `k`. `Z_train` comes from a new optional module hook `training_embedding()`, which
-  defaults to `transform(X_train)`. The hook exists because for bootstrap-dependent schemes
-  the fitted train embedding is not `transform(X_train)`: ForestGeom documents that
-  `fit_transform` and `fit().transform` differ for `gap`.
+Four choices shape the phases. Each was weighed against heavier alternatives; the
+alternatives are listed so they are not proposed again without a new reason.
+
+| Decision | Chosen | Rejected, and why |
+|---|---|---|
+| Supervision target | `y` stays a plain array. A `target` argument (an array or a metadata column name) says which array supervises the fit. `get_labels()` keeps its other job, colouring plots. | A typed target carrying "classification" or "regression": the module decides the task, as in scikit-learn. A supervised datamodule base class: it would change every datamodule and the omics extension's contract. |
+| Train rows in evaluation | The engine builds one `Split` object (train and test features, targets, embeddings) and passes it to metrics that ask for it. | Storing fit data on the module: metrics get `module=None` for Lightning algorithms. Library functions only: scores would not appear in `run()` results or sweeps. |
+| Proximity into an embedder | Nesting: a wrapper module holds a geometry module and an embedder, as `SelectiveCorrectionModule(inner=...)` already does. | One module per pairing (RF-PHATE, RF-UMAP, …): repeats the forest logic. A formal proximity-provider protocol: premature with one provider. A sequential pipeline: RF-AE needs a side input, so a chain is not enough. |
+| RF-AE's base class | `LatentModule`, with the network trained inside `fit`. | `LightningModule`: labels would have to come through the datamodule, the engine calls `encode` on raw test features, and the forest would have to be pickled into checkpoints. `ARCHITECTURE.md` says the choice of base is about API surface, not gradients. |
+
+Revisit the heavier options when a second supervised family arrives, or when repeated or
+cross-validated runs are wanted inside `run()`. If a data abstraction is built then, it
+should cover per-row annotations in general (labels, time, metadata), not labels alone.
+
+### Phase 0 — supervision plumbing (no ForestGeom)
+
+- Labels reach the module in split mode (M1).
+- `target`: `run(..., target=y)` or `run(..., target="column")` chooses the supervision
+  array (M2). Without it, the dataset's own labels are used, as today.
+- A dataset with no labels supplies none (M3). The zeros stay available to plotting
+  callbacks only.
+- **`Split` (M4).** A frozen dataclass with `x_train`, `y_train`, `z_train`, `x_test`,
+  `y_test`, `z_test`. A metric that declares a `split` parameter receives it. The engine
+  builds it only when a requested metric asks, by the same signature scan that
+  `extract_k_requirements` uses for `k`. `z_train` comes from a new optional module hook,
+  `training_embedding()`, which defaults to `transform(x_train)`. The hook exists because
+  for bootstrap-dependent schemes the fitted train embedding is not `transform(x_train)`:
+  ForestGeom documents that `fit_transform` and `fit().transform` differ for `gap`.
+- A `stratify` option on the datamodules that split discrete labels. The RF-AE protocol
+  uses stratified 80/20 splits; `random_split` is not stratified.
 
 ### Phase 1 — `ForestProximityModule` (LatentModule, extra `forest`)
 
 - New extra: `forest = ["forestgeom>=0.4"]`, imported inside methods.
 - Parameters: `forest` (`rf`, `extra_trees`, `random_trees`, `gbt`, `xgb`, `lgbm`, or an
-  estimator instance), `task` (`classification`, `regression`, `auto` from the label dtype),
-  `weight_scheme`, `n_estimators`, `min_samples_leaf`, `random_state`, `n_jobs`.
+  estimator instance), `task` (`classification` or `regression`, required for supervised
+  forests), `weight_scheme`, `n_estimators`, `min_samples_leaf`, `random_state`, `n_jobs`.
 - Output: the top `n_components` singular directions of the sparse map `Q` ("leaf PCA", as
   in ForestGeom's `demo_leaf_pca`). It is matrix-free and has a native out-of-sample
   `transform` (`query_map(X_new) · V`).
-- `kernel()` and `affinity()` return the proximity, so every existing `at: kernel` and
-  `at: affinity` metric (spectral entropy, spectral gap, kernel sparsity, …) applies to a
-  supervised geometry with no further work.
+- `proximity(x=None)`: the sparse train–train block when `x` is `None`, the query–train
+  block otherwise. This plain method is what phases 2 and 3 consume.
+- `kernel()` and `affinity()` return the dense train–train proximity, so every existing
+  `at: kernel` and `at: affinity` metric applies to a supervised geometry.
 - Guards from the audit: the wrapper fits the forest itself (F2) and rejects `max_samples`
   with `oob` or `gap` (F1).
 - `random_trees` needs no labels, so the same module is also an unsupervised baseline.
 
-### Phase 2 — RF-PHATE (LatentModule)
+### Phase 2 — `ForestGuidedModule` (LatentModule): RF-PHATE and its siblings
 
-- Proximities from phase 1 into PHATE's diffusion and MDS.
-- Out-of-sample: the linear kernel extension, which RF-AE uses as RF-PHATE's baseline.
-- Whether this wraps the `rfphate` package or is built on `PHATEModule` depends on
-  question 2.
+- `ForestGuidedModule(geometry=<module with proximity()>, embedder=<LatentModule>)`. Both
+  are nested Hydra nodes, as in `configs/algorithms/latent/selective_correction.yaml`.
+- `fit(x, y)`: fit the geometry, take the symmetrised train–train proximity, and hand it to
+  the embedder. PHATE receives it as an affinity (`knn_dist="precomputed_affinity"`). UMAP,
+  t-SNE and Isomap receive a distance (`input_metric="precomputed"`), by default
+  `max(P) − P`; the conversion is a parameter.
+- `transform(x)`: the linear kernel extension, `Z = rownorm(P(x, train)) · Z_train`. It is
+  written once and serves every embedder. `training_embedding()` returns the fitted
+  `Z_train`.
+- Shipped config: `rf_phate.yaml` (`gap` forest geometry, PHATE embedder).
+- Limit: the handoff is a dense n × n matrix.
+- If the RF-PHATE recipe cannot be expressed as "PHATE on a precomputed affinity"
+  (question 2), `rf_phate` becomes a dedicated module that wraps `rfphate`, and
+  `ForestGuidedModule` stays for the other embedders.
 
-### Phase 3 — RF-AE (LightningModule)
+### Phase 3 — `RFAEModule` (LatentModule)
 
-- Input: rows of row-normalised RF-GAP proximities, restricted to N\* prototypes chosen by
-  class-wise k-medoids on `max(P) − P`.
-- Loss: `λ · JSD(p, p̂) + (1 − λ) · ‖z − z_G‖²`, where `z_G` is the phase 2 embedding.
-  Defaults from the paper: λ = 0.01, N\* = 0.1 · n_train, encoder 800-400-100-2, ELU, softmax
-  output, AdamW (lr 1e-3, weight decay 1e-5), batch 512, 200 epochs.
-- New pieces: a JSD loss, a proximity-row datamodule wrapper, and a k-medoids dependency
-  (the paper uses FasterPAM).
-- `Reconstruction` cannot be reused unchanged: it reconstructs `batch["data"]` and has no
-  per-row target.
+- `fit(x, y)`, in stages:
+  1. Fit the geometry module (`gap`); take the symmetrised proximity with adjusted diagonal.
+  2. Choose N\* prototypes by class-wise k-medoids on `max(P) − P`.
+  3. Build each training row: proximities to the prototypes, normalised to sum to 1.
+  4. Fit the nested target embedder (the phase 2 module) to get `z_G`.
+  5. Train the autoencoder with loss `λ · JSD(p, p̂) + (1 − λ) · ‖z − z_G‖²`.
+- `transform(x)`: `proximity(x)` restricted to the prototypes, normalised, then the encoder.
+- Defaults from the paper: λ = 0.01, N\* = 0.1 · n_train, encoder 800-400-100-2, ELU,
+  softmax output, AdamW (lr 1e-3, weight decay 1e-5), batch 512, 200 epochs.
+- Training runs an inner `lightning.Trainer` over a private LightningModule, so loss curves
+  still reach the configured logger. The network reuses
+  `algorithms/lightning/networks/autoencoder.py` where it fits.
+- New pieces: a JSD loss and a k-medoids dependency (the paper uses FasterPAM).
 
 ### Phase 4 — RF-AE evaluation metrics (needs phase 0 only)
 
-All are scored on test rows against train rows. K runs from 5 to √n_train in steps of 10,
-and scores are averaged over K.
+All are scored on test rows against train rows, read from `split`. K runs from 5 to
+√n_train in steps of 10, and scores are averaged over K. Each score is first a plain
+function of arrays in `manylatents/metrics/`, then a registered metric that wraps it.
 
 | Metric | Definition |
 |---|---|
@@ -188,7 +224,8 @@ covering the paper's 20 datasets or a subset. Its source depends on question 5.
    licence be possible? It decides whether ForestGeom stays an optional import or can become
    a core dependency.
 2. **RF-PHATE recipe.** What are the exact steps from RF-GAP proximities to the RF-PHATE
-   embedding (normalisation, diffusion time, any kNN or decay step)? Should manylatents wrap
+   embedding (normalisation, diffusion time, any kNN or decay step)? Can it be written as
+   PHATE on a precomputed affinity, which is what phase 2 assumes? Should manylatents wrap
    `rfphate`, or build on ForestGeom and its own PHATE? Is there a reference RF-AE
    implementation we should port, or should we write it from the paper?
 3. **Metrics.** Are the definitions in phase 4 right? Is the evaluation code public? Which
@@ -217,8 +254,7 @@ branch, one PR.
 
 **Rules for every task**
 
-- Read `CLAUDE.md`, `ARCHITECTURE.md` and `CONTRIBUTING.md` first. They are the repository's
-  contributor rules, whatever the file name says.
+- Read `AGENTS.md`, then `CLAUDE.md`, `ARCHITECTURE.md` and `CONTRIBUTING.md`.
 - Run with `uv run`. Before pushing:
   `uv run pytest tests/ -x -q && uv run pytest manylatents/callbacks/tests/ -x -q`.
 - Keep the change to the files named in the task. Do not add experiment configs, sweeps or
@@ -227,17 +263,21 @@ branch, one PR.
   `manylatents.utils.exceptions.MeasurementUnavailable`. It never returns NaN or a
   placeholder.
 - Every new test must fail on `main` and pass on the branch.
+- With none of the new arguments set, results must be identical to `main`.
 
 **What is ready and what is blocked**
 
 | Task | State |
 |---|---|
-| T0.1 – T0.4 (phase 0) | Ready now. No dependency on ForestGeom or on Adrien's answers. |
+| T0.1 – T0.5 (phase 0) | Ready now. No dependency on ForestGeom or on Adrien's answers. T0.2 and T0.3 build on T0.1; T0.4 builds on T0.2. |
 | Phase 1 | Ready after T0.1 and T0.2. Scheme list waits on question 7; `gap` and `kerf` are safe to start with. |
+| Phase 2: `ForestGuidedModule` | Ready after phase 1. The `rf_phate` config waits on question 2. |
 | Phase 4: `knn_accuracy`, `oos_*` | Ready after T0.4, once question 3 confirms the K grid and averaging. |
 | Phase 4: importances and `sia` | Blocked on question 3. |
-| Phases 2 and 3 | Blocked on questions 2 and 4. |
+| Phase 3 | Blocked on questions 2 and 4. |
 | Phase 5 | Blocked on question 5. |
+
+Briefs for phases 1 to 5 are written when their blocking questions are answered.
 
 ### T0.1 — labels reach the module in split mode
 
@@ -254,66 +294,100 @@ branch, one PR.
   they equal the full dataset's labels at the train subset's indices, and that
   `result["label"]` has 80 entries.
 
-### T0.2 — labels for in-memory data
+### T0.2 — `target`: choose the supervision array
 
-- **Problem:** `run(input_data=X)` wraps `X` in `PrecomputedDataModule`, which accepts labels
-  only from a file (`label_col`, `labels_path`).
-- **Change:** add `labels: np.ndarray | None = None` to `run()` in `manylatents/api.py` and
-  to `PrecomputedDataModule.__init__`, next to the existing `time` argument and handled the
-  same way (kept out of `save_hyperparameters`, passed to `InMemoryDataset`). A length that
-  differs from `len(input_data)` raises `ValueError`. `labels` with `data=<name>` raises
-  `ValueError`: named datasets carry their own labels.
-- **Files:** `manylatents/api.py`, `manylatents/data/precomputed_datamodule.py`,
-  `manylatents/data/precomputed_dataset.py`, `tests/test_supervised_labels.py`,
-  `docs/api_usage.md`.
-- **Test:** `run(input_data=X, labels=y, algorithm=<recorder>)` in both modes; `fit`
-  receives `y` row-aligned with `x`. Mismatched length raises.
+- **Problem:** the array passed to `fit` as `y` is whatever `get_labels()` returns.
+  `run(input_data=X)` has no way to supply one, and a dataset with several label columns
+  has no way to choose.
+- **Change:** add `target=None` to `run()` (`manylatents/api.py`) and to `run_experiment`,
+  and a top-level `target: null` key to the Hydra config (`manylatents/configs/config.py`,
+  forwarded in `manylatents/main.py`).
+  - An array must have one entry per row of the full dataset, before any split. The engine
+    aligns it to the train and test rows: by `subset.indices` when the dataset is a
+    `Subset`, unchanged otherwise. A wrong length raises `ValueError`.
+  - A string names a column of the dataset's `metadata`. It is read through the unwrapped
+    dataset, so it is already row-aligned. A missing column, or a dataset with no tabular
+    `metadata`, raises `ValueError` naming what is available.
+  - The resolved train array replaces `train_labels` in step 4b, before pre-fit sampling,
+    which already slices it. The resolved test array is kept for T0.4.
+  - `target` changes only what `fit` and `Split` receive. `result["label"]` and plotting
+    are unchanged.
+- **Files:** `manylatents/api.py`, `manylatents/experiment.py`, `manylatents/main.py`,
+  `manylatents/configs/config.py`, `tests/test_supervised_labels.py`, `docs/api_usage.md`.
+- **Test:** `run(input_data=X, target=y, algorithm=<recorder>)` with the default datamodule
+  and with a split one; `fit` receives `y` row-aligned with `x` (check by making `y` a
+  function of a column of `X`). Wrong length raises. On `gaussian_blob`, an explicit
+  `target` wins over the dataset's labels.
 
-### T0.3 — a dataset with no labels reports none
+### T0.3 — a dataset with no labels supplies none
 
 - **Problem:** the three dataset classes in `manylatents/data/precomputed_dataset.py` return
   `np.zeros(len(self.data))` from `get_labels()` when they have no labels. The engine passes
   that to `fit` as real labels. Measured: `ClassifierModule` receives 200 labels with one
   class.
 - **Change:** add a `has_labels` property to those three classes, `False` exactly when
-  `get_labels()` would fabricate zeros. In `run_experiment` step 4b, set
-  `train_labels = None` when the (unwrapped) dataset has `has_labels` and it is `False`. A
+  `get_labels()` would fabricate zeros. In `run_experiment` step 4b, when no `target` is
+  given and the unwrapped dataset has `has_labels == False`, set `train_labels = None`. A
   dataset without the attribute behaves as today. Leave `get_labels()` and `output_labels`
-  unchanged, because plotting callbacks rely on the zeros. Add `has_labels` to the
-  attributes `_SubsetView` forwards unsliced.
+  unchanged, because plotting callbacks rely on the zeros. Let `_SubsetView` forward
+  `has_labels` unsliced.
 - **Files:** `manylatents/data/precomputed_dataset.py`, `manylatents/experiment.py`,
   `tests/test_supervised_labels.py`.
 - **Test:** `run(input_data=X, algorithm=<recorder>)` gives `fit` a `y` of `None`;
   `ClassifierModule` then raises its own "requires labels" error. `result["label"]` is
   unchanged from `main`.
 
-### T0.4 — a train-side reference for metrics
+### T0.4 — `Split`: train rows for metrics
 
 - **Problem:** a metric receives `(embeddings, dataset, module, cache)`, which describe the
-  evaluated rows only. Out-of-sample scores need the train rows in both spaces and the
-  train labels. In split mode the train embedding is never computed.
+  evaluated rows only. Out-of-sample scores need the train rows in both spaces and both
+  target arrays. In split mode the train embedding is never computed.
 - **Change:**
   1. `LatentModule.training_embedding(x)` in `latent_module_base.py`: a non-abstract method
      that returns `self.transform(x)`. Modules whose fitted embedding differs from
      `transform` of the fit rows override it.
-  2. `evaluate()` in `manylatents/evaluate.py` takes `reference: dict | None = None` and
-     passes it to every metric whose signature has a parameter named `reference`, on both
-     the registry path and the Hydra path. Metrics without that parameter are called
-     exactly as today.
-  3. `run_experiment` builds
-     `{"data": X_train, "labels": y_train or None, "embedding": Z_train}` only when at least
-     one requested metric declares `reference`. Use `inspect.signature`, as
-     `extract_k_requirements` does for `k`. `Z_train` is `training_embedding(train_tensor)`
-     for a LatentModule and `encode(train_tensor)` for a LightningModule. In `mode="full"`
-     the reference is the evaluated rows themselves and the already computed embedding is
-     reused. All three values are numpy arrays in the fit row order.
-  4. A metric that declares `reference` and receives `None` raises
-     `MeasurementUnavailable`.
+  2. `Split` in `manylatents/evaluate.py`: a frozen dataclass with `x_train`, `y_train`,
+     `z_train`, `x_test`, `y_test`, `z_test`. All are numpy arrays; the two `y` fields may
+     be `None`. Rows of the three train fields correspond, and so do rows of the three test
+     fields.
+  3. `evaluate()` takes `split: Split | None = None` and passes it to every metric whose
+     signature has a parameter named `split`, on both the registry path and the Hydra
+     path. Metrics without that parameter are called exactly as today.
+  4. `run_experiment` builds the `Split` only when at least one requested metric declares
+     `split`. Use `inspect.signature`, as `extract_k_requirements` does for `k`.
+     - `z_train` is `training_embedding(x_train)` for a LatentModule and `encode(x_train)`
+       for a LightningModule.
+     - `x_train` must be unrolled in **dataset order**. For a LightningModule the engine's
+       existing `train_tensor` comes from the shuffled train loader and must not be used
+       here; unroll the train dataset with `shuffle=False`, as the LatentModule branch
+       already does.
+     - In `mode="full"` the train fields are the same objects as the test fields and the
+       already computed embedding is reused.
+     - When pre-fit sampling is active, the train fields are the sampled rows.
+  5. A metric that declares `split` and receives `None` raises `MeasurementUnavailable`.
 - **Files:** `manylatents/algorithms/latent/latent_module_base.py`,
   `manylatents/evaluate.py`, `manylatents/experiment.py`, `manylatents/metrics/metric.py`
-  (document the parameter), `docs/evaluation.md`, new `tests/test_metric_reference.py`.
-- **Test:** register a test-only metric that returns `reference["embedding"].shape[0]`. In
-  split mode on `gaussian_blob` with 400 samples it returns 320, and
-  `reference["labels"]` matches the labels `fit` received. A run whose metrics do not
-  declare `reference` never calls `training_embedding` (assert with a module that raises
-  from it). Existing metric tests pass unchanged.
+  (document the parameter), `docs/evaluation.md`, new `tests/test_metric_split.py`.
+- **Test:** register a test-only metric that returns `split.z_train.shape[0]`. In split
+  mode on `gaussian_blob` with 400 samples it returns 320; `split.y_train` equals the labels
+  `fit` received; `split.y_test` has 80 entries. A run whose metrics do not declare `split`
+  never calls `training_embedding` (assert with a module that raises from it). With a
+  LightningModule (`ae_reconstruction`, `fast_dev_run`), `split.x_train` equals the train
+  dataset's rows in dataset order. Existing metric tests pass unchanged.
+
+### T0.5 — stratified splits
+
+- **Problem:** split-mode datamodules call `torch.utils.data.random_split`, which ignores
+  class balance. The RF-AE protocol uses a stratified 80/20 split.
+- **Change:** add `stratify: bool = False` to `GaussianBlobDataModule` and
+  `PrecomputedDataModule`. When `True` in `mode="split"`, build the two `Subset`s from
+  `sklearn.model_selection.train_test_split(np.arange(n), test_size=test_split,
+  stratify=labels, random_state=seed)`. When `False`, the code path and the resulting
+  split are unchanged. `stratify=True` on a dataset with no real labels (T0.3) raises
+  `ValueError`. Add `stratify: false` to the two data configs.
+- **Files:** `manylatents/data/gaussian_blobs.py`,
+  `manylatents/data/precomputed_datamodule.py`, `manylatents/configs/data/gaussian_blobs.yaml`,
+  `manylatents/configs/data/precomputed.yaml`, new `tests/test_stratified_split.py`.
+- **Test:** on imbalanced blobs, class proportions in train and test match the full
+  dataset to within one sample per class with `stratify=True`. With `stratify=False`, the
+  train and test indices equal those on `main` for the same seed.
