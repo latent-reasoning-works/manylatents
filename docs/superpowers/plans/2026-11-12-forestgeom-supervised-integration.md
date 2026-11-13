@@ -11,11 +11,16 @@ RF-AE as algorithms, and the evaluation protocol of the RF-AE paper
 
 **What exists today:** one supervised module, `ClassifierModule`
 (`manylatents/algorithms/latent/classifier.py`). It is a logistic regression whose
-"embedding" is one column, P(y=1|x), scored by one metric, `AUC`. It handles binary labels
-only.
+"embedding" is one column, P(y=1|x), scored by one metric, `AUC`. It is meant for binary
+labels, but it does not enforce that: it returns probability column 1 for any label array.
 
 Everything in the "measured" tables was run on 2026-11-12 against ForestGeom 0.4.0 (commit
 `053ef74`) and manylatents `ad0e10e`, with scikit-learn 1.8.0.
+
+**Revision of 2026-11-13.** An independent review (Codex, read-only, at `8b39420`) checked
+every claim about the code and every task brief. Its confirmed findings are folded in:
+corrections to the audit in section 2, the "Constraints found in review" list in section 3,
+a new task T0.0, and rewritten briefs for T0.1 to T0.5.
 
 ---
 
@@ -72,13 +77,14 @@ relicensed is its authors' call (question 1).
 
 | # | Gap | Measured |
 |---|---|---|
-| M1 | In `mode="split"`, labels never reach the module. `run_experiment` reads `train_dataset.get_labels`, and a `random_split` `Subset` has no such method. | `run(data="gaussian_blob", data_kwargs={"mode": "split"})`: the module's `fit` receives `y=None`. In `mode="full"` it receives 400 labels. |
+| M1 | In `mode="split"`, labels never reach the module. `run_experiment` reads `train_dataset.get_labels`, and a `random_split` `Subset` has no such method. | `run(data="gaussian_blob", data_kwargs={"n_samples": 400, "mode": "split"})`: the module's `fit` receives `y=None`. In `mode="full"` it receives 400 labels. |
 | M2 | `run(input_data=X)` has no way to pass labels. `PrecomputedDataModule` takes labels only from a file. | `data_kwargs={"labels": y}` raises `TypeError`. |
 | M3 | With no labels, the in-memory dataset's `get_labels()` returns `np.zeros(n)` (`data/precomputed_dataset.py`), and the engine hands that to the module as real labels. | `ClassifierModule` receives 200 labels with one class. |
 | M4 | The metric protocol is `(embeddings, dataset, module, cache)`: one set of rows. The RF-AE scores compare **test rows against train rows** in both spaces and need train labels. `metrics/reference_geometry.py` already says the protocol "has no slot" for a second array. | In split mode the train embedding is never computed: the engine runs `fit(train)` then `transform(test)`. |
-| M5 | No k-NN accuracy metric. `Trustworthiness`, `KNNPreservation` and `PearsonCorrelation` score a set against itself. No Kendall-τ importance alignment. | 125 registered names; the label-aware ones are `AUC` and `SilhouetteScore`. |
+| M5 | No k-NN accuracy metric. `Trustworthiness`, `KNNPreservation` and `PearsonCorrelation` score a set against itself. No Kendall-τ importance alignment. | 125 registered names. The label-aware ones (`AUC`, `SilhouetteScore`, and those in `stratification.py`, `outlier_score.py`, `subspace_commitment.py`) all read labels of the evaluated rows only. |
 | M6 | `PHATEModule(knn_dist="precomputed_affinity")` fits on a proximity matrix but cannot embed new rows. | `transform` raises `Cannot transform additional data using a precomputed distance matrix`. |
-| M7 | No labelled real dataset in core. All core datamodules are synthetic. | `manylatents/configs/data/`. |
+| M7 | No labelled tabular benchmark dataset in core. The core datamodules are synthetic, text, reasoning traces, or precomputed files. | `manylatents/configs/data/`. |
+| M8 | Pre-fit sampling applies the train indices to the test tensor and to the output labels (`experiment.py`, step 4c). That is right only when train and test are the same rows. | Read from the code. In `mode="split"` the test rows are indexed with indices drawn for another dataset. |
 
 ### Feasibility check
 
@@ -120,8 +126,37 @@ alternatives are listed so they are not proposed again without a new reason.
 
 `Split` and `target` are not specific to forests. The pop-gen datamodule in
 manylatents-omics loads predefined fit and projection sets as separate train and test
-datasets, so its runs receive a `Split` with no change to omics, and `target="Population"`
-selects among its label columns.
+datasets, so its runs can receive a `Split`, and `target="Population"` selects among its
+label columns. One change to omics is needed first: `ManifoldGeneticsDataset` builds its
+label encoder per dataset from that dataset's own sorted names, so the train set and the
+test set can give different integers to the same population. Until the two datasets share
+one encoder, a label-based score on an omics `Split` is not valid.
+
+### Constraints found in review
+
+These are facts about the current code that the phases must respect.
+
+- **`target` supervises LatentModules only.** A LightningModule trains from datamodule
+  batches, so the engine rejects `target` with one. Existing label-aware metrics keep
+  reading the dataset's labels; only metrics that take `split` see `target`.
+- **A `Split` needs one fit.** When `transform` raises `NotImplementedError`, the engine
+  refits on the test rows. No `Split` is built on that path.
+- **Full mode is in-sample.** `Split.held_out` is `False` when the train rows and the test
+  rows are the same. Phase 4 metrics refuse such a split and do not report training-set
+  accuracy as a score.
+- **`fit_transform` must be overridden** by the phase 1 and phase 2 modules. The inherited
+  one calls `fit` then `transform`, which for `gap` returns the query extension for the fit
+  rows, and full mode uses `fit_transform`.
+- **Nesting through the Python API.** `_instantiate_target` in `manylatents/api.py` does not
+  instantiate child dicts. Phase 2 either makes it recursive or documents that the API takes
+  module instances.
+- **Dense outputs are collected on every run.** `collect_outputs` calls `kernel()` and
+  `affinity()` whenever they exist. Phase 1 must make the dense matrices opt-in, or the
+  "matrix-free" module allocates n × n in ordinary runs.
+- **RF-AE.** The geometry must be fitted once and shared with the nested target embedder.
+  The inner trainer needs an explicit contract for logger and accelerator, because `fit`
+  receives only `x` and `y`. The existing `Autoencoder` maps any activation it does not
+  know, including `"elu"`, to ReLU, and has no softmax output.
 
 Revisit the heavier options when a second supervised family arrives, or when repeated or
 cross-validated runs are wanted inside `run()`. If a data abstraction is built then, it
@@ -129,16 +164,18 @@ should cover per-row annotations in general (labels, time, metadata), not labels
 
 ### Phase 0 — supervision plumbing (no ForestGeom)
 
+- Pre-fit sampling slices only the rows it sampled (M8).
 - Labels reach the module in split mode (M1).
 - `target`: `run(..., target=y)` or `run(..., target="column")` chooses the supervision
   array (M2). Without it, the dataset's own labels are used, as today.
 - A dataset with no labels supplies none (M3). The zeros stay available to plotting
   callbacks only.
 - **`Split` (M4).** A frozen dataclass with `x_train`, `y_train`, `z_train`, `x_test`,
-  `y_test`, `z_test`. A metric that declares a `split` parameter receives it. The engine
-  builds it only when a requested metric asks, by the same signature scan that
-  `extract_k_requirements` uses for `k`. `z_train` comes from a new optional module hook,
-  `training_embedding()`, which defaults to `transform(x_train)`. The hook exists because
+  `y_test`, `z_test`, and a `held_out` flag. A metric that declares a `split` parameter
+  receives it.
+  The engine builds it only when a requested metric asks, found by a signature scan of the
+  metric functions. `z_train` comes from a new optional module hook,
+  `training_embedding(x)`, which defaults to `transform(x)`. The hook exists because
   for bootstrap-dependent schemes the fitted train embedding is not `transform(x_train)`:
   ForestGeom documents that `fit_transform` and `fit().transform` differ for `gap`.
 - A `stratify` option (by the dataset's labels or by a named column) on the datamodules
@@ -171,8 +208,8 @@ should cover per-row annotations in general (labels, time, metadata), not labels
   t-SNE and Isomap receive a distance (`input_metric="precomputed"`), by default
   `max(P) − P`; the conversion is a parameter.
 - `transform(x)`: the linear kernel extension, `Z = rownorm(P(x, train)) · Z_train`. It is
-  written once and serves every embedder. `training_embedding()` returns the fitted
-  `Z_train`.
+  written once and serves every embedder. `training_embedding(x)` and `fit_transform`
+  return the fitted `Z_train`.
 - Shipped config: `rf_phate.yaml` (`gap` forest geometry, PHATE embedder).
 - Limit: the handoff is a dense n × n matrix.
 - If the RF-PHATE recipe cannot be expressed as "PHATE on a precomputed affinity"
@@ -268,22 +305,52 @@ branch, one PR.
 - A measurement that cannot be made raises
   `manylatents.utils.exceptions.MeasurementUnavailable`. It never returns NaN or a
   placeholder.
-- Every new test must fail on `main` and pass on the branch.
-- With none of the new arguments set, results must be identical to `main`.
+- Each task lists **new-behaviour tests** and **compatibility tests**. A new-behaviour test
+  must fail on the task's base branch and pass on the task branch. A compatibility test
+  passes on both.
+- With none of the new arguments set, results are identical to the base branch, except for
+  the **intended change** that the task names.
 
 **What is ready and what is blocked**
 
-| Task | State |
-|---|---|
-| T0.1 – T0.5 (phase 0) | Ready now. No dependency on ForestGeom or on Adrien's answers. T0.2 and T0.3 build on T0.1; T0.4 and T0.5 build on T0.2. |
-| Phase 1 | Ready after T0.1 and T0.2. Scheme list waits on question 7; `gap` and `kerf` are safe to start with. |
-| Phase 2: `ForestGuidedModule` | Ready after phase 1. The `rf_phate` config waits on question 2. |
-| Phase 4: `knn_accuracy`, `oos_*` | Ready after T0.4, once question 3 confirms the K grid and averaging. |
-| Phase 4: importances and `sia` | Blocked on question 3. |
-| Phase 3 | Blocked on questions 2 and 4. |
-| Phase 5 | Blocked on question 5. |
+| Task | Base | State |
+|---|---|---|
+| T0.0 pre-fit sampling in split mode | `main` | Ready. |
+| T0.1 labels in split mode | `main` | Ready. |
+| T0.2 `target` | T0.1 | Ready. |
+| T0.3 no fabricated labels | T0.2 | Ready. |
+| T0.4 `Split` | T0.0, T0.3 | Ready. |
+| T0.5 stratified splits | T0.3 | Ready. |
+| Phase 1 | T0.2 | Ready after T0.2. Scheme list waits on question 7; `gap` and `kerf` are safe to start with. |
+| Phase 2: `ForestGuidedModule` | phase 1 | Ready after phase 1. The `rf_phate` config waits on question 2. |
+| Phase 4: `knn_accuracy`, `oos_*` | T0.4 | Ready after T0.4, once question 3 confirms the K grid and averaging. |
+| Phase 4: importances and `sia` | | Blocked on question 3. |
+| Phase 3 | | Blocked on questions 2 and 4. |
+| Phase 5 | | Blocked on question 5. |
 
-Briefs for phases 1 to 5 are written when their blocking questions are answered.
+The six phase 0 tasks are implemented as one stack, in the order T0.0 to T0.5, each branch
+on top of the one before it. Briefs for phases 1 to 5 are written when their blocking
+questions are answered.
+
+### T0.0 — pre-fit sampling slices only the rows it sampled
+
+- **Problem:** step 4c of `run_experiment` (`manylatents/experiment.py`) draws
+  `pre_fit_indices` from the train rows, then applies them to `train_tensor`,
+  `test_tensor`, `train_labels` and `output_labels`. When the test dataset is a different
+  set of rows, the test tensor and the output labels are indexed with indices that do not
+  belong to them.
+- **Change:** compute `same_dataset = datamodule.test_dataset is datamodule.train_dataset`
+  once. Slice `test_tensor` and `output_labels` by `pre_fit_indices` only when
+  `same_dataset` is true. `train_tensor` and `train_labels` are always sliced.
+- **Intended change:** with a `"dataset"` sampler and separate test rows, the result has
+  one embedding row per test row.
+- **Files:** `manylatents/experiment.py`; new `tests/test_prefit_sampling_split.py`.
+- **New-behaviour test:** build `GaussianBlobDataModule(n_samples=400, mode="split")` and
+  call `run_experiment` with a recorder LatentModule and a sampler object whose
+  `get_indices` returns the first 100 indices. `fit` receives 100 rows, and
+  `result["embeddings"]` has 80 rows that equal `transform` of the 80 test rows.
+- **Compatibility test:** the same sampler in `mode="full"` gives 100 embedding rows, as on
+  `main`.
 
 ### T0.1 — labels reach the module in split mode
 
@@ -291,43 +358,79 @@ Briefs for phases 1 to 5 are written when their blocking questions are answered.
   `train_dataset.get_labels` and `test_dataset.get_labels`. In `mode="split"` both datasets
   are `torch.utils.data.Subset`, which has no `get_labels`, so `algorithm.fit(x, None)` is
   called and the returned `label` is `None`.
-- **Change:** pass both datasets through the existing `_unwrap_for_metrics` before the
-  `hasattr(..., "get_labels")` checks. `_SubsetView` already realigns `get_labels` by
-  `subset.indices`.
+- **Change:** for the two `hasattr(..., "get_labels")` reads only, look through
+  `_unwrap_for_metrics(dataset)`. `_SubsetView` already realigns `get_labels` by
+  `subset.indices`. Do not rebind `train_dataset`: the sampler in step 4c must still
+  receive the original object.
+- **Intended change:** in split mode `fit` receives the train labels, and
+  `result["label"]` holds the test labels where it was `None`.
 - **Files:** `manylatents/experiment.py`; new `tests/test_supervised_labels.py`.
-- **Test:** `run(data="gaussian_blob", algorithm=<LatentModule that records y>,
-  data_kwargs={"n_samples": 400, "mode": "split"})`. Assert `fit` received 320 labels, that
-  they equal the full dataset's labels at the train subset's indices, and that
-  `result["label"]` has 80 entries.
+- **New-behaviour test:** build `GaussianBlobDataModule(n_samples=400, mode="split")`
+  directly and call `run_experiment` with a LatentModule that records `y`, so the test can
+  read `datamodule.train_dataset.indices`. Assert `fit` received 320 labels, that they
+  equal the full dataset's labels at those indices, and that `result["label"]` equals the
+  full labels at `datamodule.test_dataset.indices`.
+- **Compatibility test:** in `mode="full"`, `fit` receives 400 labels and `result["label"]`
+  has 400 entries.
 
 ### T0.2 — `target`: choose the supervision array
 
 - **Problem:** the array passed to `fit` as `y` is whatever `get_labels()` returns.
   `run(input_data=X)` has no way to supply one, and a dataset with several label columns
   has no way to choose.
-- **Change:** add `target=None` to `run()` (`manylatents/api.py`) and to `run_experiment`,
-  and a top-level `target: null` key to the Hydra config (`manylatents/configs/config.py`,
-  forwarded in `manylatents/main.py`).
-  - An array must have one entry per row of the full dataset, before any split. The engine
-    aligns it to the train and test rows: by `subset.indices` when the dataset is a
-    `Subset`, unchanged otherwise. A wrong length raises `ValueError`.
-  - A string names a label column. It is resolved through the unwrapped dataset, so the
-    result is already row-aligned, in this order: `dataset.get_labels(name)` when
-    `get_labels` accepts a column argument (check with `inspect.signature`; the pop-gen
-    `ManifoldGeneticsDataset.get_labels(label_col)` in manylatents-omics is the case this
-    serves); otherwise the column `name` of a tabular `dataset.metadata`. If neither
-    applies, raise `ValueError` naming the columns that are available. `_SubsetView` must
-    pass the argument through to `get_labels`; it already forwards `*args`.
-  - The resolved train array replaces `train_labels` in step 4b, before pre-fit sampling,
-    which already slices it. The resolved test array is kept for T0.4.
-  - `target` changes only what `fit` and `Split` receive. `result["label"]` and plotting
-    are unchanged.
+- **Change:**
+  1. Add `target=None` to `run()` (`manylatents/api.py`) and to `run_experiment`, and a
+     top-level `target: null` key to the Hydra config (`manylatents/configs/config.py`,
+     forwarded in `manylatents/main.py`).
+  2. A resolver in `manylatents/utils/data.py`:
+     `resolve_target(target, dataset, datamodule=None) -> np.ndarray`. It returns one entry
+     per row of `dataset`. T0.5 reuses it. It never returns a tensor, and it returns string
+     labels as they are.
+     - Let `base` and `indices` be `dataset.dataset` and `dataset.indices` when `dataset`
+       is a `torch.utils.data.Subset`, and `dataset` and `None` otherwise. A `Subset` of a
+       `Subset` raises `ValueError`.
+     - **Array.** Its length must equal `len(base)`: one entry per row of the full
+       dataset, before any split. The result is `array[indices]`, or the array when
+       `indices` is `None`. A wrong length raises `ValueError` that states both lengths.
+     - **String.** The first rule that applies gives a full-length array, which is then
+       sliced by `indices`:
+       (a) `base.get_labels` takes a parameter (`inspect.signature` on the base's method,
+       not on a `_SubsetView`): `base.get_labels(name)`. The pop-gen
+       `ManifoldGeneticsDataset.get_labels(label_col)` in manylatents-omics is this case.
+       (b) `datamodule` has `get_metadata_column` and its `metadata` has `len(base)` rows:
+       `datamodule.get_metadata_column(name)`. `PrecomputedDataModule` is this case; its
+       metadata is on the datamodule, not on the dataset.
+       (c) `base.metadata` is a `pandas.DataFrame` or a dict that has `name`: that column.
+       Otherwise raise `ValueError` that lists the columns found by (b) and (c).
+  3. In `run_experiment` step 4b, when `target` is not `None`, the train array is
+     `resolve_target(target, train_dataset, datamodule)` and replaces `train_labels`
+     before pre-fit sampling, which already slices it. A numeric array becomes a tensor,
+     as labels do today; a non-numeric array stays a numpy array. The test array is
+     `resolve_target(target, test_dataset, datamodule)`; keep it in a local `test_target`
+     for T0.4.
+  4. An array `target` needs the train and test datasets to share one base: the same
+     object, or two `Subset`s of the same dataset. Otherwise raise `ValueError` that says
+     to pass a column name.
+  5. `target` with a LightningModule raises `ValueError`: a LightningModule trains from
+     datamodule batches, so `target` would not supervise it.
+  6. In the transductive fallback (`transform` raises `NotImplementedError`), `fallback_y`
+     is `test_target` when `target` is given.
+  7. `target` changes only what `fit` and, after T0.4, `Split` receive. `result["label"]`,
+     plotting and the existing label-aware metrics are unchanged.
 - **Files:** `manylatents/api.py`, `manylatents/experiment.py`, `manylatents/main.py`,
-  `manylatents/configs/config.py`, `tests/test_supervised_labels.py`, `docs/api_usage.md`.
-- **Test:** `run(input_data=X, target=y, algorithm=<recorder>)` with the default datamodule
-  and with a split one; `fit` receives `y` row-aligned with `x` (check by making `y` a
-  function of a column of `X`). Wrong length raises. On `gaussian_blob`, an explicit
-  `target` wins over the dataset's labels.
+  `manylatents/configs/config.py`, `manylatents/utils/data.py`,
+  `tests/test_supervised_labels.py`, `docs/api_usage.md`.
+- **New-behaviour tests:**
+  - `run(input_data=X, target=y, algorithm=<recorder>)` in full mode and with
+    `data_kwargs={"mode": "split"}`: `fit` receives `y` row-aligned with `x`. Check by
+    making `y` a function of a column of `X`.
+  - A wrong length raises. `target` with a LightningModule raises.
+  - On `gaussian_blob`, an explicit array wins over the dataset's labels, and
+    `result["label"]` is still the dataset's labels.
+  - A `PrecomputedDataModule` with a metadata file and `target="<column>"`, full and
+    split: `fit` receives that column, row-aligned, including a column of strings.
+  - `resolve_target` on a stub dataset whose `get_labels(label_col)` takes a column name
+    uses rule (a). An unknown name raises and the message lists the available columns.
 
 ### T0.3 — a dataset with no labels supplies none
 
@@ -335,17 +438,23 @@ Briefs for phases 1 to 5 are written when their blocking questions are answered.
   `np.zeros(len(self.data))` from `get_labels()` when they have no labels. The engine passes
   that to `fit` as real labels. Measured: `ClassifierModule` receives 200 labels with one
   class.
-- **Change:** add a `has_labels` property to those three classes, `False` exactly when
-  `get_labels()` would fabricate zeros. In `run_experiment` step 4b, when no `target` is
-  given and the unwrapped dataset has `has_labels == False`, set `train_labels = None`. A
-  dataset without the attribute behaves as today. Leave `get_labels()` and `output_labels`
-  unchanged, because plotting callbacks rely on the zeros. Let `_SubsetView` forward
-  `has_labels` unsliced.
+- **Change:** add a `has_labels` property to those three classes. It is `False` exactly
+  when `get_labels()` would fabricate zeros. It depends on whether labels were supplied,
+  not on their values: real labels that are all zero give `True`. Let `_SubsetView`
+  forward `has_labels` unsliced. In `run_experiment` step 4b, when `target` is `None` and
+  the dataset (seen through `_unwrap_for_metrics`) has `has_labels == False`, set
+  `train_labels = None`, and likewise `test_target = None`. A dataset without the
+  attribute behaves as today. Leave `get_labels()` and `output_labels` unchanged, because
+  plotting callbacks rely on the zeros.
+- **Intended change:** `fit` receives `y=None` where it received fabricated zeros.
 - **Files:** `manylatents/data/precomputed_dataset.py`, `manylatents/experiment.py`,
   `tests/test_supervised_labels.py`.
-- **Test:** `run(input_data=X, algorithm=<recorder>)` gives `fit` a `y` of `None`;
-  `ClassifierModule` then raises its own "requires labels" error. `result["label"]` is
-  unchanged from `main`.
+- **New-behaviour tests:** `run(input_data=X, algorithm=<recorder>)` gives `fit` a `y` of
+  `None`, in full and in split mode. `ClassifierModule` then raises its own "requires
+  labels" error. `has_labels` is `False` for each of the three classes built without
+  labels, and `True` for a `PrecomputedDataset` whose label column is all zeros.
+- **Compatibility test:** `result["label"]` for `run(input_data=X, ...)` is the zeros
+  array, as on the base branch.
 
 ### T0.4 — `Split`: train rows for metrics
 
@@ -357,33 +466,65 @@ Briefs for phases 1 to 5 are written when their blocking questions are answered.
      that returns `self.transform(x)`. Modules whose fitted embedding differs from
      `transform` of the fit rows override it.
   2. `Split` in `manylatents/evaluate.py`: a frozen dataclass with `x_train`, `y_train`,
-     `z_train`, `x_test`, `y_test`, `z_test`. All are numpy arrays; the two `y` fields may
+     `z_train`, `x_test`, `y_test`, `z_test` and `held_out: bool`. The six arrays are numpy
+     arrays (tensors are converted with `.detach().cpu().numpy()`); the two `y` fields may
      be `None`. Rows of the three train fields correspond, and so do rows of the three test
-     fields.
-  3. `evaluate()` takes `split: Split | None = None` and passes it to every metric whose
-     signature has a parameter named `split`, on both the registry path and the Hydra
-     path. Metrics without that parameter are called exactly as today.
-  4. `run_experiment` builds the `Split` only when at least one requested metric declares
-     `split`. Use `inspect.signature`, as `extract_k_requirements` does for `k`.
-     - `z_train` is `training_embedding(x_train)` for a LatentModule and `encode(x_train)`
-       for a LightningModule.
-     - `x_train` must be unrolled in **dataset order**. For a LightningModule the engine's
-       existing `train_tensor` comes from the shuffled train loader and must not be used
-       here; unroll the train dataset with `shuffle=False`, as the LatentModule branch
-       already does.
-     - In `mode="full"` the train fields are the same objects as the test fields and the
-       already computed embedding is reused.
-     - When pre-fit sampling is active, the train fields are the sampled rows.
-  5. A metric that declares `split` and receives `None` raises `MeasurementUnavailable`.
+     fields. `held_out` is `False` when the train rows are the test rows. Metrics must not
+     write to the arrays.
+  3. `metrics_declaring(metrics, name) -> list[str]` in `manylatents/evaluate.py`: the
+     requested metrics whose function has a parameter called `name`. On the registry path
+     inspect `get_metric(metric).func`. On the Hydra path resolve `_target_` with
+     `hydra.utils.get_object` and inspect that. `extract_k_requirements` does not do this
+     for Hydra configs, so this helper is new.
+  4. `evaluate()` takes `split: Split | None = None` and passes it to exactly the metrics
+     that `metrics_declaring(metrics, "split")` names, on both paths. Other metrics are
+     called exactly as today. A metric that declares `split` when `split` is `None` is not
+     called: its result is `MeasurementUnavailable`, handled as `evaluate()` already
+     handles that exception from a metric.
+  5. `run_experiment` builds the `Split` only when `metrics_declaring(metrics, "split")`
+     is not empty.
+     - `y_train` is the `train_labels` that `fit` received. `y_test` is `test_target` when
+       `target` is given; otherwise the test dataset's labels, or `None` when the dataset
+       has none (T0.3).
+     - **Separate test rows** (`datamodule.test_dataset is not datamodule.train_dataset`):
+       `held_out=True`. `x_train` is the fit tensor after pre-fit sampling. `z_train` is
+       `algorithm.training_embedding(x_train)` for a LatentModule and
+       `algorithm.encode(x_train)` for a LightningModule, called the way the engine
+       already calls `encode(test_tensor)`.
+     - `x_train` must be in **dataset order**. For a LightningModule the engine's existing
+       `train_tensor` comes from the shuffled train loader and must not be used here;
+       unroll the train dataset with `shuffle=False`, as the LatentModule branch does.
+     - **Same rows** (full mode): `held_out=False`, the train fields are the same objects
+       as the test fields, and the already computed embedding is reused.
+       `training_embedding` is not called.
+     - **Transductive fallback** (`transform` raised `NotImplementedError` and the engine
+       refitted on the test rows): no `Split` is built, and `split=None` goes to
+       `evaluate()`.
+     - **Post-fit sampling** (a `sampling` key other than `"dataset"`) together with a
+       metric that declares `split` raises `ValueError`. The two are not combined in this
+       task.
 - **Files:** `manylatents/algorithms/latent/latent_module_base.py`,
   `manylatents/evaluate.py`, `manylatents/experiment.py`, `manylatents/metrics/metric.py`
   (document the parameter), `docs/evaluation.md`, new `tests/test_metric_split.py`.
-- **Test:** register a test-only metric that returns `split.z_train.shape[0]`. In split
-  mode on `gaussian_blob` with 400 samples it returns 320; `split.y_train` equals the labels
-  `fit` received; `split.y_test` has 80 entries. A run whose metrics do not declare `split`
-  never calls `training_embedding` (assert with a module that raises from it). With a
-  LightningModule (`ae_reconstruction`, `fast_dev_run`), `split.x_train` equals the train
-  dataset's rows in dataset order. Existing metric tests pass unchanged.
+- **New-behaviour tests:**
+  - Register a test-only metric that returns facts about `split`. In split mode on
+    `gaussian_blob` with 400 samples: `z_train` has 320 rows, `y_train` equals the labels
+    `fit` received, `y_test` has 80 entries, `held_out` is `True`.
+  - The same metric given as a Hydra-style config dict with `_target_` also receives the
+    split.
+  - Full mode: `held_out` is `False` and `z_train is z_test`.
+  - A module that overrides `training_embedding` to return a marker array: `z_train` is
+    that array.
+  - With a `"dataset"` sampler in split mode, the train fields have the sampled row count
+    and the test fields have 80 rows.
+  - A module whose `transform` raises `NotImplementedError`, in split mode: the metric's
+    result is `MeasurementUnavailable`.
+  - With a LightningModule: instantiate the `ae_reconstruction` algorithm and call
+    `run_experiment` with `Trainer(fast_dev_run=True)` (`run()` does not expose trainer
+    settings). `split.x_train` equals the train dataset's rows in dataset order.
+- **Compatibility tests:** a run whose metrics do not declare `split` never calls
+  `training_embedding` (a module that raises from it). Existing metric tests pass
+  unchanged.
 
 ### T0.5 — stratified splits
 
@@ -394,22 +535,31 @@ Briefs for phases 1 to 5 are written when their blocking questions are answered.
      `stratified_subsets(dataset, labels, test_split, seed) -> (train_subset, test_subset)`.
      It builds two `torch.utils.data.Subset`s from
      `sklearn.model_selection.train_test_split(np.arange(n), test_size=test_split,
-     stratify=labels, random_state=seed)`. It is public so that extension datamodules
-     (manylatents-omics) can call it; this task does not change any of them.
+     stratify=labels, random_state=seed)`. Split sizes follow scikit-learn's rounding. A
+     class with one member raises scikit-learn's `ValueError`, which is not caught. The
+     helper is public so that extension datamodules (manylatents-omics) can call it; this
+     task does not change any of them.
   2. Add `stratify: bool | str = False` to `GaussianBlobDataModule` and
-     `PrecomputedDataModule`. In `mode="split"`: `True` stratifies by the dataset's own
-     labels, and a string stratifies by that label column, resolved by the same rule as
-     `target` in T0.2 (share the resolver; do not write it twice). `False` leaves the code
-     path and the resulting split unchanged.
-  3. `stratify` set on a dataset with no real labels (T0.3), or in `mode="full"`, raises
-     `ValueError`.
+     `PrecomputedDataModule`. In `mode="split"`:
+     - `True` stratifies by `full_dataset.get_labels()`. It raises `ValueError` when the
+       dataset has `has_labels == False` (T0.3).
+     - A string stratifies by `resolve_target(name, full_dataset, datamodule=self)`
+       (T0.2). This is allowed when the dataset has no labels of its own.
+     - `False` leaves the code path and the resulting split unchanged.
+     - The seed is the one each datamodule already gives to `random_split`:
+       `self.random_state` for Gaussian blobs, `self.hparams.seed` for precomputed data.
+  3. `stratify` other than `False` in `mode="full"` raises `ValueError`.
   4. Add `stratify: false` to the two data configs.
 - **Files:** `manylatents/utils/data.py`, `manylatents/data/gaussian_blobs.py`,
   `manylatents/data/precomputed_datamodule.py`, `manylatents/configs/data/gaussian_blobs.yaml`,
   `manylatents/configs/data/precomputed.yaml`, new `tests/test_stratified_split.py`.
-- **Test:** on imbalanced blobs, class proportions in train and test match the full
-  dataset to within one sample per class with `stratify=True`. With `stratify=False`, the
-  train and test indices equal those on `main` for the same seed. With a
-  `PrecomputedDataModule` that has a metadata file, `stratify="<column>"` balances that
-  column. The helper, called directly on a plain dataset and a label array, returns
-  disjoint subsets that cover every row.
+- **New-behaviour tests:** on imbalanced blobs, class proportions in train and test match
+  the full dataset to within one sample per class with `stratify=True`. With a
+  `PrecomputedDataModule` that has a metadata file and no label column,
+  `stratify="<column>"` balances that column. `stratify=True` on in-memory data with no
+  labels raises, and so does `stratify=True` in `mode="full"`. The helper, called directly
+  on a plain dataset and a label array, returns disjoint subsets that cover every row, and
+  raises for a class with one member.
+- **Compatibility test:** with `stratify=False`, the train and test indices equal those on
+  the base branch for the same seed (compare with a direct `random_split` call that uses
+  the same generator seed).
