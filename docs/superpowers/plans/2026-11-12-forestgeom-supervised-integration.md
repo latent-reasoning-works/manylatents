@@ -118,6 +118,11 @@ alternatives are listed so they are not proposed again without a new reason.
 | Proximity into an embedder | Nesting: a wrapper module holds a geometry module and an embedder, as `SelectiveCorrectionModule(inner=...)` already does. | One module per pairing (RF-PHATE, RF-UMAP, …): repeats the forest logic. A formal proximity-provider protocol: premature with one provider. A sequential pipeline: RF-AE needs a side input, so a chain is not enough. |
 | RF-AE's base class | `LatentModule`, with the network trained inside `fit`. | `LightningModule`: labels would have to come through the datamodule, the engine calls `encode` on raw test features, and the forest would have to be pickled into checkpoints. `ARCHITECTURE.md` says the choice of base is about API surface, not gradients. |
 
+`Split` and `target` are not specific to forests. The pop-gen datamodule in
+manylatents-omics loads predefined fit and projection sets as separate train and test
+datasets, so its runs receive a `Split` with no change to omics, and `target="Population"`
+selects among its label columns.
+
 Revisit the heavier options when a second supervised family arrives, or when repeated or
 cross-validated runs are wanted inside `run()`. If a data abstraction is built then, it
 should cover per-row annotations in general (labels, time, metadata), not labels alone.
@@ -136,8 +141,9 @@ should cover per-row annotations in general (labels, time, metadata), not labels
   `training_embedding()`, which defaults to `transform(x_train)`. The hook exists because
   for bootstrap-dependent schemes the fitted train embedding is not `transform(x_train)`:
   ForestGeom documents that `fit_transform` and `fit().transform` differ for `gap`.
-- A `stratify` option on the datamodules that split discrete labels. The RF-AE protocol
-  uses stratified 80/20 splits; `random_split` is not stratified.
+- A `stratify` option (by the dataset's labels or by a named column) on the datamodules
+  that split discrete labels, built on a shared helper that extension datamodules can
+  reuse. The RF-AE protocol uses stratified 80/20 splits; `random_split` is not stratified.
 
 ### Phase 1 — `ForestProximityModule` (LatentModule, extra `forest`)
 
@@ -269,7 +275,7 @@ branch, one PR.
 
 | Task | State |
 |---|---|
-| T0.1 – T0.5 (phase 0) | Ready now. No dependency on ForestGeom or on Adrien's answers. T0.2 and T0.3 build on T0.1; T0.4 builds on T0.2. |
+| T0.1 – T0.5 (phase 0) | Ready now. No dependency on ForestGeom or on Adrien's answers. T0.2 and T0.3 build on T0.1; T0.4 and T0.5 build on T0.2. |
 | Phase 1 | Ready after T0.1 and T0.2. Scheme list waits on question 7; `gap` and `kerf` are safe to start with. |
 | Phase 2: `ForestGuidedModule` | Ready after phase 1. The `rf_phate` config waits on question 2. |
 | Phase 4: `knn_accuracy`, `oos_*` | Ready after T0.4, once question 3 confirms the K grid and averaging. |
@@ -305,9 +311,13 @@ Briefs for phases 1 to 5 are written when their blocking questions are answered.
   - An array must have one entry per row of the full dataset, before any split. The engine
     aligns it to the train and test rows: by `subset.indices` when the dataset is a
     `Subset`, unchanged otherwise. A wrong length raises `ValueError`.
-  - A string names a column of the dataset's `metadata`. It is read through the unwrapped
-    dataset, so it is already row-aligned. A missing column, or a dataset with no tabular
-    `metadata`, raises `ValueError` naming what is available.
+  - A string names a label column. It is resolved through the unwrapped dataset, so the
+    result is already row-aligned, in this order: `dataset.get_labels(name)` when
+    `get_labels` accepts a column argument (check with `inspect.signature`; the pop-gen
+    `ManifoldGeneticsDataset.get_labels(label_col)` in manylatents-omics is the case this
+    serves); otherwise the column `name` of a tabular `dataset.metadata`. If neither
+    applies, raise `ValueError` naming the columns that are available. `_SubsetView` must
+    pass the argument through to `get_labels`; it already forwards `*args`.
   - The resolved train array replaces `train_labels` in step 4b, before pre-fit sampling,
     which already slices it. The resolved test array is kept for T0.4.
   - `target` changes only what `fit` and `Split` receive. `result["label"]` and plotting
@@ -379,15 +389,27 @@ Briefs for phases 1 to 5 are written when their blocking questions are answered.
 
 - **Problem:** split-mode datamodules call `torch.utils.data.random_split`, which ignores
   class balance. The RF-AE protocol uses a stratified 80/20 split.
-- **Change:** add `stratify: bool = False` to `GaussianBlobDataModule` and
-  `PrecomputedDataModule`. When `True` in `mode="split"`, build the two `Subset`s from
-  `sklearn.model_selection.train_test_split(np.arange(n), test_size=test_split,
-  stratify=labels, random_state=seed)`. When `False`, the code path and the resulting
-  split are unchanged. `stratify=True` on a dataset with no real labels (T0.3) raises
-  `ValueError`. Add `stratify: false` to the two data configs.
-- **Files:** `manylatents/data/gaussian_blobs.py`,
+- **Change:**
+  1. A shared helper in `manylatents/utils/data.py`:
+     `stratified_subsets(dataset, labels, test_split, seed) -> (train_subset, test_subset)`.
+     It builds two `torch.utils.data.Subset`s from
+     `sklearn.model_selection.train_test_split(np.arange(n), test_size=test_split,
+     stratify=labels, random_state=seed)`. It is public so that extension datamodules
+     (manylatents-omics) can call it; this task does not change any of them.
+  2. Add `stratify: bool | str = False` to `GaussianBlobDataModule` and
+     `PrecomputedDataModule`. In `mode="split"`: `True` stratifies by the dataset's own
+     labels, and a string stratifies by that label column, resolved by the same rule as
+     `target` in T0.2 (share the resolver; do not write it twice). `False` leaves the code
+     path and the resulting split unchanged.
+  3. `stratify` set on a dataset with no real labels (T0.3), or in `mode="full"`, raises
+     `ValueError`.
+  4. Add `stratify: false` to the two data configs.
+- **Files:** `manylatents/utils/data.py`, `manylatents/data/gaussian_blobs.py`,
   `manylatents/data/precomputed_datamodule.py`, `manylatents/configs/data/gaussian_blobs.yaml`,
   `manylatents/configs/data/precomputed.yaml`, new `tests/test_stratified_split.py`.
 - **Test:** on imbalanced blobs, class proportions in train and test match the full
   dataset to within one sample per class with `stratify=True`. With `stratify=False`, the
-  train and test indices equal those on `main` for the same seed.
+  train and test indices equal those on `main` for the same seed. With a
+  `PrecomputedDataModule` that has a metadata file, `stratify="<column>"` balances that
+  column. The helper, called directly on a plain dataset and a label array, returns
+  disjoint subsets that cover every row.
