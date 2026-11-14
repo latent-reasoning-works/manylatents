@@ -237,7 +237,7 @@ def test_selective_correction_aborts_before_moving_points(monkeypatch):
 
 
 @pytest.mark.parametrize('dispatch', ['registry', 'hydra'])
-def test_evaluation_propagates_unavailable_without_a_score(dispatch):
+def test_evaluation_keeps_unavailable_without_a_score(dispatch):
     from manylatents.evaluate import evaluate
     from omegaconf import OmegaConf
 
@@ -248,8 +248,11 @@ def test_evaluation_propagates_unavailable_without_a_score(dispatch):
             '_partial_': True, 'n_neighbors': 25, 'at': 'embedding',
         })
     }
-    with pytest.raises(MeasurementUnavailable, match='Trustworthiness'):
-        evaluate(data[:, :2], dataset=SimpleNamespace(data=data), metrics=metrics)
+    scores = evaluate(data[:, :2], dataset=SimpleNamespace(data=data), metrics=metrics)
+    name = 'trustworthiness' if dispatch == 'registry' else 'trust'
+    assert set(scores) == {name}
+    assert isinstance(scores[name], MeasurementUnavailable)
+    assert 'Trustworthiness' in str(scores[name])
 
 
 def test_bootstrap_refuses_even_one_failed_requested_replicate():

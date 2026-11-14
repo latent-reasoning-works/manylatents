@@ -208,18 +208,23 @@ def _evaluate_registry(
         **kwargs: Additional params forwarded to all metrics.
 
     Returns:
-        Flat dict of metric results.
+        Flat dict of metric results. MeasurementUnavailable is stored under
+        the metric's name without a traceback; other metrics still run.
     """
     results: dict[str, Any] = {}
     for name in metrics:
         spec = get_metric(name)
-        raw_result = spec(
-            embeddings=embeddings,
-            dataset=dataset,
-            module=module,
-            cache=cache,
-            **kwargs,
-        )
+        try:
+            raw_result = spec(
+                embeddings=embeddings,
+                dataset=dataset,
+                module=module,
+                cache=cache,
+                **kwargs,
+            )
+        except MeasurementUnavailable as exc:
+            results[name] = exc.with_traceback(None)
+            continue
         results.update(_flatten_metric_result(name, raw_result))
     return results
 
@@ -245,8 +250,9 @@ def _evaluate_hydra(
 
     Returns:
         Flat dict of metric results (with ColormapInfo viz metadata).
-        Swept entries that raise MeasurementUnavailable retain that exception
-        as their value. Each sweep must have at least one measurable entry;
+        Metrics that raise MeasurementUnavailable retain that exception under
+        their own name without a traceback; other metrics still run.
+        Each sweep must have at least one measurable entry;
         successes from other metrics do not make an unavailable sweep valid.
     """
     import hydra as _hydra
@@ -302,8 +308,6 @@ def _evaluate_hydra(
                 cache=cache,
             )
         except MeasurementUnavailable as exc:
-            if sweep_group is None:
-                raise
             results[metric_name] = exc.with_traceback(None)
             continue
 
