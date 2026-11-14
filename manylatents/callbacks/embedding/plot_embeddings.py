@@ -22,6 +22,7 @@ from manylatents.callbacks.embedding.base import (
     ColormapProvider,
 )
 from manylatents.utils.plotting import resolve_colormap, merge_colormap_info
+from manylatents.utils.exceptions import MeasurementUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -293,6 +294,9 @@ class PlotEmbeddings(EmbeddingCallback):
             scores = embeddings.get("scores")
             if scores is not None and isinstance(scores, dict):
                 color_array = scores.get(self.color_by)
+                if isinstance(color_array, MeasurementUnavailable):
+                    logger.warning(f"Coloring metric '{self.color_by}' unavailable: {color_array}")
+                    color_array = None
 
             # Fall back to direct key
             if color_array is None:

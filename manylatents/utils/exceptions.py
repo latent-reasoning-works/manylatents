@@ -9,8 +9,9 @@ class MeasurementUnavailable(ValueError):
     Callers may catch this to display an unavailable state and its reason; they
     must not turn it into a numeric score or a correction target.
 
-    A partially measurable parameter sweep retains instances as result values
-    under the requested entry's key. A wholly unavailable sweep still raises.
+    Evaluation retains instances without tracebacks under each unavailable
+    metric's name. Other metrics and algorithm outputs survive.
+    A wholly unavailable parameter sweep still raises.
     """
 
     def to_dict(self) -> dict[str, str]:

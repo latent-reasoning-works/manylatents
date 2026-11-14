@@ -104,6 +104,7 @@ def test_partial_sweep_survives_json_csv_and_logging(config, evidence, tmp_path,
     callback = SaveOutputs(save_dir=str(tmp_path), save_additional_outputs=True,
                            save_metric_tables=True, use_timestamp=False)
     callback.on_latent_end(dataset, outputs)
+    assert tmp_path.is_dir()
     csv_scores = pd.read_csv(next(tmp_path.glob("metrics_summary_*.csv"))).iloc[0]
     additional = json.loads(next(tmp_path.glob("embeddings_*_scores.json")).read_text())
     mock_wandb = MagicMock()

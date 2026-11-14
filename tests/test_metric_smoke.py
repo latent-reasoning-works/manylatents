@@ -66,11 +66,13 @@ def test_dse_knn_smoke_config_executes(smoke_data_kwargs, k):
 def test_mismatch_smoke_pca_refuses_signed_covariance(smoke_data_kwargs):
     cfg = _smoke_config("mismatch_ratio")
     module = instantiate(cfg.algorithms.latent)
-    with pytest.raises(MeasurementUnavailable, match="finite nonnegative weights"):
-        run(
-            data="swissroll", data_kwargs=smoke_data_kwargs, seed=42,
-            algorithm=module, metrics=OmegaConf.to_container(cfg.metrics, resolve=True),
-        )
+    result = run(
+        data="swissroll", data_kwargs=smoke_data_kwargs, seed=42,
+        algorithm=module, metrics=OmegaConf.to_container(cfg.metrics, resolve=True),
+    )
+    unavailable = [v for v in result["scores"].values() if isinstance(v, MeasurementUnavailable)]
+    assert unavailable and all("finite nonnegative weights" in str(v) for v in unavailable)
+    assert result["embeddings"] is not None
 
     # Evidence from the actual fitted smoke module, not a fake affinity.
     W = module.affinity()
