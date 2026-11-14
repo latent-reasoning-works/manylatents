@@ -78,10 +78,12 @@ def test_run_preserves_embedding_and_scores(collapsed):
 
 
 def test_unavailable_survives_save_and_logging(collapsed, tmp_path, monkeypatch):
-    from manylatents.callbacks.embedding.atomic_writer import write_embedding_outputs_atomic
+    from manylatents.api import _resolve_datamodule
+    from manylatents.callbacks.embedding.atomic_writer import (
+        write_embedding_outputs_atomic,
+    )
     from manylatents.callbacks.embedding.save_outputs import SaveOutputs
     from manylatents.callbacks.embedding.wandb_log_scores import WandbLogScores
-    from manylatents.api import _resolve_datamodule
     from manylatents.experiment import run_experiment
 
     mock_wandb = MagicMock()
